@@ -256,6 +256,11 @@ export default function Questionnaire({ assessment, client, error: serverError }
     [assessment?.include_pss]
   );
 
+  const scrollRef = useRef(null);
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [step]);
+
   const totalSteps = steps.length;
   const current = steps[step];
   const isLast = step === totalSteps - 1;
@@ -367,11 +372,6 @@ export default function Questionnaire({ assessment, client, error: serverError }
       </>
     );
   }
-
-  const scrollRef = useRef(null);
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = 0;
-  }, [step]);
 
   const { answered, total } = countAnswered();
   const sectionType = current?.type;

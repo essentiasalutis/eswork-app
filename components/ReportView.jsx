@@ -129,11 +129,14 @@ export default function ReportView({ assessment, client, baseline }) {
     <div className="max-w-2xl mx-auto px-4 pb-10" id="report-root">
       {/* Header */}
       <div className="flex items-end justify-between py-5 border-b-2 border-green-600 mb-6">
-        <div>
-          <div className="text-2xl font-bold text-gray-900">
-            ES <span className="text-green-600">Work</span>
+        <div className="flex items-center gap-3">
+          <img src="/logo-es.png" alt="Essentia Salutis" className="w-12 h-12 object-contain" />
+          <div>
+            <div className="text-2xl font-bold text-gray-900">
+              ES <span className="text-green-600">Work</span>
+            </div>
+            <div className="text-sm text-gray-500 mt-0.5">{TYPE_LABELS[assessment.type]}</div>
           </div>
-          <div className="text-sm text-gray-500 mt-0.5">{TYPE_LABELS[assessment.type]}</div>
         </div>
         <div className="text-right text-xs text-gray-400">
           <div>{new Date(assessment.created_at || Date.now()).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
@@ -318,8 +321,9 @@ export default function ReportView({ assessment, client, baseline }) {
       )}
 
       {/* Footer */}
-      <div className="text-center text-xs text-gray-400 mt-8 pt-4 border-t border-gray-200">
-        ES Work by Essentia Salutis — Report generato automaticamente
+      <div className="flex items-center justify-center gap-3 mt-8 pt-4 border-t border-gray-200">
+        <img src="/logo-es.png" alt="Essentia Salutis" className="w-8 h-8 object-contain opacity-60" />
+        <span className="text-xs text-gray-400">ES Work by Essentia Salutis® — Report generato automaticamente</span>
       </div>
     </div>
   );

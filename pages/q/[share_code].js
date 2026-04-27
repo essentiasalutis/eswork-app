@@ -493,16 +493,15 @@ export default function Questionnaire({ assessment, client, error: serverError }
 export async function getServerSideProps({ params }) {
   const { share_code } = params;
   try {
-    const { readDb } = await import('../../lib/store');
-    const db = readDb();
-    const assessment = db.assessments.find(a => a.share_code === share_code);
+    const { getAssessmentByShareCode, getClientById } = await import('../../lib/store');
+    const assessment = await getAssessmentByShareCode(share_code);
     if (!assessment) {
       return { props: { assessment: null, client: null, error: 'Link non valido o scaduto.' } };
     }
     if (assessment.status !== 'active') {
       return { props: { assessment: null, client: null, error: 'Questo questionario è stato chiuso.' } };
     }
-    const client = db.clients.find(c => c.id === assessment.client_id);
+    const client = await getClientById(assessment.client_id);
     return {
       props: {
         assessment: {

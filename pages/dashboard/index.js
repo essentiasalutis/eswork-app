@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { getSessionToken, verifyToken } from '../../lib/auth';
-import { readDb } from '../../lib/store';
+import { getClients, getAssessmentCounts } from '../../lib/store';
 import { TYPE_COLORS, TYPE_LABELS } from '../../lib/scoring';
 
 export default function Dashboard({ clients: initialClients, assessmentCounts }) {
@@ -180,12 +180,9 @@ export default function Dashboard({ clients: initialClients, assessmentCounts })
 }
 
 export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async () => {
-  const db = readDb();
-  const assessmentCounts = {};
-  for (const a of db.assessments) {
-    if (!assessmentCounts[a.client_id]) assessmentCounts[a.client_id] = { total: 0, active: 0 };
-    assessmentCounts[a.client_id].total++;
-    if (a.status === 'active') assessmentCounts[a.client_id].active++;
-  }
-  return { props: { clients: db.clients, assessmentCounts } };
+  const [clients, assessmentCounts] = await Promise.all([
+    getClients(),
+    getAssessmentCounts(),
+  ]);
+  return { props: { clients, assessmentCounts } };
 });

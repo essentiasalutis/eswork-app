@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { getSessionToken, verifyToken } from '../../lib/auth';
-import { readDb } from '../../lib/store';
+import { getClientById, getResponsesForClient } from '../../lib/store';
 import { TYPE_LABELS, TYPE_COLORS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
 
@@ -261,16 +261,9 @@ export default function ClientPage({ client, assessments: initial, responses: in
 
 export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async (ctx) => {
   const { clientId } = ctx.params;
-  const db = readDb();
-  const client = db.clients.find(c => c.id === clientId);
+  const client = await getClientById(clientId);
   if (!client) return { notFound: true };
 
-  const assessments = db.assessments.filter(a => a.client_id === clientId);
-  const responses = {};
-  for (const a of assessments) {
-    responses[a.id] = db.responses
-      .filter(r => r.assessment_id === a.id)
-      .map(r => r.answers);
-  }
+  const { assessments, responses } = await getResponsesForClient(clientId);
   return { props: { client, assessments, responses } };
 });

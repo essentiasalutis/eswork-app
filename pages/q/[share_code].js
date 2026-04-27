@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import Head from 'next/head';
 import {
   BODY_ZONES, NMQ_LABELS,
@@ -368,6 +368,11 @@ export default function Questionnaire({ assessment, client, error: serverError }
     );
   }
 
+  const scrollRef = useRef(null);
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [step]);
+
   const { answered, total } = countAnswered();
   const sectionType = current?.type;
   const sectionColor = SECTION_COLORS[sectionType] || '#16a34a';
@@ -411,7 +416,7 @@ export default function Questionnaire({ assessment, client, error: serverError }
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-4 py-5">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5">
           <div className="max-w-lg mx-auto">
             {sectionType === 'nmq' && (
               <NMQZone

@@ -350,9 +350,9 @@ export default function Questionnaire({ assessment, client, error: serverError }
             {/* Logo + brand in evidenza */}
             <div className="border-t border-gray-100 pt-10">
               <img
-                src="/es-logo.svg"
+                src="/logo-es.png"
                 alt="Essentia Salutis"
-                className="w-28 h-28 mx-auto mb-4"
+                className="w-32 h-32 mx-auto mb-4"
               />
               <div className="text-xl font-bold text-gray-900 tracking-wide">ES Work</div>
               <div className="text-sm font-medium text-green-600 tracking-widest uppercase mt-1">

@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E '[A-Za-z]{4,}')",
+      "Bash(grep -v '^[a-z]{1,3}$')",
+      "Bash(npm install *)",
+      "Bash(python3 -c ' *)",
+      "Bash(ipconfig getifaddr *)",
+      "Bash(xargs ls *)",
+      "Bash(sort -k5 -rn)",
+      "Bash(node -e ' *)"
+    ]
+  }
+}

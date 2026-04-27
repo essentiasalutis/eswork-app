@@ -258,7 +258,9 @@ export default function Questionnaire({ assessment, client, error: serverError }
 
   const scrollRef = useRef(null);
   useEffect(() => {
+    // reset sia il div interno che la finestra (mobile)
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    window.scrollTo({ top: 0, behavior: 'instant' });
   }, [step]);
 
   const totalSteps = steps.length;

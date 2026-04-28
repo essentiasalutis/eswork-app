@@ -71,6 +71,20 @@ export default function ClientPage({ client, assessments: initial, responses: in
     setReportAssessment({ ...a, responseList: rList });
   }
 
+  function openCalculator(a) {
+    const { aggregateNMQ } = require('../../lib/scoring');
+    const rList = responses[a.id] || [];
+    const nmq = aggregateNMQ(rList);
+    const params = new URLSearchParams({
+      clientId: client.id,
+      assessmentId: a.id,
+      n: client.employees,
+      l1: nmq.level1.count,
+      l2: nmq.level2.count,
+    });
+    router.push(`/dashboard/calculator?${params}`);
+  }
+
   function getBaseline(assessment) {
     if (assessment.type === 'initial') return null;
     const base = assessments.find(a => a.type === 'initial' && a.status === 'closed');
@@ -93,6 +107,7 @@ export default function ClientPage({ client, assessments: initial, responses: in
           assessment={reportAssessment}
           client={client}
           baseline={getBaseline(reportAssessment)}
+          onOpenCalculator={reportAssessment.type === 'initial' ? () => openCalculator(reportAssessment) : undefined}
         />
       </div>
     );

@@ -6,8 +6,9 @@ import {
 
 // ─── Semaphore ────────────────────────────────────────────────────────────────
 
-function Semaphore({ type, value, label, subtitle }) {
-  const color = trafficLight(type, value);
+function Semaphore({ type, score, value, label, subtitle }) {
+  const numeric = score !== undefined ? score : parseFloat(value);
+  const color = trafficLight(type, numeric);
   return (
     <div
       className="rounded-2xl p-4 text-center print-page"
@@ -99,9 +100,109 @@ function SectionTitle({ children }) {
   );
 }
 
+// ─── Livelli box ─────────────────────────────────────────────────────────────
+
+function LevelBoxes({ nmq }) {
+  const levels = [
+    {
+      count: nmq.level1.count, pct: nmq.level1.pct,
+      label: 'Trattamento — Anno 1',
+      subtitle: 'Problemi che impattano le attività',
+      bg: '#FFEBEE', border: '#E74C3C', color: '#E74C3C',
+    },
+    {
+      count: nmq.level2.count, pct: nmq.level2.pct,
+      label: 'Prevenzione — Anno 2',
+      subtitle: 'Segnali da monitorare',
+      bg: '#FFF8E1', border: '#F39C12', color: '#F39C12',
+    },
+    {
+      count: nmq.level3.count, pct: nmq.level3.pct,
+      label: 'Solo formazione',
+      subtitle: 'Postura ed ergonomia per tutti',
+      bg: '#E8F5E9', border: '#16a34a', color: '#16a34a',
+    },
+  ];
+  return (
+    <div className="mb-3">
+      <div className="grid grid-cols-3 gap-2 mb-2">
+        {levels.map((l, i) => (
+          <div
+            key={i}
+            className="rounded-2xl p-3 text-center print-page"
+            style={{ background: l.bg, border: `1px solid ${l.border}` }}
+          >
+            <div className="text-2xl font-bold" style={{ color: l.color }}>{l.count}</div>
+            <div className="text-xs text-gray-600 mt-0.5">dip. ({l.pct}%)</div>
+            <div className="text-xs font-semibold mt-2 leading-tight" style={{ color: l.color }}>{l.label}</div>
+            <div className="text-xs text-gray-400 mt-1 leading-tight hidden sm:block">{l.subtitle}</div>
+          </div>
+        ))}
+      </div>
+      <div className="text-xs text-gray-400 text-center">
+        Prevalenza generica: <strong>{nmq.prevalence.pct}%</strong> ha riportato almeno un fastidio negli ultimi 12 mesi (dato informativo)
+      </div>
+    </div>
+  );
+}
+
+// ─── Analisi per ruolo ────────────────────────────────────────────────────────
+
+function RoleAnalysis({ byRole }) {
+  const prod = byRole.production;
+  const off = byRole.office;
+  const hasEnoughData = prod.n >= 10 && off.n >= 10;
+
+  if (prod.n === 0 && off.n === 0) return null;
+
+  if (!hasEnoughData) {
+    return (
+      <div className="bg-gray-50 rounded-2xl border border-gray-200 p-4 mb-3 text-xs text-gray-500 text-center">
+        Analisi per ruolo non disponibile: uno dei gruppi ha meno di 10 risposte
+        {prod.n > 0 && off.n > 0 && ` (Produzione: ${prod.n}, Ufficio: ${off.n})`}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-3 mb-3 print-page">
+      {[
+        { label: 'In produzione', data: prod },
+        { label: 'In ufficio', data: off },
+      ].map(({ label, data }) => (
+        <div key={label} className="bg-white rounded-2xl border border-gray-200 p-3">
+          <div className="text-xs font-semibold text-gray-600 mb-2">
+            {label} <span className="font-normal text-gray-400">({data.n} risp.)</span>
+          </div>
+          {data.zones.slice(0, 5).map((z, i) => (
+            <div key={i} className="flex items-center gap-1.5 mb-1">
+              <div className="w-20 text-xs text-gray-500 truncate text-right flex-shrink-0">{z.zone}</div>
+              <div className="flex-1 h-3 bg-gray-100 rounded overflow-hidden">
+                <div
+                  className="h-full rounded"
+                  style={{
+                    width: `${z.pct12}%`,
+                    background: z.pct12 > 50 ? '#dc2626' : z.pct12 > 30 ? '#ca8a04' : '#16a34a',
+                    minWidth: z.pct12 > 0 ? 16 : 0,
+                  }}
+                />
+              </div>
+              <div className="text-xs text-gray-500 w-8 flex-shrink-0">{z.pct12}%</div>
+            </div>
+          ))}
+          <div className="mt-2 pt-2 border-t border-gray-100 text-xs">
+            <span className="text-red-600 font-semibold">L1: {data.level1.count}</span>
+            <span className="text-gray-400 ml-1">({data.level1.pct}%)</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function ReportView({ assessment, client, baseline }) {
+export default function ReportView({ assessment, client, baseline, onOpenCalculator }) {
   const responseList = assessment.responseList || [];
   const n = responseList.length;
 
@@ -163,10 +264,10 @@ export default function ReportView({ assessment, client, baseline }) {
       {/* KPI Dashboard */}
       <SectionTitle>Cruscotto sintetico</SectionTitle>
       <div className={`grid gap-3 mb-2 ${pss ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
-        <Semaphore type="nmq" value={`${nmq.pct}%`} label="Salute fisica" subtitle="con disturbi MSDs" />
-        {pss && <Semaphore type="pss" value={pss.mean} label="Stress (PSS-10)" subtitle="score medio" />}
-        <Semaphore type="uwes" value={uwes.mean} label="Engagement" subtitle="UWES-9 medio" />
-        <Semaphore type="enps" value={`${enps.score > 0 ? '+' : ''}${enps.score}`} label="Clima (eNPS)" subtitle="" />
+        <Semaphore type="nmq" score={nmq.level1.pct} value={`${nmq.level1.pct}%`} label="Salute fisica" subtitle="Livello 1" />
+        {pss && <Semaphore type="pss" score={pss.mean} value={pss.mean} label="Stress (PSS-10)" subtitle="score medio" />}
+        <Semaphore type="uwes" score={uwes.mean} value={uwes.mean} label="Engagement" subtitle="UWES-9 medio" />
+        <Semaphore type="enps" score={enps.score} value={`${enps.score > 0 ? '+' : ''}${enps.score}`} label="Clima (eNPS)" subtitle="" />
       </div>
 
       {/* NMQ */}
@@ -176,9 +277,21 @@ export default function ReportView({ assessment, client, baseline }) {
           <HBar key={i} label={z.zone} value={z.pct12} />
         ))}
         <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-100">
-          Popolazione sintomatica: <strong>{nmq.symptomatic}</strong> dipendenti ({nmq.pct}%) con almeno 1 zona con disturbi
+          Prevalenza: <strong>{nmq.prevalence.count}</strong> dip. ({nmq.prevalence.pct}%) con almeno 1 disturbo negli ultimi 12 mesi
         </div>
       </div>
+
+      {/* 3 livelli */}
+      <SectionTitle>Stratificazione popolazione — 3 livelli</SectionTitle>
+      <LevelBoxes nmq={nmq} />
+
+      {/* Analisi per ruolo */}
+      {(nmq.byRole.production.n > 0 || nmq.byRole.office.n > 0) && (
+        <>
+          <SectionTitle>Analisi per tipologia di lavoro</SectionTitle>
+          <RoleAnalysis byRole={nmq.byRole} />
+        </>
+      )}
 
       {/* NMQ Comparison */}
       {hasBaseline && baseNmq && (
@@ -230,10 +343,7 @@ export default function ReportView({ assessment, client, baseline }) {
               <div className="text-xs text-gray-500 mb-1">{d.l}</div>
               <div className="text-2xl font-bold text-blue-600">{d.v}</div>
               <div className="mt-2 h-1.5 bg-gray-100 rounded overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 rounded transition-all duration-500"
-                  style={{ width: `${(d.v / 6) * 100}%` }}
-                />
+                <div className="h-full bg-blue-500 rounded" style={{ width: `${(d.v / 6) * 100}%` }} />
               </div>
             </div>
           ))}
@@ -256,26 +366,17 @@ export default function ReportView({ assessment, client, baseline }) {
         </div>
         <div className="flex h-6 rounded-full overflow-hidden">
           {enps.promoters > 0 && (
-            <div
-              className="bg-green-500 flex items-center justify-center text-white text-xs font-medium"
-              style={{ width: `${enps.promoters}%` }}
-            >
+            <div className="bg-green-500 flex items-center justify-center text-white text-xs font-medium" style={{ width: `${enps.promoters}%` }}>
               {enps.promoters}%
             </div>
           )}
           {enps.passives > 0 && (
-            <div
-              className="bg-yellow-400 flex items-center justify-center text-white text-xs font-medium"
-              style={{ width: `${enps.passives}%` }}
-            >
+            <div className="bg-yellow-400 flex items-center justify-center text-white text-xs font-medium" style={{ width: `${enps.passives}%` }}>
               {enps.passives}%
             </div>
           )}
           {enps.detractors > 0 && (
-            <div
-              className="bg-red-500 flex items-center justify-center text-white text-xs font-medium"
-              style={{ width: `${enps.detractors}%` }}
-            >
+            <div className="bg-red-500 flex items-center justify-center text-white text-xs font-medium" style={{ width: `${enps.detractors}%` }}>
               {enps.detractors}%
             </div>
           )}
@@ -294,8 +395,8 @@ export default function ReportView({ assessment, client, baseline }) {
           <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-3 print-page">
             <div className="grid grid-cols-2 gap-y-2 text-sm text-gray-700">
               <div>
-                MSDs: <strong>{baseNmq.pct}%</strong> → <strong>{nmq.pct}%</strong>
-                <Delta before={baseNmq.pct} after={nmq.pct} inverse />
+                L1 MSDs: <strong>{baseNmq.level1.pct}%</strong> → <strong>{nmq.level1.pct}%</strong>
+                <Delta before={baseNmq.level1.pct} after={nmq.level1.pct} inverse />
               </div>
               {pss && basePss && (
                 <div>
@@ -318,6 +419,18 @@ export default function ReportView({ assessment, client, baseline }) {
             </div>
           </div>
         </>
+      )}
+
+      {/* Genera preventivo button */}
+      {assessment.type === 'initial' && onOpenCalculator && (
+        <div className="mt-6 mb-3 no-print">
+          <button
+            onClick={onOpenCalculator}
+            className="w-full py-3.5 rounded-2xl bg-green-600 text-white font-semibold text-base hover:bg-green-700 transition-colors"
+          >
+            Genera preventivo →
+          </button>
+        </div>
       )}
 
       {/* Footer */}

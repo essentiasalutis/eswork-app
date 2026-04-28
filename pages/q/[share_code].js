@@ -7,24 +7,20 @@ import {
   TYPE_LABELS,
 } from '../../lib/scoring';
 
-// ─── Step builder ───────────────────────────────────────────────────────────
+// ─── Step builder ─────────────────────────────────────────────────────────────
 
 function buildSteps(includePSS) {
   const steps = [];
-  // NMQ: one zone per step
-  BODY_ZONES.forEach((zone, zi) => {
-    steps.push({ type: 'nmq', zone, zi });
-  });
-  // PSS (optional)
+  steps.push({ type: 'role' });
+  BODY_ZONES.forEach((zone, zi) => steps.push({ type: 'nmq', zone, zi }));
   if (includePSS) steps.push({ type: 'pss' });
-  // UWES
   steps.push({ type: 'uwes' });
-  // eNPS
   steps.push({ type: 'enps' });
   return steps;
 }
 
 const SECTION_COLORS = {
+  role: '#6b7280',
   nmq: '#16a34a',
   pss: '#ca8a04',
   uwes: '#2563eb',
@@ -32,13 +28,14 @@ const SECTION_COLORS = {
 };
 
 const SECTION_TITLES = {
+  role: 'Il tuo ruolo',
   nmq: 'Salute fisica',
   pss: 'Stress percepito',
   uwes: 'Engagement',
   enps: 'Clima aziendale',
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function YesNoBtn({ value, selected, onSelect }) {
   return (
@@ -76,6 +73,44 @@ function LikertBtn({ label, selected, onSelect, color }) {
 }
 
 // ─── Section renderers ────────────────────────────────────────────────────────
+
+function RoleSection({ answers, setAnswer }) {
+  const options = [
+    { value: 'production', label: 'In piedi / in movimento / in produzione', icon: '🏭' },
+    { value: 'office', label: 'Seduto / al computer / in ufficio', icon: '💻' },
+  ];
+  return (
+    <div>
+      <div className="bg-white rounded-2xl border border-gray-200 p-5">
+        <p className="text-base font-semibold text-gray-800 mb-6 text-center leading-relaxed">
+          Il tuo lavoro è prevalentemente:
+        </p>
+        <div className="flex flex-col gap-3">
+          {options.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setAnswer('role', opt.value)}
+              className="p-4 rounded-xl border-2 text-left transition-all"
+              style={{
+                borderColor: answers.role === opt.value ? '#16a34a' : '#e5e7eb',
+                background: answers.role === opt.value ? '#dcfce7' : '#fff',
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">{opt.icon}</span>
+                <span className="text-sm font-medium text-gray-700">{opt.label}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-gray-400 text-center mt-4">
+          Risposta anonima — usata solo per analisi aggregate
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function NMQZone({ zone, zi, answers, setAnswer }) {
   return (
@@ -206,12 +241,10 @@ function ENPSSection({ answers, setAnswer }) {
 
 // ─── Progress bar ─────────────────────────────────────────────────────────────
 
-function ProgressBar({ steps, current, answers }) {
-  const sections = ['nmq', 'pss', 'uwes', 'enps'].filter(s =>
+function ProgressBar({ steps, current }) {
+  const sections = ['role', 'nmq', 'pss', 'uwes', 'enps'].filter(s =>
     steps.some(step => step.type === s)
   );
-  const currentType = steps[current]?.type;
-
   return (
     <div className="flex gap-1.5">
       {sections.map(s => {
@@ -222,10 +255,7 @@ function ProgressBar({ steps, current, answers }) {
         const isActive = current >= first && current <= last;
         const color = SECTION_COLORS[s];
         return (
-          <div
-            key={s}
-            className="flex-1 h-1.5 rounded-full overflow-hidden bg-gray-200"
-          >
+          <div key={s} className="flex-1 h-1.5 rounded-full overflow-hidden bg-gray-200">
             <div
               className="h-full rounded-full transition-all duration-300"
               style={{
@@ -258,7 +288,6 @@ export default function Questionnaire({ assessment, client, error: serverError }
 
   const scrollRef = useRef(null);
   useEffect(() => {
-    // reset sia il div interno che la finestra (mobile)
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [step]);
@@ -273,6 +302,9 @@ export default function Questionnaire({ assessment, client, error: serverError }
 
   function countAnswered() {
     if (!current) return { answered: 0, total: 0 };
+    if (current.type === 'role') {
+      return { answered: answers.role !== undefined ? 1 : 0, total: 1 };
+    }
     if (current.type === 'nmq') {
       const zi = current.zi;
       const keys = [`nmq_${zi}_0`, `nmq_${zi}_1`, `nmq_${zi}_2`];
@@ -341,33 +373,23 @@ export default function Questionnaire({ assessment, client, error: serverError }
         <Head><title>Grazie! — ES Work</title></Head>
         <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6 py-12">
           <div className="text-center max-w-sm w-full">
-            {/* Spunta verde */}
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-8">
               <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-
             <h1 className="text-3xl font-bold text-gray-900 mb-3">Grazie!</h1>
             <p className="text-gray-500 text-base leading-relaxed mb-12">
               Le tue risposte sono state registrate in modo anonimo.<br/>
               Il tuo contributo aiuterà a migliorare il benessere in azienda.
             </p>
-
-            {/* Logo + brand in evidenza */}
             <div className="border-t border-gray-100 pt-10">
-              <img
-                src="/logo-es.png"
-                alt="Essentia Salutis"
-                className="w-32 h-32 mx-auto mb-4"
-              />
+              <img src="/logo-es.png" alt="Essentia Salutis" className="w-32 h-32 mx-auto mb-4" />
               <div className="text-xl font-bold text-gray-900 tracking-wide">ES Work</div>
               <div className="text-sm font-medium text-green-600 tracking-widest uppercase mt-1">
                 by Essentia Salutis
               </div>
-              <p className="text-xs text-gray-400 mt-3">
-                Programma di prevenzione muscolo-scheletrica
-              </p>
+              <p className="text-xs text-gray-400 mt-3">Programma di prevenzione muscolo-scheletrica</p>
             </div>
           </div>
         </div>
@@ -401,7 +423,7 @@ export default function Questionnaire({ assessment, client, error: serverError }
               </div>
               <div className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">Anonimo</div>
             </div>
-            <ProgressBar steps={steps} current={step} answers={answers} />
+            <ProgressBar steps={steps} current={step} />
             <div className="flex items-center justify-between mt-2">
               <div
                 className="text-xs font-semibold px-2 py-0.5 rounded-full"
@@ -411,7 +433,7 @@ export default function Questionnaire({ assessment, client, error: serverError }
               </div>
               <div className="text-xs text-gray-400">
                 Passo {step + 1} di {totalSteps}
-                {total > 0 && ` · ${answered}/${total}`}
+                {total > 1 && ` · ${answered}/${total}`}
               </div>
             </div>
           </div>
@@ -420,13 +442,11 @@ export default function Questionnaire({ assessment, client, error: serverError }
         {/* Content */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5">
           <div className="max-w-lg mx-auto">
+            {sectionType === 'role' && (
+              <RoleSection answers={answers} setAnswer={setAnswer} />
+            )}
             {sectionType === 'nmq' && (
-              <NMQZone
-                zone={current.zone}
-                zi={current.zi}
-                answers={answers}
-                setAnswer={setAnswer}
-              />
+              <NMQZone zone={current.zone} zi={current.zi} answers={answers} setAnswer={setAnswer} />
             )}
             {sectionType === 'pss' && (
               <PSSSection answers={answers} setAnswer={setAnswer} />
@@ -437,7 +457,6 @@ export default function Questionnaire({ assessment, client, error: serverError }
             {sectionType === 'enps' && (
               <ENPSSection answers={answers} setAnswer={setAnswer} />
             )}
-
             {error && (
               <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
                 {error}
@@ -449,7 +468,6 @@ export default function Questionnaire({ assessment, client, error: serverError }
         {/* Bottom nav */}
         <div className="bg-white border-t border-gray-200 px-4 pt-3 pb-4 safe-bottom">
           <div className="max-w-lg mx-auto">
-            {/* Avviso risposte mancanti */}
             {!canAdvance() && (
               <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl">
                 <span className="text-amber-500 text-base">⚠️</span>
@@ -459,36 +477,36 @@ export default function Questionnaire({ assessment, client, error: serverError }
               </div>
             )}
             <div className="flex gap-3">
-            {step > 0 && (
-              <button
-                onClick={() => setStep(s => s - 1)}
-                className="px-5 py-3.5 rounded-xl border border-gray-300 text-gray-600 font-medium text-sm"
-              >
-                ← Indietro
-              </button>
-            )}
-            {!isLast ? (
-              <button
-                onClick={() => canAdvance() && setStep(s => s + 1)}
-                disabled={!canAdvance()}
-                className="flex-1 py-3.5 rounded-xl font-semibold text-white text-base transition-opacity"
-                style={{
-                  background: sectionColor,
-                  opacity: canAdvance() ? 1 : 0.4,
-                  cursor: canAdvance() ? 'pointer' : 'not-allowed',
-                }}
-              >
-                Avanti →
-              </button>
-            ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="flex-1 py-3.5 rounded-xl font-semibold text-white text-base bg-green-600 disabled:opacity-60"
-              >
-                {submitting ? 'Invio in corso...' : 'Invia risposte ✓'}
-              </button>
-            )}
+              {step > 0 && (
+                <button
+                  onClick={() => setStep(s => s - 1)}
+                  className="px-5 py-3.5 rounded-xl border border-gray-300 text-gray-600 font-medium text-sm"
+                >
+                  ← Indietro
+                </button>
+              )}
+              {!isLast ? (
+                <button
+                  onClick={() => canAdvance() && setStep(s => s + 1)}
+                  disabled={!canAdvance()}
+                  className="flex-1 py-3.5 rounded-xl font-semibold text-white text-base transition-opacity"
+                  style={{
+                    background: sectionColor,
+                    opacity: canAdvance() ? 1 : 0.4,
+                    cursor: canAdvance() ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  Avanti →
+                </button>
+              ) : (
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting || !canAdvance()}
+                  className="flex-1 py-3.5 rounded-xl font-semibold text-white text-base bg-green-600 disabled:opacity-60"
+                >
+                  {submitting ? 'Invio in corso...' : 'Invia risposte ✓'}
+                </button>
+              )}
             </div>
           </div>
         </div>

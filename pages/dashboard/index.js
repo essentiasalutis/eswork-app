@@ -5,6 +5,7 @@ import { getSessionToken, verifyToken } from '../../lib/auth';
 import { getClients, getAssessmentCounts } from '../../lib/store';
 import { TYPE_COLORS, TYPE_LABELS } from '../../lib/scoring';
 
+
 export default function Dashboard({ clients: initialClients, assessmentCounts }) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
@@ -51,9 +52,14 @@ export default function Dashboard({ clients: initialClients, assessmentCounts })
             <span className="text-xl font-bold text-green-600">Work</span>
             <span className="text-sm text-gray-500 ml-2">Dashboard</span>
           </div>
-          <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-800 py-2 px-3">
-            Esci
-          </button>
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard/calculator" className="text-sm text-green-700 hover:text-green-900 py-2 px-3 border border-green-200 rounded-xl bg-green-50">
+              Calcolatore
+            </Link>
+            <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-800 py-2 px-3">
+              Esci
+            </button>
+          </div>
         </div>
       </header>
 

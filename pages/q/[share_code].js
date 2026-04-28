@@ -42,7 +42,7 @@ function YesNoBtn({ value, selected, onSelect }) {
     <button
       type="button"
       onClick={() => onSelect(value)}
-      className="flex-1 py-4 rounded-xl border-2 text-base font-semibold transition-all"
+      className="flex-1 py-3 rounded-xl border-2 text-base font-semibold transition-all"
       style={{
         borderColor: selected ? '#16a34a' : '#e5e7eb',
         background: selected ? '#dcfce7' : '#fff',
@@ -114,20 +114,20 @@ function RoleSection({ answers, setAnswer }) {
 
 function NMQZone({ zone, zi, answers, setAnswer }) {
   return (
-    <div className="space-y-4">
-      <div className="bg-green-50 border border-green-200 rounded-2xl px-4 py-3 text-center">
-        <div className="text-xs text-green-600 font-medium uppercase tracking-wide mb-1">Zona corporea</div>
-        <div className="text-xl font-bold text-green-800">{zone}</div>
+    <div className="space-y-2">
+      <div className="bg-green-50 border border-green-200 rounded-xl px-3 py-2 text-center">
+        <div className="text-xs text-green-600 font-medium uppercase tracking-wide">Zona corporea</div>
+        <div className="text-lg font-bold text-green-800">{zone}</div>
       </div>
       {NMQ_LABELS.map((label, qi) => (
-        <div key={qi} className="bg-white rounded-2xl border border-gray-200 p-4">
-          <p className="text-sm text-gray-700 mb-4 leading-relaxed">
+        <div key={qi} className="bg-white rounded-xl border border-gray-200 p-3">
+          <p className="text-sm text-gray-700 mb-2 leading-snug">
             {qi === 0 && 'Negli ultimi 12 mesi, hai avuto fastidi o dolori a: '}
             {qi === 1 && 'Questo problema ti ha impedito di svolgere le normali attività? '}
             {qi === 2 && 'Negli ultimi 7 giorni, hai avuto fastidi o dolori a: '}
             {qi === 0 || qi === 2 ? <strong>{zone.toLowerCase()}</strong> : null}
           </p>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <YesNoBtn
               value={1}
               selected={answers[`nmq_${zi}_${qi}`] === 1}
@@ -440,7 +440,7 @@ export default function Questionnaire({ assessment, client, error: serverError }
         </div>
 
         {/* Content */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3">
           <div className="max-w-lg mx-auto">
             {sectionType === 'role' && (
               <RoleSection answers={answers} setAnswer={setAnswer} />

@@ -12,16 +12,26 @@ function Semaphore({ type, score, value, label, subtitle }) {
   const color = trafficLight(type, numeric);
   return (
     <div
-      className="rounded-2xl p-4 text-center print-page"
-      style={{ background: TL_BG[color], border: `1px solid ${TL_BORDER[color]}` }}
+      className="rounded-2xl p-3 text-center print-page"
+      style={{
+        background: TL_BG[color],
+        border: `1.5px solid ${TL_BORDER[color]}`,
+        printColorAdjust: 'exact',
+        WebkitPrintColorAdjust: 'exact',
+      }}
     >
+      {/* Cerchio pieno invece di box-shadow (stampa meglio) */}
       <div
-        className="w-3 h-3 rounded-full mx-auto mb-2"
-        style={{ background: TL_COLOR[color], boxShadow: `0 0 8px ${TL_COLOR[color]}80` }}
+        className="w-4 h-4 rounded-full mx-auto mb-1"
+        style={{
+          background: TL_COLOR[color],
+          printColorAdjust: 'exact',
+          WebkitPrintColorAdjust: 'exact',
+        }}
       />
-      <div className="text-xs text-gray-500 mb-1">{label}</div>
-      <div className="text-2xl font-bold" style={{ color: TL_COLOR[color] }}>{value}</div>
-      {subtitle && <div className="text-xs text-gray-400 mt-1">{subtitle}</div>}
+      <div className="text-xs text-gray-600 mb-0.5">{label}</div>
+      <div className="text-xl font-bold" style={{ color: TL_COLOR[color] }}>{value}</div>
+      {subtitle && <div className="text-xs text-gray-400 mt-0.5">{subtitle}</div>}
     </div>
   );
 }
@@ -30,14 +40,23 @@ function Semaphore({ type, score, value, label, subtitle }) {
 
 function HBar({ label, value, max = 100 }) {
   const color = value > 50 ? '#dc2626' : value > 30 ? '#ca8a04' : '#16a34a';
-  const pct = Math.max((value / max) * 100, value > 0 ? 5 : 0);
+  const pct = Math.max((value / max) * 100, value > 0 ? 4 : 0);
   return (
-    <div className="flex items-center gap-2 mb-2">
-      <div className="w-36 text-xs text-gray-500 text-right flex-shrink-0 truncate">{label}</div>
-      <div className="flex-1 h-5 bg-gray-100 rounded overflow-hidden">
+    <div className="flex items-center gap-2 mb-1.5">
+      <div className="w-36 text-xs text-gray-600 text-right flex-shrink-0 truncate">{label}</div>
+      <div
+        className="flex-1 h-4 rounded overflow-hidden"
+        style={{ background: '#f3f4f6', printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
+      >
         <div
-          className="h-full rounded flex items-center justify-end pr-2 text-white text-xs font-medium transition-all duration-500"
-          style={{ width: `${pct}%`, background: color, minWidth: value > 0 ? 32 : 0 }}
+          className="h-full rounded flex items-center justify-end pr-1.5 text-white text-xs font-semibold"
+          style={{
+            width: `${pct}%`,
+            background: color,
+            minWidth: value > 0 ? 28 : 0,
+            printColorAdjust: 'exact',
+            WebkitPrintColorAdjust: 'exact',
+          }}
         >
           {value > 0 && `${value}%`}
         </div>
@@ -95,7 +114,7 @@ function Delta({ before, after, inverse = false }) {
 
 function SectionTitle({ children }) {
   return (
-    <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3 mt-6">
+    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 mt-4 border-b border-gray-200 pb-1">
       {children}
     </div>
   );
@@ -105,7 +124,8 @@ function SectionTitle({ children }) {
 
 function LegendBox({ children }) {
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-3 text-xs text-gray-500 leading-relaxed">
+    <div className="border border-gray-300 rounded-xl p-2.5 mb-2 text-xs text-gray-600 leading-relaxed"
+      style={{ background: '#f9fafb', printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
       {children}
     </div>
   );
@@ -141,7 +161,7 @@ function LevelBoxes({ nmq }) {
           <div
             key={i}
             className="rounded-2xl p-3 text-center print-page"
-            style={{ background: l.bg, border: `1px solid ${l.border}` }}
+            style={{ background: l.bg, border: `1.5px solid ${l.border}`, printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
           >
             <div className="text-2xl font-bold" style={{ color: l.color }}>{l.count}</div>
             <div className="text-xs text-gray-600 mt-0.5">dip. ({l.pct}%)</div>
@@ -215,18 +235,19 @@ function RoleAnalysis({ byRole }) {
 
 function ReportFooter() {
   return (
-    <div className="mt-8 pt-4 border-t border-gray-200 text-center">
-      <div className="flex items-center justify-center gap-3 mb-3">
-        <img src="/logo-es.png" alt="Essentia Salutis" className="w-8 h-8 object-contain opacity-60" />
-        <span className="text-xs text-gray-400 font-medium">
-          © 2026 {CONFIG.company_name} — ES Work
-        </span>
-      </div>
-      <div className="text-xs text-gray-400 leading-relaxed">
-        {CONFIG.company_address} · Tel: {CONFIG.contact_phone} · {CONFIG.contact_email}
-      </div>
-      <div className="text-xs text-gray-300 mt-2 leading-relaxed max-w-lg mx-auto">
-        Documento riservato e confidenziale. La riproduzione, anche parziale, è vietata senza autorizzazione scritta di Essentia Salutis.
+    <div className="mt-6 pt-4 border-t-2 border-green-600">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <img src="/logo-es.png" alt="Essentia Salutis" className="w-8 h-8 object-contain" />
+          <div>
+            <div className="text-sm font-bold text-gray-800">ES <span style={{color:'#16a34a'}}>Work</span> — {CONFIG.company_name}</div>
+            <div className="text-xs text-gray-500">{CONFIG.company_address} · {CONFIG.contact_phone} · {CONFIG.contact_email}</div>
+          </div>
+        </div>
+        <div className="text-xs text-gray-400 text-right max-w-xs">
+          Documento riservato e confidenziale.<br/>
+          Riproduzione vietata senza autorizzazione scritta.
+        </div>
       </div>
     </div>
   );
@@ -263,9 +284,34 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
   const pssRef = !pss && isCheckpoint && basePss ? basePss : null;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pb-10" id="report-root">
+    <div className="max-w-2xl mx-auto px-4 pb-6" id="report-root">
+      {/* CSS stampa */}
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 1.2cm 1.5cm; }
+          body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          .no-print { display: none !important; }
+          #report-root { padding: 0 !important; }
+          #report-root > div { margin-bottom: 8px !important; }
+          .rounded-2xl { border-radius: 8px !important; }
+          .p-4 { padding: 8px !important; }
+          .p-5 { padding: 10px !important; }
+          .p-3 { padding: 6px !important; }
+          .mb-6 { margin-bottom: 10px !important; }
+          .mb-4 { margin-bottom: 8px !important; }
+          .mb-3 { margin-bottom: 6px !important; }
+          .mb-2 { margin-bottom: 4px !important; }
+          .mt-6 { margin-top: 10px !important; }
+          .py-5 { padding-top: 10px !important; padding-bottom: 10px !important; }
+          .pb-6 { padding-bottom: 0 !important; }
+          .gap-3 { gap: 8px !important; }
+          .space-y-3 > * + * { margin-top: 6px !important; }
+        }
+      `}</style>
+
       {/* Header */}
-      <div className="flex items-end justify-between py-5 border-b-2 border-green-600 mb-6">
+      <div className="flex items-end justify-between py-5 border-b-2 border-green-600 mb-4">
         <div className="flex items-center gap-3">
           <img src="/logo-es.png" alt="Essentia Salutis" className="w-12 h-12 object-contain" />
           <div>

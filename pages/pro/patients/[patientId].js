@@ -35,27 +35,29 @@ function NrsSlider({ value, onChange, label }) {
 // ─── NRS Trend chart (SVG) ────────────────────────────────────────────────────
 
 function NrsTrendChart({ sessions }) {
-  const closed = sessions.filter(s => s.closed_at && s.nrs_post !== null);
-  if (closed.length < 2) return null;
+  const closed = sessions.filter(s => s.closed_at && s.nrs_pre !== null);
+  if (closed.length < 1) return null;
   const W = 300, H = 100, PAD = 20;
-  const xs = closed.map((_, i) => PAD + (i / (closed.length - 1)) * (W - 2 * PAD));
+  const xs = closed.map((_, i) =>
+    closed.length === 1 ? W / 2 : PAD + (i / (closed.length - 1)) * (W - 2 * PAD)
+  );
   const ys = v => H - PAD - ((v / 10) * (H - 2 * PAD));
   return (
     <div>
-      <div className="text-xs text-gray-500 mb-1 flex gap-4">
-        <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-orange-400 inline-block" /> NRS pre</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-green-500 inline-block" /> NRS post</span>
+      <div className="text-xs text-gray-500 mb-1">
+        <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-green-500 inline-block" /> NRS per seduta</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 100 }}>
         {[0,2,4,6,8,10].map(v => (
           <line key={v} x1={PAD} x2={W-PAD} y1={ys(v)} y2={ys(v)} stroke="#f3f4f6" strokeWidth={1} />
         ))}
-        <polyline points={closed.map((s,i) => `${xs[i]},${ys(s.nrs_pre??0)}`).join(' ')} fill="none" stroke="#f97316" strokeWidth={2} strokeDasharray="4 2" />
-        <polyline points={closed.map((s,i) => `${xs[i]},${ys(s.nrs_post)}`).join(' ')} fill="none" stroke="#16a34a" strokeWidth={2} />
+        {closed.length > 1 && (
+          <polyline points={closed.map((s,i) => `${xs[i]},${ys(s.nrs_pre)}`).join(' ')} fill="none" stroke="#16a34a" strokeWidth={2} />
+        )}
         {closed.map((s, i) => (
           <g key={i}>
-            <circle cx={xs[i]} cy={ys(s.nrs_pre??0)} r={3} fill="#f97316" />
-            <circle cx={xs[i]} cy={ys(s.nrs_post)} r={3} fill="#16a34a" />
+            <circle cx={xs[i]} cy={ys(s.nrs_pre)} r={4} fill="#16a34a" />
+            <text x={xs[i]} y={ys(s.nrs_pre) - 7} textAnchor="middle" fontSize={9} fill="#374151">{s.nrs_pre}</text>
           </g>
         ))}
       </svg>
@@ -459,8 +461,7 @@ function AnamnesisBlock({ patient: initial, onUpdated }) {
 // ─── Form nuova sessione ──────────────────────────────────────────────────────
 
 function SessionForm({ patientId, sessionNumber, lastNote, onSaved }) {
-  const [nrsPre, setNrsPre] = useState(5);
-  const [nrsPost, setNrsPost] = useState(5);
+  const [nrs, setNrs] = useState(5);
   const [treatmentNotes, setTreatmentNotes] = useState('');
   const [nextNotes, setNextNotes] = useState('');
   const [phase, setPhase] = useState('pre');
@@ -473,7 +474,7 @@ function SessionForm({ patientId, sessionNumber, lastNote, onSaved }) {
     const res = await fetch(`/api/pro/patients/${patientId}/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nrs_pre: nrsPre, treatment_notes: treatmentNotes, next_session_notes: nextNotes }),
+      body: JSON.stringify({ nrs_pre: nrs, treatment_notes: treatmentNotes, next_session_notes: nextNotes }),
     });
     if (!res.ok) { setSaving(false); return setError('Errore creazione sessione'); }
     const session = await res.json();
@@ -481,7 +482,7 @@ function SessionForm({ patientId, sessionNumber, lastNote, onSaved }) {
     const res2 = await fetch(`/api/pro/patients/${patientId}/sessions`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: session.id, nrs_post: nrsPost, close: true }),
+      body: JSON.stringify({ sessionId: session.id, close: true }),
     });
     setSaving(false);
     if (res2.ok) {
@@ -504,7 +505,7 @@ function SessionForm({ patientId, sessionNumber, lastNote, onSaved }) {
       )}
       {phase === 'pre' && (
         <>
-          <NrsSlider value={nrsPre} onChange={setNrsPre} label="NRS pre-trattamento" />
+          <NrsSlider value={nrs} onChange={setNrs} label="NRS inizio seduta" />
           <button onClick={() => setPhase('post')} className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold">
             Avvia trattamento →
           </button>
@@ -512,8 +513,9 @@ function SessionForm({ patientId, sessionNumber, lastNote, onSaved }) {
       )}
       {phase === 'post' && (
         <>
-          <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">Pre: {nrsPre}/10 registrato</div>
-          <NrsSlider value={nrsPost} onChange={setNrsPost} label="NRS post-trattamento" />
+          <div className="bg-gray-50 rounded-xl px-3 py-2 text-sm text-gray-600">
+            NRS registrato: <strong>{nrs}/10</strong>
+          </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">Note trattamento *</label>
             <textarea value={treatmentNotes} onChange={e => setTreatmentNotes(e.target.value)} rows={3}
@@ -580,7 +582,7 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
 
           <AnamnesisBlock patient={patient} onUpdated={setPatient} />
 
-          {closedSessions.length >= 2 && (
+          {closedSessions.length >= 1 && (
             <div className="bg-white rounded-2xl border border-gray-200 p-4">
               <h3 className="font-semibold text-gray-800 mb-3 text-sm">Trend NRS</h3>
               <NrsTrendChart sessions={sessions} />
@@ -590,33 +592,27 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
           {closedSessions.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide">Sedute precedenti</h3>
-              {closedSessions.map(s => {
-                const delta = s.nrs_post - (s.nrs_pre ?? s.nrs_post);
-                return (
-                  <div key={s.id} className="bg-white rounded-2xl border border-gray-200 p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-gray-700 text-sm">Seduta #{s.session_number}</span>
+              {closedSessions.map(s => (
+                <div key={s.id} className="bg-white rounded-2xl border border-gray-200 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-gray-700 text-sm">Seduta #{s.session_number}</span>
+                    <div className="flex items-center gap-3">
+                      {s.nrs_pre !== null && (
+                        <span className="text-sm font-semibold" style={{
+                          color: s.nrs_pre <= 3 ? '#16a34a' : s.nrs_pre <= 6 ? '#ca8a04' : '#dc2626'
+                        }}>NRS {s.nrs_pre}/10</span>
+                      )}
                       <span className="text-xs text-gray-400">{new Date(s.date).toLocaleDateString('it-IT')}</span>
                     </div>
-                    <div className="flex gap-3 text-sm mb-2">
-                      <span className="text-orange-600">Pre: <strong>{s.nrs_pre ?? '—'}</strong></span>
-                      <span className="text-gray-400">→</span>
-                      <span className="text-green-700">Post: <strong>{s.nrs_post}</strong></span>
-                      {s.nrs_pre !== null && (
-                        <span className={`font-bold ${delta < 0 ? 'text-green-600' : delta > 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                          ({delta > 0 ? '+' : ''}{delta})
-                        </span>
-                      )}
-                    </div>
-                    {s.treatment_notes && (
-                      <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 mb-1">{s.treatment_notes}</div>
-                    )}
-                    {s.next_session_notes && (
-                      <div className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2">→ {s.next_session_notes}</div>
-                    )}
                   </div>
-                );
-              })}
+                  {s.treatment_notes && (
+                    <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 mb-1">{s.treatment_notes}</div>
+                  )}
+                  {s.next_session_notes && (
+                    <div className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2">→ {s.next_session_notes}</div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
 

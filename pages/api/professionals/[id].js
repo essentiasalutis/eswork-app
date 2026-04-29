@@ -30,7 +30,8 @@ export default requireAuth(async function handler(req, res) {
   // Elimina professionista
   if (req.method === 'DELETE') {
     try {
-      // Rimuove assegnazioni e log accessi prima di eliminare
+      // Rimuove tutte le righe collegate prima di eliminare il professionista
+      await supabase.from('sessions').delete().eq('professional_id', id);
       await supabase.from('professional_assignments').delete().eq('professional_id', id);
       await supabase.from('access_logs').delete().eq('professional_id', id);
       const { error } = await supabase.from('professionals').delete().eq('id', id);

@@ -333,6 +333,53 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         </div>
       </div>
 
+      {/* Suddivisione per ruolo dentro la sezione NMQ */}
+      {(nmq.byRole.production.n > 0 && nmq.byRole.office.n > 0) && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3 print-page">
+          <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Suddivisione per tipologia di lavoro</div>
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { label: '🏭 In produzione', data: nmq.byRole.production },
+              { label: '💻 In ufficio', data: nmq.byRole.office },
+            ].map(({ label, data }) => (
+              <div key={label}>
+                <div className="text-xs font-semibold text-gray-600 mb-2">
+                  {label} <span className="font-normal text-gray-400">({data.n} risp.)</span>
+                </div>
+                {data.n < 5 ? (
+                  <div className="text-xs text-gray-400 italic">Dati insufficienti (&lt;5 risposte)</div>
+                ) : (
+                  data.zones.slice(0, 7).map((z, i) => (
+                    <div key={i} className="flex items-center gap-1.5 mb-1">
+                      <div className="w-20 text-xs text-gray-500 truncate text-right flex-shrink-0">{z.zone}</div>
+                      <div className="flex-1 h-3 bg-gray-100 rounded overflow-hidden">
+                        <div
+                          className="h-full rounded"
+                          style={{
+                            width: `${z.pct12}%`,
+                            background: z.pct12 > 50 ? '#dc2626' : z.pct12 > 30 ? '#ca8a04' : '#16a34a',
+                            minWidth: z.pct12 > 0 ? 16 : 0,
+                          }}
+                        />
+                      </div>
+                      <div className="text-xs text-gray-500 w-8 flex-shrink-0">{z.pct12}%</div>
+                    </div>
+                  ))
+                )}
+                {data.n >= 5 && (
+                  <div className="mt-2 pt-2 border-t border-gray-100 text-xs">
+                    <span className="text-red-600 font-semibold">L1: {data.level1.count}</span>
+                    <span className="text-gray-400 ml-1">({data.level1.pct}%)</span>
+                    <span className="text-yellow-600 font-semibold ml-2">L2: {data.level2.count}</span>
+                    <span className="text-gray-400 ml-1">({data.level2.pct}%)</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 3 livelli */}
       <SectionTitle>Stratificazione popolazione — 3 livelli</SectionTitle>
       <LevelBoxes nmq={nmq} />
@@ -344,14 +391,6 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         <div className="mb-0.5"><strong className="text-yellow-600">Livello 2 (Prevenzione):</strong> dipendenti con disturbi diffusi (3+ zone) o dolore localizzato attuale, che non rientrano nel Livello 1. Candidati alla prevenzione attiva dall&apos;Anno 2.</div>
         <div><strong className="text-green-600">Livello 3 (Formazione):</strong> dipendenti senza problemi significativi. Partecipano alla formazione collettiva su postura ed ergonomia insieme a tutti gli altri.</div>
       </LegendBox>
-
-      {/* Analisi per ruolo */}
-      {(nmq.byRole.production.n > 0 || nmq.byRole.office.n > 0) && (
-        <>
-          <SectionTitle>Analisi per tipologia di lavoro</SectionTitle>
-          <RoleAnalysis byRole={nmq.byRole} />
-        </>
-      )}
 
       {/* NMQ Comparison */}
       {hasBaseline && baseNmq && (

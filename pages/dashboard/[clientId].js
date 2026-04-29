@@ -160,7 +160,7 @@ export default function ClientPage({ client, assessments: initial, responses: in
 
 come concordato, le invio il link per l'assessment ES Work dedicato ai dipendenti di ${client.name}.
 
-Il questionario è anonimo, si compila dallo smartphone in circa 15 minuti, e può essere completato in qualsiasi momento entro i prossimi 3 giorni lavorativi.
+Il questionario è anonimo, si compila dallo smartphone in circa 5 minuti, e può essere completato in qualsiasi momento entro i prossimi 3 giorni lavorativi.
 
 Può inoltrare questo link a tutti i dipendenti:
 ${url}

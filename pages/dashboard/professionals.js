@@ -10,8 +10,32 @@ export default function ProfessionalsPage({ professionals: initial, clients }) {
   const [error, setError] = useState('');
   const [assignModal, setAssignModal] = useState(null); // { proId, proName, assignments }
   const [newPassword, setNewPassword] = useState({ proId: null, value: '' });
+  const [justCreated, setJustCreated] = useState(null); // { name, email, password } — mostrato dopo creazione
+
+  const BASE_URL = typeof window !== 'undefined' ? window.location.origin : 'https://eswork-app.vercel.app';
 
   function set(k, v) { setForm(p => ({ ...p, [k]: v })); }
+
+  function credentialsMailto(name, email, password) {
+    const subject = `Accesso ES Work — Area Professionisti`;
+    const body = `Gentile ${name},
+
+le invio le credenziali per accedere all'area professionisti di ES Work.
+
+🔗 Link di accesso: ${BASE_URL}/pro/login
+📧 Email: ${email}
+🔑 Password temporanea: ${password}
+
+Al primo accesso le verrà chiesto di impostare una nuova password personale.
+
+Per qualsiasi problema non esiti a contattarmi.
+
+Cordiali saluti,
+Dott. Enrico Maiolo — founder @ Essentia Salutis
+Tel: 327 102 7443
+info@essentiasalutis.it`;
+    return `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }
 
   async function createPro(e) {
     e.preventDefault();
@@ -27,6 +51,8 @@ export default function ProfessionalsPage({ professionals: initial, clients }) {
       const p = await res.json();
       setProfessionals(prev => [p, ...prev]);
       setShowNew(false);
+      // Salva i dati per mostrare il riquadro "invia credenziali"
+      setJustCreated({ name: form.name, email: form.email, password: form.password });
       setForm({ name: '', email: '', password: '', phone: '' });
     } else {
       const d = await res.json();
@@ -162,7 +188,31 @@ export default function ProfessionalsPage({ professionals: initial, clients }) {
           </form>
         )}
 
-        {professionals.length === 0 && (
+        {/* Riquadro credenziali appena create */}
+        {justCreated && (
+          <div className="bg-green-50 border border-green-300 rounded-2xl p-5 mb-5">
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <div>
+                <div className="font-semibold text-green-800">✓ Professionista creato</div>
+                <div className="text-sm text-green-700 mt-0.5">Invia le credenziali via email prima di chiudere questa schermata.</div>
+              </div>
+              <button onClick={() => setJustCreated(null)} className="text-green-400 hover:text-green-700 text-xl leading-none shrink-0">✕</button>
+            </div>
+            <div className="bg-white rounded-xl border border-green-200 px-4 py-3 text-sm space-y-1 mb-4 font-mono">
+              <div><span className="text-gray-500">Email:</span> <strong>{justCreated.email}</strong></div>
+              <div><span className="text-gray-500">Password:</span> <strong>{justCreated.password}</strong></div>
+              <div><span className="text-gray-500">Link:</span> <strong>{BASE_URL}/pro/login</strong></div>
+            </div>
+            <a
+              href={credentialsMailto(justCreated.name, justCreated.email, justCreated.password)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700"
+            >
+              ✉ Invia credenziali via email
+            </a>
+          </div>
+        )}
+
+        {professionals.length === 0 && !justCreated && (
           <div className="text-center py-16 text-gray-400">
             <div className="text-4xl mb-3">👨‍⚕️</div>
             <p>Nessun professionista. Aggiungine uno con il pulsante in alto.</p>
@@ -185,6 +235,12 @@ export default function ProfessionalsPage({ professionals: initial, clients }) {
               </div>
 
               <div className="flex flex-wrap gap-2 mt-3">
+                <a
+                  href={`mailto:${encodeURIComponent(pro.email)}?subject=${encodeURIComponent('Accesso ES Work — Area Professionisti')}&body=${encodeURIComponent(`Gentile ${pro.name},\n\nle ricordo le credenziali per accedere all'area professionisti di ES Work.\n\n🔗 Link: ${BASE_URL}/pro/login\n📧 Email: ${pro.email}\n🔑 Password: [inserisci la password che hai impostato]\n\nCordiali saluti,\nDott. Enrico Maiolo — founder @ Essentia Salutis\nTel: 327 102 7443\ninfo@essentiasalutis.it`)}`}
+                  className="text-xs px-3 py-1.5 rounded-xl border border-green-200 text-green-700 bg-green-50"
+                >
+                  ✉ Invia credenziali
+                </a>
                 <button
                   onClick={() => openAssignModal(pro)}
                   className="text-xs px-3 py-1.5 rounded-xl border border-blue-200 text-blue-700 bg-blue-50"

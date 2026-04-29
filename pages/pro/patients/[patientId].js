@@ -66,6 +66,54 @@ function NrsTrendChart({ sessions }) {
   );
 }
 
+// ─── Form helpers (definiti FUORI dal componente per evitare il bug di freeze) ──
+
+function FormRow({ label, children }) {
+  return (
+    <div className="space-y-1">
+      <label className="block text-xs font-semibold text-gray-600">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function FormInput({ value, onChange, placeholder }) {
+  return (
+    <input
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+    />
+  );
+}
+
+function FormTextarea({ value, onChange, placeholder, rows = 2 }) {
+  return (
+    <textarea
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={rows}
+      className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+    />
+  );
+}
+
+function FormToggle({ checked, onChange, label }) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={!!checked}
+        onChange={e => onChange(e.target.checked)}
+        className="w-4 h-4 rounded accent-green-600"
+      />
+      <span className="text-sm text-gray-700">{label}</span>
+    </label>
+  );
+}
+
 // ─── Anamnesi — view + edit ───────────────────────────────────────────────────
 
 function AnamnesisBlock({ patient: initial, onUpdated }) {
@@ -74,43 +122,52 @@ function AnamnesisBlock({ patient: initial, onUpdated }) {
   const [saving, setSaving] = useState(false);
   const [p, setP] = useState(initial);
 
-  // Form state
   const [f, setF] = useState({
-    job_activity:           p.job_activity || '',
-    sedentary:              p.sedentary ?? false,
-    does_sport:             p.does_sport ?? false,
-    sport_details:          p.sport_details || '',
-    pain_location:          p.pain_location || '',
-    pain_onset:             p.pain_onset || '',
-    pain_type:              p.pain_type || '',
-    takes_medications:      p.takes_medications ?? false,
-    medications_details:    p.medications_details || '',
-    recent_diagnostics:     p.recent_diagnostics ?? false,
-    diagnostics_details:    p.diagnostics_details || '',
-    traumas_surgeries:      p.traumas_surgeries || '',
-    vision_issues:          p.vision_issues ?? false,
-    hearing_issues:         p.hearing_issues ?? false,
-    headaches:              p.headaches ?? false,
-    bruxism:                p.bruxism ?? false,
-    reflux_gastritis:       p.reflux_gastritis ?? false,
-    bowel_regular:          p.bowel_regular ?? true,
-    cardiovascular_regular: p.cardiovascular_regular ?? true,
-    urological_issues:      p.urological_issues || '',
-    gynecological_info:     p.gynecological_info || '',
-    red_flags:              p.red_flags ?? false,
-    red_flags_details:      p.red_flags_details || '',
-    notes:                  p.notes || '',
-    level:                  p.level || '',
+    job_activity:                 p.job_activity || '',
+    sedentary:                    p.sedentary ?? false,
+    does_sport:                   p.does_sport ?? false,
+    sport_details:                p.sport_details || '',
+    pain_location:                p.pain_location || '',
+    pain_onset:                   p.pain_onset || '',
+    pain_type:                    p.pain_type || '',
+    takes_medications:            p.takes_medications ?? false,
+    medications_details:          p.medications_details || '',
+    recent_diagnostics:           p.recent_diagnostics ?? false,
+    diagnostics_details:          p.diagnostics_details || '',
+    traumas_surgeries:            p.traumas_surgeries || '',
+    vision_issues:                p.vision_issues ?? false,
+    hearing_issues:               p.hearing_issues ?? false,
+    headaches:                    p.headaches ?? false,
+    bruxism:                      p.bruxism ?? false,
+    reflux_gastritis:             p.reflux_gastritis ?? false,
+    has_cardiovascular_issues:    p.has_cardiovascular_issues ?? false,
+    cardiovascular_details:       p.cardiovascular_details || '',
+    has_gastrointestinal_issues:  p.has_gastrointestinal_issues ?? false,
+    gastrointestinal_details:     p.gastrointestinal_details || '',
+    urological_issues:            p.urological_issues || '',
+    gynecological_info:           p.gynecological_info || '',
+    obstetric_history:            p.obstetric_history || '',
+    red_flags:                    p.red_flags ?? false,
+    red_flags_details:            p.red_flags_details || '',
+    notes:                        p.notes || '',
+    level:                        p.level || '',
   });
+
+  // Stato locale per checkbox show/hide (non salvato: derivato dal testo)
+  const [showUrological, setShowUrological] = useState(!!p.urological_issues);
+  const [showGynecological, setShowGynecological] = useState(!!p.gynecological_info);
 
   function upd(k, v) { setF(prev => ({ ...prev, [k]: v })); }
 
   async function save() {
     setSaving(true);
+    const payload = { ...f };
+    if (!showUrological) payload.urological_issues = '';
+    if (!showGynecological) payload.gynecological_info = '';
     const res = await fetch(`/api/pro/patients/${p.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(f),
+      body: JSON.stringify(payload),
     });
     setSaving(false);
     if (res.ok) {
@@ -124,11 +181,11 @@ function AnamnesisBlock({ patient: initial, onUpdated }) {
 
   // ── Vista lettura ──
   if (!editing) {
-    const boolLabel = v => v === true ? 'Sì' : v === false ? 'No' : '—';
+    const yn = v => v === true ? 'Sì' : v === false ? 'No' : null;
     const hasData = p.pain_location || p.job_activity || p.traumas_surgeries;
     const rows = [
       ['Attività lavorativa', p.job_activity],
-      ['Lavoro sedentario', boolLabel(p.sedentary)],
+      ['Lavoro sedentario', yn(p.sedentary)],
       ['Sport', p.does_sport ? `Sì — ${p.sport_details || ''}` : p.does_sport === false ? 'No' : null],
       ['Zona del dolore', p.pain_location],
       ['Insorgenza', p.pain_onset],
@@ -136,15 +193,16 @@ function AnamnesisBlock({ patient: initial, onUpdated }) {
       ['Farmaci', p.takes_medications ? `Sì — ${p.medications_details || ''}` : p.takes_medications === false ? 'No' : null],
       ['Esami recenti', p.recent_diagnostics ? `Sì — ${p.diagnostics_details || ''}` : p.recent_diagnostics === false ? 'No' : null],
       ['Traumi / Chirurgie', p.traumas_surgeries],
-      ['Problemi visivi', p.vision_issues ? 'Sì' : p.vision_issues === false ? 'No' : null],
-      ['Problemi uditivi', p.hearing_issues ? 'Sì' : p.hearing_issues === false ? 'No' : null],
-      ['Cefalee', p.headaches ? 'Sì' : p.headaches === false ? 'No' : null],
-      ['Bruxismo', p.bruxism ? 'Sì' : p.bruxism === false ? 'No' : null],
-      ['Reflusso / gastrite', p.reflux_gastritis ? 'Sì' : p.reflux_gastritis === false ? 'No' : null],
-      ['Intestino regolare', p.bowel_regular ? 'Sì' : p.bowel_regular === false ? 'No' : null],
-      ['Cardio nella norma', p.cardiovascular_regular ? 'Sì' : p.cardiovascular_regular === false ? 'No' : null],
-      ['Note urologiche', p.urological_issues],
-      p.gender === 'F' ? ['Note ginecologiche', p.gynecological_info] : null,
+      ['Problemi visivi', yn(p.vision_issues)],
+      ['Problemi uditivi', yn(p.hearing_issues)],
+      ['Cefalee', yn(p.headaches)],
+      ['Bruxismo', yn(p.bruxism)],
+      ['Reflusso / gastrite', yn(p.reflux_gastritis)],
+      p.has_cardiovascular_issues ? ['Prob. cardiovascolari', p.cardiovascular_details || 'Sì'] : null,
+      p.has_gastrointestinal_issues ? ['Prob. gastrointestinali', p.gastrointestinal_details || 'Sì'] : null,
+      p.urological_issues ? ['Prob. urologiche', p.urological_issues] : null,
+      p.gynecological_info ? ['Prob. ginecologiche', p.gynecological_info] : null,
+      p.obstetric_history ? ['Parti / cesarei / interruzioni', p.obstetric_history] : null,
       ['Red flags', p.red_flags ? `⚠️ SÌ — ${p.red_flags_details || ''}` : 'No'],
       ['Note anamnesi', p.notes],
     ].filter(Boolean).filter(([, v]) => v);
@@ -177,7 +235,7 @@ function AnamnesisBlock({ patient: initial, onUpdated }) {
             {rows.length === 0 && <p className="text-sm text-gray-400 italic">Nessun dato inserito.</p>}
             {rows.map(([k, v]) => (
               <div key={k} className="flex gap-2 text-sm">
-                <span className="text-gray-500 w-40 shrink-0">{k}:</span>
+                <span className="text-gray-500 w-44 shrink-0">{k}:</span>
                 <span className="text-gray-800">{v}</span>
               </div>
             ))}
@@ -193,28 +251,6 @@ function AnamnesisBlock({ patient: initial, onUpdated }) {
   }
 
   // ── Form modifica ──
-  const Row = ({ label, children }) => (
-    <div className="space-y-1">
-      <label className="block text-xs font-semibold text-gray-600">{label}</label>
-      {children}
-    </div>
-  );
-  const TI = ({ k, placeholder }) => (
-    <input value={f[k]} onChange={e => upd(k, e.target.value)} placeholder={placeholder}
-      className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-  );
-  const TA = ({ k, placeholder, rows = 2 }) => (
-    <textarea value={f[k]} onChange={e => upd(k, e.target.value)} placeholder={placeholder} rows={rows}
-      className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
-  );
-  const Toggle = ({ k, label }) => (
-    <label className="flex items-center gap-2 cursor-pointer">
-      <input type="checkbox" checked={!!f[k]} onChange={e => upd(k, e.target.checked)}
-        className="w-4 h-4 rounded accent-green-600" />
-      <span className="text-sm text-gray-700">{label}</span>
-    </label>
-  );
-
   return (
     <div className="bg-white rounded-2xl border-2 border-blue-200 p-5 mb-4 space-y-5">
       <div className="flex items-center justify-between">
@@ -223,7 +259,7 @@ function AnamnesisBlock({ patient: initial, onUpdated }) {
       </div>
 
       {/* Livello */}
-      <Row label="Livello (da assessment NMQ)">
+      <FormRow label="Livello (da assessment NMQ)">
         <select value={f.level} onChange={e => upd('level', e.target.value)}
           className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500">
           <option value="">— non specificato —</option>
@@ -231,40 +267,40 @@ function AnamnesisBlock({ patient: initial, onUpdated }) {
           <option value="level2">Livello 2 — Prevenzione</option>
           <option value="level3">Livello 3 — Formazione</option>
         </select>
-      </Row>
+      </FormRow>
 
       {/* Attività lavorativa */}
       <div className="border-t border-gray-100 pt-4">
         <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Attività lavorativa</div>
-        <Row label="Descrizione attività in azienda">
-          <TI k="job_activity" placeholder="es. operaio reparto montaggio, impiegato ufficio..." />
-        </Row>
+        <FormRow label="Descrizione attività in azienda">
+          <FormInput value={f.job_activity} onChange={v => upd('job_activity', v)} placeholder="es. operaio reparto montaggio, impiegato ufficio..." />
+        </FormRow>
         <div className="mt-3 space-y-2">
-          <Toggle k="sedentary" label="Lavoro prevalentemente sedentario" />
-          <Toggle k="does_sport" label="Pratica sport" />
+          <FormToggle checked={f.sedentary} onChange={v => upd('sedentary', v)} label="Lavoro prevalentemente sedentario" />
+          <FormToggle checked={f.does_sport} onChange={v => upd('does_sport', v)} label="Pratica sport" />
         </div>
         {f.does_sport && (
           <div className="mt-2">
-            <Row label="Quale sport, con che frequenza?">
-              <TI k="sport_details" placeholder="es. calcetto 2 volte a settimana..." />
-            </Row>
+            <FormRow label="Quale sport, con che frequenza?">
+              <FormInput value={f.sport_details} onChange={v => upd('sport_details', v)} placeholder="es. calcetto 2 volte a settimana..." />
+            </FormRow>
           </div>
         )}
       </div>
 
-      {/* Dolore */}
+      {/* Sintomatologia */}
       <div className="border-t border-gray-100 pt-4">
         <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Sintomatologia</div>
         <div className="space-y-3">
-          <Row label="Dove ha male? (zona corporea)">
-            <TI k="pain_location" placeholder="es. lombare sinistra, collo, spalla destra..." />
-          </Row>
-          <Row label="Come è insorto? Quando? Trauma o no?">
-            <TA k="pain_onset" placeholder="es. dolore graduale da 6 mesi, peggiorato con lavoro sedentario..." />
-          </Row>
-          <Row label="Tipo di dolore">
-            <TI k="pain_type" placeholder="es. sordo, acuto, bruciore, irradiato al braccio..." />
-          </Row>
+          <FormRow label="Dove ha male? (zona corporea)">
+            <FormInput value={f.pain_location} onChange={v => upd('pain_location', v)} placeholder="es. lombare sinistra, collo, spalla destra..." />
+          </FormRow>
+          <FormRow label="Come è insorto? Quando? Trauma o no?">
+            <FormTextarea value={f.pain_onset} onChange={v => upd('pain_onset', v)} placeholder="es. dolore graduale da 6 mesi, peggiorato con lavoro sedentario..." />
+          </FormRow>
+          <FormRow label="Tipo di dolore">
+            <FormInput value={f.pain_type} onChange={v => upd('pain_type', v)} placeholder="es. sordo, acuto, bruciore, irradiato al braccio..." />
+          </FormRow>
         </div>
       </div>
 
@@ -272,66 +308,112 @@ function AnamnesisBlock({ patient: initial, onUpdated }) {
       <div className="border-t border-gray-100 pt-4">
         <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Farmaci e diagnostica</div>
         <div className="space-y-3">
-          <Toggle k="takes_medications" label="Assume farmaci" />
+          <FormToggle checked={f.takes_medications} onChange={v => upd('takes_medications', v)} label="Assume farmaci" />
           {f.takes_medications && (
-            <Row label="Quali farmaci?">
-              <TI k="medications_details" placeholder="es. antinfiammatori FANS, cortisone..." />
-            </Row>
+            <FormRow label="Quali farmaci?">
+              <FormInput value={f.medications_details} onChange={v => upd('medications_details', v)} placeholder="es. antinfiammatori FANS, cortisone..." />
+            </FormRow>
           )}
-          <Toggle k="recent_diagnostics" label="Ha eseguito esami recenti (RX, RM, TAC...)" />
+          <FormToggle checked={f.recent_diagnostics} onChange={v => upd('recent_diagnostics', v)} label="Ha eseguito esami recenti (RX, RM, TAC...)" />
           {f.recent_diagnostics && (
-            <Row label="Quali esami e risultato?">
-              <TA k="diagnostics_details" placeholder="es. RMN lombare — protrusione L4-L5..." />
-            </Row>
+            <FormRow label="Quali esami e risultato?">
+              <FormTextarea value={f.diagnostics_details} onChange={v => upd('diagnostics_details', v)} placeholder="es. RMN lombare — protrusione L4-L5..." />
+            </FormRow>
           )}
-          <Row label="Traumi, fratture, colpi di frusta, interventi chirurgici">
-            <TA k="traumas_surgeries" placeholder="es. frattura clavicola 2018, appendicectomia..." />
-          </Row>
+          <FormRow label="Traumi, fratture, colpi di frusta, interventi chirurgici">
+            <FormTextarea value={f.traumas_surgeries} onChange={v => upd('traumas_surgeries', v)} placeholder="es. frattura clavicola 2018, appendicectomia..." />
+          </FormRow>
         </div>
       </div>
 
       {/* Anamnesi sistemica */}
       <div className="border-t border-gray-100 pt-4">
         <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Anamnesi sistemica</div>
-        <div className="grid grid-cols-2 gap-2">
-          <Toggle k="vision_issues" label="Problemi visivi" />
-          <Toggle k="hearing_issues" label="Problemi uditivi" />
-          <Toggle k="headaches" label="Cefalee / emicranie" />
-          <Toggle k="bruxism" label="Bruxismo / serramento" />
-          <Toggle k="reflux_gastritis" label="Reflusso / gastrite" />
-          <Toggle k="bowel_regular" label="Intestino regolare" />
-          <Toggle k="cardiovascular_regular" label="Cardio nella norma" />
-        </div>
-        <div className="mt-3 space-y-3">
-          <Row label="Note urologiche (cistiti, prostata, vescica...)">
-            <TI k="urological_issues" placeholder="opzionale" />
-          </Row>
-          {p.gender === 'F' && (
-            <Row label="Note ginecologiche (parti, mestruazioni, complicanze...)">
-              <TA k="gynecological_info" placeholder="opzionale" />
-            </Row>
+        <div className="space-y-3">
+
+          {/* Flag semplici */}
+          <div className="grid grid-cols-2 gap-2">
+            <FormToggle checked={f.vision_issues} onChange={v => upd('vision_issues', v)} label="Problemi visivi" />
+            <FormToggle checked={f.hearing_issues} onChange={v => upd('hearing_issues', v)} label="Problemi uditivi" />
+            <FormToggle checked={f.headaches} onChange={v => upd('headaches', v)} label="Cefalee / emicranie" />
+            <FormToggle checked={f.bruxism} onChange={v => upd('bruxism', v)} label="Bruxismo / serramento" />
+            <FormToggle checked={f.reflux_gastritis} onChange={v => upd('reflux_gastritis', v)} label="Reflusso / gastrite" />
+          </div>
+
+          {/* Cardiovascolare */}
+          <FormToggle checked={f.has_cardiovascular_issues} onChange={v => upd('has_cardiovascular_issues', v)} label="Problemi cardiovascolari" />
+          {f.has_cardiovascular_issues && (
+            <FormRow label="Dettaglio problemi cardiovascolari">
+              <FormInput value={f.cardiovascular_details} onChange={v => upd('cardiovascular_details', v)} placeholder="es. ipertensione, tachicardia, cardiopatia..." />
+            </FormRow>
           )}
+
+          {/* Gastrointestinale */}
+          <FormToggle checked={f.has_gastrointestinal_issues} onChange={v => upd('has_gastrointestinal_issues', v)} label="Problemi gastrointestinali" />
+          {f.has_gastrointestinal_issues && (
+            <FormRow label="Dettaglio problemi gastrointestinali">
+              <FormInput value={f.gastrointestinal_details} onChange={v => upd('gastrointestinal_details', v)} placeholder="es. colon irritabile, Crohn, stipsi cronica..." />
+            </FormRow>
+          )}
+
+          {/* Urologiche */}
+          <FormToggle
+            checked={showUrological}
+            onChange={v => {
+              setShowUrological(v);
+              if (!v) upd('urological_issues', '');
+            }}
+            label="Problematiche urologiche"
+          />
+          {showUrological && (
+            <FormRow label="Dettaglio problematiche urologiche">
+              <FormInput value={f.urological_issues} onChange={v => upd('urological_issues', v)} placeholder="es. cistiti ricorrenti, calcoli renali, ipertrofia prostatica..." />
+            </FormRow>
+          )}
+
+          {/* Ginecologiche */}
+          <FormToggle
+            checked={showGynecological}
+            onChange={v => {
+              setShowGynecological(v);
+              if (!v) upd('gynecological_info', '');
+            }}
+            label="Problematiche ginecologiche"
+          />
+          {showGynecological && (
+            <FormRow label="Dettaglio problematiche ginecologiche">
+              <FormTextarea value={f.gynecological_info} onChange={v => upd('gynecological_info', v)} placeholder="es. endometriosi, ciclo irregolare, menopausa..." />
+            </FormRow>
+          )}
+
+          {/* Parti / cesarei / interruzioni — solo F */}
+          {p.gender === 'F' && (
+            <FormRow label="Parti, cesarei, interruzioni di gravidanza">
+              <FormTextarea value={f.obstetric_history} onChange={v => upd('obstetric_history', v)} placeholder="es. 2 parti naturali, 1 cesareo nel 2019..." />
+            </FormRow>
+          )}
+
         </div>
       </div>
 
       {/* Red flags */}
       <div className="border-t border-gray-100 pt-4">
         <div className="text-xs font-bold text-red-500 uppercase tracking-widest mb-3">Red Flags</div>
-        <Toggle k="red_flags" label="⚠️ Red flags presenti" />
+        <FormToggle checked={f.red_flags} onChange={v => upd('red_flags', v)} label="⚠️ Red flags presenti" />
         {f.red_flags && (
           <div className="mt-2">
-            <Row label="Dettaglio red flags">
-              <TA k="red_flags_details" placeholder="es. dolore notturno, calo peso improvviso, deficit neurologico..." />
-            </Row>
+            <FormRow label="Dettaglio red flags">
+              <FormTextarea value={f.red_flags_details} onChange={v => upd('red_flags_details', v)} placeholder="es. dolore notturno, calo peso improvviso, deficit neurologico..." />
+            </FormRow>
           </div>
         )}
       </div>
 
       {/* Note libere */}
       <div className="border-t border-gray-100 pt-4">
-        <Row label="Note libere anamnesi">
-          <TA k="notes" placeholder="Tutto ciò che vuoi ricordare..." rows={3} />
-        </Row>
+        <FormRow label="Note libere anamnesi">
+          <FormTextarea value={f.notes} onChange={v => upd('notes', v)} placeholder="Tutto ciò che vuoi ricordare..." rows={3} />
+        </FormRow>
       </div>
 
       {/* Salva */}
@@ -471,10 +553,8 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
 
         <main className="max-w-xl mx-auto px-4 py-5 space-y-4">
 
-          {/* Anamnesi con modifica */}
           <AnamnesisBlock patient={patient} onUpdated={setPatient} />
 
-          {/* NRS Trend */}
           {closedSessions.length >= 2 && (
             <div className="bg-white rounded-2xl border border-gray-200 p-4">
               <h3 className="font-semibold text-gray-800 mb-3 text-sm">Trend NRS</h3>
@@ -482,7 +562,6 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
             </div>
           )}
 
-          {/* Sedute chiuse */}
           {closedSessions.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide">Sedute precedenti</h3>
@@ -516,7 +595,6 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
             </div>
           )}
 
-          {/* Nuova seduta */}
           {!hasOpenSession && !showNewSession && (
             <button onClick={() => setShowNewSession(true)}
               className="w-full py-3 rounded-xl bg-green-600 text-white font-semibold">

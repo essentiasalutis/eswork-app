@@ -53,6 +53,9 @@ export default function Dashboard({ clients: initialClients, assessmentCounts })
             <span className="text-sm text-gray-500 ml-2">Dashboard</span>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/dashboard/professionals" className="text-sm text-indigo-700 hover:text-indigo-900 py-2 px-3 border border-indigo-200 rounded-xl bg-indigo-50">
+              Professionisti
+            </Link>
             <Link href="/dashboard/pipeline" className="text-sm text-purple-700 hover:text-purple-900 py-2 px-3 border border-purple-200 rounded-xl bg-purple-50">
               Pipeline
             </Link>

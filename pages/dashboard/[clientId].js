@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { getClientById, getResponsesForClient } from '../../lib/store';
+import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient } from '../../lib/store';
 import { TYPE_LABELS, TYPE_COLORS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
 import { CONFIG } from '../../lib/config';
@@ -72,10 +72,27 @@ function EmailModal({ to, subject, body, onClose }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function ClientPage({ client, assessments: initial, responses: initialResponses }) {
+// ─── NRS bar inline ───────────────────────────────────────────────────────────
+
+function NrsBar({ value, max = 10 }) {
+  if (value === null || value === undefined) return <span className="text-gray-300">—</span>;
+  const color = value <= 3 ? '#16a34a' : value <= 6 ? '#ca8a04' : '#dc2626';
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="font-bold" style={{ color }}>{value}</span>
+      <span className="text-gray-400 text-xs">/ 10</span>
+      <span className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden inline-block">
+        <span className="h-full rounded-full inline-block" style={{ width: `${(value / max) * 100}%`, background: color }} />
+      </span>
+    </span>
+  );
+}
+
+export default function ClientPage({ client, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs }) {
   const router = useRouter();
   const [assessments, setAssessments] = useState(initial);
   const [responses, setResponses] = useState(initialResponses);
+  const [assignments, setAssignments] = useState(initialAssignments || []);
   const [showNew, setShowNew] = useState(false);
   const [newType, setNewType] = useState('initial');
   const [includePSS, setIncludePSS] = useState(true);
@@ -303,6 +320,83 @@ ${FIRMA}`;
           </div>
         )}
 
+        {/* ── Professionisti assegnati ────────────────────────────────── */}
+        <div className="mb-5">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Professionisti assegnati</h2>
+            <Link href="/dashboard/professionals" className="text-xs text-blue-600 hover:underline">Gestisci →</Link>
+          </div>
+          {assignments.length === 0 ? (
+            <div className="bg-gray-50 rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-400">
+              Nessun professionista assegnato. <Link href="/dashboard/professionals" className="text-blue-500 hover:underline">Assegna</Link>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {assignments.map(a => (
+                <div key={a.id} className={`bg-white rounded-xl border px-4 py-2.5 flex items-center justify-between ${a.active ? 'border-gray-200' : 'border-gray-100 opacity-60'}`}>
+                  <div>
+                    <span className="text-sm font-medium text-gray-800">{a.professionals?.name}</span>
+                    <span className="text-xs text-gray-400 ml-2">{a.professionals?.email}</span>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${a.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                    {a.active ? 'attivo' : 'revocato'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Pazienti / NRS (solo coord., niente note cliniche) ──────── */}
+        {patientsNrs && patientsNrs.length > 0 && (
+          <div className="mb-5">
+            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-2">Pazienti — NRS</h2>
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
+                    <th className="text-left px-4 py-2">Paziente</th>
+                    <th className="text-center px-3 py-2">Livello</th>
+                    <th className="text-center px-3 py-2">Sedute</th>
+                    <th className="text-center px-3 py-2">NRS inizio</th>
+                    <th className="text-center px-3 py-2">NRS fine</th>
+                    <th className="text-center px-3 py-2">Delta</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {patientsNrs.map(p => {
+                    const delta = (p.nrs_first !== null && p.nrs_last !== null) ? p.nrs_last - p.nrs_first : null;
+                    const levelColors = { level1: '#dc2626', level2: '#ca8a04', level3: '#16a34a' };
+                    const levelLabels = { level1: 'L1', level2: 'L2', level3: 'L3' };
+                    return (
+                      <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
+                        <td className="px-4 py-2.5 font-medium text-gray-800">{p.first_name} {p.last_name}</td>
+                        <td className="px-3 py-2.5 text-center">
+                          {p.level ? (
+                            <span className="text-xs font-bold px-1.5 py-0.5 rounded" style={{ color: levelColors[p.level], background: levelColors[p.level] + '18' }}>
+                              {levelLabels[p.level]}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-3 py-2.5 text-center text-gray-600">{p.closed_count}/{p.session_count}</td>
+                        <td className="px-3 py-2.5 text-center"><NrsBar value={p.nrs_first} /></td>
+                        <td className="px-3 py-2.5 text-center"><NrsBar value={p.nrs_last} /></td>
+                        <td className="px-3 py-2.5 text-center font-bold">
+                          {delta !== null ? (
+                            <span className={delta < 0 ? 'text-green-600' : delta > 0 ? 'text-red-600' : 'text-gray-400'}>
+                              {delta > 0 ? '+' : ''}{delta}
+                            </span>
+                          ) : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-3">
           {sortedAssessments.map(a => {
             const rCount = (responses[a.id] || []).length;
@@ -414,6 +508,29 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
   const client = await getClientById(clientId);
   if (!client) return { notFound: true };
 
-  const { assessments, responses } = await getResponsesForClient(clientId);
-  return { props: { client, assessments, responses } };
+  const [{ assessments, responses }, assignments, patientsRaw, sessionsRaw] = await Promise.all([
+    getResponsesForClient(clientId),
+    getAssignmentsByClient(clientId),
+    getPatientsByClient(clientId),
+    getSessionsForClient(clientId),
+  ]);
+
+  // Aggrega NRS per paziente (no note cliniche)
+  const patientsNrs = patientsRaw.map(p => {
+    const ps = sessionsRaw.filter(s => s.patient_id === p.id);
+    const first = ps.find(s => s.nrs_pre !== null);
+    const closed = ps.filter(s => s.closed_at && s.nrs_post !== null);
+    return {
+      id: p.id,
+      first_name: p.first_name,
+      last_name: p.last_name,
+      level: p.level || null,
+      session_count: ps.length,
+      closed_count: closed.length,
+      nrs_first: first?.nrs_pre ?? null,
+      nrs_last: closed.length > 0 ? closed[closed.length - 1].nrs_post : null,
+    };
+  });
+
+  return { props: { client, assessments, responses, assignments, patientsNrs } };
 });

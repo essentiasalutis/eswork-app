@@ -1,0 +1,34 @@
+import { getProfessionalByEmail, logAccess } from '../../../../lib/store';
+import { verifyPassword, setProSessionCookie } from '../../../../lib/pro-auth';
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).end();
+
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'Credenziali mancanti' });
+
+  const pro = await getProfessionalByEmail(email);
+  if (!pro) return res.status(401).json({ error: 'Credenziali non valide' });
+  if (!pro.active) return res.status(403).json({ error: 'Account disattivato. Contatta Essentia Salutis.' });
+
+  const ok = verifyPassword(password, pro.password_hash);
+  if (!ok) return res.status(401).json({ error: 'Credenziali non valide' });
+
+  const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
+  await logAccess(pro.id, 'login', ip, `Login da ${email}`);
+
+  setProSessionCookie(res, {
+    role: 'professional',
+    proId: pro.id,
+    proName: pro.name,
+    proEmail: pro.email,
+    mustReset: pro.must_reset_password,
+  });
+
+  return res.json({
+    id: pro.id,
+    name: pro.name,
+    email: pro.email,
+    mustReset: pro.must_reset_password,
+  });
+}

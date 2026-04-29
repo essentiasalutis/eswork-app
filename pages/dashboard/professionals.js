@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
-import { getProfessionals, getClients, getAssignmentsByProfessional } from '../../lib/store';
 
 export default function ProfessionalsPage({ professionals: initial, clients }) {
   const [professionals, setProfessionals] = useState(initial);
@@ -272,6 +271,7 @@ export default function ProfessionalsPage({ professionals: initial, clients }) {
 }
 
 export const getServerSideProps = requireAuthSsr(async () => {
+  const { getProfessionals, getClients } = require('../../lib/store');
   const [professionals, clients] = await Promise.all([
     getProfessionals(),
     getClients(),

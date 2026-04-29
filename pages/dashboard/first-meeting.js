@@ -2,7 +2,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireAuthSsr } from '../../lib/auth';
-import { getClientById, getFirstMeeting } from '../../lib/store';
 
 // ─── Costanti ─────────────────────────────────────────────────────────────────
 
@@ -278,6 +277,7 @@ export default function FirstMeetingPage({ client, meeting: initialMeeting }) {
 }
 
 export const getServerSideProps = requireAuthSsr(async (ctx) => {
+  const { getClientById, getFirstMeeting } = require('../../lib/store');
   const { clientId } = ctx.query;
   if (!clientId) return { notFound: true };
 

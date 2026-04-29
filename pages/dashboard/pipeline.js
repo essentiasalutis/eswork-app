@@ -2,7 +2,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireAuthSsr } from '../../lib/auth';
-import { getClients, updatePipelineStage } from '../../lib/store';
 import { CONFIG } from '../../lib/config';
 
 // ─── Costanti ─────────────────────────────────────────────────────────────────
@@ -271,6 +270,7 @@ export default function PipelinePage({ clients: initialClients }) {
 }
 
 export const getServerSideProps = requireAuthSsr(async () => {
+  const { getClients } = require('../../lib/store');
   const clients = await getClients();
   return {
     props: {

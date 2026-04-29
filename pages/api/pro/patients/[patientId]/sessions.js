@@ -75,7 +75,6 @@ export default requireProAuth(async function handler(req, res) {
       if (next_session_notes !== undefined) fields.next_session_notes = next_session_notes?.trim() || null;
 
       if (close) {
-        if (fields.nrs_post === undefined) return res.status(400).json({ error: 'NRS post obbligatorio per chiudere la visita' });
         fields.closed_at = new Date().toISOString();
         const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
         await logAccess(proId, 'close_session', ip, `Sessione ${sessionId} chiusa`);

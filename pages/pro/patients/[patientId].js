@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import { requireProAuthSsr } from '../../../lib/pro-auth';
 import {
   getPatientById,
@@ -542,9 +543,21 @@ function SessionForm({ patientId, sessionNumber, lastNote, onSaved }) {
 // ─── Pagina principale ────────────────────────────────────────────────────────
 
 export default function PatientPage({ proName, patient: initialPatient, sessions: initialSessions, client }) {
+  const router = useRouter();
   const [patient, setPatient] = useState(initialPatient);
   const [sessions, setSessions] = useState(initialSessions);
   const [showNewSession, setShowNewSession] = useState(false);
+
+  async function deletePatient() {
+    const name = `${patient.first_name} ${patient.last_name}`;
+    if (!confirm(`Eliminare definitivamente il paziente ${name}?\n\nVerranno cancellate anche tutte le sedute registrate. Questa azione non è reversibile.`)) return;
+    const res = await fetch(`/api/pro/patients/${patient.id}`, { method: 'DELETE' });
+    if (res.ok) {
+      router.replace(`/pro/clients/${patient.client_id}/patients`);
+    } else {
+      alert('Errore durante l\'eliminazione. Riprova.');
+    }
+  }
 
   const closedSessions = sessions.filter(s => s.closed_at);
   const lastClosed = closedSessions[closedSessions.length - 1];
@@ -575,7 +588,15 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
               </span>
             )}
           </div>
-          <div className="text-center text-xs text-gray-300 pb-1">{proName} — Essentia Salutis</div>
+          <div className="text-center text-xs text-gray-300 pb-1 flex items-center justify-center gap-3">
+            <span>{proName} — Essentia Salutis</span>
+            <button
+              onClick={deletePatient}
+              className="text-red-400 hover:text-red-600 text-xs underline"
+            >
+              Elimina paziente
+            </button>
+          </div>
         </header>
 
         <main className="max-w-xl mx-auto px-4 py-5 space-y-4">

@@ -4,6 +4,7 @@ import {
   updatePatient,
   getAssignmentsByProfessional,
 } from '../../../../lib/store';
+import supabase from '../../../../lib/db';
 
 async function checkAccess(proId, patient) {
   if (!patient) return false;
@@ -29,6 +30,17 @@ export default requireProAuth(async function handler(req, res) {
     try {
       const updated = await updatePatient(patientId, req.body);
       return res.json(updated);
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  if (req.method === 'DELETE') {
+    try {
+      await supabase.from('sessions').delete().eq('patient_id', patientId);
+      const { error } = await supabase.from('patients').delete().eq('id', patientId);
+      if (error) throw error;
+      return res.json({ ok: true });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }

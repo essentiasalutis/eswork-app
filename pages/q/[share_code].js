@@ -155,7 +155,7 @@ function PSSSection({ answers, setAnswer }) {
       {PSS_QUESTIONS.map((q, i) => (
         <div key={i} className="bg-white rounded-2xl border border-gray-200 p-4">
           <p className="text-sm text-gray-700 mb-3 leading-relaxed">{q.t}</p>
-          <div className="flex flex-nowrap gap-1.5 overflow-x-auto pb-1">
+          <div className="flex flex-wrap gap-2">
             {PSS_OPTS.map((opt, oi) => (
               <LikertBtn
                 key={oi}
@@ -188,7 +188,7 @@ function UWESSection({ answers, setAnswer }) {
             </span>
             <p className="text-sm text-gray-700 leading-relaxed">{q.t}</p>
           </div>
-          <div className="flex flex-nowrap gap-1.5 overflow-x-auto pb-1">
+          <div className="grid grid-cols-4 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
             {UWES_OPTS.map((opt, oi) => (
               <LikertBtn
                 key={oi}

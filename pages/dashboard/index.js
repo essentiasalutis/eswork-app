@@ -10,7 +10,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts })
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
   const [showNew, setShowNew] = useState(false);
-  const [form, setForm] = useState({ name: '', sector: 1, employees: 50, contact_name: '', contact_email: '', notes: '' });
+  const [form, setForm] = useState({ name: '', sector: 1, employees: 50, contact_name: '', contact_email: '', contact_phone: '', source: 'passaparola', notes: '' });
   const [saving, setSaving] = useState(false);
 
   async function logout() {
@@ -30,7 +30,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts })
       const client = await res.json();
       setClients(prev => [...prev, client]);
       setShowNew(false);
-      setForm({ name: '', sector: 1, employees: 50 });
+      setForm({ name: '', sector: 1, employees: 50, contact_name: '', contact_email: '', contact_phone: '', source: 'passaparola', notes: '' });
     }
     setSaving(false);
   }
@@ -53,6 +53,9 @@ export default function Dashboard({ clients: initialClients, assessmentCounts })
             <span className="text-sm text-gray-500 ml-2">Dashboard</span>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/dashboard/pipeline" className="text-sm text-purple-700 hover:text-purple-900 py-2 px-3 border border-purple-200 rounded-xl bg-purple-50">
+              Pipeline
+            </Link>
             <Link href="/dashboard/calculator" className="text-sm text-green-700 hover:text-green-900 py-2 px-3 border border-green-200 rounded-xl bg-green-50">
               Calcolatore
             </Link>
@@ -108,13 +111,38 @@ export default function Dashboard({ clients: initialClients, assessmentCounts })
               placeholder="Nome referente (opzionale)"
               className="w-full px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
             />
-            <input
-              type="email"
-              value={form.contact_email}
-              onChange={e => setForm(p => ({ ...p, contact_email: e.target.value }))}
-              placeholder="Email referente (opzionale)"
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
+            <div className="flex gap-3">
+              <input
+                type="email"
+                value={form.contact_email}
+                onChange={e => setForm(p => ({ ...p, contact_email: e.target.value }))}
+                placeholder="Email referente (opzionale)"
+                className="flex-1 px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <input
+                type="tel"
+                value={form.contact_phone}
+                onChange={e => setForm(p => ({ ...p, contact_phone: e.target.value }))}
+                placeholder="Telefono (opz.)"
+                className="w-36 px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Fonte contatto</label>
+              <select
+                value={form.source}
+                onChange={e => setForm(p => ({ ...p, source: e.target.value }))}
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+              >
+                <option value="passaparola">Passaparola</option>
+                <option value="contatto_diretto">Contatto diretto</option>
+                <option value="social">Social media</option>
+                <option value="evento">Evento</option>
+                <option value="sito_web">Sito web</option>
+                <option value="intermediario">Intermediario</option>
+                <option value="altro">Altro</option>
+              </select>
+            </div>
             <textarea
               value={form.notes}
               onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}

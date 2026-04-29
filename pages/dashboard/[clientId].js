@@ -1,10 +1,76 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { getSessionToken, verifyToken } from '../../lib/auth';
 import { getClientById, getResponsesForClient } from '../../lib/store';
 import { TYPE_LABELS, TYPE_COLORS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
+import { CONFIG } from '../../lib/config';
+
+// ─── Email Modal ──────────────────────────────────────────────────────────────
+
+function EmailModal({ to, subject, body, onClose }) {
+  const [editTo, setEditTo] = useState(to || '');
+  const [editSubject, setEditSubject] = useState(subject);
+  const [editBody, setEditBody] = useState(body);
+
+  function sendEmail() {
+    const mailto = `mailto:${encodeURIComponent(editTo)}?subject=${encodeURIComponent(editSubject)}&body=${encodeURIComponent(editBody)}`;
+    window.location.href = mailto;
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <h3 className="font-semibold text-gray-900">Invia email</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+        <div className="p-4 space-y-3">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">A:</label>
+            <input
+              value={editTo}
+              onChange={e => setEditTo(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="email@azienda.it"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Oggetto:</label>
+            <input
+              value={editSubject}
+              onChange={e => setEditSubject(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Testo:</label>
+            <textarea
+              value={editBody}
+              onChange={e => setEditBody(e.target.value)}
+              rows={12}
+              className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none font-mono"
+            />
+          </div>
+        </div>
+        <div className="flex gap-3 p-4 border-t border-gray-200">
+          <button
+            onClick={sendEmail}
+            className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold text-sm"
+          >
+            Apri in Mail →
+          </button>
+          <button onClick={onClose} className="px-4 py-3 rounded-xl border border-gray-300 text-gray-600 text-sm">
+            Annulla
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function ClientPage({ client, assessments: initial, responses: initialResponses }) {
   const router = useRouter();
@@ -16,10 +82,13 @@ export default function ClientPage({ client, assessments: initial, responses: in
   const [saving, setSaving] = useState(false);
   const [reportAssessment, setReportAssessment] = useState(null);
   const [copied, setCopied] = useState(null);
+  const [emailModal, setEmailModal] = useState(null); // { to, subject, body }
 
   const baseUrl = typeof window !== 'undefined'
     ? window.location.origin
     : process.env.NEXT_PUBLIC_BASE_URL || '';
+
+  const FIRMA = `Cordiali saluti,\nDott. Enrico Maiolo — founder @ Essentia Salutis\nTel: ${CONFIG.contact_phone}\n${CONFIG.contact_email}`;
 
   async function createAssessment(e) {
     e.preventDefault();
@@ -66,6 +135,31 @@ export default function ClientPage({ client, assessments: initial, responses: in
     setTimeout(() => setCopied(null), 2000);
   }
 
+  // Mod 3: email link assessment
+  function emailLink(a) {
+    const url = `${baseUrl}/q/${a.share_code}`;
+    const referente = client.contact_name || 'referente';
+    const body = `Gentile ${referente},
+
+come concordato, le invio il link per l'assessment ES Work dedicato ai dipendenti di ${client.name}.
+
+Il questionario è anonimo, si compila dallo smartphone in circa 15 minuti, e può essere completato in qualsiasi momento entro i prossimi 3 giorni lavorativi.
+
+Può inoltrare questo link a tutti i dipendenti:
+${url}
+
+Le chiedo di comunicare ai dipendenti che l'azienda ha avviato un'iniziativa di salute organizzativa e che il questionario è completamente anonimo — i risultati saranno usati solo in forma aggregata.
+
+Per qualsiasi domanda, sono a disposizione.
+
+${FIRMA}`;
+    setEmailModal({
+      to: client.contact_email || '',
+      subject: `Assessment ES Work — ${client.name}`,
+      body,
+    });
+  }
+
   function openReport(a) {
     const rList = responses[a.id] || [];
     setReportAssessment({ ...a, responseList: rList });
@@ -107,7 +201,7 @@ export default function ClientPage({ client, assessments: initial, responses: in
           assessment={reportAssessment}
           client={client}
           baseline={getBaseline(reportAssessment)}
-          onOpenCalculator={reportAssessment.type === 'initial' ? () => openCalculator(reportAssessment) : undefined}
+          onOpenCalculator={reportAssessment.type === 'initial' ? () => openCalculator(reportAssessment) : null}
         />
       </div>
     );
@@ -117,6 +211,15 @@ export default function ClientPage({ client, assessments: initial, responses: in
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {emailModal && (
+        <EmailModal
+          to={emailModal.to}
+          subject={emailModal.subject}
+          body={emailModal.body}
+          onClose={() => setEmailModal(null)}
+        />
+      )}
+
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
           <Link href="/dashboard" className="text-gray-400 hover:text-gray-600 p-1">
@@ -128,12 +231,20 @@ export default function ClientPage({ client, assessments: initial, responses: in
             <div className="font-semibold text-gray-900 truncate">{client.name}</div>
             <div className="text-xs text-gray-500">{client.employees} dip. · {client.sector === 1 ? 'Manifattura' : 'Ufficio/IT'}</div>
           </div>
-          <button
-            onClick={() => setShowNew(true)}
-            className="bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl whitespace-nowrap"
-          >
-            + Assessment
-          </button>
+          <div className="flex gap-2">
+            <Link
+              href={`/dashboard/first-meeting?clientId=${client.id}`}
+              className="text-sm text-blue-600 border border-blue-200 bg-blue-50 px-3 py-2 rounded-xl whitespace-nowrap"
+            >
+              Colloquio
+            </Link>
+            <button
+              onClick={() => setShowNew(true)}
+              className="bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl whitespace-nowrap"
+            >
+              + Assessment
+            </button>
+          </div>
         </div>
       </header>
 
@@ -233,7 +344,7 @@ export default function ClientPage({ client, assessments: initial, responses: in
 
                 {a.status === 'active' && (
                   <div className="bg-gray-50 rounded-xl p-3 mb-3">
-                    <div className="text-xs text-gray-500 mb-1">Link questionario (da inviare ai dipendenti):</div>
+                    <div className="text-xs text-gray-500 mb-1">Link questionario:</div>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 text-xs text-gray-700 font-mono bg-white border border-gray-200 rounded-lg px-2 py-1.5 truncate">
                         {shareUrl}
@@ -255,12 +366,21 @@ export default function ClientPage({ client, assessments: initial, responses: in
 
                 <div className="flex flex-wrap gap-2">
                   {a.status === 'active' && (
-                    <button
-                      onClick={() => closeAssessment(a.id)}
-                      className="text-sm px-4 py-2 rounded-xl border border-gray-300 text-gray-600"
-                    >
-                      Chiudi raccolta
-                    </button>
+                    <>
+                      <button
+                        onClick={() => closeAssessment(a.id)}
+                        className="text-sm px-4 py-2 rounded-xl border border-gray-300 text-gray-600"
+                      >
+                        Chiudi raccolta
+                      </button>
+                      {/* Mod 3: Invia link via email */}
+                      <button
+                        onClick={() => emailLink(a)}
+                        className="text-sm px-4 py-2 rounded-xl border border-blue-200 text-blue-600 bg-blue-50"
+                      >
+                        Invia link email
+                      </button>
+                    </>
                   )}
                   {rCount > 0 && (
                     <button
@@ -269,6 +389,14 @@ export default function ClientPage({ client, assessments: initial, responses: in
                       style={{ borderColor: color + '60', color: color, background: color + '10' }}
                     >
                       Visualizza report
+                    </button>
+                  )}
+                  {rCount > 0 && a.type === 'initial' && (
+                    <button
+                      onClick={() => openCalculator(a)}
+                      className="text-sm px-4 py-2 rounded-xl border border-green-300 text-green-700 bg-green-50 font-medium"
+                    >
+                      Preventivo
                     </button>
                   )}
                 </div>

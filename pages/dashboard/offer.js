@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import Head from 'next/head';
 import { requireAuthSsr } from '../../lib/auth';
 import { getAssessmentById, getClientById, getResponsesByAssessment } from '../../lib/store';
@@ -7,6 +8,73 @@ import {
 } from '../../lib/scoring';
 import { calculatePricing, calculateROI, fmt } from '../../lib/calculator';
 import { CONFIG } from '../../lib/config';
+
+// ─── Firma standard ───────────────────────────────────────────────────────────
+
+const FIRMA = `Cordiali saluti,
+Dott. Enrico Maiolo — founder @ Essentia Salutis
+Tel: ${CONFIG.contact_phone}
+${CONFIG.contact_email}`;
+
+// ─── Modale email ─────────────────────────────────────────────────────────────
+
+function EmailModal({ modal, onClose }) {
+  const [to, setTo] = useState(modal.to);
+  const [subject, setSubject] = useState(modal.subject);
+  const [body, setBody] = useState(modal.body);
+
+  const href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-lg p-5 space-y-3 shadow-2xl">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-gray-800">Invia via email</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">A</label>
+          <input
+            value={to}
+            onChange={e => setTo(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Oggetto</label>
+          <input
+            value={subject}
+            onChange={e => setSubject(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Testo</label>
+          <textarea
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            rows={10}
+            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+          />
+        </div>
+        <div className="flex gap-3">
+          <a
+            href={href}
+            className="flex-1 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold text-center hover:bg-green-700"
+          >
+            Apri in Mail
+          </a>
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-600 text-sm"
+          >
+            Chiudi
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -48,6 +116,8 @@ function Page({ children, className = '' }) {
 // ─── Offer Document ───────────────────────────────────────────────────────────
 
 export default function OfferPage({ client, assessment, nmq, pss, uwes, enps, calc, roi, date }) {
+  const [emailModal, setEmailModal] = useState(null);
+
   if (!client || !assessment) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-400">
@@ -58,6 +128,34 @@ export default function OfferPage({ client, assessment, nmq, pss, uwes, enps, ca
 
   const interventions = generateInterventionPlan(nmq);
   const summaryText = generateSummaryText(nmq, pss, uwes, enps);
+
+  function openOfferEmail() {
+    const referente = client.contact_name ? `Gentile ${client.contact_name},` : `Gentile referente,`;
+    const prezzoY1 = calc ? fmt(calc.price_y1) : '–';
+    const body = `${referente}
+
+Le invio in allegato la proposta di intervento per ${client.name}, elaborata a seguito dell'assessment ES Work.
+
+In sintesi, il programma anno 1 prevede:
+• Sportello osteopatico in sede (trattamento individuale)
+• Formazione collettiva su postura ed ergonomia
+• 2 review intermedie (3 e 6 mesi) + report annuale finale
+• Coordinamento completo e documentazione INAIL OT23
+
+Investimento Anno 1: ${prezzoY1}
+
+Il documento allegato contiene tutti i dettagli: dati emersi dall'assessment, piano di intervento, analisi ROI e metodologia.
+
+Sono disponibile per qualsiasi domanda o per fissare una call di approfondimento.
+
+${FIRMA}`;
+
+    setEmailModal({
+      to: client.contact_email || '',
+      subject: `Proposta ES Work — ${client.name}`,
+      body,
+    });
+  }
 
   const semaphoreData = [
     { type: 'nmq', score: nmq.level1.pct, value: `${nmq.level1.pct}%`, label: 'Salute fisica', sub: 'Livello 1' },
@@ -104,7 +202,7 @@ export default function OfferPage({ client, assessment, nmq, pss, uwes, enps, ca
       `}</style>
 
       {/* ── Pulsanti UI (no print) ─────────────────────────────────────── */}
-      <div className="no-print flex gap-3 max-w-3xl mx-auto px-4 pt-4 pb-2">
+      <div className="no-print flex gap-3 max-w-3xl mx-auto px-4 pt-4 pb-2 flex-wrap">
         <button
           onClick={() => window.history.back()}
           className="flex items-center gap-1 text-sm text-gray-600 border border-gray-300 px-3 py-2 rounded-xl"
@@ -117,7 +215,15 @@ export default function OfferPage({ client, assessment, nmq, pss, uwes, enps, ca
         >
           Stampa / Salva PDF
         </button>
+        <button
+          onClick={openOfferEmail}
+          className="flex items-center gap-1 text-sm text-blue-700 border border-blue-300 bg-blue-50 px-4 py-2 rounded-xl font-semibold"
+        >
+          ✉ Invia offerta via email
+        </button>
       </div>
+
+      {emailModal && <EmailModal modal={emailModal} onClose={() => setEmailModal(null)} />}
 
       {/* ── PAG 1: Copertina ───────────────────────────────────────────── */}
       <Page>

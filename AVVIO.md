@@ -44,7 +44,7 @@ Aprire il browser su **http://localhost:3000**
 
 | Campo    | Valore            |
 |----------|-------------------|
-| Email    | henk@eswork.it    |
+| Email    | admin@eswork.it   |
 | Password | eswork2026        |
 
 ---

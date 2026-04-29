@@ -517,6 +517,49 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         </>
       )}
 
+      {/* Mod 2: Matrice migrazione livelli (solo per final con baseline) */}
+      {assessment.type === 'final' && hasBaseline && baseNmq && (
+        <>
+          <SectionTitle>Migrazione tra livelli — Baseline vs Finale</SectionTitle>
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3 print-page">
+            <div className="text-xs text-gray-500 mb-3">
+              Variazione nella distribuzione della popolazione tra i 3 livelli di rischio.
+            </div>
+            {[
+              { label: 'Livello 1 (Trattamento)', before: baseNmq.level1.count, after: nmq.level1.count, beforePct: baseNmq.level1.pct, afterPct: nmq.level1.pct, color: '#E74C3C', inverse: true },
+              { label: 'Livello 2 (Prevenzione)', before: baseNmq.level2.count, after: nmq.level2.count, beforePct: baseNmq.level2.pct, afterPct: nmq.level2.pct, color: '#F39C12', inverse: true },
+              { label: 'Livello 3 (Solo formazione)', before: baseNmq.level3.count, after: nmq.level3.count, beforePct: baseNmq.level3.pct, afterPct: nmq.level3.pct, color: '#16a34a', inverse: false },
+            ].map((row, i) => {
+              const diff = row.after - row.before;
+              const good = row.inverse ? diff < 0 : diff > 0;
+              const neutral = diff === 0;
+              return (
+                <div key={i} className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-100 last:border-0 last:mb-0 last:pb-0">
+                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: row.color }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-gray-700 mb-1">{row.label}</div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-gray-400">{row.before} ({row.beforePct}%)</span>
+                      <span className="text-gray-300">→</span>
+                      <span className="font-semibold" style={{ color: row.color }}>{row.after} ({row.afterPct}%)</span>
+                      {!neutral && (
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${good ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                          {diff > 0 ? '+' : ''}{diff} {good ? '↓' : '↑'}
+                        </span>
+                      )}
+                      {neutral && <span className="text-xs text-gray-400 px-2 py-0.5 rounded-full bg-gray-100">stabile</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <div className="text-xs text-gray-400 pt-2 mt-1">
+              Per Livello 1 e 2: verde = riduzione (miglioramento). Per Livello 3: verde = aumento.
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Genera preventivo button */}
       {assessment.type === 'initial' && onOpenCalculator && (
         <div className="mt-6 mb-3 no-print">

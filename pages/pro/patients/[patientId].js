@@ -136,10 +136,13 @@ function AnamnesisBlock({ patient: initial, onUpdated }) {
     diagnostics_details:          p.diagnostics_details || '',
     traumas_surgeries:            p.traumas_surgeries || '',
     vision_issues:                p.vision_issues ?? false,
+    vision_details:               p.vision_details || '',
     hearing_issues:               p.hearing_issues ?? false,
+    hearing_details:              p.hearing_details || '',
     headaches:                    p.headaches ?? false,
+    headaches_details:            p.headaches_details || '',
     bruxism:                      p.bruxism ?? false,
-    reflux_gastritis:             p.reflux_gastritis ?? false,
+    bruxism_details:              p.bruxism_details || '',
     has_cardiovascular_issues:    p.has_cardiovascular_issues ?? false,
     cardiovascular_details:       p.cardiovascular_details || '',
     has_gastrointestinal_issues:  p.has_gastrointestinal_issues ?? false,
@@ -193,11 +196,10 @@ function AnamnesisBlock({ patient: initial, onUpdated }) {
       ['Farmaci', p.takes_medications ? `Sì — ${p.medications_details || ''}` : p.takes_medications === false ? 'No' : null],
       ['Esami recenti', p.recent_diagnostics ? `Sì — ${p.diagnostics_details || ''}` : p.recent_diagnostics === false ? 'No' : null],
       ['Traumi / Chirurgie', p.traumas_surgeries],
-      ['Problemi visivi', yn(p.vision_issues)],
-      ['Problemi uditivi', yn(p.hearing_issues)],
-      ['Cefalee', yn(p.headaches)],
-      ['Bruxismo', yn(p.bruxism)],
-      ['Reflusso / gastrite', yn(p.reflux_gastritis)],
+      p.vision_issues ? ['Problemi visivi', p.vision_details || 'Sì'] : null,
+      p.hearing_issues ? ['Problemi uditivi', p.hearing_details || 'Sì'] : null,
+      p.headaches ? ['Cefalee / emicranie', p.headaches_details || 'Sì'] : null,
+      p.bruxism ? ['Bruxismo / serramento', p.bruxism_details || 'Sì'] : null,
       p.has_cardiovascular_issues ? ['Prob. cardiovascolari', p.cardiovascular_details || 'Sì'] : null,
       p.has_gastrointestinal_issues ? ['Prob. gastrointestinali', p.gastrointestinal_details || 'Sì'] : null,
       p.urological_issues ? ['Prob. urologiche', p.urological_issues] : null,
@@ -331,14 +333,37 @@ function AnamnesisBlock({ patient: initial, onUpdated }) {
         <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Anamnesi sistemica</div>
         <div className="space-y-3">
 
-          {/* Flag semplici */}
-          <div className="grid grid-cols-2 gap-2">
-            <FormToggle checked={f.vision_issues} onChange={v => upd('vision_issues', v)} label="Problemi visivi" />
-            <FormToggle checked={f.hearing_issues} onChange={v => upd('hearing_issues', v)} label="Problemi uditivi" />
-            <FormToggle checked={f.headaches} onChange={v => upd('headaches', v)} label="Cefalee / emicranie" />
-            <FormToggle checked={f.bruxism} onChange={v => upd('bruxism', v)} label="Bruxismo / serramento" />
-            <FormToggle checked={f.reflux_gastritis} onChange={v => upd('reflux_gastritis', v)} label="Reflusso / gastrite" />
-          </div>
+          {/* Visivi */}
+          <FormToggle checked={f.vision_issues} onChange={v => upd('vision_issues', v)} label="Problemi visivi" />
+          {f.vision_issues && (
+            <FormRow label="Dettaglio problemi visivi">
+              <FormInput value={f.vision_details} onChange={v => upd('vision_details', v)} placeholder="es. miopia grave, glaucoma, strabismo..." />
+            </FormRow>
+          )}
+
+          {/* Uditivi */}
+          <FormToggle checked={f.hearing_issues} onChange={v => upd('hearing_issues', v)} label="Problemi uditivi" />
+          {f.hearing_issues && (
+            <FormRow label="Dettaglio problemi uditivi">
+              <FormInput value={f.hearing_details} onChange={v => upd('hearing_details', v)} placeholder="es. ipoacusia, acufeni, vertigini..." />
+            </FormRow>
+          )}
+
+          {/* Cefalee */}
+          <FormToggle checked={f.headaches} onChange={v => upd('headaches', v)} label="Cefalee / emicranie" />
+          {f.headaches && (
+            <FormRow label="Dettaglio cefalee / emicranie">
+              <FormInput value={f.headaches_details} onChange={v => upd('headaches_details', v)} placeholder="es. emicrania con aura, cefalea tensiva quotidiana..." />
+            </FormRow>
+          )}
+
+          {/* Bruxismo */}
+          <FormToggle checked={f.bruxism} onChange={v => upd('bruxism', v)} label="Bruxismo / serramento" />
+          {f.bruxism && (
+            <FormRow label="Dettaglio bruxismo / serramento">
+              <FormInput value={f.bruxism_details} onChange={v => upd('bruxism_details', v)} placeholder="es. notturno, bite, dolore ATM..." />
+            </FormRow>
+          )}
 
           {/* Cardiovascolare */}
           <FormToggle checked={f.has_cardiovascular_issues} onChange={v => upd('has_cardiovascular_issues', v)} label="Problemi cardiovascolari" />

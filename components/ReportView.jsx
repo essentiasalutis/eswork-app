@@ -3,6 +3,7 @@ import {
   trafficLight, TL_COLOR, TL_BG, TL_BORDER,
   TYPE_LABELS, generateSummaryText,
 } from '../lib/scoring';
+import { CONFIG } from '../lib/config';
 
 // ─── Semaphore ────────────────────────────────────────────────────────────────
 
@@ -100,6 +101,16 @@ function SectionTitle({ children }) {
   );
 }
 
+// ─── Legend box ──────────────────────────────────────────────────────────────
+
+function LegendBox({ children }) {
+  return (
+    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-3 text-xs text-gray-500 leading-relaxed">
+      {children}
+    </div>
+  );
+}
+
 // ─── Livelli box ─────────────────────────────────────────────────────────────
 
 function LevelBoxes({ nmq }) {
@@ -124,7 +135,7 @@ function LevelBoxes({ nmq }) {
     },
   ];
   return (
-    <div className="mb-3">
+    <div className="mb-2">
       <div className="grid grid-cols-3 gap-2 mb-2">
         {levels.map((l, i) => (
           <div
@@ -139,7 +150,7 @@ function LevelBoxes({ nmq }) {
           </div>
         ))}
       </div>
-      <div className="text-xs text-gray-400 text-center">
+      <div className="text-xs text-gray-400 text-center mb-2">
         Prevalenza generica: <strong>{nmq.prevalence.pct}%</strong> ha riportato almeno un fastidio negli ultimi 12 mesi (dato informativo)
       </div>
     </div>
@@ -200,6 +211,27 @@ function RoleAnalysis({ byRole }) {
   );
 }
 
+// ─── Footer ───────────────────────────────────────────────────────────────────
+
+function ReportFooter() {
+  return (
+    <div className="mt-8 pt-4 border-t border-gray-200 text-center">
+      <div className="flex items-center justify-center gap-3 mb-3">
+        <img src="/logo-es.png" alt="Essentia Salutis" className="w-8 h-8 object-contain opacity-60" />
+        <span className="text-xs text-gray-400 font-medium">
+          © 2026 {CONFIG.company_name} — ES Work
+        </span>
+      </div>
+      <div className="text-xs text-gray-400 leading-relaxed">
+        {CONFIG.company_address} · Tel: {CONFIG.contact_phone} · {CONFIG.contact_email}
+      </div>
+      <div className="text-xs text-gray-300 mt-2 leading-relaxed max-w-lg mx-auto">
+        Documento riservato e confidenziale. La riproduzione, anche parziale, è vietata senza autorizzazione scritta di Essentia Salutis.
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function ReportView({ assessment, client, baseline, onOpenCalculator }) {
@@ -225,6 +257,10 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
   const baseUwes = baseResp.length > 0 ? aggregateUWES(baseResp) : null;
   const baseEnps = baseResp.length > 0 ? aggregateENPS(baseResp) : null;
   const hasBaseline = !!baseNmq;
+
+  // Per checkpoint: mostra PSS dalla baseline come riferimento
+  const isCheckpoint = assessment.type === '3month' || assessment.type === '6month';
+  const pssRef = !pss && isCheckpoint && basePss ? basePss : null;
 
   return (
     <div className="max-w-2xl mx-auto px-4 pb-10" id="report-root">
@@ -253,9 +289,9 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         </div>
       </div>
 
-      {/* Auto-generated summary */}
+      {/* Sintesi — Mod 7: rimosso "automatica" */}
       <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-2 print-page">
-        <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Sintesi automatica</div>
+        <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Sintesi</div>
         <p className="text-sm text-gray-700 leading-relaxed">
           {generateSummaryText(nmq, pss, uwes, enps)}
         </p>
@@ -269,6 +305,22 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         <Semaphore type="uwes" score={uwes.mean} value={uwes.mean} label="Engagement" subtitle="UWES-9 medio" />
         <Semaphore type="enps" score={enps.score} value={`${enps.score > 0 ? '+' : ''}${enps.score}`} label="Clima (eNPS)" subtitle="" />
       </div>
+
+      {/* Mod 7: legenda semafori */}
+      <LegendBox>
+        <div className="font-semibold text-gray-600 mb-1">Come leggere i semafori:</div>
+        <div className="flex flex-col gap-0.5">
+          <span><span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1.5 align-middle" />Verde = situazione positiva, nessun intervento urgente</span>
+          <span><span className="inline-block w-2 h-2 rounded-full bg-yellow-400 mr-1.5 align-middle" />Giallo = area di attenzione, intervento consigliato</span>
+          <span><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1.5 align-middle" />Rosso = area critica, intervento prioritario</span>
+        </div>
+        <div className="mt-1.5 text-gray-400">
+          Salute fisica: % dipendenti con disturbi che impattano le attività (Livello 1) ·
+          Stress: punteggio medio PSS-10 (0–40) ·
+          Engagement: punteggio medio UWES-9 (0–6) ·
+          Clima: eNPS (–100 a +100)
+        </div>
+      </LegendBox>
 
       {/* NMQ */}
       <SectionTitle>Disturbi muscolo-scheletrici per zona — 12 mesi</SectionTitle>
@@ -284,6 +336,14 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
       {/* 3 livelli */}
       <SectionTitle>Stratificazione popolazione — 3 livelli</SectionTitle>
       <LevelBoxes nmq={nmq} />
+
+      {/* Mod 8: legenda livelli */}
+      <LegendBox>
+        <div className="font-semibold text-gray-600 mb-1">Come si determinano i livelli:</div>
+        <div className="mb-0.5"><strong className="text-red-600">Livello 1 (Trattamento):</strong> dipendenti i cui disturbi hanno impedito le normali attività, oppure che presentano dolore attuale in 2 o più zone corporee. Necessitano di trattamento osteopatico individuale.</div>
+        <div className="mb-0.5"><strong className="text-yellow-600">Livello 2 (Prevenzione):</strong> dipendenti con disturbi diffusi (3+ zone) o dolore localizzato attuale, che non rientrano nel Livello 1. Candidati alla prevenzione attiva dall&apos;Anno 2.</div>
+        <div><strong className="text-green-600">Livello 3 (Formazione):</strong> dipendenti senza problemi significativi. Partecipano alla formazione collettiva su postura ed ergonomia insieme a tutti gli altri.</div>
+      </LegendBox>
 
       {/* Analisi per ruolo */}
       {(nmq.byRole.production.n > 0 || nmq.byRole.office.n > 0) && (
@@ -306,11 +366,11 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         </>
       )}
 
-      {/* PSS */}
+      {/* PSS attuale */}
       {pss && (
         <>
           <SectionTitle>Distribuzione stress percepito (PSS-10)</SectionTitle>
-          <div className="grid grid-cols-3 gap-3 mb-3 print-page">
+          <div className="grid grid-cols-3 gap-3 mb-2 print-page">
             <div className="bg-green-50 rounded-2xl p-4 text-center border border-green-100">
               <div className="text-3xl font-bold text-green-600">{pss.low}%</div>
               <div className="text-xs text-green-700 mt-1">Stress basso</div>
@@ -327,12 +387,40 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
               <div className="text-xs text-gray-400">≥27</div>
             </div>
           </div>
+          {/* Mod 9: legenda PSS */}
+          <LegendBox>
+            PSS-10 (Perceived Stress Scale): questionario validato che misura lo stress percepito nell&apos;ultimo mese. Punteggio 0–40. Basso: 0–13 | Moderato: 14–26 | Elevato: 27–40.
+          </LegendBox>
+        </>
+      )}
+
+      {/* PSS da baseline per checkpoint */}
+      {pssRef && (
+        <>
+          <SectionTitle>Stress percepito (PSS-10) — Dato di riferimento</SectionTitle>
+          <div className="grid grid-cols-3 gap-3 mb-2 print-page opacity-75">
+            <div className="bg-green-50 rounded-2xl p-4 text-center border border-green-100">
+              <div className="text-3xl font-bold text-green-600">{pssRef.low}%</div>
+              <div className="text-xs text-green-700 mt-1">Stress basso</div>
+            </div>
+            <div className="bg-yellow-50 rounded-2xl p-4 text-center border border-yellow-100">
+              <div className="text-3xl font-bold text-yellow-600">{pssRef.mod}%</div>
+              <div className="text-xs text-yellow-700 mt-1">Moderato</div>
+            </div>
+            <div className="bg-red-50 rounded-2xl p-4 text-center border border-red-100">
+              <div className="text-3xl font-bold text-red-600">{pssRef.high}%</div>
+              <div className="text-xs text-red-700 mt-1">Stress elevato</div>
+            </div>
+          </div>
+          <LegendBox>
+            Dati dello stress rilevati all&apos;assessment iniziale. La prossima misurazione PSS-10 verrà effettuata all&apos;assessment finale.
+          </LegendBox>
         </>
       )}
 
       {/* UWES */}
       <SectionTitle>Engagement lavorativo (UWES-9)</SectionTitle>
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3 print-page">
+      <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-2 print-page">
         <div className="grid grid-cols-3 gap-3 mb-4">
           {[
             { l: 'Vigore', v: uwes.vigore },
@@ -352,10 +440,14 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
           Score globale UWES-9: <strong className="text-blue-600 text-sm">{uwes.mean}</strong> / 6
         </div>
       </div>
+      {/* Mod 9: legenda UWES */}
+      <LegendBox>
+        UWES-9 (Utrecht Work Engagement Scale): misura il coinvolgimento lavorativo su 3 dimensioni. Vigore = energia e resilienza. Dedizione = senso di significato e orgoglio. Assorbimento = concentrazione e immersione. Punteggio 0–6.
+      </LegendBox>
 
       {/* eNPS */}
       <SectionTitle>Clima aziendale — eNPS</SectionTitle>
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3 print-page">
+      <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-2 print-page">
         <div className="flex items-center justify-center gap-2 mb-4">
           <div className="text-4xl font-bold" style={{
             color: enps.score >= 20 ? '#16a34a' : enps.score >= 0 ? '#ca8a04' : '#dc2626'
@@ -387,6 +479,10 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
           <span>Detrattori (0-6)</span>
         </div>
       </div>
+      {/* Mod 9: legenda eNPS */}
+      <LegendBox>
+        eNPS (Employee Net Promoter Score): misura la propensione dei dipendenti a raccomandare l&apos;azienda come posto di lavoro. Promotori (9–10) meno Detrattori (0–6). Positivo = buono, sopra +20 = ottimo.
+      </LegendBox>
 
       {/* Baseline comparison summary */}
       {hasBaseline && (
@@ -433,11 +529,8 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         </div>
       )}
 
-      {/* Footer */}
-      <div className="flex items-center justify-center gap-3 mt-8 pt-4 border-t border-gray-200">
-        <img src="/logo-es.png" alt="Essentia Salutis" className="w-8 h-8 object-contain opacity-60" />
-        <span className="text-xs text-gray-400">ES Work by Essentia Salutis® — Report generato automaticamente</span>
-      </div>
+      {/* Mod 13: Footer con copyright */}
+      <ReportFooter />
     </div>
   );
 }

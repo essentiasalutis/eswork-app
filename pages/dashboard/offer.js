@@ -156,7 +156,7 @@ export default function OfferPage({ client, assessment, nmq, pss, uwes, enps, ca
         </div>
 
         <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 16, padding: 16 }}>
-          <div className="section-label" style={{ marginTop: 0 }}>Sintesi automatica</div>
+          <div className="section-label" style={{ marginTop: 0 }}>Sintesi</div>
           <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.7, margin: 0 }}>{summaryText}</p>
         </div>
       </Page>
@@ -353,30 +353,24 @@ export default function OfferPage({ client, assessment, nmq, pss, uwes, enps, ca
             </div>
           </div>
 
-          <table className="offer-table" style={{ marginBottom: 16 }}>
-            <tbody>
-              <tr><td>Giornate sportello osteopatico ({calc.days_osteo_y1} gg)</td><td>{fmt(calc.cost_osteo_y1)}</td></tr>
-              <tr><td>Formazione ({calc.training_sessions_y1} sessioni, {calc.groups} gruppi)</td><td>{fmt(calc.cost_training_y1)}</td></tr>
-              <tr><td>Assessment iniziale + report attivazione</td><td>{fmt(CONFIG.cost_initial_assessment)}</td></tr>
-              <tr><td>Assessment finale + report annuale</td><td>{fmt(CONFIG.cost_final_assessment + CONFIG.cost_annual_report)}</td></tr>
-              <tr><td>2 review semestrali</td><td>{fmt(calc.cost_reviews_y1)}</td></tr>
-              <tr className="total"><td>Totale costi</td><td>{fmt(calc.total_cost_y1)}</td></tr>
-            </tbody>
-          </table>
-
-          {/* Servizi inclusi */}
-          <div className="section-label">Servizi inclusi</div>
-          <table className="offer-table" style={{ marginBottom: 16 }}>
+          {/* Mod 10: tabella servizi con descrizione, niente spaccato costi */}
+          <div className="section-label">Il programma include</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 16 }}>
             <tbody>
               {[
-                ['Giornate sportello osteopatico', `${calc.days_osteo_y1} gg/anno`],
-                ['Sessioni formative', `${calc.training_sessions_y1} sessioni`],
-                ['Assessment (iniziale + finale)', '2'],
-                ['Review alla direzione', '2'],
-                ['Report annuale', '1'],
-                ['Coordinamento ES Work', 'Incluso'],
-                ['Documentazione OT23 INAIL', 'Inclusa'],
-              ].map(([l, v], i) => <tr key={i}><td>{l}</td><td>{v}</td></tr>)}
+                ['Assessment iniziale + Report di Attivazione', 'Check-up completo della salute muscolo-scheletrica con strumenti scientifici validati'],
+                [`Sportello osteopatico in sede (${calc.days_osteo_y1} gg/anno)`, 'Trattamento individuale in sede per i dipendenti con disturbi'],
+                [`Formazione postura ed ergonomia (${calc.training_sessions_y1} sessioni)`, 'Sessioni collettive teoria + pratica per tutti i dipendenti'],
+                ['2 Review intermedie (3 e 6 mesi)', 'Assessment di monitoraggio + report alla direzione con aggiornamento KPI'],
+                ['Assessment finale + Report annuale', 'Confronto completo baseline vs risultati, documentazione per OT23 INAIL'],
+                ['Coordinamento e regia ES Work', 'Un unico interlocutore per tutto: professionisti, calendario, logistica, report'],
+                ['Documentazione OT23 INAIL', 'Documentazione per la richiesta di riduzione del premio assicurativo INAIL'],
+              ].map(([servizio, dettaglio], i) => (
+                <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={{ padding: '8px 10px', fontWeight: 600, color: '#1e293b', width: '40%' }}>{servizio}</td>
+                  <td style={{ padding: '8px 10px', color: '#6b7280', fontSize: 11 }}>{dettaglio}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
 
@@ -387,17 +381,19 @@ export default function OfferPage({ client, assessment, nmq, pss, uwes, enps, ca
             <div style={{ fontSize: 12, color: '#2563eb' }}>Estensione a {calc.pop_y2} dip. (mantenimento + prevenzione)</div>
           </div>
 
-          {/* Tempo */}
+          {/* Tempo — Mod 11: titoli aggiornati */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <div style={{ background: '#fef2f2', borderRadius: 12, padding: 14, border: '1px solid #fecaca', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', marginBottom: 6 }}>Tempo per dipendente TRATTATO</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: '#dc2626' }}>{calc.hours_treated}h/anno</div>
-              <div style={{ fontSize: 11, color: '#6b7280' }}>Dipendente trattato</div>
-              <div style={{ fontSize: 10, color: '#9ca3af' }}>meno di 1h/mese</div>
+              <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>Trattamento individuale + formazione</div>
+              <div style={{ fontSize: 10, color: '#9ca3af' }}>meno di 1 ora al mese</div>
             </div>
             <div style={{ background: '#f0fdf4', borderRadius: 12, padding: 14, border: '1px solid #bbf7d0', textAlign: 'center' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#16a34a', marginBottom: 6 }}>Tempo per dipendente NON trattato</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: '#16a34a' }}>{calc.hours_untreated}h/anno</div>
-              <div style={{ fontSize: 11, color: '#6b7280' }}>Dipendente non trattato</div>
-              <div style={{ fontSize: 10, color: '#9ca3af' }}>solo formazione collettiva</div>
+              <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>Solo formazione collettiva</div>
+              <div style={{ fontSize: 10, color: '#9ca3af' }}>postura ed ergonomia</div>
             </div>
           </div>
 
@@ -474,8 +470,12 @@ export default function OfferPage({ client, assessment, nmq, pss, uwes, enps, ca
             &ldquo;I disturbi muscolo-scheletrici rappresentano il 77% delle malattie professionali in Italia. Noi lavoriamo su questo.&rdquo;
           </div>
 
-          <div style={{ marginTop: 40, fontSize: 11, color: '#9ca3af' }}>
-            Documento riservato — generato da ES Work il {date}
+          <div style={{ marginTop: 32, fontSize: 12, color: '#6b7280', lineHeight: 1.8 }}>
+            <div>{CONFIG.company_address}</div>
+            <div>Tel: {CONFIG.contact_phone} · {CONFIG.contact_email} · {CONFIG.contact_website}</div>
+          </div>
+          <div style={{ marginTop: 16, fontSize: 10, color: '#9ca3af', maxWidth: 480 }}>
+            © 2026 {CONFIG.company_name} — Documento riservato e confidenziale. La riproduzione, anche parziale, è vietata senza autorizzazione scritta di Essentia Salutis.
           </div>
         </div>
       </Page>

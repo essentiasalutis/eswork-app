@@ -5,7 +5,8 @@ import { requireAuthSsr } from '../../lib/auth';
 export default function ProfessionalsPage({ professionals: initial, clients }) {
   const [professionals, setProfessionals] = useState(initial);
   const [showNew, setShowNew] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' });
+  const DEFAULT_PASSWORD = 'ESworkpro';
+  const [form, setForm] = useState({ name: '', email: '', password: DEFAULT_PASSWORD, phone: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [assignModal, setAssignModal] = useState(null); // { proId, proName, assignments }
@@ -53,10 +54,18 @@ info@essentiasalutis.it`;
       setShowNew(false);
       // Salva i dati per mostrare il riquadro "invia credenziali"
       setJustCreated({ name: form.name, email: form.email, password: form.password });
-      setForm({ name: '', email: '', password: '', phone: '' });
+      setForm({ name: '', email: '', password: DEFAULT_PASSWORD, phone: '' });
     } else {
       const d = await res.json();
       setError(d.error || 'Errore');
+    }
+  }
+
+  async function deletePro(id, name) {
+    if (!confirm(`Eliminare definitivamente ${name}? Questa azione non è reversibile.`)) return;
+    const res = await fetch(`/api/professionals/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      setProfessionals(prev => prev.filter(p => p.id !== id));
     }
   }
 
@@ -236,7 +245,7 @@ info@essentiasalutis.it`;
 
               <div className="flex flex-wrap gap-2 mt-3">
                 <a
-                  href={`mailto:${encodeURIComponent(pro.email)}?subject=${encodeURIComponent('Accesso ES Work — Area Professionisti')}&body=${encodeURIComponent(`Gentile ${pro.name},\n\nle ricordo le credenziali per accedere all'area professionisti di ES Work.\n\n🔗 Link: ${BASE_URL}/pro/login\n📧 Email: ${pro.email}\n🔑 Password: [inserisci la password che hai impostato]\n\nCordiali saluti,\nDott. Enrico Maiolo — founder @ Essentia Salutis\nTel: 327 102 7443\ninfo@essentiasalutis.it`)}`}
+                  href={credentialsMailto(pro.name, pro.email, DEFAULT_PASSWORD)}
                   className="text-xs px-3 py-1.5 rounded-xl border border-green-200 text-green-700 bg-green-50"
                 >
                   ✉ Invia credenziali
@@ -283,6 +292,12 @@ info@essentiasalutis.it`;
                   className={`text-xs px-3 py-1.5 rounded-xl border ${pro.active ? 'border-red-200 text-red-600 bg-red-50' : 'border-green-200 text-green-600 bg-green-50'}`}
                 >
                   {pro.active ? 'Disattiva account' : 'Riattiva account'}
+                </button>
+                <button
+                  onClick={() => deletePro(pro.id, pro.name)}
+                  className="text-xs px-3 py-1.5 rounded-xl border border-red-300 text-red-700 bg-red-50 font-semibold"
+                >
+                  🗑 Elimina
                 </button>
               </div>
             </div>

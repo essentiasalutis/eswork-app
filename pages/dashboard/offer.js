@@ -234,7 +234,6 @@ ${FIRMA}`;
           <strong>Per un PDF pulito:</strong> nel dialog di stampa Chrome → <em>Altre impostazioni</em> → deseleziona <strong>&quot;Intestazioni e piè di pagina&quot;</strong> → salva come PDF
         </div>
       </div>
-      </div>
 
       {emailModal && <EmailModal modal={emailModal} onClose={() => setEmailModal(null)} />}
 

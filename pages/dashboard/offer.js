@@ -209,25 +209,31 @@ ${FIRMA}`;
       `}</style>
 
       {/* ── Pulsanti UI (no print) ─────────────────────────────────────── */}
-      <div className="no-print flex gap-3 max-w-3xl mx-auto px-4 pt-4 pb-2 flex-wrap">
-        <button
-          onClick={() => window.history.back()}
-          className="flex items-center gap-1 text-sm text-gray-600 border border-gray-300 px-3 py-2 rounded-xl"
-        >
-          ← Indietro
-        </button>
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-1 text-sm text-green-700 border border-green-300 bg-green-50 px-4 py-2 rounded-xl font-semibold"
-        >
-          Stampa / Salva PDF
-        </button>
-        <button
-          onClick={openOfferEmail}
-          className="flex items-center gap-1 text-sm text-blue-700 border border-blue-300 bg-blue-50 px-4 py-2 rounded-xl font-semibold"
-        >
-          ✉ Invia offerta via email
-        </button>
+      <div className="no-print max-w-3xl mx-auto px-4 pt-4 pb-2">
+        <div className="flex gap-3 flex-wrap mb-2">
+          <button
+            onClick={() => window.history.back()}
+            className="flex items-center gap-1 text-sm text-gray-600 border border-gray-300 px-3 py-2 rounded-xl"
+          >
+            ← Indietro
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-1 text-sm text-green-700 border border-green-300 bg-green-50 px-4 py-2 rounded-xl font-semibold"
+          >
+            🖨 Stampa / Salva PDF
+          </button>
+          <button
+            onClick={openOfferEmail}
+            className="flex items-center gap-1 text-sm text-blue-700 border border-blue-300 bg-blue-50 px-4 py-2 rounded-xl font-semibold"
+          >
+            ✉ Invia offerta via email
+          </button>
+        </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-xs text-amber-800">
+          <strong>Per un PDF pulito:</strong> nel dialog di stampa Chrome → <em>Altre impostazioni</em> → deseleziona <strong>&quot;Intestazioni e piè di pagina&quot;</strong> → salva come PDF
+        </div>
+      </div>
       </div>
 
       {emailModal && <EmailModal modal={emailModal} onClose={() => setEmailModal(null)} />}

@@ -585,8 +585,32 @@ ${FIRMA}`;
           </div>
         </div>
 
-        {/* spacer che spinge il footer in fondo */}
+        {/* spacer che spinge firma + footer in fondo */}
         <div style={{ flex: 1 }} />
+
+        {/* — Accettazione e firma — */}
+        <div style={{ marginTop: 24, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: '16px 20px' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Accettazione offerta</div>
+          <div style={{ fontSize: 11, color: '#374151', lineHeight: 1.7, marginBottom: 20 }}>
+            Il sottoscritto, in qualità di rappresentante legale / responsabile HR di <strong>{client.name}</strong>, dichiara di accettare integralmente la presente proposta di intervento ES Work nei termini e alle condizioni indicate.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 }}>
+            <div>
+              <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4 }}>Data e luogo</div>
+              <div style={{ borderBottom: '1px solid #d1d5db', height: 28 }} />
+            </div>
+            <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginTop: 8 }}>
+              <div>
+                <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4 }}>Per {client.name} — timbro e firma</div>
+                <div style={{ borderBottom: '1px solid #d1d5db', height: 44 }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4 }}>Per Essentia Salutis — Dott. Enrico Maiolo</div>
+                <div style={{ borderBottom: '1px solid #d1d5db', height: 44 }} />
+              </div>
+            </div>
+          </div>
+        </div>
 
         <hr className="section-sep" />
 

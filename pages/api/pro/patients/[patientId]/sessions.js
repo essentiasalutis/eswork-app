@@ -30,26 +30,33 @@ export default requireProAuth(async function handler(req, res) {
     return res.json(sessions);
   }
 
-  // POST — crea nuova sessione (aperta)
+  // POST — crea nuova sessione (atomica: crea e chiude in un colpo)
   if (req.method === 'POST') {
     try {
       const sessions = await getSessionsByPatient(patientId);
-      const nextNumber = sessions.length + 1;
-      const { nrs_pre, treatment_notes, next_session_notes } = req.body;
+      const nextNumber = sessions.filter(s => s.closed_at).length + 1;
+      const { nrs_pre, treatment_notes, next_session_notes, close } = req.body;
+      const now = new Date().toISOString();
 
       const session = await insertSession({
         id: generateId('ses'),
         patient_id: patientId,
         professional_id: proId,
         client_id: patient.client_id,
-        date: new Date().toISOString(),
+        date: now,
         session_number: nextNumber,
         nrs_pre: nrs_pre !== undefined ? parseInt(nrs_pre) : null,
         nrs_post: null,
         treatment_notes: treatment_notes?.trim() || null,
         next_session_notes: next_session_notes?.trim() || null,
-        closed_at: null,
+        closed_at: close ? now : null,
       });
+
+      if (close) {
+        const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
+        await logAccess(proId, 'close_session', ip, `Sessione ${session.id} chiusa`);
+      }
+
       return res.status(201).json(session);
     } catch (e) {
       return res.status(500).json({ error: e.message });

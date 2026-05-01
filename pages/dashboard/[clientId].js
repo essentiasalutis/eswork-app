@@ -378,7 +378,7 @@ ${FIRMA}`;
                             </span>
                           ) : '—'}
                         </td>
-                        <td className="px-3 py-2.5 text-center text-gray-600">{p.closed_count}/{p.session_count}</td>
+                        <td className="px-3 py-2.5 text-center text-gray-600">{p.session_count}</td>
                         <td className="px-3 py-2.5 text-center"><NrsBar value={p.nrs_first} /></td>
                         <td className="px-3 py-2.5 text-center"><NrsBar value={p.nrs_last} /></td>
                         <td className="px-3 py-2.5 text-center font-bold">
@@ -517,18 +517,17 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
 
   // Aggrega NRS per paziente (no note cliniche)
   const patientsNrs = patientsRaw.map(p => {
-    const ps = sessionsRaw.filter(s => s.patient_id === p.id);
-    const first = ps.find(s => s.nrs_pre !== null);
-    const closed = ps.filter(s => s.closed_at && s.nrs_post !== null);
+    const closed = sessionsRaw.filter(s => s.patient_id === p.id && s.closed_at);
+    const firstClosed = closed.find(s => s.nrs_pre !== null);
+    const lastClosed = closed.length > 0 ? closed[closed.length - 1] : null;
     return {
       id: p.id,
       first_name: p.first_name,
       last_name: p.last_name,
       level: p.level || null,
-      session_count: ps.length,
-      closed_count: closed.length,
-      nrs_first: first?.nrs_pre ?? null,
-      nrs_last: closed.length > 0 ? closed[closed.length - 1].nrs_post : null,
+      session_count: closed.length,
+      nrs_first: firstClosed?.nrs_pre ?? null,
+      nrs_last: lastClosed?.nrs_pre ?? null,
     };
   });
 

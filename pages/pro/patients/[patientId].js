@@ -475,21 +475,19 @@ function SessionForm({ patientId, sessionNumber, lastNote, onSaved }) {
     const res = await fetch(`/api/pro/patients/${patientId}/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nrs_pre: nrs, treatment_notes: treatmentNotes, next_session_notes: nextNotes }),
-    });
-    if (!res.ok) { setSaving(false); return setError('Errore creazione sessione'); }
-    const session = await res.json();
-
-    const res2 = await fetch(`/api/pro/patients/${patientId}/sessions`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: session.id, close: true }),
+      body: JSON.stringify({
+        nrs_pre: nrs,
+        treatment_notes: treatmentNotes,
+        next_session_notes: nextNotes,
+        close: true,
+      }),
     });
     setSaving(false);
-    if (res2.ok) {
-      onSaved(await res2.json());
+    if (res.ok) {
+      onSaved(await res.json());
     } else {
-      setError((await res2.json()).error || 'Errore chiusura');
+      const d = await res.json();
+      setError(d.error || 'Errore salvataggio');
     }
   }
 
@@ -637,17 +635,17 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
             </div>
           )}
 
-          {!hasOpenSession && !showNewSession && (
+          {!showNewSession && (
             <button onClick={() => setShowNewSession(true)}
               className="w-full py-3 rounded-xl bg-green-600 text-white font-semibold">
               + Nuova seduta
             </button>
           )}
 
-          {(showNewSession || hasOpenSession) && (
+          {showNewSession && (
             <SessionForm
               patientId={patient.id}
-              sessionNumber={sessions.length + 1}
+              sessionNumber={closedSessions.length + 1}
               lastNote={lastClosed?.next_session_notes || null}
               onSaved={s => { setSessions(prev => [...prev, s]); setShowNewSession(false); }}
             />

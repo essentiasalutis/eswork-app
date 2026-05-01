@@ -242,17 +242,22 @@ ${FIRMA}`;
           ══════════════════════════════════════════════════════════════ */}
       <Page className="page-break">
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', paddingTop: 60, paddingBottom: 60 }}>
-          <img src="/logo-es.png" alt="Essentia Salutis" style={{ width: 100, height: 100, objectFit: 'contain', marginBottom: 20 }} />
-          <div style={{ fontSize: 40, fontWeight: 900, color: '#111827', letterSpacing: -1 }}>
+          <img src="/logo-es.png" alt="Essentia Salutis" style={{ width: 130, height: 130, objectFit: 'contain', marginBottom: 24 }} />
+          <div style={{ fontSize: 52, fontWeight: 900, color: '#111827', letterSpacing: -1 }}>
             ES <span style={{ color: '#16a34a' }}>Work</span>
           </div>
-          <div style={{ fontSize: 12, color: '#4b5563', marginTop: 4, letterSpacing: 1 }}>by Essentia Salutis</div>
-          <div style={{ width: 50, height: 3, background: '#16a34a', margin: '24px auto' }} />
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#1e293b', maxWidth: 400 }}>
-            Report di Attivazione e proposta di intervento
+          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 5, letterSpacing: 1 }}>by Essentia Salutis</div>
+          <div style={{ width: 50, height: 3, background: '#16a34a', margin: '28px auto' }} />
+          <div style={{ lineHeight: 1.3, textAlign: 'center' }}>
+            <div style={{ fontSize: 18, fontWeight: 400, color: '#6b7280' }}>Report di Attivazione</div>
+            <div style={{ fontSize: 14, fontWeight: 300, color: '#9ca3af', marginTop: 2 }}>e</div>
+            <div style={{ fontSize: 18, fontWeight: 400, color: '#6b7280', marginTop: 2 }}>proposta di intervento</div>
           </div>
-          <div style={{ fontSize: 16, color: '#1e293b', marginTop: 18, fontWeight: 600 }}>{client.name}</div>
-          <div style={{ fontSize: 13, color: '#4b5563', marginTop: 6 }}>{date}</div>
+          <div style={{ marginTop: 28 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 }}>Azienda cliente</div>
+            <div style={{ fontSize: 22, color: '#1e293b', fontWeight: 700 }}>{client.name}</div>
+          </div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>{date}</div>
 
           <div style={{ marginTop: 48, width: '100%', maxWidth: 480, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 16, padding: '16px 24px', textAlign: 'left' }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Contenuto del documento</div>
@@ -541,6 +546,7 @@ ${FIRMA}`;
           PAG 5 — Come funziona + Footer
           ══════════════════════════════════════════════════════════════ */}
       <Page>
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: 920 }}>
         {/* — Come funziona — */}
         <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 14 }}>Come funziona</div>
 
@@ -579,6 +585,9 @@ ${FIRMA}`;
           </div>
         </div>
 
+        {/* spacer che spinge il footer in fondo */}
+        <div style={{ flex: 1 }} />
+
         <hr className="section-sep" />
 
         {/* — Footer contatti — */}
@@ -607,6 +616,7 @@ ${FIRMA}`;
         <div style={{ marginTop: 12, fontSize: 9, color: '#4b5563', textAlign: 'center' }}>
           © 2026 {CONFIG.company_name} — Documento riservato e confidenziale. Riproduzione vietata senza autorizzazione scritta di Essentia Salutis.
         </div>
+        </div>{/* end flex column */}
       </Page>
     </>
   );

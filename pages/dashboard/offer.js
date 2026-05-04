@@ -292,9 +292,21 @@ ${FIRMA}`;
           })}
         </div>
 
-        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, marginBottom: 20 }}>
+        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, marginBottom: 10 }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 6 }}>Sintesi</div>
           <p style={{ fontSize: 12, color: '#374151', lineHeight: 1.7, margin: 0 }}>{summaryText}</p>
+        </div>
+
+        {/* AI branding box */}
+        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: '8px 12px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+          <span style={{ fontSize: 18 }}>🤖</span>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#1d4ed8', marginBottom: 1 }}>Tecnologia ES Work AI</div>
+            <div style={{ fontSize: 10, color: '#3b82f6', lineHeight: 1.5 }}>
+              Piattaforma digitale con intelligenza artificiale per la raccolta, analisi e restituzione dei dati di salute occupazionale.
+              I risultati e il piano di intervento sono elaborati automaticamente dai dati reali della vostra azienda.
+            </div>
+          </div>
         </div>
 
         <hr className="section-sep" />
@@ -416,6 +428,10 @@ ${FIRMA}`;
 
         {/* — Piano di intervento — */}
         <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 4 }}>Piano di intervento proposto</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3b82f6', flexShrink: 0, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
+          <span style={{ fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>Piano generato da ES Work AI sulla base dei dati specifici della vostra azienda</span>
+        </div>
         <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 12 }}>Zone con prevalenza &gt; 40% — interventi e risultati attesi</div>
 
         {interventions.length > 0 ? (

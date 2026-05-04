@@ -244,9 +244,12 @@ function ReportFooter() {
             <div className="text-xs text-gray-500">{CONFIG.company_address} · {CONFIG.contact_phone} · {CONFIG.contact_email}</div>
           </div>
         </div>
-        <div className="text-xs text-gray-400 text-right max-w-xs">
-          Documento riservato e confidenziale.<br/>
-          Riproduzione vietata senza autorizzazione scritta.
+        <div className="text-right">
+          <div className="text-xs text-gray-400 italic mb-1">Powered by ES Work AI · Piattaforma digitale per la salute occupazionale</div>
+          <div className="text-xs text-gray-400">
+            Documento riservato e confidenziale.<br/>
+            Riproduzione vietata senza autorizzazione scritta.
+          </div>
         </div>
       </div>
     </div>
@@ -338,6 +341,10 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
       {/* Sintesi — Mod 7: rimosso "automatica" */}
       <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-2 print-page">
         <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Sintesi</div>
+        <div className="flex items-center gap-1.5 mb-2">
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3b82f6', display: 'inline-block', flexShrink: 0 }} />
+          <span className="text-xs text-gray-400 italic">Analisi generata da ES Work AI — sistema di intelligenza artificiale per la salute occupazionale</span>
+        </div>
         <p className="text-sm text-gray-700 leading-relaxed">
           {generateSummaryText(nmq, pss, uwes, enps)}
         </p>

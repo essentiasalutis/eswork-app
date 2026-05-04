@@ -594,7 +594,7 @@ ${FIRMA}`;
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
           {[
-            { num: '1', title: 'Misurare', desc: 'Assessment NMQ + PSS + UWES + eNPS — già completato. I dati in questo report ne sono il risultato.' },
+            { num: '1', title: 'Misurare', desc: 'Assessment scientifico con analisi AI dei dati — già completato. I risultati in questo report sono generati dalla piattaforma ES Work con intelligenza artificiale.' },
             { num: '2', title: 'Trattare', desc: 'Sportello osteopatico in sede secondo calendario concordato. Accesso prioritario per dipendenti Livello 1.' },
             { num: '3', title: 'Formare', desc: 'Sessioni formative collettive su postura, ergonomia e gestione del rischio muscolo-scheletrico.' },
             { num: '4', title: 'Monitorare', desc: 'Checkpoint a 3 e 6 mesi, report annuale, revisione del piano. Adattamento continuo ai risultati.' },

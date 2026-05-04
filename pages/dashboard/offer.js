@@ -303,7 +303,7 @@ ${FIRMA}`;
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#1d4ed8', marginBottom: 1 }}>Tecnologia ES Work AI</div>
             <div style={{ fontSize: 10, color: '#3b82f6', lineHeight: 1.5 }}>
-              Piattaforma digitale con intelligenza artificiale per la raccolta, analisi e restituzione dei dati di salute occupazionale.
+              Piattaforma digitale con intelligenza artificiale per la prevenzione muscolo-scheletrica e la salute dei dipendenti.
               I risultati e il piano di intervento sono elaborati automaticamente dai dati reali della vostra azienda.
             </div>
           </div>
@@ -362,64 +362,79 @@ ${FIRMA}`;
           ══════════════════════════════════════════════════════════════ */}
       <Page className="page-break">
         {/* — Engagement — */}
-        <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 12 }}>Engagement e clima aziendale</div>
+        <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 10 }}>Engagement e clima aziendale</div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
-          {/* UWES */}
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>UWES-9 — Engagement lavorativo</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+        {/* UWES row */}
+        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: '10px 14px', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ minWidth: 130 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: '#4b5563', textTransform: 'uppercase', marginBottom: 2 }}>UWES-9</div>
+              <div style={{ fontSize: 10, color: '#6b7280' }}>Engagement lavorativo</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#2563eb', marginTop: 4 }}>{uwes.mean} <span style={{ fontSize: 10, fontWeight: 400, color: '#6b7280' }}>/ 6</span></div>
+            </div>
+            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
               {[
                 { l: 'Vigore', v: uwes.vigore },
                 { l: 'Dedizione', v: uwes.dedizione },
                 { l: 'Assorbimento', v: uwes.assorbimento },
               ].map(d => (
-                <div key={d.l} style={{ textAlign: 'center', background: '#eff6ff', borderRadius: 12, padding: '10px 8px', border: '1px solid #bfdbfe', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                  <div style={{ fontSize: 10, color: '#374151' }}>{d.l}</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: '#2563eb' }}>{d.v}</div>
-                  <div style={{ height: 4, background: '#dbeafe', borderRadius: 2, marginTop: 6, overflow: 'hidden', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                <div key={d.l} style={{ textAlign: 'center', background: '#eff6ff', borderRadius: 10, padding: '8px 6px', border: '1px solid #bfdbfe', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                  <div style={{ fontSize: 9, color: '#374151' }}>{d.l}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#2563eb' }}>{d.v}</div>
+                  <div style={{ height: 3, background: '#dbeafe', borderRadius: 2, marginTop: 4, overflow: 'hidden', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
                     <div style={{ width: `${(d.v / 6) * 100}%`, height: '100%', background: '#2563eb', borderRadius: 2, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
                   </div>
                 </div>
               ))}
             </div>
-            <div style={{ textAlign: 'center', fontSize: 12, color: '#374151' }}>
-              Score globale: <strong style={{ color: '#2563eb', fontSize: 15 }}>{uwes.mean}</strong> / 6
-            </div>
-            {pss && (
-              <div style={{ marginTop: 12, background: '#f9fafb', borderRadius: 12, padding: 12, border: '1px solid #e5e7eb' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>PSS-10 — Stress percepito</div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {[
-                    { val: pss.low, label: 'Basso', sub: '≤13', bg: '#f0fdf4', border: '#bbf7d0', color: '#16a34a' },
-                    { val: pss.mod, label: 'Moderato', sub: '14–26', bg: '#fefce8', border: '#fde68a', color: '#ca8a04' },
-                    { val: pss.high, label: 'Elevato', sub: '≥27', bg: '#fef2f2', border: '#fecaca', color: '#dc2626' },
-                  ].map((b, i) => (
-                    <div key={i} style={{ flex: 1, background: b.bg, border: `1px solid ${b.border}`, borderRadius: 10, padding: '8px 4px', textAlign: 'center', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                      <div style={{ fontSize: 20, fontWeight: 800, color: b.color }}>{b.val}%</div>
-                      <div style={{ fontSize: 10, color: b.color }}>{b.label}</div>
-                      <div style={{ fontSize: 9, color: '#4b5563' }}>{b.sub}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ fontSize: 11, color: '#374151', marginTop: 8, textAlign: 'center' }}>Score medio: <strong>{pss.mean}</strong> / 40</div>
-              </div>
-            )}
           </div>
+        </div>
 
-          {/* eNPS */}
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>eNPS — Clima aziendale</div>
-            <div style={{ textAlign: 'center', fontSize: 44, fontWeight: 900, color: enps.score >= 20 ? '#16a34a' : enps.score >= 0 ? '#ca8a04' : '#dc2626', marginBottom: 12 }}>
-              {enps.score > 0 ? '+' : ''}{enps.score}
+        {/* PSS row */}
+        {pss && (
+          <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: '10px 14px', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ minWidth: 130 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: '#4b5563', textTransform: 'uppercase', marginBottom: 2 }}>PSS-10</div>
+                <div style={{ fontSize: 10, color: '#6b7280' }}>Stress percepito</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#374151', marginTop: 4 }}>{pss.mean} <span style={{ fontSize: 10, fontWeight: 400, color: '#6b7280' }}>/ 40</span></div>
+              </div>
+              <div style={{ flex: 1, display: 'flex', gap: 8 }}>
+                {[
+                  { val: pss.low, label: 'Basso', sub: '≤13', bg: '#f0fdf4', border: '#bbf7d0', color: '#16a34a' },
+                  { val: pss.mod, label: 'Moderato', sub: '14–26', bg: '#fefce8', border: '#fde68a', color: '#ca8a04' },
+                  { val: pss.high, label: 'Elevato', sub: '≥27', bg: '#fef2f2', border: '#fecaca', color: '#dc2626' },
+                ].map((b, i) => (
+                  <div key={i} style={{ flex: 1, background: b.bg, border: `1px solid ${b.border}`, borderRadius: 10, padding: '8px 4px', textAlign: 'center', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: b.color }}>{b.val}%</div>
+                    <div style={{ fontSize: 9, color: b.color }}>{b.label}</div>
+                    <div style={{ fontSize: 8, color: '#4b5563' }}>{b.sub}</div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div style={{ display: 'flex', height: 24, borderRadius: 999, overflow: 'hidden', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-              {enps.promoters > 0 && <div style={{ width: `${enps.promoters}%`, background: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 10, fontWeight: 600, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>{enps.promoters}%</div>}
-              {enps.passives > 0 && <div style={{ width: `${enps.passives}%`, background: '#ca8a04', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 10, fontWeight: 600, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>{enps.passives}%</div>}
-              {enps.detractors > 0 && <div style={{ width: `${enps.detractors}%`, background: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 10, fontWeight: 600, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>{enps.detractors}%</div>}
+          </div>
+        )}
+
+        {/* eNPS row */}
+        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: '10px 14px', marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ minWidth: 130 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: '#4b5563', textTransform: 'uppercase', marginBottom: 2 }}>eNPS</div>
+              <div style={{ fontSize: 10, color: '#6b7280' }}>Clima aziendale</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: enps.score >= 20 ? '#16a34a' : enps.score >= 0 ? '#ca8a04' : '#dc2626', marginTop: 2 }}>
+                {enps.score > 0 ? '+' : ''}{enps.score}
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#374151', marginTop: 4 }}>
-              <span>Promotori (9-10)</span><span>Passivi (7-8)</span><span>Detrattori (0-6)</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', height: 22, borderRadius: 999, overflow: 'hidden', marginBottom: 4, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                {enps.promoters > 0 && <div style={{ width: `${enps.promoters}%`, background: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 9, fontWeight: 600, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>{enps.promoters}%</div>}
+                {enps.passives > 0 && <div style={{ width: `${enps.passives}%`, background: '#ca8a04', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 9, fontWeight: 600, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>{enps.passives}%</div>}
+                {enps.detractors > 0 && <div style={{ width: `${enps.detractors}%`, background: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 9, fontWeight: 600, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>{enps.detractors}%</div>}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#6b7280' }}>
+                <span>Promotori (9-10)</span><span>Passivi (7-8)</span><span>Detrattori (0-6)</span>
+              </div>
             </div>
           </div>
         </div>

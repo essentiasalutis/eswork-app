@@ -245,7 +245,7 @@ function ReportFooter() {
           </div>
         </div>
         <div className="text-right">
-          <div className="text-xs text-gray-400 italic mb-1">Powered by ES Work AI · Piattaforma digitale per la salute occupazionale</div>
+          <div className="text-xs text-gray-400 italic mb-1">Powered by ES Work AI · Piattaforma digitale per la prevenzione muscolo-scheletrica</div>
           <div className="text-xs text-gray-400">
             Documento riservato e confidenziale.<br/>
             Riproduzione vietata senza autorizzazione scritta.
@@ -343,7 +343,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Sintesi</div>
         <div className="flex items-center gap-1.5 mb-2">
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3b82f6', display: 'inline-block', flexShrink: 0 }} />
-          <span className="text-xs text-gray-400 italic">Analisi generata da ES Work AI — sistema di intelligenza artificiale per la salute occupazionale</span>
+          <span className="text-xs text-gray-400 italic">Analisi generata da ES Work AI — sistema di intelligenza artificiale per la prevenzione muscolo-scheletrica</span>
         </div>
         <p className="text-sm text-gray-700 leading-relaxed">
           {generateSummaryText(nmq, pss, uwes, enps)}
@@ -510,71 +510,73 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         </>
       )}
 
-      {/* UWES */}
-      <SectionTitle>Engagement lavorativo (UWES-9)</SectionTitle>
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-2 print-page">
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          {[
-            { l: 'Vigore', v: uwes.vigore },
-            { l: 'Dedizione', v: uwes.dedizione },
-            { l: 'Assorbimento', v: uwes.assorbimento },
-          ].map(d => (
-            <div key={d.l} className="text-center">
-              <div className="text-xs text-gray-500 mb-1">{d.l}</div>
-              <div className="text-2xl font-bold text-blue-600">{d.v}</div>
-              <div className="mt-2 h-1.5 bg-gray-100 rounded overflow-hidden">
-                <div className="h-full bg-blue-500 rounded" style={{ width: `${(d.v / 6) * 100}%` }} />
+      {/* UWES + eNPS side by side — evita che eNPS finisca da solo sull'ultima pagina */}
+      <SectionTitle>Engagement e clima aziendale</SectionTitle>
+      <div className="grid grid-cols-2 gap-3 mb-2 print-page">
+        {/* UWES */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-4">
+          <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">UWES-9 — Engagement</div>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            {[
+              { l: 'Vigore', v: uwes.vigore },
+              { l: 'Dedizione', v: uwes.dedizione },
+              { l: 'Assorbimento', v: uwes.assorbimento },
+            ].map(d => (
+              <div key={d.l} className="text-center">
+                <div className="text-xs text-gray-500 mb-1">{d.l}</div>
+                <div className="text-xl font-bold text-blue-600">{d.v}</div>
+                <div className="mt-2 h-1.5 bg-gray-100 rounded overflow-hidden">
+                  <div className="h-full bg-blue-500 rounded" style={{ width: `${(d.v / 6) * 100}%` }} />
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-        <div className="text-xs text-gray-500 pt-3 border-t border-gray-100 text-center">
-          Score globale UWES-9: <strong className="text-blue-600 text-sm">{uwes.mean}</strong> / 6
-        </div>
-      </div>
-      {/* Mod 9: legenda UWES */}
-      <LegendBox>
-        UWES-9 (Utrecht Work Engagement Scale): misura il coinvolgimento lavorativo su 3 dimensioni. Vigore = energia e resilienza. Dedizione = senso di significato e orgoglio. Assorbimento = concentrazione e immersione. Punteggio 0–6.
-      </LegendBox>
-
-      {/* eNPS */}
-      <SectionTitle>Clima aziendale — eNPS</SectionTitle>
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-2 print-page">
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <div className="text-4xl font-bold" style={{
-            color: enps.score >= 20 ? '#16a34a' : enps.score >= 0 ? '#ca8a04' : '#dc2626'
-          }}>
-            {enps.score > 0 ? '+' : ''}{enps.score}
+            ))}
           </div>
-          <div className="text-sm text-gray-500">eNPS</div>
+          <div className="text-xs text-gray-500 pt-2 border-t border-gray-100 text-center">
+            Score globale: <strong className="text-blue-600">{uwes.mean}</strong> / 6
+          </div>
+          <div className="mt-2 text-xs text-gray-400 leading-relaxed">
+            Vigore = energia · Dedizione = significato · Assorbimento = concentrazione
+          </div>
         </div>
-        <div className="flex h-6 rounded-full overflow-hidden">
-          {enps.promoters > 0 && (
-            <div className="bg-green-500 flex items-center justify-center text-white text-xs font-medium" style={{ width: `${enps.promoters}%` }}>
-              {enps.promoters}%
+
+        {/* eNPS */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-4">
+          <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Clima aziendale — eNPS</div>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <div className="text-4xl font-bold" style={{
+              color: enps.score >= 20 ? '#16a34a' : enps.score >= 0 ? '#ca8a04' : '#dc2626'
+            }}>
+              {enps.score > 0 ? '+' : ''}{enps.score}
             </div>
-          )}
-          {enps.passives > 0 && (
-            <div className="bg-yellow-400 flex items-center justify-center text-white text-xs font-medium" style={{ width: `${enps.passives}%` }}>
-              {enps.passives}%
-            </div>
-          )}
-          {enps.detractors > 0 && (
-            <div className="bg-red-500 flex items-center justify-center text-white text-xs font-medium" style={{ width: `${enps.detractors}%` }}>
-              {enps.detractors}%
-            </div>
-          )}
-        </div>
-        <div className="flex justify-between text-xs text-gray-400 mt-1.5 px-0.5">
-          <span>Promotori (9-10)</span>
-          <span>Passivi (7-8)</span>
-          <span>Detrattori (0-6)</span>
+            <div className="text-sm text-gray-500">eNPS</div>
+          </div>
+          <div className="flex h-6 rounded-full overflow-hidden">
+            {enps.promoters > 0 && (
+              <div className="bg-green-500 flex items-center justify-center text-white text-xs font-medium" style={{ width: `${enps.promoters}%` }}>
+                {enps.promoters}%
+              </div>
+            )}
+            {enps.passives > 0 && (
+              <div className="bg-yellow-400 flex items-center justify-center text-white text-xs font-medium" style={{ width: `${enps.passives}%` }}>
+                {enps.passives}%
+              </div>
+            )}
+            {enps.detractors > 0 && (
+              <div className="bg-red-500 flex items-center justify-center text-white text-xs font-medium" style={{ width: `${enps.detractors}%` }}>
+                {enps.detractors}%
+              </div>
+            )}
+          </div>
+          <div className="flex justify-between text-xs text-gray-400 mt-1.5 px-0.5">
+            <span>Promotori (9-10)</span>
+            <span>Passivi (7-8)</span>
+            <span>Detrattori (0-6)</span>
+          </div>
+          <div className="mt-2 text-xs text-gray-400 leading-relaxed">
+            Promotori − Detrattori. Positivo = buono, sopra +20 = ottimo.
+          </div>
         </div>
       </div>
-      {/* Mod 9: legenda eNPS */}
-      <LegendBox>
-        eNPS (Employee Net Promoter Score): misura la propensione dei dipendenti a raccomandare l&apos;azienda come posto di lavoro. Promotori (9–10) meno Detrattori (0–6). Positivo = buono, sopra +20 = ottimo.
-      </LegendBox>
 
       {/* Baseline comparison summary */}
       {hasBaseline && (

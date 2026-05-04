@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { requireAuthSsr } from '../../lib/auth';
 import { getAssessmentById, getClientById, getResponsesByAssessment } from '../../lib/store';
@@ -82,26 +82,7 @@ function today() {
   return new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
-function generateInterventionPlan(nmq) {
-  const MAP = {
-    'Collo': 'Sportello osteopatico — protocollo cervicale + ergonomia postazione',
-    'Spalle': 'Sportello osteopatico — protocollo spalle + formazione postura',
-    'Schiena alta (dorsale)': 'Sportello osteopatico — rachide dorsale + ergonomia workstation',
-    'Schiena bassa (lombare)': 'Sportello osteopatico — lombare + formazione movimentazione carichi',
-    'Gomiti': 'Sportello osteopatico — arto superiore + analisi postura',
-    'Polsi / Mani': 'Sportello osteopatico — polso/mano + ergonomia strumenti',
-    'Anche / Cosce': 'Sportello osteopatico — arto inferiore + formazione stazione eretta',
-    'Ginocchia': 'Sportello osteopatico — protocollo ginocchio + analisi del passo',
-    'Caviglie / Piedi': 'Sportello osteopatico — arto inferiore distale + calzature professionali',
-  };
-  return nmq.zones
-    .filter(z => z.pct12 > 40)
-    .map(z => ({
-      issue: `${z.pct12}% disturbi ${z.zone.toLowerCase()}`,
-      intervention: MAP[z.zone] || 'Sportello osteopatico + formazione specifica',
-      result: 'Riduzione dolore 20-30% in 12 mesi',
-    }));
-}
+// generateInterventionPlan rimossa — ora usa AI via /api/ai/intervention-plan
 
 // ─── Print page wrapper ───────────────────────────────────────────────────────
 
@@ -117,6 +98,26 @@ function Page({ children, className = '' }) {
 
 export default function OfferPage({ client, assessment, nmq, pss, uwes, enps, calc, roi, date }) {
   const [emailModal, setEmailModal] = useState(null);
+  const [aiPlan, setAiPlan] = useState(null);       // null = caricamento, [] = pronto
+  const [aiSource, setAiSource] = useState(null);   // 'ai' | 'fallback' | 'fallback_no_key'
+
+  useEffect(() => {
+    if (!nmq) return;
+    fetch('/api/ai/intervention-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        zones: nmq.zones,
+        clientName: client?.name || 'Azienda',
+        sector: client?.sector ?? 2,
+        level1Count: nmq.level1.count,
+      }),
+    })
+      .then(r => r.json())
+      .then(d => { setAiPlan(d.plan || []); setAiSource(d.source); })
+      .catch(() => { setAiPlan([]); setAiSource('fallback'); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!client || !assessment) {
     return (
@@ -126,7 +127,6 @@ export default function OfferPage({ client, assessment, nmq, pss, uwes, enps, ca
     );
   }
 
-  const interventions = generateInterventionPlan(nmq);
   const summaryText = generateSummaryText(nmq, pss, uwes, enps);
 
   function openOfferEmail() {
@@ -445,38 +445,49 @@ ${FIRMA}`;
         <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 4 }}>Piano di intervento proposto</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3b82f6', flexShrink: 0, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
-          <span style={{ fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>Piano generato da ES Work AI sulla base dei dati specifici della vostra azienda</span>
+          <span style={{ fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>
+            Piano generato da ES Work AI sulla base dei dati specifici della vostra azienda
+            {aiSource === 'ai' && <span style={{ marginLeft: 6, color: '#3b82f6', fontWeight: 600 }}>✦ AI</span>}
+          </span>
         </div>
-        <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 12 }}>Zone con prevalenza &gt; 40% — interventi e risultati attesi</div>
+        <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 12 }}>
+          Zone con prevalenza ≥ 30% — interventi e risultati attesi
+        </div>
 
-        {interventions.length > 0 ? (
-          <table className="offer-table">
-            <thead>
-              <tr style={{ background: '#f9fafb', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                <td style={{ fontWeight: 700, color: '#1e293b', width: '28%', fontSize: 11 }}>Criticità emersa</td>
-                <td style={{ fontWeight: 700, color: '#1e293b', width: '46%', fontSize: 11 }}>Intervento proposto</td>
-                <td style={{ fontWeight: 700, color: '#1e293b', width: '26%', fontSize: 11, textAlign: 'right' }}>Risultato atteso</td>
-              </tr>
-            </thead>
-            <tbody>
-              {interventions.map((row, i) => (
-                <tr key={i}>
-                  <td style={{ color: '#dc2626', fontWeight: 600 }}>{row.issue}</td>
-                  <td style={{ color: '#374151' }}>{row.intervention}</td>
-                  <td style={{ color: '#16a34a', textAlign: 'right' }}>{row.result}</td>
-                </tr>
-              ))}
-              <tr>
-                <td style={{ color: '#374151', fontWeight: 600 }}>100% dipendenti</td>
-                <td style={{ color: '#374151' }}>Formazione collettiva postura ed ergonomia</td>
-                <td style={{ color: '#16a34a', textAlign: 'right' }}>Prevenzione primaria</td>
-              </tr>
-            </tbody>
-          </table>
-        ) : (
-          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: 16, textAlign: 'center', color: '#16a34a', fontSize: 12 }}>
-            Nessuna zona critica (&gt;40%). Si raccomanda formazione preventiva e monitoraggio.
+        {aiPlan === null ? (
+          /* Caricamento AI */
+          <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20, textAlign: 'center' }}>
+            <div style={{ fontSize: 12, color: '#6b7280' }}>
+              <span style={{ display: 'inline-block', marginRight: 8 }}>⏳</span>
+              Generazione piano AI in corso…
+            </div>
           </div>
+        ) : (
+          <>
+            <table className="offer-table">
+              <thead>
+                <tr style={{ background: '#f9fafb', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                  <td style={{ fontWeight: 700, color: '#1e293b', width: '28%', fontSize: 11 }}>Criticità emersa</td>
+                  <td style={{ fontWeight: 700, color: '#1e293b', width: '46%', fontSize: 11 }}>Intervento proposto</td>
+                  <td style={{ fontWeight: 700, color: '#1e293b', width: '26%', fontSize: 11, textAlign: 'right' }}>Risultato atteso</td>
+                </tr>
+              </thead>
+              <tbody>
+                {aiPlan.map((row, i) => (
+                  <tr key={i}>
+                    <td style={{ color: '#dc2626', fontWeight: 600 }}>{row.criticita}</td>
+                    <td style={{ color: '#374151' }}>{row.intervento}</td>
+                    <td style={{ color: '#16a34a', textAlign: 'right' }}>{row.risultato}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td style={{ color: '#374151', fontWeight: 600 }}>100% dipendenti</td>
+                  <td style={{ color: '#374151' }}>Formazione collettiva postura ed ergonomia</td>
+                  <td style={{ color: '#16a34a', textAlign: 'right' }}>Prevenzione primaria</td>
+                </tr>
+              </tbody>
+            </table>
+          </>
         )}
 
         <div style={{ marginTop: 12, background: '#f9fafb', borderRadius: 12, padding: 12, fontSize: 11, color: '#374151', lineHeight: 1.7 }}>

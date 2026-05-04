@@ -577,7 +577,7 @@ ${FIRMA}`;
           PAG 5 — Come funziona + Footer
           ══════════════════════════════════════════════════════════════ */}
       <Page>
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: 920 }}>
+        <div>
         {/* — Come funziona — */}
         <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 14 }}>Come funziona</div>
 
@@ -615,9 +615,6 @@ ${FIRMA}`;
             ))}
           </div>
         </div>
-
-        {/* spacer che spinge firma + footer in fondo */}
-        <div style={{ flex: 1 }} />
 
         {/* — Accettazione e firma — */}
         <div style={{ marginTop: 24, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: '16px 20px' }}>

@@ -88,8 +88,9 @@ function NrsBar({ value, max = 10 }) {
   );
 }
 
-export default function ClientPage({ client, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs }) {
+export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs }) {
   const router = useRouter();
+  const [client, setClient] = useState(initialClient);
   const [assessments, setAssessments] = useState(initial);
   const [responses, setResponses] = useState(initialResponses);
   const [assignments, setAssignments] = useState(initialAssignments || []);
@@ -100,6 +101,38 @@ export default function ClientPage({ client, assessments: initial, responses: in
   const [reportAssessment, setReportAssessment] = useState(null);
   const [copied, setCopied] = useState(null);
   const [emailModal, setEmailModal] = useState(null); // { to, subject, body }
+  const [showEdit, setShowEdit] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
+
+  function openEdit() {
+    setEditForm({
+      name: client.name || '',
+      employees: client.employees || '',
+      sector: client.sector ?? 2,
+      contact_name: client.contact_name || '',
+      contact_email: client.contact_email || '',
+      contact_phone: client.contact_phone || '',
+      notes: client.notes || '',
+    });
+    setShowEdit(true);
+  }
+
+  async function saveEdit(e) {
+    e.preventDefault();
+    setEditSaving(true);
+    const res = await fetch(`/api/clients/${client.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editForm),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setClient(updated);
+      setShowEdit(false);
+    }
+    setEditSaving(false);
+  }
 
   const baseUrl = typeof window !== 'undefined'
     ? window.location.origin
@@ -237,6 +270,103 @@ ${FIRMA}`;
         />
       )}
 
+      {showEdit && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="font-semibold text-gray-900">Modifica azienda</h3>
+              <button onClick={() => setShowEdit(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+            <form onSubmit={saveEdit}>
+              <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Nome azienda *</label>
+                  <input
+                    required
+                    value={editForm.name}
+                    onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Dipendenti *</label>
+                    <input
+                      required
+                      type="number"
+                      min="1"
+                      value={editForm.employees}
+                      onChange={e => setEditForm(f => ({ ...f, employees: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Settore *</label>
+                    <select
+                      value={editForm.sector}
+                      onChange={e => setEditForm(f => ({ ...f, sector: parseInt(e.target.value) }))}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                    >
+                      <option value={1}>Manifattura / Produzione</option>
+                      <option value={2}>Ufficio / IT / Servizi</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Referente</label>
+                  <input
+                    value={editForm.contact_name}
+                    onChange={e => setEditForm(f => ({ ...f, contact_name: e.target.value }))}
+                    placeholder="Nome cognome"
+                    className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={editForm.contact_email}
+                      onChange={e => setEditForm(f => ({ ...f, contact_email: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Telefono</label>
+                    <input
+                      value={editForm.contact_phone}
+                      onChange={e => setEditForm(f => ({ ...f, contact_phone: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Note interne</label>
+                  <textarea
+                    value={editForm.notes}
+                    onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                    rows={3}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 p-4 border-t border-gray-200">
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold text-sm disabled:opacity-50"
+                >
+                  {editSaving ? 'Salvataggio…' : 'Salva modifiche'}
+                </button>
+                <button type="button" onClick={() => setShowEdit(false)} className="px-4 py-3 rounded-xl border border-gray-300 text-gray-600 text-sm">
+                  Annulla
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
           <Link href="/dashboard" className="text-gray-400 hover:text-gray-600 p-1">
@@ -245,7 +375,18 @@ ${FIRMA}`;
             </svg>
           </Link>
           <div className="flex-1 min-w-0">
-            <div className="font-semibold text-gray-900 truncate">{client.name}</div>
+            <div className="flex items-center gap-1.5">
+              <div className="font-semibold text-gray-900 truncate">{client.name}</div>
+              <button
+                onClick={openEdit}
+                title="Modifica azienda"
+                className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+            </div>
             <div className="text-xs text-gray-500">{client.employees} dip. · {client.sector === 1 ? 'Manifattura' : 'Ufficio/IT'}</div>
           </div>
           <div className="flex gap-2">

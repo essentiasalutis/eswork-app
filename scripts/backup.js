@@ -5,6 +5,7 @@
  */
 
 const { createClient } = require('@supabase/supabase-js');
+const ws = require('ws');
 const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
@@ -25,7 +26,10 @@ async function main() {
   }
 
   // ── 1. Connessione Supabase ──────────────────────────────────────────────────
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+    global: { fetch: fetch },
+    realtime: { transport: ws },
+  });
 
   // ── 2. Export di tutte le tabelle ───────────────────────────────────────────
   const TABLES = [

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { requireAuth } from '../../../lib/auth';
 
 // ─── Fallback deterministico ──────────────────────────────────────────────────
 
@@ -31,7 +32,7 @@ function fallbackPlan(zones, level1Count) {
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
-export default async function handler(req, res) {
+export default requireAuth(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { zones, clientName, sector, level1Count } = req.body;
@@ -98,4 +99,4 @@ Rispondi SOLO con il JSON, senza altro testo.`;
     console.error('[AI intervention-plan] fallback:', e.message);
     return res.json({ plan: fallbackPlan(zones, level1Count), source: 'fallback', error: e.message });
   }
-}
+});

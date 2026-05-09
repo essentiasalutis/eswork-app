@@ -32,6 +32,14 @@ jobs:
           GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
         run: node scripts/backup.js
 
+      - name: Commit backup to repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backups/
+          git commit -m "Backup automatico $(date +%Y-%m-%d)" || echo "Nessun file nuovo da committare"
+          git push
+
       - name: Notify on failure
         if: failure()
         run: echo "::error::Backup ES Work fallito — controlla i log su GitHub Actions"

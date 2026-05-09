@@ -23,7 +23,6 @@ export default async function handler(req, res) {
   const ok = verifyPassword(password, pro.password_hash);
   if (!ok) return res.status(401).json({ error: 'Credenziali non valide' });
 
-  const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
   await logAccess(pro.id, 'login', ip, `Login da ${email}`);
 
   setProSessionCookie(res, {

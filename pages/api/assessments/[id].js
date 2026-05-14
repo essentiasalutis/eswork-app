@@ -1,9 +1,13 @@
 import { requireAuth } from '../../../lib/auth';
 import {
   getAssessmentById,
+  getClientById,
   getResponsesByAssessment,
   updateAssessment,
   deleteAssessmentById,
+  buildReferralCode,
+  countReferralCodesForClientYear,
+  insertReferralCode,
 } from '../../../lib/store';
 
 export default requireAuth(async function handler(req, res) {
@@ -21,6 +25,28 @@ export default requireAuth(async function handler(req, res) {
     try {
       const { status } = req.body;
       const updated = await updateAssessment(id, { status });
+
+      // Auto-genera codice referral quando l'assessment viene chiuso
+      if (status === 'closed' && assessment.status !== 'closed') {
+        try {
+          const client = await getClientById(assessment.client_id);
+          if (client) {
+            const year = new Date().getFullYear();
+            const existing = await countReferralCodesForClientYear(assessment.client_id, year);
+            const code = buildReferralCode(client.name, year, existing + 1);
+            await insertReferralCode({
+              client_id: assessment.client_id,
+              assessment_id: id,
+              code,
+            });
+            return res.json({ ...updated, referral_code: code });
+          }
+        } catch (refErr) {
+          // Non bloccare la risposta se il referral fallisce
+          console.error('[referral] auto-generate failed:', refErr.message);
+        }
+      }
+
       return res.json(updated);
     } catch (e) {
       return res.status(500).json({ error: e.message });

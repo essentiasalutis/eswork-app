@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient } from '../../lib/store';
+import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient } from '../../lib/store';
 import { TYPE_LABELS, TYPE_COLORS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
 import { CONFIG } from '../../lib/config';
@@ -88,7 +88,7 @@ function NrsBar({ value, max = 10 }) {
   );
 }
 
-export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs }) {
+export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes }) {
   const router = useRouter();
   const [client, setClient] = useState(initialClient);
   const [assessments, setAssessments] = useState(initial);
@@ -104,6 +104,8 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editSaving, setEditSaving] = useState(false);
+  const [referralCodes, setReferralCodes] = useState(initialReferralCodes || []);
+  const [copiedReferral, setCopiedReferral] = useState(null);
 
   function openEdit() {
     setEditForm({
@@ -164,7 +166,13 @@ export default function ClientPage({ client: initialClient, assessments: initial
       body: JSON.stringify({ status: 'closed' }),
     });
     if (res.ok) {
+      const data = await res.json();
       setAssessments(prev => prev.map(a => a.id === id ? { ...a, status: 'closed' } : a));
+      // Se l'API ha restituito un codice referral appena generato, ricarica la lista
+      if (data.referral_code) {
+        const codesRes = await fetch(`/api/referrals?clientId=${client.id}`);
+        if (codesRes.ok) setReferralCodes(await codesRes.json());
+      }
     }
   }
 
@@ -213,6 +221,13 @@ ${FIRMA}`;
   function openReport(a) {
     const rList = responses[a.id] || [];
     setReportAssessment({ ...a, responseList: rList });
+  }
+
+  function copyReferralLink(code) {
+    const url = `${baseUrl}/care/${code}`;
+    navigator.clipboard.writeText(url).catch(() => {});
+    setCopiedReferral(code);
+    setTimeout(() => setCopiedReferral(null), 2000);
   }
 
   function openCalculator(a) {
@@ -639,6 +654,65 @@ ${FIRMA}`;
             );
           })}
         </div>
+
+        {/* ── Referral B2C ────────────────────────────────────────────── */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">🔗 Referral B2C</h2>
+            <Link href="/dashboard/referrals" className="text-xs text-orange-600 hover:underline">Tutti i referral →</Link>
+          </div>
+          {referralCodes.length === 0 ? (
+            <div className="bg-orange-50 rounded-xl border border-orange-200 px-4 py-3 text-sm text-orange-600">
+              Nessun codice ancora generato. I codici vengono creati automaticamente alla chiusura di un assessment.
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide border-b border-gray-100">
+                  <tr>
+                    <th className="px-4 py-2.5 text-left">Codice</th>
+                    <th className="px-3 py-2.5 text-center">Generato</th>
+                    <th className="px-3 py-2.5 text-center">Utilizzi</th>
+                    <th className="px-3 py-2.5 text-center">Link</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {referralCodes.map(rc => {
+                    const uses = rc.referral_uses || [];
+                    return (
+                      <tr key={rc.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2.5">
+                          <span className="font-mono font-semibold text-blue-700 text-xs">{rc.code}</span>
+                        </td>
+                        <td className="px-3 py-2.5 text-center text-gray-400 text-xs">
+                          {new Date(rc.created_at).toLocaleDateString('it-IT')}
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          {uses.length > 0 ? (
+                            <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                              {uses.length}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <button
+                            onClick={() => copyReferralLink(rc.code)}
+                            className="text-xs text-gray-500 hover:text-orange-600 transition-colors"
+                          >
+                            {copiedReferral === rc.code ? '✅ Copiato' : '🔗 Copia link'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
       </main>
     </div>
   );
@@ -649,11 +723,12 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
   const client = await getClientById(clientId);
   if (!client) return { notFound: true };
 
-  const [{ assessments, responses }, assignments, patientsRaw, sessionsRaw] = await Promise.all([
+  const [{ assessments, responses }, assignments, patientsRaw, sessionsRaw, referralCodes] = await Promise.all([
     getResponsesForClient(clientId),
     getAssignmentsByClient(clientId),
     getPatientsByClient(clientId),
     getSessionsForClient(clientId),
+    getReferralCodesByClient(clientId),
   ]);
 
   // Aggrega NRS per paziente (no note cliniche)
@@ -672,5 +747,5 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     };
   });
 
-  return { props: { client, assessments, responses, assignments, patientsNrs } };
+  return { props: { client, assessments, responses, assignments, patientsNrs, referralCodes } };
 });

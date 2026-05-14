@@ -62,6 +62,9 @@ export default function Dashboard({ clients: initialClients, assessmentCounts })
             <Link href="/dashboard/calculator" className="text-sm text-green-700 hover:text-green-900 py-2 px-3 border border-green-200 rounded-xl bg-green-50">
               Calcolatore
             </Link>
+            <Link href="/dashboard/referrals" className="text-sm text-orange-700 hover:text-orange-900 py-2 px-3 border border-orange-200 rounded-xl bg-orange-50">
+              Referral B2C
+            </Link>
             <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-800 py-2 px-3">
               Esci
             </button>

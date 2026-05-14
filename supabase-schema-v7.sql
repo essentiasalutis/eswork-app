@@ -1,20 +1,21 @@
 -- ─── ES Work — Schema v7: Referral B2C ───────────────────────────────────────
 -- Esegui questo script su Supabase SQL Editor (una volta sola)
+-- NOTA: client_id e assessment_id sono TEXT (compatibile con generateId())
 
 -- Tabella dei codici referral (uno per assessment chiuso)
 CREATE TABLE IF NOT EXISTS referral_codes (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  client_id   UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-  assessment_id UUID NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
-  code        TEXT UNIQUE NOT NULL,
-  is_active   BOOLEAN DEFAULT TRUE,
-  created_at  TIMESTAMPTZ DEFAULT NOW()
+  id            TEXT PRIMARY KEY,
+  client_id     TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  assessment_id TEXT NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
+  code          TEXT UNIQUE NOT NULL,
+  is_active     BOOLEAN DEFAULT TRUE,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Tabella dei log di utilizzo
 CREATE TABLE IF NOT EXISTS referral_uses (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  referral_code_id  UUID NOT NULL REFERENCES referral_codes(id) ON DELETE CASCADE,
+  id                TEXT PRIMARY KEY,
+  referral_code_id  TEXT NOT NULL REFERENCES referral_codes(id) ON DELETE CASCADE,
   patient_name      TEXT,
   used_at           TIMESTAMPTZ DEFAULT NOW(),
   ip                TEXT

@@ -106,6 +106,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [editSaving, setEditSaving] = useState(false);
   const [referralCodes, setReferralCodes] = useState(initialReferralCodes || []);
   const [copiedReferral, setCopiedReferral] = useState(null);
+  const [generatingCode, setGeneratingCode] = useState(null); // 'P' | 'F' | null
 
   function openEdit() {
     setEditForm({
@@ -228,6 +229,24 @@ ${FIRMA}`;
     navigator.clipboard.writeText(url).catch(() => {});
     setCopiedReferral(code);
     setTimeout(() => setCopiedReferral(null), 2000);
+  }
+
+  async function generateCode(type) {
+    setGeneratingCode(type);
+    const res = await fetch('/api/referrals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: client.id, type }),
+    });
+    if (res.ok) {
+      const newCode = await res.json();
+      // Aggiungi referral_uses vuoto per compatibilità con la tabella
+      setReferralCodes(prev => [{ ...newCode, referral_uses: [] }, ...prev]);
+    } else {
+      const err = await res.json();
+      alert(err.error || 'Errore nella generazione del codice');
+    }
+    setGeneratingCode(null);
   }
 
   async function toggleReferral(rc) {
@@ -679,9 +698,25 @@ ${FIRMA}`;
 
         {/* ── Referral B2C ────────────────────────────────────────────── */}
         <div className="mt-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
             <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">🔗 Referral B2C</h2>
-            <Link href="/dashboard/referrals" className="text-xs text-orange-600 hover:underline">Tutti i referral →</Link>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => generateCode('P')}
+                disabled={!!generatingCode}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50"
+              >
+                {generatingCode === 'P' ? '…' : '+ Codice P'}
+              </button>
+              <button
+                onClick={() => generateCode('F')}
+                disabled={!!generatingCode}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 disabled:opacity-50"
+              >
+                {generatingCode === 'F' ? '…' : '+ Codice F'}
+              </button>
+              <Link href="/dashboard/referrals" className="text-xs text-orange-600 hover:underline">Tutti →</Link>
+            </div>
           </div>
           {referralCodes.length === 0 ? (
             <div className="bg-orange-50 rounded-xl border border-orange-200 px-4 py-3 text-sm text-orange-600">

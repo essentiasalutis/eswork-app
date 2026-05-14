@@ -5,7 +5,7 @@ import {
   getClientById,
   getAssessmentById,
   buildReferralCode,
-  countReferralCodesForClientYear,
+  countReferralPairsForClient,
   insertReferralCode,
 } from '../../../lib/store';
 
@@ -39,9 +39,8 @@ export default requireAuth(async function handler(req, res) {
       if (!client) return res.status(404).json({ error: 'Cliente non trovato' });
       if (!assessment) return res.status(404).json({ error: 'Assessment non trovato' });
 
-      const year = new Date().getFullYear();
-      const existing = await countReferralCodesForClientYear(client_id, year);
-      const code = buildReferralCode(client.name, year, existing + 1);
+      const existing = await countReferralPairsForClient(client_id);
+      const code = buildReferralCode(client.name, existing + 1);
 
       const referral = await insertReferralCode({ client_id, assessment_id, code });
       return res.json(referral);

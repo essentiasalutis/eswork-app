@@ -20,13 +20,35 @@ function pct(used, total) {
 
 export default function ReferralsPage({ codes: initialCodes }) {
   const router = useRouter();
-  const [codes] = useState(initialCodes);
+  const [codes, setCodes] = useState(initialCodes);
   const [search, setSearch] = useState('');
   const [monthFilter, setMonthFilter] = useState('all');
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/');
+  }
+
+  async function toggleActive(rc) {
+    const res = await fetch(`/api/referrals/manage/${rc.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !rc.is_active }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setCodes(prev => prev.map(c => c.id === rc.id ? { ...c, is_active: updated.is_active } : c));
+    }
+  }
+
+  async function deleteCode(rc) {
+    const uses = rc.referral_uses?.length || 0;
+    const msg = uses > 0
+      ? `Eliminare il codice ${rc.code}? Ha già ${uses} utilizzo/i — verranno cancellati anche quelli.`
+      : `Eliminare il codice ${rc.code}?`;
+    if (!confirm(msg)) return;
+    const res = await fetch(`/api/referrals/manage/${rc.id}`, { method: 'DELETE' });
+    if (res.ok) setCodes(prev => prev.filter(c => c.id !== rc.id));
   }
 
   // ── Statistiche globali ───────────────────────────────────────────────────
@@ -199,14 +221,15 @@ export default function ReferralsPage({ codes: initialCodes }) {
                   <th className="px-4 py-3 text-left">Azienda</th>
                   <th className="px-4 py-3 text-center">Generato</th>
                   <th className="px-4 py-3 text-center">Utilizzi</th>
-                  <th className="px-4 py-3 text-center">Link</th>
+                  <th className="px-4 py-3 text-center">Stato</th>
+                  <th className="px-4 py-3 text-center">Azioni</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {monthlyReport.map(c => {
                   const uses = c.referral_uses || [];
                   return (
-                    <tr key={c.id} className="hover:bg-gray-50">
+                    <tr key={c.id} className={`hover:bg-gray-50 ${!c.is_active ? 'opacity-50' : ''}`}>
                       <td className="px-5 py-3">
                         <span className="font-mono font-semibold text-blue-700 text-xs">{c.code}</span>
                       </td>
@@ -222,13 +245,34 @@ export default function ReferralsPage({ codes: initialCodes }) {
                         )}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => copyLink(c.code)}
-                          className="text-xs text-gray-500 hover:text-blue-700 transition-colors"
-                          title="Copia link /care/[code]"
-                        >
-                          {copiedCode === c.code ? '✅ Copiato' : '🔗 Link'}
-                        </button>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${c.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {c.is_active ? 'Attivo' : 'Stoppato'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-3">
+                          <button
+                            onClick={() => copyLink(c.code)}
+                            className="text-xs text-gray-400 hover:text-blue-700 transition-colors"
+                            title="Copia link"
+                          >
+                            {copiedCode === c.code ? '✅' : '🔗'}
+                          </button>
+                          <button
+                            onClick={() => toggleActive(c)}
+                            className={`text-xs font-medium transition-colors ${c.is_active ? 'text-yellow-600 hover:text-yellow-800' : 'text-green-600 hover:text-green-800'}`}
+                            title={c.is_active ? 'Stoppa link' : 'Riattiva link'}
+                          >
+                            {c.is_active ? '⏸ Stoppa' : '▶ Riattiva'}
+                          </button>
+                          <button
+                            onClick={() => deleteCode(c)}
+                            className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                            title="Elimina"
+                          >
+                            🗑
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

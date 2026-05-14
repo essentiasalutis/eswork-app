@@ -230,6 +230,28 @@ ${FIRMA}`;
     setTimeout(() => setCopiedReferral(null), 2000);
   }
 
+  async function toggleReferral(rc) {
+    const res = await fetch(`/api/referrals/manage/${rc.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !rc.is_active }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setReferralCodes(prev => prev.map(c => c.id === rc.id ? { ...c, is_active: updated.is_active } : c));
+    }
+  }
+
+  async function deleteReferral(rc) {
+    const uses = rc.referral_uses?.length || 0;
+    const msg = uses > 0
+      ? `Eliminare il codice ${rc.code}? Ha ${uses} utilizzo/i — verranno cancellati anche quelli.`
+      : `Eliminare il codice ${rc.code}?`;
+    if (!confirm(msg)) return;
+    const res = await fetch(`/api/referrals/manage/${rc.id}`, { method: 'DELETE' });
+    if (res.ok) setReferralCodes(prev => prev.filter(c => c.id !== rc.id));
+  }
+
   function openCalculator(a) {
     const { aggregateNMQ } = require('../../lib/scoring');
     const rList = responses[a.id] || [];
@@ -671,21 +693,19 @@ ${FIRMA}`;
                 <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide border-b border-gray-100">
                   <tr>
                     <th className="px-4 py-2.5 text-left">Codice</th>
-                    <th className="px-3 py-2.5 text-center">Generato</th>
                     <th className="px-3 py-2.5 text-center">Utilizzi</th>
-                    <th className="px-3 py-2.5 text-center">Link</th>
+                    <th className="px-3 py-2.5 text-center">Stato</th>
+                    <th className="px-3 py-2.5 text-center">Azioni</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {referralCodes.map(rc => {
                     const uses = rc.referral_uses || [];
                     return (
-                      <tr key={rc.id} className="hover:bg-gray-50">
+                      <tr key={rc.id} className={`hover:bg-gray-50 ${!rc.is_active ? 'opacity-50' : ''}`}>
                         <td className="px-4 py-2.5">
                           <span className="font-mono font-semibold text-blue-700 text-xs">{rc.code}</span>
-                        </td>
-                        <td className="px-3 py-2.5 text-center text-gray-400 text-xs">
-                          {new Date(rc.created_at).toLocaleDateString('it-IT')}
+                          <div className="text-xs text-gray-400 mt-0.5">{new Date(rc.created_at).toLocaleDateString('it-IT')}</div>
                         </td>
                         <td className="px-3 py-2.5 text-center">
                           {uses.length > 0 ? (
@@ -697,12 +717,34 @@ ${FIRMA}`;
                           )}
                         </td>
                         <td className="px-3 py-2.5 text-center">
-                          <button
-                            onClick={() => copyReferralLink(rc.code)}
-                            className="text-xs text-gray-500 hover:text-orange-600 transition-colors"
-                          >
-                            {copiedReferral === rc.code ? '✅ Copiato' : '🔗 Copia link'}
-                          </button>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${rc.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {rc.is_active ? 'Attivo' : 'Stoppato'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => copyReferralLink(rc.code)}
+                              className="text-xs text-gray-400 hover:text-blue-600 transition-colors"
+                              title="Copia link"
+                            >
+                              {copiedReferral === rc.code ? '✅' : '🔗'}
+                            </button>
+                            <button
+                              onClick={() => toggleReferral(rc)}
+                              className={`text-xs font-medium transition-colors ${rc.is_active ? 'text-yellow-600 hover:text-yellow-800' : 'text-green-600 hover:text-green-800'}`}
+                              title={rc.is_active ? 'Stoppa link' : 'Riattiva link'}
+                            >
+                              {rc.is_active ? '⏸' : '▶'}
+                            </button>
+                            <button
+                              onClick={() => deleteReferral(rc)}
+                              className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                              title="Elimina"
+                            >
+                              🗑
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

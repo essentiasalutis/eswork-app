@@ -1,24 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Head from 'next/head';
 
-export default function CarePage({ code, clientName, valid, error }) {
-  const [submitted, setSubmitted] = useState(false);
+const BOOKING_URL = 'https://essentiasalutis.it';
+const BOOKING_EMAIL = 'info@essentiasalutis.it';
+
+export default function CarePage({ code, clientName, valid }) {
   const [name, setName] = useState('');
   const [sending, setSending] = useState(false);
 
   async function handlePrenotazione(e) {
     e.preventDefault();
-    if (!valid || submitted) return;
+    if (!valid) return;
     setSending(true);
     try {
+      // Registra l'utilizzo in background
       await fetch(`/api/referrals/${code}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ patient_name: name }),
       });
-      setSubmitted(true);
     } catch (_) {}
-    setSending(false);
+    // Reindirizza al sito di prenotazione
+    window.location.href = BOOKING_URL;
+  }
+
+  function handleEmail() {
+    const subject = encodeURIComponent(`Prenotazione tariffa agevolata ES Work — codice ${code}`);
+    const body = encodeURIComponent(`Buongiorno,\n\nVorrei prenotare una visita osteopatica con la tariffa agevolata ES Work.\n\nCodice referral: ${code}${name ? `\nNome: ${name}` : ''}\n\nGrazie`);
+    window.location.href = `mailto:${BOOKING_EMAIL}?subject=${subject}&body=${body}`;
   }
 
   return (
@@ -74,26 +83,6 @@ export default function CarePage({ code, clientName, valid, error }) {
               <p style={{ color: '#64748b', fontSize: 15, margin: 0 }}>
                 Il codice che hai inserito non è valido o è scaduto.<br />
                 Contatta la tua azienda per ricevere un nuovo codice.
-              </p>
-            </>
-          ) : submitted ? (
-            /* Conferma invio */
-            <>
-              <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
-              <h1 style={{ fontSize: 20, color: '#0f172a', margin: '0 0 12px' }}>
-                Ottimo! Accesso registrato.
-              </h1>
-              <p style={{ color: '#64748b', fontSize: 15, margin: 0 }}>
-                Ricorda di indicare il codice <strong style={{ color: '#0369a1' }}>{code}</strong>{' '}
-                quando prenoti la tua visita su{' '}
-                <a
-                  href="https://essentiasalutis.it"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: '#0369a1' }}
-                >
-                  essentiasalutis.it
-                </a>.
               </p>
             </>
           ) : (
@@ -152,6 +141,7 @@ export default function CarePage({ code, clientName, valid, error }) {
                   </div>
                 </div>
 
+                {/* Pulsante principale → va al sito */}
                 <button
                   type="submit"
                   disabled={sending}
@@ -165,26 +155,36 @@ export default function CarePage({ code, clientName, valid, error }) {
                     fontSize: 16,
                     fontWeight: 700,
                     cursor: 'pointer',
-                    marginBottom: 12,
+                    marginBottom: 10,
                     opacity: sending ? 0.7 : 1,
                   }}
                 >
-                  {sending ? 'Registrazione...' : '📅 Prenota ora'}
+                  {sending ? 'Un momento…' : '🌐 Prenota sul sito'}
                 </button>
 
-                <a
-                  href="https://essentiasalutis.it"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                {/* Alternativa via email */}
+                <button
+                  type="button"
+                  onClick={handleEmail}
                   style={{
-                    display: 'block',
-                    fontSize: 13,
-                    color: '#64748b',
-                    textDecoration: 'none',
+                    width: '100%',
+                    background: '#fff',
+                    color: '#0369a1',
+                    border: '1.5px solid #bae6fd',
+                    borderRadius: 10,
+                    padding: '13px',
+                    fontSize: 15,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    marginBottom: 16,
                   }}
                 >
-                  Vai su essentiasalutis.it →
-                </a>
+                  ✉️ Prenota via email
+                </button>
+
+                <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>
+                  Indica sempre il codice <strong>{code}</strong> al momento della prenotazione.
+                </p>
               </form>
             </>
           )}

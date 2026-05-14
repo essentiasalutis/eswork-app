@@ -11,7 +11,7 @@ const WA_ICON = (
   </svg>
 );
 
-export default function CarePage({ code, clientName, valid }) {
+export default function CarePage({ code, clientName, type, expiresAt, valid }) {
   const [name, setName] = useState('');
 
   function handleWhatsApp(e) {
@@ -107,15 +107,47 @@ export default function CarePage({ code, clientName, valid }) {
                 {code}
               </div>
 
+              {/* Badge tipo codice */}
+              <div style={{ marginBottom: 10 }}>
+                <span style={{
+                  display: 'inline-block',
+                  background: type === 'F' ? '#fdf4ff' : '#f0fdf4',
+                  border: `1px solid ${type === 'F' ? '#e9d5ff' : '#bbf7d0'}`,
+                  color: type === 'F' ? '#7c3aed' : '#15803d',
+                  borderRadius: 6,
+                  padding: '3px 10px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  letterSpacing: '0.5px',
+                }}>
+                  {type === 'F' ? '👨‍👩‍👧 Codice Familiare' : '👤 Codice Personale'}
+                </span>
+              </div>
+
               <h1 style={{ fontSize: 21, color: '#0f172a', margin: '0 0 14px', lineHeight: 1.35 }}>
-                Hai diritto alla tariffa agevolata ES Work
+                {type === 'F'
+                  ? 'Accesso riservato a familiari conviventi'
+                  : 'Accesso riservato dipendenti ES Work'}
               </h1>
 
-              <p style={{ color: '#475569', fontSize: 14, margin: '0 0 24px', lineHeight: 1.6 }}>
-                {clientName ? <>La tua azienda (<strong>{clientName}</strong>) ti ha </> : 'Hai '}
-                fornito questo codice per accedere alle prestazioni osteopatiche a tariffa agevolata.
-                Inserisci nome e cognome e scegli come contattarci.
+              <p style={{ color: '#475569', fontSize: 14, margin: '0 0 6px', lineHeight: 1.6 }}>
+                {type === 'F'
+                  ? <>Sei il familiare convivente di un dipendente{clientName ? <> di <strong>{clientName}</strong></> : ''} che partecipa al programma <strong>ES Work</strong>. Hai diritto alla <strong>tariffa agevolata (sconto 20%)</strong> per le tue sedute osteopatiche.</>
+                  : <>{clientName ? <>La tua azienda (<strong>{clientName}</strong>) ti ha </> : 'Hai '}fornito questo codice per accedere alle prestazioni osteopatiche a <strong>tariffa agevolata (sconto 20%)</strong> tramite il programma <strong>ES Work</strong>.</>
+                }
               </p>
+
+              {type === 'F' && (
+                <p style={{ background: '#fdf4ff', border: '1px solid #e9d5ff', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#6d28d9', margin: '0 0 20px' }}>
+                  ⚠️ Questo codice è utilizzabile <strong>una sola volta</strong> per intestazione.
+                </p>
+              )}
+
+              {expiresAt && (
+                <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 20px' }}>
+                  Valido fino al {new Date(expiresAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}
+                </p>
+              )}
 
               {/* Campo nome — obbligatorio */}
               <div style={{ marginBottom: 20, textAlign: 'left' }}>
@@ -236,7 +268,7 @@ export async function getServerSideProps({ params }) {
     const res = await fetch(`${baseUrl}/api/referrals/${code}`);
     if (!res.ok) return { props: { code, clientName: '', valid: false } };
     const data = await res.json();
-    return { props: { code: data.code, clientName: data.clientName, valid: true } };
+    return { props: { code: data.code, clientName: data.clientName, type: data.type || 'P', expiresAt: data.expiresAt || null, valid: true } };
   } catch {
     return { props: { code, clientName: '', valid: false } };
   }

@@ -52,9 +52,14 @@ export default function ReferralsPage({ codes: initialCodes }) {
   }
 
   // ── Statistiche globali ───────────────────────────────────────────────────
+  const codesP = codes.filter(c => (c.type || 'P') === 'P');
+  const codesF = codes.filter(c => c.type === 'F');
   const totalCodes = codes.length;
-  const totalUses = codes.reduce((s, c) => s + (c.referral_uses?.length || 0), 0);
+  const totalUsesP = codesP.reduce((s, c) => s + (c.referral_uses?.length || 0), 0);
+  const totalUsesF = codesF.reduce((s, c) => s + (c.referral_uses?.length || 0), 0);
+  const totalUses = totalUsesP + totalUsesF;
   const globalConversion = pct(totalUses, totalCodes);
+  const totalRevenue = codes.reduce((s, c) => s + (c.referral_uses?.length || 0) * (c.session_price || 65), 0);
 
   // ── Report mensile ────────────────────────────────────────────────────────
   const availableMonths = useMemo(() => {
@@ -71,10 +76,11 @@ export default function ReferralsPage({ codes: initialCodes }) {
     const map = {};
     codes.forEach(c => {
       const cid = c.client_id;
-      if (!map[cid]) map[cid] = { clientName: c.clients?.name || '—', clientId: cid, codes: [] };
-      map[cid].codes.push(c);
+      if (!map[cid]) map[cid] = { clientName: c.clients?.name || '—', clientId: cid, codesP: [], codesF: [] };
+      if ((c.type || 'P') === 'P') map[cid].codesP.push(c);
+      else map[cid].codesF.push(c);
     });
-    return Object.values(map).sort((a, b) => b.codes.length - a.codes.length);
+    return Object.values(map).sort((a, b) => (b.codesP.length + b.codesF.length) - (a.codesP.length + a.codesF.length));
   }, [codes]);
 
   // ── Report mensile ────────────────────────────────────────────────────────
@@ -118,18 +124,22 @@ export default function ReferralsPage({ codes: initialCodes }) {
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
 
         {/* KPI globali */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <div className="text-3xl font-bold text-gray-900">{totalCodes}</div>
-            <div className="text-sm text-gray-500 mt-1">Codici distribuiti</div>
+            <div className="text-2xl font-bold text-gray-900">{codesP.length} / {codesF.length}</div>
+            <div className="text-xs text-gray-500 mt-1">Codici P / F distribuiti</div>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <div className="text-3xl font-bold text-green-600">{totalUses}</div>
-            <div className="text-sm text-gray-500 mt-1">Codici usati</div>
+            <div className="text-2xl font-bold text-green-600">{totalUsesP} / {totalUsesF}</div>
+            <div className="text-xs text-gray-500 mt-1">Usi P / F</div>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <div className="text-3xl font-bold text-blue-600">{globalConversion}%</div>
-            <div className="text-sm text-gray-500 mt-1">Tasso di conversione</div>
+            <div className="text-2xl font-bold text-blue-600">{globalConversion}%</div>
+            <div className="text-xs text-gray-500 mt-1">Tasso di conversione</div>
+          </div>
+          <div className="bg-white rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+            <div className="text-2xl font-bold text-emerald-700">€{totalRevenue.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</div>
+            <div className="text-xs text-emerald-600 mt-1">Revenue stimata</div>
           </div>
         </div>
 
@@ -145,15 +155,22 @@ export default function ReferralsPage({ codes: initialCodes }) {
               <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
                 <tr>
                   <th className="px-5 py-3 text-left">Azienda</th>
-                  <th className="px-4 py-3 text-center">Distribuiti</th>
-                  <th className="px-4 py-3 text-center">Usati</th>
-                  <th className="px-4 py-3 text-center">Conversione</th>
+                  <th className="px-4 py-3 text-center">👤 P dist.</th>
+                  <th className="px-4 py-3 text-center">👤 P usati</th>
+                  <th className="px-4 py-3 text-center">👨‍👩‍👧 F dist.</th>
+                  <th className="px-4 py-3 text-center">👨‍👩‍👧 F usati</th>
+                  <th className="px-4 py-3 text-center">Conv.</th>
+                  <th className="px-4 py-3 text-center text-emerald-700">Revenue</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {byClient.map(({ clientName, clientId, codes: cc }) => {
-                  const used = cc.reduce((s, c) => s + (c.referral_uses?.length || 0), 0);
-                  const conv = pct(used, cc.length);
+                {byClient.map(({ clientName, clientId, codesP: cp, codesF: cf }) => {
+                  const usedP = cp.reduce((s, c) => s + (c.referral_uses?.length || 0), 0);
+                  const usedF = cf.reduce((s, c) => s + (c.referral_uses?.length || 0), 0);
+                  const totalDist = cp.length + cf.length;
+                  const totalUsed = usedP + usedF;
+                  const conv = pct(totalUsed, totalDist);
+                  const revenue = [...cp, ...cf].reduce((s, c) => s + (c.referral_uses?.length || 0) * (c.session_price || 65), 0);
                   return (
                     <tr key={clientId} className="hover:bg-gray-50">
                       <td className="px-5 py-3">
@@ -161,12 +178,17 @@ export default function ReferralsPage({ codes: initialCodes }) {
                           {clientName}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 text-center text-gray-700">{cc.length}</td>
-                      <td className="px-4 py-3 text-center text-green-600 font-medium">{used}</td>
+                      <td className="px-4 py-3 text-center text-gray-600">{cp.length}</td>
+                      <td className="px-4 py-3 text-center font-semibold text-green-600">{usedP}</td>
+                      <td className="px-4 py-3 text-center text-gray-600">{cf.length}</td>
+                      <td className="px-4 py-3 text-center font-semibold text-purple-600">{usedF}</td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`font-semibold ${conv >= 50 ? 'text-green-600' : conv >= 20 ? 'text-yellow-600' : 'text-gray-500'}`}>
+                        <span className={`font-semibold ${conv >= 50 ? 'text-green-600' : conv >= 20 ? 'text-yellow-600' : 'text-gray-400'}`}>
                           {conv}%
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-center font-bold text-emerald-700">
+                        {revenue > 0 ? `€${revenue.toLocaleString('it-IT')}` : '—'}
                       </td>
                     </tr>
                   );
@@ -231,7 +253,12 @@ export default function ReferralsPage({ codes: initialCodes }) {
                   return (
                     <tr key={c.id} className={`hover:bg-gray-50 ${!c.is_active ? 'opacity-50' : ''}`}>
                       <td className="px-5 py-3">
-                        <span className="font-mono font-semibold text-blue-700 text-xs">{c.code}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-semibold text-blue-700 text-xs">{c.code}</span>
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${(c.type||'P') === 'F' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
+                            {c.type || 'P'}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-gray-700">{c.clients?.name || '—'}</td>
                       <td className="px-4 py-3 text-center text-gray-500">{fmtDate(c.created_at)}</td>

@@ -168,8 +168,8 @@ export default function ClientPage({ client: initialClient, assessments: initial
     if (res.ok) {
       const data = await res.json();
       setAssessments(prev => prev.map(a => a.id === id ? { ...a, status: 'closed' } : a));
-      // Se l'API ha restituito un codice referral appena generato, ricarica la lista
-      if (data.referral_code) {
+      // Se l'API ha restituito i codici referral appena generati, ricarica la lista
+      if (data.referral_code_p || data.referral_code_f) {
         const codesRes = await fetch(`/api/referrals?clientId=${client.id}`);
         if (codesRes.ok) setReferralCodes(await codesRes.json());
       }
@@ -704,7 +704,12 @@ ${FIRMA}`;
                     return (
                       <tr key={rc.id} className={`hover:bg-gray-50 ${!rc.is_active ? 'opacity-50' : ''}`}>
                         <td className="px-4 py-2.5">
-                          <span className="font-mono font-semibold text-blue-700 text-xs">{rc.code}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-semibold text-blue-700 text-xs">{rc.code}</span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${(rc.type||'P') === 'F' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
+                              {(rc.type||'P') === 'F' ? '👨‍👩‍👧 F' : '👤 P'}
+                            </span>
+                          </div>
                           <div className="text-xs text-gray-400 mt-0.5">{new Date(rc.created_at).toLocaleDateString('it-IT')}</div>
                         </td>
                         <td className="px-3 py-2.5 text-center">

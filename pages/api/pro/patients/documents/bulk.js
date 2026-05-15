@@ -1,0 +1,70 @@
+import { requireProAuth } from '../../../../../lib/pro-auth';
+import { upsertPatientDocument } from '../../../../../lib/store';
+import { hashIp, hashContent } from '../../../../../lib/crypto-utils';
+import { getClientIp } from '../../../../../lib/rate-limit';
+
+// POST /api/pro/patients/documents/bulk?patientId=xxx
+// Salva consenso + privacy + anamnesi in un'unica operazione con firma cumulativa.
+// Registra: timestamp, hash contenuto documenti, ip anonimizzato, user-agent.
+
+export default async function handler(req, res) {
+  const proSession = await requireProAuth(req, res);
+  if (!proSession) return;
+
+  if (req.method !== 'POST') return res.status(405).end();
+
+  const { patientId } = req.query;
+  if (!patientId) return res.status(400).json({ error: 'patientId richiesto' });
+
+  try {
+    const {
+      client_id,
+      signature_image,
+      form_data,
+      pro_notes,
+      consent_text,
+      privacy_text,
+    } = req.body;
+
+    if (!client_id)       return res.status(400).json({ error: 'client_id richiesto' });
+    if (!signature_image) return res.status(400).json({ error: 'firma obbligatoria' });
+    if (!form_data)       return res.status(400).json({ error: 'dati anamnesi obbligatori' });
+
+    const ip    = getClientIp(req);
+    const now   = new Date().toISOString();
+    const base  = {
+      professional_id: proSession.proId,
+      signed_at:       now,
+      ip_hash:         hashIp(ip),
+      user_agent:      req.headers['user-agent']?.slice(0, 200) || null,
+      signature_image,
+    };
+
+    const [docConsent, docPrivacy, docAnamnesi] = await Promise.all([
+      upsertPatientDocument(patientId, client_id, 'consent_treatment', {
+        ...base,
+        status:       'signed',
+        content_hash: consent_text ? hashContent(consent_text) : null,
+      }),
+      upsertPatientDocument(patientId, client_id, 'privacy_extended', {
+        ...base,
+        status:       'signed',
+        content_hash: privacy_text ? hashContent(privacy_text) : null,
+      }),
+      upsertPatientDocument(patientId, client_id, 'anamnesi', {
+        ...base,
+        status:       'completed',
+        form_data,
+        pro_notes:    pro_notes || null,
+        content_hash: hashContent(JSON.stringify(form_data)),
+      }),
+    ]);
+
+    console.log(`[bulk-docs] patient=${patientId} signed at ${now} — consent=${docConsent.id} privacy=${docPrivacy.id} anamnesi=${docAnamnesi.id}`);
+    return res.json([docConsent, docPrivacy, docAnamnesi]);
+
+  } catch (e) {
+    console.error('[bulk-docs] error:', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+}

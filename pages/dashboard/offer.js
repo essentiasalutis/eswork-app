@@ -209,7 +209,7 @@ ${FIRMA}`;
       `}</style>
 
       {/* ── Pulsanti UI (no print) ─────────────────────────────────────── */}
-      <div className="no-print max-w-3xl mx-auto px-4 pt-4 pb-2">
+      <div className="no-print max-w-5xl mx-auto px-6 pt-4 pb-2">
         <div className="flex gap-3 flex-wrap mb-2">
           <button
             onClick={() => window.history.back()}

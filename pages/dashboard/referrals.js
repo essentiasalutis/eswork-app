@@ -109,7 +109,7 @@ export default function ReferralsPage({ codes: initialCodes }) {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-800">← Dashboard</Link>
             <span className="text-gray-300">|</span>
@@ -121,7 +121,7 @@ export default function ReferralsPage({ codes: initialCodes }) {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-5xl mx-auto px-6 py-6 space-y-6">
 
         {/* KPI globali */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

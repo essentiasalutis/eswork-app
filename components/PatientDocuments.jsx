@@ -159,7 +159,7 @@ function DocModal({ type, patient, existingDoc, saving, error, onSave, onClose }
 
   // Per consensi: serve firma + conferma. Per anamnesi: serve almeno conferma (firma facoltativa)
   const canSubmitDoc = alreadySigned || (signature && cbConfirm);
-  const canSubmitAnamnesi = f.pain_location && f.job_activity && nrsTouched && cbConfirm; // NRS obbligatorio, firma facoltativa
+  const canSubmitAnamnesi = f.pain_location && f.job_activity && nrsTouched; // NRS obbligatorio, firma e spunta facoltative
   const canSubmit = isAnamnesi ? canSubmitAnamnesi : canSubmitDoc;
 
   function submit() {

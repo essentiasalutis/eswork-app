@@ -82,22 +82,26 @@ export default function ConsentScreen({ assessmentId, onConsented }) {
       fontFamily: 'system-ui, -apple-system, sans-serif',
     }}>
       {/* Header */}
-      <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', width: '100%', padding: '16px 24px', textAlign: 'center' }}>
-        <div style={{ fontSize: 22, fontWeight: 800, color: '#0369a1', letterSpacing: '-0.5px' }}>ES Work</div>
-        <div style={{ fontSize: 12, color: '#64748b' }}>by Essentia Salutis</div>
+      <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', width: '100%', padding: '12px 24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <img
+            src="/logo-es.png"
+            alt="ES Work"
+            style={{ height: 40, objectFit: 'contain', flexShrink: 0 }}
+            onError={e => { e.target.style.display = 'none'; }}
+          />
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#0369a1', letterSpacing: '-0.5px', lineHeight: 1.1 }}>ES Work</div>
+            <div style={{ fontSize: 11, color: '#64748b' }}>by Essentia Salutis</div>
+          </div>
+        </div>
       </div>
 
       {/* Card */}
       <div style={{ maxWidth: 520, width: '100%', padding: '32px 20px 48px' }}>
 
-        {/* Logo + titolo */}
+        {/* Titolo */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <img
-            src="/logo-es.png"
-            alt="ES Work"
-            style={{ height: 56, marginBottom: 14, objectFit: 'contain' }}
-            onError={e => { e.target.style.display = 'none'; }}
-          />
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', margin: '0 0 10px' }}>
             Prima di iniziare
           </h1>

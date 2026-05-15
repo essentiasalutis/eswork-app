@@ -169,11 +169,22 @@ export default function ClientPage({ client: initialClient, assessments: initial
     if (res.ok) {
       const data = await res.json();
       setAssessments(prev => prev.map(a => a.id === id ? { ...a, status: 'closed' } : a));
-      // Se l'API ha restituito i codici referral appena generati, ricarica la lista
       if (data.referral_code_p || data.referral_code_f) {
         const codesRes = await fetch(`/api/referrals?clientId=${client.id}`);
         if (codesRes.ok) setReferralCodes(await codesRes.json());
       }
+    }
+  }
+
+  async function reopenAssessment(id) {
+    if (!confirm('Riaprire questo assessment? I dipendenti potranno tornare a rispondere.')) return;
+    const res = await fetch(`/api/assessments/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'active' }),
+    });
+    if (res.ok) {
+      setAssessments(prev => prev.map(a => a.id === id ? { ...a, status: 'active' } : a));
     }
   }
 
@@ -664,7 +675,6 @@ ${FIRMA}`;
                       >
                         Chiudi raccolta
                       </button>
-                      {/* Mod 3: Invia link via email */}
                       <button
                         onClick={() => emailLink(a)}
                         className="text-sm px-4 py-2 rounded-xl border border-blue-200 text-blue-600 bg-blue-50"
@@ -672,6 +682,14 @@ ${FIRMA}`;
                         Invia link email
                       </button>
                     </>
+                  )}
+                  {a.status === 'closed' && (
+                    <button
+                      onClick={() => reopenAssessment(a.id)}
+                      className="text-sm px-4 py-2 rounded-xl border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100"
+                    >
+                      🔓 Riapri raccolta
+                    </button>
                   )}
                   {/* Consensi raccolti */}
                   {a.status === 'closed' && a.consents && a.consents.length > 0 && (

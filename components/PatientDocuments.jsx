@@ -100,6 +100,7 @@ function DocModal({ type, patient, existingDoc, saving, error, onSave, onClose }
   const [signature, setSignature] = useState(null);
   const [cbConfirm, setCbConfirm] = useState(false);
   const [proNotes, setProNotes] = useState(existingDoc?.pro_notes || '');
+  const [nrsTouched, setNrsTouched] = useState(!!(existingDoc?.form_data));
 
   // Anamnesi — campi (stessi del DB paziente, estesi)
   const [f, setF] = useState(existingDoc?.form_data || {
@@ -158,7 +159,7 @@ function DocModal({ type, patient, existingDoc, saving, error, onSave, onClose }
 
   // Per consensi: serve firma + conferma. Per anamnesi: serve almeno conferma (firma facoltativa)
   const canSubmitDoc = alreadySigned || (signature && cbConfirm);
-  const canSubmitAnamnesi = f.pain_location && f.job_activity && cbConfirm; // firma facoltativa
+  const canSubmitAnamnesi = f.pain_location && f.job_activity && nrsTouched && cbConfirm; // NRS obbligatorio, firma facoltativa
   const canSubmit = isAnamnesi ? canSubmitAnamnesi : canSubmitDoc;
 
   function submit() {
@@ -250,13 +251,16 @@ function DocModal({ type, patient, existingDoc, saving, error, onSave, onClose }
               <FF label="Modalità di insorgenza">
                 <input style={IS} value={f.pain_onset} onChange={e => upd('pain_onset', e.target.value)} placeholder="es. acuto improvviso, progressivo, post-trauma…" />
               </FF>
-              <FF label="Intensità dolore NRS (0–10)">
+              <FF label={<>Intensità dolore NRS (0–10) <span style={{ color: '#ef4444' }}>*</span> {!nrsTouched && <span style={{ color: '#f59e0b', fontWeight: 400, fontSize: 11 }}>— obbligatorio</span>}</>}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <input type="range" min={0} max={10} value={f.nrs}
-                    onChange={e => upd('nrs', +e.target.value)}
+                    onChange={e => { upd('nrs', +e.target.value); setNrsTouched(true); }}
                     style={{ flex: 1, accentColor: f.nrs >= 7 ? '#dc2626' : f.nrs >= 4 ? '#f59e0b' : '#16a34a' }} />
-                  <span style={{ fontWeight: 700, fontSize: 18, minWidth: 36, textAlign: 'center', color: f.nrs >= 7 ? '#dc2626' : f.nrs >= 4 ? '#f59e0b' : '#16a34a' }}>{f.nrs}</span>
+                  <span style={{ fontWeight: 700, fontSize: 18, minWidth: 36, textAlign: 'center', color: nrsTouched ? (f.nrs >= 7 ? '#dc2626' : f.nrs >= 4 ? '#f59e0b' : '#16a34a') : '#94a3b8' }}>
+                    {nrsTouched ? f.nrs : '—'}
+                  </span>
                 </div>
+                {!nrsTouched && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Muovi lo slider per impostare il valore NRS</div>}
               </FF>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <FF label="Fattori aggravanti"><textarea style={TS} rows={2} value={f.fattori_peggio} onChange={e => upd('fattori_peggio', e.target.value)} placeholder="es. seduto a lungo, sollevamenti…" /></FF>

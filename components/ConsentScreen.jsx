@@ -90,9 +90,14 @@ export default function ConsentScreen({ assessmentId, onConsented }) {
       {/* Card */}
       <div style={{ maxWidth: 520, width: '100%', padding: '32px 20px 48px' }}>
 
-        {/* Icona + titolo */}
+        {/* Logo + titolo */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
+          <img
+            src="/logo-es.png"
+            alt="ES Work"
+            style={{ height: 56, marginBottom: 14, objectFit: 'contain' }}
+            onError={e => { e.target.style.display = 'none'; }}
+          />
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', margin: '0 0 10px' }}>
             Prima di iniziare
           </h1>

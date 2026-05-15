@@ -8,7 +8,9 @@ import {
   getSessionsByPatient,
   getAssignmentsByProfessional,
   getClientById,
+  getPatientDocuments,
 } from '../../../lib/store';
+import PatientDocuments from '../../../components/PatientDocuments';
 
 // ─── NRS Slider ───────────────────────────────────────────────────────────────
 
@@ -540,11 +542,20 @@ function SessionForm({ patientId, sessionNumber, lastNote, onSaved }) {
 
 // ─── Pagina principale ────────────────────────────────────────────────────────
 
-export default function PatientPage({ proName, patient: initialPatient, sessions: initialSessions, client }) {
+export default function PatientPage({ proName, patient: initialPatient, sessions: initialSessions, client, documents: initialDocs }) {
   const router = useRouter();
   const [patient, setPatient] = useState(initialPatient);
   const [sessions, setSessions] = useState(initialSessions);
   const [showNewSession, setShowNewSession] = useState(false);
+  const [patientDocs, setPatientDocs] = useState(initialDocs || []);
+
+  function allDocsSigned() {
+    const types = ['consent_treatment', 'privacy_extended', 'anamnesi'];
+    return types.every(t => {
+      const d = patientDocs.find(doc => doc.type === t);
+      return d && (d.status === 'signed' || d.status === 'completed');
+    });
+  }
 
   async function deletePatient() {
     const name = `${patient.first_name} ${patient.last_name}`;
@@ -599,6 +610,25 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
 
         <main className="max-w-xl mx-auto px-4 py-5 space-y-4">
 
+          {/* ── Documenti e consensi (solo L1) ───────────────────────────── */}
+          {patient.level === 'level1' && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-4">
+              <h3 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-2">
+                📄 Documenti e consensi
+                {allDocsSigned()
+                  ? <span className="text-xs font-semibold text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">✅ Completi</span>
+                  : <span className="text-xs font-semibold text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">⚠️ Da completare</span>
+                }
+              </h3>
+              <PatientDocuments
+                patientId={patient.id}
+                clientId={patient.client_id}
+                documents={patientDocs}
+                onDocsChange={setPatientDocs}
+              />
+            </div>
+          )}
+
           <AnamnesisBlock patient={patient} onUpdated={setPatient} />
 
           {closedSessions.length >= 1 && (
@@ -636,10 +666,16 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
           )}
 
           {!showNewSession && (
-            <button onClick={() => setShowNewSession(true)}
-              className="w-full py-3 rounded-xl bg-green-600 text-white font-semibold">
-              + Nuova seduta
-            </button>
+            patient.level === 'level1' && !allDocsSigned() ? (
+              <div className="w-full py-3 px-4 rounded-xl bg-orange-50 border border-orange-200 text-sm text-orange-700 text-center">
+                ⚠️ Prima di poter avviare il trattamento, completare i 3 documenti nella sezione <strong>"Documenti e consensi"</strong>.
+              </div>
+            ) : (
+              <button onClick={() => setShowNewSession(true)}
+                className="w-full py-3 rounded-xl bg-green-600 text-white font-semibold">
+                + Nuova seduta
+              </button>
+            )
           )}
 
           {showNewSession && (
@@ -673,9 +709,10 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   const allowed = assignments.some(a => a.client_id === patient.client_id);
   if (!allowed) return { notFound: true };
 
-  const [sessions, client] = await Promise.all([
+  const [sessions, client, documents] = await Promise.all([
     getSessionsByPatient(patientId),
     getClientById(patient.client_id),
+    getPatientDocuments(patientId),
   ]);
 
   return {
@@ -684,6 +721,7 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
       patient,
       sessions: sessions.map(s => ({ ...s, professionals: undefined })),
       client,
+      documents: documents.map(d => ({ ...d, signature_image: undefined })), // non passare la firma al client per default
     },
   };
 });

@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import Head from 'next/head';
+import ConsentScreen from '../../components/ConsentScreen';
 import {
   BODY_ZONES, NMQ_LABELS,
   PSS_QUESTIONS, PSS_OPTS,
@@ -275,6 +276,7 @@ function ProgressBar({ steps, current }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function Questionnaire({ assessment, client, error: serverError }) {
+  const [consented, setConsented] = useState(false);
   const [answers, setAnswers] = useState({});
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
@@ -355,15 +357,28 @@ export default function Questionnaire({ assessment, client, error: serverError }
     setSubmitting(false);
   }
 
-  if (error && !assessment) {
+  if (serverError && !assessment) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="text-center">
           <div className="text-5xl mb-4">🔗</div>
           <h1 className="text-xl font-semibold text-gray-800 mb-2">Link non disponibile</h1>
-          <p className="text-gray-500">{error}</p>
+          <p className="text-gray-500">{serverError}</p>
         </div>
       </div>
+    );
+  }
+
+  // ── Schermata consenso obbligatoria ──────────────────────────────────────────
+  if (!consented && assessment) {
+    return (
+      <>
+        <Head><title>ES Work — Consenso</title></Head>
+        <ConsentScreen
+          assessmentId={assessment.id}
+          onConsented={() => setConsented(true)}
+        />
+      </>
     );
   }
 

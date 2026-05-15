@@ -46,7 +46,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts })
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10 no-print">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
           <div>
             <span className="text-xl font-bold text-gray-900">ES </span>
             <span className="text-xl font-bold text-green-600">Work</span>
@@ -75,7 +75,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts })
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6">
+      <main className="max-w-5xl mx-auto px-6 py-6">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-lg font-semibold text-gray-800">Aziende clienti</h1>
           <button

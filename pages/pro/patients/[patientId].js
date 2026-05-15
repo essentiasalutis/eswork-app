@@ -623,13 +623,12 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
               <PatientDocuments
                 patientId={patient.id}
                 clientId={patient.client_id}
+                patient={patient}
                 documents={patientDocs}
                 onDocsChange={setPatientDocs}
               />
             </div>
           )}
-
-          <AnamnesisBlock patient={patient} onUpdated={setPatient} />
 
           {closedSessions.length >= 1 && (
             <div className="bg-white rounded-2xl border border-gray-200 p-4">

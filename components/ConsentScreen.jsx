@@ -150,7 +150,7 @@ export default function ConsentScreen({ assessmentId, onConsented }) {
           <Checkbox
             checked={cbPrivacy}
             onChange={setCbPrivacy}
-            label='Ho letto e compreso l\'informativa sul trattamento dei miei dati personali.'
+            label="Ho letto e compreso l'informativa sul trattamento dei miei dati personali."
           />
           <div style={{ height: 1, background: '#f1f5f9' }} />
           <Checkbox

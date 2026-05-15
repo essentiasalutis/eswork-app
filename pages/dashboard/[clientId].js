@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient } from '../../lib/store';
+import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment } from '../../lib/store';
 import { TYPE_LABELS, TYPE_COLORS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
 import { CONFIG } from '../../lib/config';
@@ -673,6 +673,14 @@ ${FIRMA}`;
                       </button>
                     </>
                   )}
+                  {/* Consensi raccolti */}
+                  {a.status === 'closed' && a.consents && a.consents.length > 0 && (
+                    <div className="w-full mt-1 px-3 py-2 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700">
+                      ✅ <strong>{a.consents.length}</strong> consenso/i GDPR raccolto/i
+                      <span className="text-green-500 ml-2">· IP anonimizzato · {new Date(a.consents[0].consent_privacy_at).toLocaleDateString('it-IT')}</span>
+                    </div>
+                  )}
+
                   {rCount > 0 && (
                     <button
                       onClick={() => openReport(a)}
@@ -813,6 +821,17 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     getReferralCodesByClient(clientId),
   ]);
 
+  // Carica consensi per ogni assessment chiuso
+  const assessmentsWithConsents = await Promise.all(
+    assessments.map(async a => {
+      if (a.status === 'closed') {
+        const consents = await getConsentsByAssessment(a.id);
+        return { ...a, consents };
+      }
+      return { ...a, consents: [] };
+    })
+  );
+
   // Aggrega NRS per paziente (no note cliniche)
   const patientsNrs = patientsRaw.map(p => {
     const closed = sessionsRaw.filter(s => s.patient_id === p.id && s.closed_at);
@@ -829,5 +848,5 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     };
   });
 
-  return { props: { client, assessments, responses, assignments, patientsNrs, referralCodes } };
+  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes } };
 });

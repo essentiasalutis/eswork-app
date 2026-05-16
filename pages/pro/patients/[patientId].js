@@ -14,20 +14,21 @@ import PatientDocuments from '../../../components/PatientDocuments';
 
 // ─── NRS Slider ───────────────────────────────────────────────────────────────
 
-function NrsSlider({ value, onChange, label }) {
+function NrsSlider({ value, onChange, label, touched, onTouch }) {
   const color = value <= 3 ? '#16a34a' : value <= 6 ? '#ca8a04' : '#dc2626';
   const desc = value === 0 ? 'nessun dolore' : value <= 3 ? 'lieve' : value <= 6 ? 'moderato' : 'severo';
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
         <span className="text-sm font-medium text-gray-700">{label}</span>
-        <span className="text-2xl font-bold" style={{ color }}>{value}
-          <span className="text-xs font-normal text-gray-400"> / 10 — {desc}</span>
-        </span>
+        {touched
+          ? <span className="text-2xl font-bold" style={{ color }}>{value}<span className="text-xs font-normal text-gray-400"> / 10 — {desc}</span></span>
+          : <span className="text-2xl font-bold text-gray-300">—<span className="text-xs font-normal text-gray-400"> muovi lo slider</span></span>
+        }
       </div>
       <input type="range" min={0} max={10} value={value}
-        onChange={e => onChange(parseInt(e.target.value))}
-        className="w-full" style={{ accentColor: color }} />
+        onChange={e => { if (onTouch) onTouch(); onChange(parseInt(e.target.value)); }}
+        className="w-full" style={{ accentColor: touched ? color : '#d1d5db' }} />
       <div className="flex justify-between text-xs text-gray-400 mt-1">
         <span>0 nessun dolore</span><span>10 massimo dolore</span>
       </div>
@@ -465,7 +466,8 @@ function AnamnesisBlock({ patient: initial, onUpdated }) {
 
 function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved }) {
   const isFirst = sessionNumber === 1;
-  const [nrs, setNrs] = useState(isFirst ? (anamnesiNrs ?? 5) : 5);
+  const [nrs, setNrs] = useState(0);
+  const [nrsTouched, setNrsTouched] = useState(false);
   const [treatmentNotes, setTreatmentNotes] = useState('');
   const [nextNotes, setNextNotes] = useState('');
   // Prima seduta: salta la fase NRS (già raccolto in anamnesi), vai diretto al trattamento
@@ -480,7 +482,7 @@ function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        nrs_pre: nrs,
+        nrs_pre: isFirst ? (anamnesiNrs ?? null) : (nrsTouched ? nrs : null),
         treatment_notes: treatmentNotes,
         next_session_notes: nextNotes,
         close: true,
@@ -512,9 +514,14 @@ function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved 
       )}
       {phase === 'pre' && (
         <>
-          <NrsSlider value={nrs} onChange={setNrs} label="NRS inizio seduta" />
-          <button onClick={() => setPhase('post')} className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold">
-            Avvia trattamento →
+          <NrsSlider value={nrs} onChange={setNrs} label="NRS inizio seduta" touched={nrsTouched} onTouch={() => setNrsTouched(true)} />
+          <button
+            onClick={() => { if (nrsTouched) setPhase('post'); }}
+            disabled={!nrsTouched}
+            className="w-full py-3 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: nrsTouched ? '#2563eb' : '#e2e8f0', color: nrsTouched ? '#fff' : '#94a3b8' }}
+          >
+            {nrsTouched ? 'Avvia trattamento →' : 'Imposta NRS per avviare il trattamento'}
           </button>
         </>
       )}

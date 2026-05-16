@@ -463,11 +463,13 @@ function AnamnesisBlock({ patient: initial, onUpdated }) {
 
 // ─── Form nuova sessione ──────────────────────────────────────────────────────
 
-function SessionForm({ patientId, sessionNumber, lastNote, onSaved }) {
-  const [nrs, setNrs] = useState(5);
+function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved }) {
+  const isFirst = sessionNumber === 1;
+  const [nrs, setNrs] = useState(isFirst ? (anamnesiNrs ?? 5) : 5);
   const [treatmentNotes, setTreatmentNotes] = useState('');
   const [nextNotes, setNextNotes] = useState('');
-  const [phase, setPhase] = useState('pre');
+  // Prima seduta: salta la fase NRS (già raccolto in anamnesi), vai diretto al trattamento
+  const [phase, setPhase] = useState(isFirst ? 'post' : 'pre');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -519,7 +521,10 @@ function SessionForm({ patientId, sessionNumber, lastNote, onSaved }) {
       {phase === 'post' && (
         <>
           <div className="bg-gray-50 rounded-xl px-3 py-2 text-sm text-gray-600">
-            NRS registrato: <strong>{nrs}/10</strong>
+            {isFirst && anamnesiNrs !== undefined
+              ? <>NRS registrato in anamnesi: <strong>{anamnesiNrs}/10</strong></>
+              : <>NRS registrato: <strong>{nrs}/10</strong></>
+            }
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">Note trattamento *</label>
@@ -686,6 +691,7 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
               patientId={patient.id}
               sessionNumber={closedSessions.length + 1}
               lastNote={lastClosed?.next_session_notes || null}
+              anamnesiNrs={patientDocs.find(d => d.type === 'anamnesi')?.form_data?.nrs}
               onSaved={s => { setSessions(prev => [...prev, s]); setShowNewSession(false); }}
             />
           )}

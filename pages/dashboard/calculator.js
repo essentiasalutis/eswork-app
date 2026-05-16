@@ -203,6 +203,9 @@ export default function CalculatorPage({ client, prefill }) {
                   <div className="text-xs text-gray-400">solo incontri collettivi</div>
                 </div>
               </div>
+              <div className="text-xs text-gray-400 mt-2 text-center">
+                Valori fissi di protocollo — indipendenti dal n. di dipendenti
+              </div>
             </div>
 
             {/* Servizi inclusi */}
@@ -216,6 +219,7 @@ export default function CalculatorPage({ client, prefill }) {
                     ['Assessment (iniziale + finale)', '2'],
                     ['Review alla direzione', '2'],
                     ['Report annuale', '1'],
+                    ['Piattaforma ES Work con AI', 'Inclusa'],
                     ['Coordinamento ES Work', 'Incluso'],
                     ['Documentazione OT23 INAIL', 'Inclusa'],
                   ].map(([label, val], i) => (

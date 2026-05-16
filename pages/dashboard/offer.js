@@ -520,6 +520,7 @@ ${FIRMA}`;
                 ['Assessment iniziale + Report di Attivazione', 'Check-up completo della salute muscolo-scheletrica con strumenti validati'],
                 [`Sportello osteopatico in sede (${calc.days_osteo_y1} gg/anno)`, 'Trattamento individuale in sede per i dipendenti con disturbi'],
                 [`Formazione postura ed ergonomia (${calc.training_sessions_y1} sessioni)`, 'Sessioni collettive teoria + pratica per tutti i dipendenti'],
+                ['Piattaforma ES Work con AI', 'Monitoraggio continuo, alert automatici, dashboard aggregata e storico clinico digitale'],
                 ['2 Review intermedie (3 e 6 mesi)', 'Assessment di monitoraggio + report alla direzione con KPI aggiornati'],
                 ['Assessment finale + Report annuale', 'Confronto baseline vs risultati, documentazione per OT23 INAIL'],
                 ['Coordinamento e regia ES Work', 'Un unico interlocutore: professionisti, calendario, logistica, report'],

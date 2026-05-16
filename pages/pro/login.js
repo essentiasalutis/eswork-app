@@ -8,6 +8,7 @@ export default function ProLogin() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const sessionExpired = router.query.expired === '1';
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -46,6 +47,12 @@ export default function ProLogin() {
             </div>
             <div className="text-sm text-gray-500 mt-1">Accesso professionista</div>
           </div>
+
+          {sessionExpired && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 mb-4 text-center">
+              ⏱ Sessione scaduta — effettua di nuovo l'accesso per continuare.
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
             <div>

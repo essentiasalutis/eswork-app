@@ -488,6 +488,10 @@ function SessionForm({ patientId, sessionNumber, lastNote, onSaved }) {
     if (res.ok) {
       onSaved(await res.json());
     } else {
+      if (res.status === 401) {
+        window.location.href = '/pro/login?expired=1';
+        return;
+      }
       const d = await res.json();
       setError(d.error || 'Errore salvataggio');
     }

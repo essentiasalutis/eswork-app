@@ -527,11 +527,21 @@ function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved 
       )}
       {phase === 'post' && (
         <>
-          <div className="bg-gray-50 rounded-xl px-3 py-2 text-sm text-gray-600">
-            {isFirst && anamnesiNrs !== undefined
-              ? <>NRS registrato in anamnesi: <strong>{anamnesiNrs}/10</strong></>
-              : <>NRS registrato: <strong>{nrs}/10</strong></>
-            }
+          <div className="bg-gray-50 rounded-xl px-3 py-2 text-sm text-gray-600 flex items-center justify-between">
+            <span>
+              {isFirst && anamnesiNrs !== undefined
+                ? <>NRS registrato in anamnesi: <strong>{anamnesiNrs}/10</strong></>
+                : <>NRS registrato: <strong>{nrs}/10</strong></>
+              }
+            </span>
+            {!isFirst && (
+              <button
+                onClick={() => setPhase('pre')}
+                className="text-xs text-blue-600 font-semibold hover:underline ml-3"
+              >
+                ✏️ modifica
+              </button>
+            )}
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">Note trattamento *</label>

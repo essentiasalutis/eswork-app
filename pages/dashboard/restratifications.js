@@ -16,7 +16,7 @@ const STATUS_BADGE = {
   not_confirmed:  { label: '❌ Non confermato', cls: 'bg-red-100 text-red-800 border-red-200' },
 };
 
-export default function RestratificationsPage({ alerts: initialAlerts }) {
+export default function RestratificationsPage({ alerts: initialAlerts, dbError }) {
   const [alerts, setAlerts] = useState(initialAlerts);
   const [updating, setUpdating] = useState(null);
 
@@ -60,6 +60,11 @@ export default function RestratificationsPage({ alerts: initialAlerts }) {
         </header>
 
         <main className="max-w-5xl mx-auto px-6 py-6">
+          {dbError && (
+            <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-sm text-amber-800">
+              <strong>⚠️ Migrazione SQL mancante.</strong> Esegui <code className="bg-amber-100 px-1 rounded">supabase-schema-v11-restratification.sql</code> nel SQL Editor di Supabase per attivare questa sezione.
+            </div>
+          )}
           {alerts.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
               <div className="text-4xl mb-3">🎉</div>
@@ -142,6 +147,10 @@ export default function RestratificationsPage({ alerts: initialAlerts }) {
 }
 
 export const getServerSideProps = requireAuthSsr(async () => {
-  const alerts = await getAllRestratAlerts();
-  return { props: { alerts } };
+  try {
+    const alerts = await getAllRestratAlerts();
+    return { props: { alerts, dbError: null } };
+  } catch {
+    return { props: { alerts: [], dbError: true } };
+  }
 });

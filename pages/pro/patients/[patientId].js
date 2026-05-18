@@ -606,18 +606,23 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
   const [careToken, setCareTokenState] = useState(initialPatient.care_token || null);
   const [generatingToken, setGeneratingToken] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [careTokenError, setCareTokenError] = useState(null);
 
   async function generateCareToken() {
     setGeneratingToken(true);
+    setCareTokenError(null);
     try {
       const res = await fetch(`/api/pro/patients/${patient.id}/generate-care-token`, { method: 'POST' });
       if (res.ok) {
         const { care_token } = await res.json();
         setCareTokenState(care_token);
         setPatient(prev => ({ ...prev, care_token }));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setCareTokenError(err.error || `Errore ${res.status} — esegui la migrazione SQL v11 su Supabase`);
       }
     } catch (e) {
-      console.error(e);
+      setCareTokenError('Errore di rete');
     }
     setGeneratingToken(false);
   }
@@ -762,13 +767,20 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={generateCareToken}
-                  disabled={generatingToken}
-                  className="w-full py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold disabled:opacity-60"
-                >
-                  {generatingToken ? 'Generazione...' : '+ Genera link self-valutazione'}
-                </button>
+                <>
+                  <button
+                    onClick={generateCareToken}
+                    disabled={generatingToken}
+                    className="w-full py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold disabled:opacity-60"
+                  >
+                    {generatingToken ? 'Generazione...' : '+ Genera link self-valutazione'}
+                  </button>
+                  {careTokenError && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+                      ⚠️ {careTokenError}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

@@ -97,6 +97,41 @@ export default function RestratificationsPage({ alerts: initialAlerts, bufferByC
             </div>
           )}
 
+          {/* ── Legenda ───────────────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-4">
+            <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Legenda</div>
+            <div className="grid sm:grid-cols-2 gap-3 text-sm">
+              <div className="flex gap-3">
+                <span className="mt-0.5 text-orange-500 text-base">⚠️</span>
+                <div>
+                  <div className="font-semibold text-gray-800">Da valutare</div>
+                  <div className="text-xs text-gray-500">È arrivato un segnale (dal dipendente, dal checkpoint o dall'osteopata). Devi decidere se promuovere questo dipendente a Livello 1.</div>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <span className="mt-0.5 text-green-600 text-base">✅</span>
+                <div>
+                  <div className="font-semibold text-gray-800">Promosso L1</div>
+                  <div className="text-xs text-gray-500">Hai confermato il passaggio a trattamento attivo. Questo dipendente consuma uno slot del buffer 15% dell'azienda.</div>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <span className="mt-0.5 text-gray-400 text-base">✖</span>
+                <div>
+                  <div className="font-semibold text-gray-800">Non confermato</div>
+                  <div className="text-xs text-gray-500">Il segnale è stato valutato ma non richiede un cambio di livello. Non consuma buffer.</div>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <span className="mt-0.5 text-gray-500 text-base">📊</span>
+                <div>
+                  <div className="font-semibold text-gray-800">Buffer 15%</div>
+                  <div className="text-xs text-gray-500">Slot aggiuntivi inclusi nel preventivo per assorbire nuovi L1 senza rinegoziare il contratto. Esauriti gli slot, ogni nuovo L1 è fuori contratto.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* ── Buffer per azienda ─────────────────────────────────────── */}
           {bufferByClient && bufferByClient.length > 0 && (
             <div>

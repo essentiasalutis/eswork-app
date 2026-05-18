@@ -623,7 +623,7 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
   }
 
   function copyCareLink() {
-    const url = `${window.location.origin}/care/${careToken}`;
+    const url = `${window.location.origin}/checkin/${careToken}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -752,7 +752,7 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
               {careToken ? (
                 <div className="space-y-2">
                   <div className="bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-600 font-mono break-all">
-                    {typeof window !== 'undefined' ? `${window.location.origin}/care/${careToken}` : `/care/${careToken}`}
+                    {typeof window !== 'undefined' ? `${window.location.origin}/checkin/${careToken}` : `/checkin/${careToken}`}
                   </div>
                   <button
                     onClick={copyCareLink}

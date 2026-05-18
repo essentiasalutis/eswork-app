@@ -578,8 +578,8 @@ function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved 
                 className="w-4 h-4 mt-0.5 rounded accent-amber-500"
               />
               <div>
-                <span className="text-sm font-semibold text-amber-800">Possibile cambio livello</span>
-                <p className="text-xs text-amber-700 mt-0.5">Segnala al referente — richiede rivalutazione della stratificazione</p>
+                <span className="text-sm font-semibold text-amber-800">⬆️ Proponi passaggio a Livello 1</span>
+                <p className="text-xs text-amber-700 mt-0.5">Segnala al referente ES Work — consuma capacità dal buffer 15%</p>
               </div>
             </label>
           </div>
@@ -753,8 +753,8 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
             </div>
           )}
 
-          {/* ── Link self-valutazione dipendente ─────────────────────── */}
-          {patient.level === 'level1' && (
+          {/* ── Link self-valutazione dipendente (L2/L3 → possibile upgrade L1) ── */}
+          {(patient.level === 'level2' || patient.level === 'level3') && (
             <div className="bg-white rounded-2xl border border-gray-200 p-4">
               <h3 className="font-semibold text-gray-800 mb-3 text-sm">🔗 Link dipendente</h3>
               {careToken ? (

@@ -8,16 +8,18 @@ import { CONFIG } from '../../lib/config';
 // Sessioni per un nuovo L1 (protocollo Anno 1)
 const SESSIONS_PER_NEW_L1 = (CONFIG.sessions_intensive + CONFIG.sessions_maintenance) * CONFIG.completion_rate;
 
+// Fonte: tutti grigi/neutri — è solo informazione su chi ha segnalato
 const SOURCE_BADGE = {
-  self_trigger: { label: '🙋 Self-trigger', cls: 'bg-amber-100 text-amber-800 border-amber-200' },
-  checkpoint:   { label: '📅 Checkpoint',   cls: 'bg-blue-100 text-blue-800 border-blue-200' },
-  osteopath:    { label: '🦴 Osteopata',    cls: 'bg-green-100 text-green-800 border-green-200' },
+  self_trigger: { label: 'Dipendente',  cls: 'bg-gray-100 text-gray-600 border-gray-200' },
+  checkpoint:   { label: 'Checkpoint', cls: 'bg-gray-100 text-gray-600 border-gray-200' },
+  osteopath:    { label: 'Osteopata',  cls: 'bg-gray-100 text-gray-600 border-gray-200' },
 };
 
+// Status: colore = azione richiesta
 const STATUS_BADGE = {
-  pending:       { label: '⏳ Da valutare',    cls: 'bg-gray-100 text-gray-700 border-gray-200' },
-  confirmed_l1:  { label: '✅ Confermato L1',  cls: 'bg-green-100 text-green-800 border-green-200' },
-  not_confirmed: { label: '❌ Non confermato', cls: 'bg-red-100 text-red-800 border-red-200' },
+  pending:       { label: '⚠️ Da valutare',    cls: 'bg-orange-100 text-orange-700 border-orange-200' },
+  confirmed_l1:  { label: '✅ Promosso L1',    cls: 'bg-green-100 text-green-800 border-green-200' },
+  not_confirmed: { label: 'Non confermato',    cls: 'bg-gray-100 text-gray-500 border-gray-200' },
 };
 
 function BufferBar({ used, max }) {

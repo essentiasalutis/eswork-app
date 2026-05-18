@@ -605,7 +605,7 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
   const [patientDocs, setPatientDocs] = useState(initialDocs || []);
   const [careToken, setCareTokenState] = useState(initialPatient.care_token || null);
   const [generatingToken, setGeneratingToken] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(null); // 'self' | 't3' | 't6' | null
   const [careTokenError, setCareTokenError] = useState(null);
 
   async function generateCareToken() {
@@ -627,11 +627,14 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
     setGeneratingToken(false);
   }
 
-  function copyCareLink() {
-    const url = `${window.location.origin}/checkin/${careToken}`;
+  function copyCareLink(type) {
+    const base = `${window.location.origin}/checkin/${careToken}`;
+    const url = type === 't3' ? `${base}?mode=checkpoint&type=t3`
+              : type === 't6' ? `${base}?mode=checkpoint&type=t6`
+              : base;
     navigator.clipboard.writeText(url).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopied(type || 'self');
+      setTimeout(() => setCopied(null), 2000);
     });
   }
 
@@ -753,18 +756,37 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
           {/* ── Link self-valutazione dipendente ─────────────────────── */}
           {patient.level === 'level1' && (
             <div className="bg-white rounded-2xl border border-gray-200 p-4">
-              <h3 className="font-semibold text-gray-800 mb-3 text-sm">🔗 Link self-valutazione dipendente</h3>
+              <h3 className="font-semibold text-gray-800 mb-3 text-sm">🔗 Link dipendente</h3>
               {careToken ? (
                 <div className="space-y-2">
-                  <div className="bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-600 font-mono break-all">
-                    {typeof window !== 'undefined' ? `${window.location.origin}/checkin/${careToken}` : `/checkin/${careToken}`}
+                  {/* Link "Come stai oggi?" */}
+                  <div>
+                    <div className="text-xs text-gray-500 font-medium mb-1">💬 Come stai oggi? <span className="text-gray-400 font-normal">(sempre disponibile)</span></div>
+                    <button
+                      onClick={() => copyCareLink('self')}
+                      className="w-full py-2 rounded-xl border border-green-300 text-green-700 bg-green-50 text-sm font-semibold"
+                    >
+                      {copied === 'self' ? '✓ Copiato!' : '📋 Copia link'}
+                    </button>
                   </div>
-                  <button
-                    onClick={copyCareLink}
-                    className="w-full py-2 rounded-xl border border-green-300 text-green-700 bg-green-50 text-sm font-semibold"
-                  >
-                    {copied ? '✓ Link copiato!' : '📋 Copia link'}
-                  </button>
+                  {/* Divider */}
+                  <div className="border-t border-gray-100 pt-2">
+                    <div className="text-xs text-gray-500 font-medium mb-2">📅 Checkpoint periodici <span className="text-gray-400 font-normal">(manda al momento giusto)</span></div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => copyCareLink('t3')}
+                        className="flex-1 py-2 rounded-xl border border-blue-200 text-blue-700 bg-blue-50 text-xs font-semibold"
+                      >
+                        {copied === 't3' ? '✓ Copiato!' : '📋 Checkpoint 3 mesi'}
+                      </button>
+                      <button
+                        onClick={() => copyCareLink('t6')}
+                        className="flex-1 py-2 rounded-xl border border-indigo-200 text-indigo-700 bg-indigo-50 text-xs font-semibold"
+                      >
+                        {copied === 't6' ? '✓ Copiato!' : '📋 Checkpoint 6 mesi'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <>

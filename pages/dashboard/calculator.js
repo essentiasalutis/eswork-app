@@ -131,7 +131,7 @@ export default function CalculatorPage({ client, prefill }) {
                   <table className="w-full text-sm">
                     <tbody>
                       {[
-                        [`Giornate osteopatiche (${calc.days_osteo_y1} gg)`, calc.cost_osteo_y1],
+                        [<><span>{`Giornate osteopatiche (${calc.days_osteo_y1} gg)`}</span><br /><span className="text-xs text-gray-400">include +{Math.round(calc.buffer_hours)}h ri-stratificazione</span></>, calc.cost_osteo_y1],
                         [`Formazione (${calc.training_sessions_y1} sessioni, ${calc.groups} gruppi)`, calc.cost_training_y1],
                         ['Assessment iniziale + report attivazione', CONFIG.cost_initial_assessment],
                         ['Assessment finale + report annuale', CONFIG.cost_final_assessment + CONFIG.cost_annual_report],
@@ -214,7 +214,7 @@ export default function CalculatorPage({ client, prefill }) {
               <table className="w-full text-sm">
                 <tbody>
                   {[
-                    ['Giornate sportello osteopatico', `${calc.days_osteo_y1} gg/anno`],
+                    [<><span>Giornate sportello osteopatico</span><br /><span className="text-xs text-gray-400">include capacità di ri-stratificazione</span></>, `${calc.days_osteo_y1} gg/anno`],
                     ['Sessioni formative', `${calc.training_sessions_y1} sessioni`],
                     ['Assessment (iniziale + finale)', '2'],
                     ['Review alla direzione', '2'],

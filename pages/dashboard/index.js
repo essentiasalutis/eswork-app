@@ -68,6 +68,9 @@ export default function Dashboard({ clients: initialClients, assessmentCounts })
             <Link href="/dashboard/compliance" className="text-sm text-teal-700 hover:text-teal-900 py-2 px-3 border border-teal-200 rounded-xl bg-teal-50">
               Compliance
             </Link>
+            <Link href="/dashboard/restratifications" className="text-sm text-rose-700 hover:text-rose-900 py-2 px-3 border border-rose-200 rounded-xl bg-rose-50">
+              Ri-strat.
+            </Link>
             <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-800 py-2 px-3">
               Esci
             </button>

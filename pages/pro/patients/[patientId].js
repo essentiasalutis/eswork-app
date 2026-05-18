@@ -470,6 +470,7 @@ function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved 
   const [nrsTouched, setNrsTouched] = useState(false);
   const [treatmentNotes, setTreatmentNotes] = useState('');
   const [nextNotes, setNextNotes] = useState('');
+  const [flagRestrat, setFlagRestrat] = useState(false);
   // Prima seduta: salta la fase NRS (già raccolto in anamnesi), vai diretto al trattamento
   const [phase, setPhase] = useState(isFirst ? 'post' : 'pre');
   const [saving, setSaving] = useState(false);
@@ -490,7 +491,19 @@ function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved 
     });
     setSaving(false);
     if (res.ok) {
-      onSaved(await res.json());
+      const session = await res.json();
+      if (flagRestrat) {
+        try {
+          await fetch(`/api/pro/patients/${patientId}/restratification-flag`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: session?.id, notes: treatmentNotes }),
+          });
+        } catch (e) {
+          console.error('Errore flag ri-stratificazione:', e);
+        }
+      }
+      onSaved(session);
     } else {
       if (res.status === 401) {
         window.location.href = '/pro/login?expired=1';
@@ -555,6 +568,22 @@ function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved 
               placeholder="Esercizi domiciliari, aree da rivalutare, priorità..."
               className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
           </div>
+          {/* Flag ri-stratificazione */}
+          <div className={`rounded-xl border-2 px-4 py-3 ${flagRestrat ? 'bg-amber-50 border-amber-300' : 'bg-gray-50 border-gray-200'}`}>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={flagRestrat}
+                onChange={e => setFlagRestrat(e.target.checked)}
+                className="w-4 h-4 mt-0.5 rounded accent-amber-500"
+              />
+              <div>
+                <span className="text-sm font-semibold text-amber-800">Possibile cambio livello</span>
+                <p className="text-xs text-amber-700 mt-0.5">Segnala al referente — richiede rivalutazione della stratificazione</p>
+              </div>
+            </label>
+          </div>
+
           {error && <div className="text-sm text-red-600">{error}</div>}
           <button onClick={closeSession} disabled={saving}
             className="w-full py-3 rounded-xl bg-green-600 text-white font-bold disabled:opacity-60">
@@ -574,6 +603,32 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
   const [sessions, setSessions] = useState(initialSessions);
   const [showNewSession, setShowNewSession] = useState(false);
   const [patientDocs, setPatientDocs] = useState(initialDocs || []);
+  const [careToken, setCareTokenState] = useState(initialPatient.care_token || null);
+  const [generatingToken, setGeneratingToken] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function generateCareToken() {
+    setGeneratingToken(true);
+    try {
+      const res = await fetch(`/api/pro/patients/${patient.id}/generate-care-token`, { method: 'POST' });
+      if (res.ok) {
+        const { care_token } = await res.json();
+        setCareTokenState(care_token);
+        setPatient(prev => ({ ...prev, care_token }));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setGeneratingToken(false);
+  }
+
+  function copyCareLink() {
+    const url = `${window.location.origin}/care/${careToken}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
 
   function allDocsSigned() {
     const types = ['consent_treatment', 'privacy_extended', 'anamnesi'];
@@ -687,6 +742,34 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* ── Link self-valutazione dipendente ─────────────────────── */}
+          {patient.level === 'level1' && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-4">
+              <h3 className="font-semibold text-gray-800 mb-3 text-sm">🔗 Link self-valutazione dipendente</h3>
+              {careToken ? (
+                <div className="space-y-2">
+                  <div className="bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-600 font-mono break-all">
+                    {typeof window !== 'undefined' ? `${window.location.origin}/care/${careToken}` : `/care/${careToken}`}
+                  </div>
+                  <button
+                    onClick={copyCareLink}
+                    className="w-full py-2 rounded-xl border border-green-300 text-green-700 bg-green-50 text-sm font-semibold"
+                  >
+                    {copied ? '✓ Link copiato!' : '📋 Copia link'}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={generateCareToken}
+                  disabled={generatingToken}
+                  className="w-full py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold disabled:opacity-60"
+                >
+                  {generatingToken ? 'Generazione...' : '+ Genera link self-valutazione'}
+                </button>
+              )}
             </div>
           )}
 

@@ -169,6 +169,35 @@ export default function ConsentScreen({ assessmentId, onConsented }) {
           />
         </div>
 
+        {/* Box privacy */}
+        <div style={{
+          background: '#f0f9ff',
+          border: '1px solid #bae6fd',
+          borderRadius: 12,
+          padding: '12px 16px',
+          display: 'flex',
+          gap: 10,
+          alignItems: 'flex-start',
+        }}>
+          <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>🔒</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#0369a1', marginBottom: 6 }}>
+              La tua privacy è protetta
+            </div>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {[
+                'Connessione cifrata (HTTPS)',
+                'Server in territorio UE',
+                "L'azienda non vede mai le tue risposte individuali",
+              ].map(item => (
+                <li key={item} style={{ fontSize: 12, color: '#0369a1', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ color: '#38bdf8', fontWeight: 700 }}>✓</span> {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
         {/* Pulsante */}
         <button
           onClick={handleStart}

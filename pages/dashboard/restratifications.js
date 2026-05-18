@@ -22,14 +22,15 @@ const STATUS_BADGE = {
   not_confirmed: { label: 'Non confermato',    cls: 'bg-gray-100 text-gray-500 border-gray-200' },
 };
 
-function BufferBar({ used, max }) {
-  const pct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
+function BufferBar({ usedSessions, totalSessions }) {
+  const pct = totalSessions > 0 ? Math.min(100, Math.round((usedSessions / totalSessions) * 100)) : 0;
   const color = pct >= 90 ? '#dc2626' : pct >= 60 ? '#ca8a04' : '#16a34a';
+  const residuoSess = Math.max(0, totalSessions - usedSessions);
   return (
-    <div className="mt-2">
-      <div className="flex justify-between text-xs text-gray-500 mb-1">
-        <span>{used} confermati su {max} disponibili</span>
-        <span style={{ color }} className="font-semibold">{100 - pct}% residuo</span>
+    <div className="mt-3">
+      <div className="flex justify-between text-xs mb-1">
+        <span className="text-gray-500">{usedSessions} sess. impegnate su {totalSessions} buffer</span>
+        <span style={{ color }} className="font-semibold">{residuoSess} sess. residue</span>
       </div>
       <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
@@ -141,27 +142,35 @@ export default function RestratificationsPage({ alerts: initialAlerts, bufferByC
               <div className="grid gap-3 sm:grid-cols-2">
                 {bufferByClient.map(c => {
                   const confirmed = confirmedForClient(c.client_id);
-                  const remaining = Math.max(0, c.max_new_l1 - confirmed);
-                  const isOver = confirmed > c.max_new_l1;
+                  // Sessioni impegnate = promozioni confermate × sessioni per nuovo L1
+                  const sessPerL1 = Math.round(SESSIONS_PER_NEW_L1);
+                  const usedSessions = confirmed * sessPerL1;
+                  const residuoSess = c.buffer_sessions - usedSessions;
+                  const isOver = residuoSess < 0;
+                  const pctUsed = c.buffer_sessions > 0 ? Math.min(100, Math.round((usedSessions / c.buffer_sessions) * 100)) : 0;
+                  const statusColor = isOver ? 'text-red-600' : pctUsed >= 60 ? 'text-amber-600' : 'text-green-700';
                   return (
                     <div key={c.client_id}
                       className={`bg-white rounded-2xl border p-4 ${isOver ? 'border-red-300' : 'border-gray-200'}`}>
-                      <div className="flex items-start justify-between">
+                      <div className="flex items-start justify-between gap-2">
                         <div>
                           <div className="font-semibold text-gray-900 text-sm">{c.client_name}</div>
                           <div className="text-xs text-gray-500 mt-0.5">
                             {c.l1_count} L1 attivi · {c.l2_count} L2 monitorati
                           </div>
                         </div>
-                        <div className={`text-right ${isOver ? 'text-red-600' : remaining === 0 ? 'text-amber-600' : 'text-green-700'}`}>
-                          <div className="text-2xl font-bold">{remaining}</div>
-                          <div className="text-xs font-medium">slot liberi</div>
+                        <div className={`text-right shrink-0 ${statusColor}`}>
+                          <div className="text-2xl font-bold leading-none">
+                            {isOver ? '−' + Math.abs(residuoSess) : '+' + residuoSess}
+                          </div>
+                          <div className="text-xs font-medium">sess. {isOver ? 'fuori budget' : 'residue'}</div>
                         </div>
                       </div>
-                      <BufferBar used={confirmed} max={c.max_new_l1} />
+                      <BufferBar usedSessions={usedSessions} totalSessions={c.buffer_sessions} />
                       <div className="text-xs text-gray-400 mt-2">
-                        Buffer: {c.buffer_sessions} sessioni tot. · {c.max_new_l1} nuovi L1 max (a {Math.round(SESSIONS_PER_NEW_L1)} sess/persona)
-                        {isOver && <span className="ml-1 text-red-600 font-semibold">⚠️ Limite superato</span>}
+                        Buffer totale: <strong>{c.buffer_sessions} sessioni</strong> (15% di {c.l1_count} L1 × {sessPerL1} sess.)
+                        {confirmed > 0 && <span className="ml-1">· {confirmed} promozioni × {sessPerL1} sess. = {usedSessions} impegnate</span>}
+                        {isOver && <span className="ml-1 text-red-600 font-semibold"> ⚠️ Fuori budget — rinegoziare il contratto</span>}
                       </div>
                     </div>
                   );

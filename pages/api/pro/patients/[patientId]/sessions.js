@@ -7,6 +7,8 @@ import {
   getAssignmentsByProfessional,
   generateId,
   logAccess,
+  getActiveCycleByPatient,
+  updateTreatmentCycle,
 } from '../../../../../lib/store';
 
 async function checkAccess(proId, patient) {
@@ -38,6 +40,22 @@ export default requireProAuth(async function handler(req, res) {
       const { nrs_pre, treatment_notes, next_session_notes, close } = req.body;
       const now = new Date().toISOString();
 
+      // Recupera ciclo attivo (se esiste)
+      let activeCycle = null;
+      try {
+        activeCycle = await getActiveCycleByPatient(patientId);
+      } catch (_) {
+        // Tabella non ancora creata — ignora gracefully
+      }
+
+      // Controlla limite 4 sessioni per ciclo
+      if (activeCycle) {
+        const cycleSessions = sessions.filter(s => s.cycle_id === activeCycle.id && s.closed_at);
+        if (close && cycleSessions.length >= 4) {
+          return res.status(400).json({ error: 'Limite di 4 sessioni per ciclo raggiunto' });
+        }
+      }
+
       const session = await insertSession({
         id: generateId('ses'),
         patient_id: patientId,
@@ -50,11 +68,23 @@ export default requireProAuth(async function handler(req, res) {
         treatment_notes: treatment_notes?.trim() || null,
         next_session_notes: next_session_notes?.trim() || null,
         closed_at: close ? now : null,
+        cycle_id: activeCycle ? activeCycle.id : null,
       });
 
       if (close) {
         const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
         await logAccess(proId, 'close_session', ip, `Sessione ${session.id} chiusa`);
+
+        // Aggiorna sessions_completed del ciclo
+        if (activeCycle) {
+          try {
+            await updateTreatmentCycle(activeCycle.id, {
+              sessions_completed: activeCycle.sessions_completed + 1,
+            });
+          } catch (_) {
+            // ignora errori di aggiornamento ciclo
+          }
+        }
       }
 
       return res.status(201).json(session);

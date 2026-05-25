@@ -2,11 +2,18 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { getSessionToken, verifyToken } from '../../lib/auth';
-import { getClients, getAssessmentCounts } from '../../lib/store';
+import { getClients, getAssessmentCounts, getAllAcuteEvents } from '../../lib/store';
 import { TYPE_COLORS, TYPE_LABELS } from '../../lib/scoring';
 
+function getTierFromEmployees(employees) {
+  const n = parseInt(employees) || 0;
+  if (n <= 150) return 'core';
+  if (n <= 500) return 'plus';
+  return 'enterprise';
+}
 
-export default function Dashboard({ clients: initialClients, assessmentCounts, checkpointReminders }) {
+
+export default function Dashboard({ clients: initialClients, assessmentCounts, checkpointReminders, pendingAcuteCount }) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
   const [showNew, setShowNew] = useState(false);
@@ -21,10 +28,11 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, c
   async function createClient(e) {
     e.preventDefault();
     setSaving(true);
+    const tier = getTierFromEmployees(form.employees);
     const res = await fetch('/api/clients', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, tier }),
     });
     if (res.ok) {
       const client = await res.json();
@@ -71,6 +79,14 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, c
             <Link href="/dashboard/restratifications" className="text-sm text-rose-700 hover:text-rose-900 py-2 px-3 border border-rose-200 rounded-xl bg-rose-50">
               Ri-strat.
             </Link>
+            <Link href="/dashboard/acute-events" className="text-sm text-red-700 hover:text-red-900 py-2 px-3 border border-red-200 rounded-xl bg-red-50 relative">
+              Ev. Acuti
+              {pendingAcuteCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  {pendingAcuteCount}
+                </span>
+              )}
+            </Link>
             <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-800 py-2 px-3">
               Esci
             </button>
@@ -116,6 +132,10 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, c
                 min="1"
                 className="w-24 px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
               />
+            </div>
+            <div className="text-xs text-gray-500">
+              Tier suggerito: <span className="font-semibold text-gray-700 capitalize">{getTierFromEmployees(form.employees)}</span>
+              {' '}(Core ≤150 · Plus 151-500 · Enterprise &gt;500)
             </div>
             <input
               value={form.contact_name}
@@ -247,6 +267,15 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     getAssessmentCounts(),
   ]);
 
+  // Conta eventi acuti pending (graceful: tabella potrebbe non esistere ancora)
+  let pendingAcuteCount = 0;
+  try {
+    const acuteEvents = await getAllAcuteEvents();
+    pendingAcuteCount = acuteEvents.filter(e => e.status === 'pending').length;
+  } catch (_) {
+    pendingAcuteCount = 0;
+  }
+
   // Calcola reminder checkpoint
   const checkpointReminders = [];
   clients.forEach(c => {
@@ -269,5 +298,5 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     });
   });
 
-  return { props: { clients, assessmentCounts, checkpointReminders } };
+  return { props: { clients, assessmentCounts, checkpointReminders, pendingAcuteCount } };
 });

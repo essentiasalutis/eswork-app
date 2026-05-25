@@ -9,6 +9,7 @@ import {
   getAssignmentsByProfessional,
   getClientById,
   getPatientDocuments,
+  getCyclesByPatient,
 } from '../../../lib/store';
 import PatientDocuments from '../../../components/PatientDocuments';
 
@@ -597,7 +598,7 @@ function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved 
 
 // ─── Pagina principale ────────────────────────────────────────────────────────
 
-export default function PatientPage({ proName, patient: initialPatient, sessions: initialSessions, client, documents: initialDocs }) {
+export default function PatientPage({ proName, patient: initialPatient, sessions: initialSessions, client, documents: initialDocs, cycles: initialCycles }) {
   const router = useRouter();
   const [patient, setPatient] = useState(initialPatient);
   const [sessions, setSessions] = useState(initialSessions);
@@ -607,6 +608,10 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
   const [generatingToken, setGeneratingToken] = useState(false);
   const [copied, setCopied] = useState(null); // 'self' | 't3' | 't6' | null
   const [careTokenError, setCareTokenError] = useState(null);
+  const [cycles, setCycles] = useState(initialCycles || []);
+  const [cycleLoading, setCycleLoading] = useState(false);
+  const [cycleError, setCycleError] = useState('');
+  const [showCloseOutcome, setShowCloseOutcome] = useState(false);
 
   async function generateCareToken() {
     setGeneratingToken(true);
@@ -657,9 +662,54 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
     }
   }
 
+  async function startCycle() {
+    setCycleLoading(true);
+    setCycleError('');
+    try {
+      const res = await fetch(`/api/pro/patients/${patient.id}/start-cycle`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setCycles(prev => [...prev, data]);
+        setPatient(prev => ({ ...prev, current_cycle: data.cycle_number }));
+      } else {
+        setCycleError(data.error || 'Errore avvio ciclo');
+      }
+    } catch (e) {
+      setCycleError('Errore di rete');
+    }
+    setCycleLoading(false);
+  }
+
+  async function closeCycle(outcome) {
+    setCycleLoading(true);
+    setCycleError('');
+    try {
+      const res = await fetch(`/api/pro/patients/${patient.id}/close-cycle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outcome }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCycles(prev => prev.map(c => c.id === data.cycle.id ? data.cycle : c));
+        if (data.opted_out) {
+          setPatient(prev => ({ ...prev, level_status: 'opted_out' }));
+        }
+        setShowCloseOutcome(false);
+      } else {
+        setCycleError(data.error || 'Errore chiusura ciclo');
+      }
+    } catch (e) {
+      setCycleError('Errore di rete');
+    }
+    setCycleLoading(false);
+  }
+
   const closedSessions = sessions.filter(s => s.closed_at);
   const lastClosed = closedSessions[closedSessions.length - 1];
   const hasOpenSession = sessions.some(s => !s.closed_at);
+  const activeCycle = cycles.find(c => c.status === 'active');
+  const closedCycles = cycles.filter(c => c.status === 'closed');
 
   const levelLabel = { level1: 'Livello 1', level2: 'Livello 2', level3: 'Livello 3' };
   const levelColor = { level1: '#dc2626', level2: '#ca8a04', level3: '#16a34a' };
@@ -716,6 +766,87 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
                 documents={patientDocs}
                 onDocsChange={setPatientDocs}
               />
+            </div>
+          )}
+
+          {/* ── Ciclo di trattamento (solo L1) ───────────────────────── */}
+          {patient.level === 'level1' && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-4">
+              <h3 className="font-semibold text-gray-800 mb-3 text-sm">Ciclo di trattamento</h3>
+
+              {patient.level_status === 'opted_out' && (
+                <div className="mb-3 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-800 font-medium">
+                  Paziente uscito dal programma — referral medico competente richiesto
+                </div>
+              )}
+
+              {cycleError && (
+                <div className="mb-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{cycleError}</div>
+              )}
+
+              {activeCycle && (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-green-800">Ciclo {activeCycle.cycle_number} — in corso</span>
+                    <span className="text-xs text-green-600">{activeCycle.sessions_completed} / {activeCycle.sessions_planned} sedute</span>
+                  </div>
+                  <div className="w-full h-2 bg-green-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-green-500 rounded-full transition-all"
+                      style={{ width: `${(activeCycle.sessions_completed / activeCycle.sessions_planned) * 100}%` }} />
+                  </div>
+                  {!showCloseOutcome ? (
+                    <button
+                      onClick={() => setShowCloseOutcome(true)}
+                      disabled={cycleLoading}
+                      className="mt-3 w-full py-2 rounded-xl border border-gray-300 text-sm text-gray-700 disabled:opacity-60"
+                    >
+                      Chiudi ciclo
+                    </button>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      <div className="text-xs text-gray-600 font-medium">Seleziona esito del ciclo:</div>
+                      <div className="flex gap-2">
+                        <button onClick={() => closeCycle('improved')} disabled={cycleLoading}
+                          className="flex-1 py-2 rounded-xl bg-green-600 text-white text-sm font-semibold disabled:opacity-60">
+                          Migliorato
+                        </button>
+                        <button onClick={() => closeCycle('no_improvement')} disabled={cycleLoading}
+                          className="flex-1 py-2 rounded-xl bg-orange-500 text-white text-sm font-semibold disabled:opacity-60">
+                          Nessun miglioramento
+                        </button>
+                      </div>
+                      <button onClick={() => setShowCloseOutcome(false)} className="text-xs text-gray-400 underline w-full text-center">Annulla</button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!activeCycle && patient.level_status !== 'opted_out' && closedCycles.length < 2 && (
+                <button onClick={startCycle} disabled={cycleLoading}
+                  className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-60">
+                  {cycleLoading ? 'Avvio...' : `+ Avvia ciclo ${closedCycles.length + 1}`}
+                </button>
+              )}
+
+              {closedCycles.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide">Storico cicli</div>
+                  {closedCycles.map(c => (
+                    <div key={c.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2 text-sm">
+                      <span className="text-gray-700">Ciclo {c.cycle_number}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500">{c.sessions_completed} sedute</span>
+                        {c.outcome === 'improved' && (
+                          <span className="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">Migliorato</span>
+                        )}
+                        {c.outcome === 'no_improvement' && (
+                          <span className="text-xs font-medium text-orange-700 bg-orange-50 px-2 py-0.5 rounded-full">Nessun miglioramento</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -858,6 +989,14 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
     getPatientDocuments(patientId),
   ]);
 
+  // Carica cicli (graceful: tabella potrebbe non esistere ancora)
+  let cycles = [];
+  try {
+    cycles = await getCyclesByPatient(patientId);
+  } catch (_) {
+    cycles = [];
+  }
+
   return {
     props: {
       proName,
@@ -865,6 +1004,7 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
       sessions: sessions.map(s => ({ ...s, professionals: undefined })),
       client,
       documents: documents.map(d => ({ ...d, signature_image: undefined })), // non passare la firma al client per default
+      cycles,
     },
   };
 });

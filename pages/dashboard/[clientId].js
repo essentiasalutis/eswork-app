@@ -1,10 +1,20 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment } from '../../lib/store';
+import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient } from '../../lib/store';
 import { TYPE_LABELS, TYPE_COLORS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
 import { CONFIG } from '../../lib/config';
+
+function getTierFromEmployees(employees) {
+  const n = parseInt(employees) || 0;
+  if (n <= 150) return 'core';
+  if (n <= 500) return 'plus';
+  return 'enterprise';
+}
+
+const TIER_LABELS = { core: 'Core', plus: 'Plus', enterprise: 'Enterprise' };
+const TIER_COLORS = { core: '#6b7280', plus: '#2563eb', enterprise: '#7c3aed' };
 
 // ─── Email Modal ──────────────────────────────────────────────────────────────
 
@@ -124,7 +134,7 @@ function NrsBar({ value, max = 10 }) {
   );
 }
 
-export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes }) {
+export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist }) {
   const router = useRouter();
   const [client, setClient] = useState(initialClient);
   const [assessments, setAssessments] = useState(initial);
@@ -145,6 +155,9 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [generatingCode, setGeneratingCode] = useState(null); // 'P' | 'F' | null
   const [contractStart, setContractStart] = useState(initialClient.contract_start_date || '');
   const [savingDate, setSavingDate] = useState(false);
+  const [waitlist, setWaitlist] = useState(initialWaitlist || []);
+
+  const tier = client.tier || getTierFromEmployees(client.employees);
 
   function openEdit() {
     setEditForm({
@@ -502,7 +515,13 @@ ${FIRMA}`;
                 </svg>
               </button>
             </div>
-            <div className="text-xs text-gray-500">{client.employees} dip. · {client.sector === 1 ? 'Manifattura' : 'Ufficio/IT'}</div>
+            <div className="text-xs text-gray-500 flex items-center gap-2">
+              <span>{client.employees} dip. · {client.sector === 1 ? 'Manifattura' : 'Ufficio/IT'}</span>
+              <span className="text-xs font-semibold px-1.5 py-0.5 rounded"
+                style={{ background: TIER_COLORS[tier] + '18', color: TIER_COLORS[tier] }}>
+                {TIER_LABELS[tier]}
+              </span>
+            </div>
           </div>
           <div className="flex gap-2">
             <Link
@@ -602,6 +621,41 @@ ${FIRMA}`;
             </div>
           )}
         </div>
+
+        {/* ── Lista d'attesa L1 ───────────────────────────────────────── */}
+        {waitlist && waitlist.length > 0 && (
+          <div className="mb-5">
+            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-2">Lista d'attesa L1</h2>
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
+                    <th className="text-left px-4 py-2">Paziente</th>
+                    <th className="text-center px-3 py-2">Punteggio</th>
+                    <th className="text-center px-3 py-2">Fonte</th>
+                    <th className="text-center px-3 py-2">Stato</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {waitlist.map(w => (
+                    <tr key={w.id} className="border-b border-gray-50 last:border-0">
+                      <td className="px-4 py-2 text-gray-800">
+                        {w.patients ? `${w.patients.first_name} ${w.patients.last_name}` : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-center font-semibold text-blue-700">{w.score}</td>
+                      <td className="px-3 py-2 text-center text-xs text-gray-500 capitalize">{w.source}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                          {w.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* ── Pazienti / NRS (solo coord., niente note cliniche) ──────── */}
         {patientsNrs && patientsNrs.length > 0 && (
@@ -996,5 +1050,13 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     };
   });
 
-  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes } };
+  // Carica waitlist L1 (graceful: tabella potrebbe non esistere ancora)
+  let waitlist = [];
+  try {
+    waitlist = await getWaitlistByClient(clientId);
+  } catch (_) {
+    waitlist = [];
+  }
+
+  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist } };
 });

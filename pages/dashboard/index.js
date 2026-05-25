@@ -87,6 +87,12 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, c
                 </span>
               )}
             </Link>
+            <Link href="/dashboard/finance" className="text-sm text-emerald-700 hover:text-emerald-900 py-2 px-3 border border-emerald-200 rounded-xl bg-emerald-50">
+              💶 Finance
+            </Link>
+            <Link href="/dashboard/settings" className="text-sm text-gray-700 hover:text-gray-900 py-2 px-3 border border-gray-200 rounded-xl bg-gray-50">
+              ⚙️ Settings
+            </Link>
             <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-800 py-2 px-3">
               Esci
             </button>

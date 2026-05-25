@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient } from '../../lib/store';
+import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient } from '../../lib/store';
 import { TYPE_LABELS, TYPE_COLORS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
 import { CONFIG } from '../../lib/config';
@@ -134,7 +134,7 @@ function NrsBar({ value, max = 10 }) {
   );
 }
 
-export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist }) {
+export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist, generatedReports: initialReports }) {
   const router = useRouter();
   const [client, setClient] = useState(initialClient);
   const [assessments, setAssessments] = useState(initial);
@@ -156,8 +156,52 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [contractStart, setContractStart] = useState(initialClient.contract_start_date || '');
   const [savingDate, setSavingDate] = useState(false);
   const [waitlist, setWaitlist] = useState(initialWaitlist || []);
+  const [generatedReports, setGeneratedReports] = useState(initialReports || []);
+  const [generatingReport, setGeneratingReport] = useState(null); // 'activation'|'t3'|'t6'|null
+  const [reportModal, setReportModal] = useState(null); // { title, content }
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [csvText, setCsvText] = useState('');
+  const [importResult, setImportResult] = useState(null);
+  const [importing, setImporting] = useState(false);
 
   const tier = client.tier || getTierFromEmployees(client.employees);
+
+  async function generateReport(type) {
+    setGeneratingReport(type);
+    try {
+      const body = type === 'activation' ? {} : { checkpoint: type };
+      const url = type === 'activation'
+        ? `/api/clients/${client.id}/generate-activation-report`
+        : `/api/clients/${client.id}/generate-checkpoint-report`;
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (data.report) {
+        const title = type === 'activation' ? 'Report di Attivazione' : `Report Intermedio ${type.toUpperCase()}`;
+        setReportModal({ title, content: data.report, source: data.source });
+        setGeneratedReports(prev => [{ id: Date.now(), report_type: type === 'activation' ? 'activation' : `checkpoint_${type}`, created_at: new Date().toISOString() }, ...prev]);
+      }
+    } catch {}
+    setGeneratingReport(null);
+  }
+
+  async function handleImportCSV() {
+    if (!csvText.trim()) return;
+    setImporting(true);
+    try {
+      const lines = csvText.trim().split('\n');
+      const header = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[""]/g, ''));
+      const rows = lines.slice(1).map(line => {
+        const vals = line.split(',').map(v => v.trim().replace(/[""]/g, ''));
+        return Object.fromEntries(header.map((h, i) => [h, vals[i] || '']));
+      });
+      const res = await fetch(`/api/clients/${client.id}/import-employees`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows }),
+      });
+      const result = await res.json();
+      setImportResult(result);
+    } catch { setImportResult({ error: 'Errore di rete' }); }
+    setImporting(false);
+  }
 
   function openEdit() {
     setEditForm({
@@ -388,6 +432,7 @@ ${FIRMA}`;
   const sortedAssessments = [...assessments].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50">
       {emailModal && (
         <EmailModal
@@ -1003,8 +1048,122 @@ ${FIRMA}`;
           )}
         </div>
 
+        {/* ── Sezione AI Reports ─────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Report AI</div>
+              <div className="text-xs text-gray-400 mt-0.5">Generati con Claude Sonnet — richiedono 15-30 secondi</div>
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-3 mb-4">
+            {[
+              { type: 'activation', label: '📋 Report Attivazione', desc: 'Mappa clinica + piano operativo', color: 'green' },
+              { type: 't3', label: '📊 Report T3 (3 mesi)', desc: 'KPI intermedi + trend NRS', color: 'blue' },
+              { type: 't6', label: '📈 Report T6 (6 mesi)', desc: 'Analisi + doc. INAIL OT23', color: 'purple' },
+            ].map(({ type, label, desc, color }) => {
+              const colorCls = {
+                green: 'bg-green-600 hover:bg-green-700 disabled:bg-green-300',
+                blue: 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300',
+                purple: 'bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300',
+              }[color];
+              return (
+                <button key={type} onClick={() => generateReport(type)} disabled={generatingReport !== null}
+                  className={`${colorCls} text-white rounded-xl p-4 text-left transition-colors disabled:cursor-not-allowed`}>
+                  <div className="font-semibold text-sm mb-1">{label}</div>
+                  <div className="text-xs opacity-80">{desc}</div>
+                  {generatingReport === type && (
+                    <div className="mt-2 text-xs opacity-90 animate-pulse">⏳ Generazione in corso...</div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {generatedReports.length > 0 && (
+            <div className="border-t border-gray-100 pt-3">
+              <div className="text-xs text-gray-400 mb-2">Report generati di recente</div>
+              {generatedReports.slice(0, 5).map(r => (
+                <div key={r.id} className="flex items-center justify-between py-1.5 text-xs text-gray-500">
+                  <span>{r.report_type === 'activation' ? '📋 Attivazione' : `📊 ${r.report_type?.replace('checkpoint_', '').toUpperCase()}`}</span>
+                  <span>{new Date(r.created_at).toLocaleDateString('it-IT')}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── CSV Import dipendenti ──────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Importa dipendenti (CSV)</div>
+            <button onClick={() => { setShowImportModal(v => !v); setImportResult(null); setCsvText(''); }}
+              className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100">
+              {showImportModal ? '✕ Chiudi' : '📥 Importa CSV'}
+            </button>
+          </div>
+          {showImportModal && (
+            <div className="space-y-3">
+              <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500 font-mono">
+                Formato CSV atteso (intestazione obbligatoria):<br />
+                <span className="text-green-700">nome,cognome,sede,genere,mansione</span><br />
+                <span className="text-gray-400">Mario,Rossi,Torino,M,Operaio</span>
+              </div>
+              <textarea value={csvText} onChange={e => setCsvText(e.target.value)}
+                placeholder="Incolla il CSV qui..."
+                rows={6}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-300" />
+              <button onClick={handleImportCSV} disabled={!csvText.trim() || importing}
+                className={`w-full py-3 rounded-xl text-sm font-semibold transition-colors ${!csvText.trim() || importing ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                {importing ? '⏳ Importazione...' : 'Importa dipendenti'}
+              </button>
+              {importResult && (
+                <div className={`rounded-xl p-3 text-sm ${importResult.error ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-800'}`}>
+                  {importResult.error ? `❌ ${importResult.error}` : (
+                    <>✅ Importati: <strong>{importResult.imported}</strong> · Saltati: {importResult.skipped}
+                      {importResult.errors?.length > 0 && <div className="mt-1 text-xs">{importResult.errors.slice(0,3).map(e => `⚠️ ${e.row}: ${e.error}`).join(' · ')}</div>}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
       </main>
     </div>
+
+    {/* ── Modal Report AI ────────────────────────────────────────── */}
+    {reportModal && (
+      <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
+          <div className="flex items-center justify-between p-5 border-b border-gray-200">
+            <div>
+              <div className="font-bold text-gray-900">{reportModal.title}</div>
+              <div className="text-xs text-gray-400 mt-0.5">{reportModal.source === 'ai' ? '✨ Generato con Claude AI' : '📋 Generato con template'} · {client.name}</div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { navigator.clipboard?.writeText(reportModal.content); }}
+                className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100">
+                📋 Copia
+              </button>
+              <button onClick={() => setReportModal(null)} className="text-gray-400 hover:text-gray-600 text-xl px-2">✕</button>
+            </div>
+          </div>
+          <div className="overflow-y-auto p-5 flex-1 prose prose-sm max-w-none">
+            {reportModal.content.split('\n').map((line, i) => {
+              if (line.startsWith('## ')) return <h2 key={i} className="text-lg font-bold text-gray-900 mt-5 mb-2">{line.slice(3)}</h2>;
+              if (line.startsWith('### ')) return <h3 key={i} className="text-base font-bold text-gray-800 mt-4 mb-1">{line.slice(4)}</h3>;
+              if (line.startsWith('**') && line.endsWith('**')) return <p key={i} className="font-bold text-gray-800">{line.slice(2, -2)}</p>;
+              if (line.startsWith('- ')) return <li key={i} className="text-gray-700 ml-4">{line.slice(2)}</li>;
+              if (line.match(/^\d+\. /)) return <li key={i} className="text-gray-700 ml-4">{line.replace(/^\d+\. /, '')}</li>;
+              if (line.trim() === '') return <div key={i} className="h-2" />;
+              return <p key={i} className="text-gray-700">{line}</p>;
+            })}
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -1058,5 +1217,10 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     waitlist = [];
   }
 
-  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist } };
+  let generatedReports = [];
+  try {
+    generatedReports = await getGeneratedReportsByClient(clientId);
+  } catch (_) {}
+
+  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist, generatedReports } };
 });

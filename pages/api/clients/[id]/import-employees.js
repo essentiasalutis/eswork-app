@@ -1,7 +1,7 @@
 import { requireAuth } from '../../../../lib/auth';
 import { getClientById, insertPatient, generateId } from '../../../../lib/store';
 
-// Atteso body: { rows: [{first_name, last_name, location, gender?, job_title?}] }
+// Atteso body: { rows: [{first_name, last_name, email?, location, gender?, job_title?}] }
 export default requireAuth(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
@@ -20,12 +20,16 @@ export default requireAuth(async function handler(req, res) {
     const lastName = (row.last_name || row.cognome || '').trim();
     if (!firstName || !lastName) { results.skipped++; continue; }
 
+    const emailRaw = (row.email || '').trim().toLowerCase();
+    const email = emailRaw && emailRaw.includes('@') ? emailRaw : null;
+
     try {
       await insertPatient({
         id: generateId('pat'),
         client_id: id,
         first_name: firstName,
         last_name: lastName,
+        email,
         location: (row.location || row.sede || '').trim() || null,
         gender: ['M', 'F'].includes((row.gender || row.genere || '').toUpperCase())
           ? (row.gender || row.genere).toUpperCase() : null,

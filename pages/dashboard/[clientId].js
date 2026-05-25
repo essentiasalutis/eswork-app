@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient } from '../../lib/store';
+import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getPatientsWithEmailByClient, getDocumentsByClient } from '../../lib/store';
 import { TYPE_LABELS, TYPE_COLORS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
 import { CONFIG } from '../../lib/config';
@@ -158,11 +158,16 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [waitlist, setWaitlist] = useState(initialWaitlist || []);
   const [generatedReports, setGeneratedReports] = useState(initialReports || []);
   const [generatingReport, setGeneratingReport] = useState(null); // 'activation'|'t3'|'t6'|null
-  const [reportModal, setReportModal] = useState(null); // { title, content }
+  const [reportModal, setReportModal] = useState(null); // { title, content, pdf_url }
   const [showImportModal, setShowImportModal] = useState(false);
   const [csvText, setCsvText] = useState('');
   const [importResult, setImportResult] = useState(null);
   const [importing, setImporting] = useState(false);
+  const [sendingCampaign, setSendingCampaign] = useState(false);
+  const [campaignResult, setCampaignResult] = useState(null);
+  const [showCampaignConfirm, setShowCampaignConfirm] = useState(false);
+  const [generatingQuotePdf, setGeneratingQuotePdf] = useState(false);
+  const [quotePdfUrl, setQuotePdfUrl] = useState(null);
 
   const tier = client.tier || getTierFromEmployees(client.employees);
 
@@ -177,11 +182,34 @@ export default function ClientPage({ client: initialClient, assessments: initial
       const data = await res.json();
       if (data.report) {
         const title = type === 'activation' ? 'Report di Attivazione' : `Report Intermedio ${type.toUpperCase()}`;
-        setReportModal({ title, content: data.report, source: data.source });
-        setGeneratedReports(prev => [{ id: Date.now(), report_type: type === 'activation' ? 'activation' : `checkpoint_${type}`, created_at: new Date().toISOString() }, ...prev]);
+        setReportModal({ title, content: data.report, source: data.source, pdf_url: data.pdf_url });
+        setGeneratedReports(prev => [{ id: data.report_id || Date.now(), report_type: type === 'activation' ? 'activation' : `checkpoint_${type}`, created_at: new Date().toISOString(), pdf_url: data.pdf_url }, ...prev]);
       }
     } catch {}
     setGeneratingReport(null);
+  }
+
+  async function sendCampaign() {
+    setSendingCampaign(true);
+    setCampaignResult(null);
+    try {
+      const res = await fetch(`/api/admin/clients/${client.id}/send-assessments`, { method: 'POST' });
+      const data = await res.json();
+      setCampaignResult(data);
+    } catch { setCampaignResult({ error: 'Errore di rete' }); }
+    setSendingCampaign(false);
+    setShowCampaignConfirm(false);
+  }
+
+  async function generateQuotePdf() {
+    setGeneratingQuotePdf(true);
+    try {
+      const res = await fetch(`/api/admin/clients/${client.id}/generate-quote-pdf`, { method: 'POST' });
+      const data = await res.json();
+      if (data.url) setQuotePdfUrl(data.url);
+      else if (data.html_preview) alert('BLOB_READ_WRITE_TOKEN non configurata — PDF non salvato. Configura la variabile ambiente su Vercel.');
+    } catch {}
+    setGeneratingQuotePdf(false);
   }
 
   async function handleImportCSV() {
@@ -1092,42 +1120,131 @@ ${FIRMA}`;
           )}
         </div>
 
-        {/* ── CSV Import dipendenti ──────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Importa dipendenti (CSV)</div>
-            <button onClick={() => { setShowImportModal(v => !v); setImportResult(null); setCsvText(''); }}
-              className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100">
-              {showImportModal ? '✕ Chiudi' : '📥 Importa CSV'}
-            </button>
+        {/* ── Gestione Dipendenti & Campagna Assessment ──────────── */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Dipendenti & Campagna Assessment</div>
+            <Link href={`/dashboard/${client.id}/waitlist`}
+              className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-100">
+              📋 Gestisci Waitlist L1
+            </Link>
           </div>
-          {showImportModal && (
-            <div className="space-y-3">
-              <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500 font-mono">
-                Formato CSV atteso (intestazione obbligatoria):<br />
-                <span className="text-green-700">nome,cognome,sede,genere,mansione</span><br />
-                <span className="text-gray-400">Mario,Rossi,Torino,M,Operaio</span>
-              </div>
-              <textarea value={csvText} onChange={e => setCsvText(e.target.value)}
-                placeholder="Incolla il CSV qui..."
-                rows={6}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-300" />
-              <button onClick={handleImportCSV} disabled={!csvText.trim() || importing}
-                className={`w-full py-3 rounded-xl text-sm font-semibold transition-colors ${!csvText.trim() || importing ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-                {importing ? '⏳ Importazione...' : 'Importa dipendenti'}
-              </button>
-              {importResult && (
-                <div className={`rounded-xl p-3 text-sm ${importResult.error ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-800'}`}>
-                  {importResult.error ? `❌ ${importResult.error}` : (
-                    <>✅ Importati: <strong>{importResult.imported}</strong> · Saltati: {importResult.skipped}
-                      {importResult.errors?.length > 0 && <div className="mt-1 text-xs">{importResult.errors.slice(0,3).map(e => `⚠️ ${e.row}: ${e.error}`).join(' · ')}</div>}
-                    </>
-                  )}
+
+          {/* Monitoring widget */}
+          {patientsNrs && patientsNrs.length > 0 && (
+            <div className="grid grid-cols-4 gap-3">
+              {[
+                { label: 'Totale', value: patientsNrs.length, color: 'text-gray-700' },
+                { label: 'Con email', value: patientsNrs.filter(p => p.email).length, color: 'text-blue-700' },
+                { label: 'Completati', value: patientsNrs.filter(p => p.assessment_completed_at).length, color: 'text-green-700' },
+                { label: 'Tasso', value: patientsNrs.length > 0 ? `${Math.round(patientsNrs.filter(p => p.assessment_completed_at).length / patientsNrs.length * 100)}%` : '0%', color: 'text-purple-700' },
+              ].map(k => (
+                <div key={k.label} className="bg-gray-50 rounded-xl p-3 text-center">
+                  <div className={`text-xl font-bold ${k.color}`}>{k.value}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{k.label}</div>
                 </div>
-              )}
+              ))}
             </div>
           )}
+
+          {/* Import CSV */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-gray-500">Importa dipendenti (CSV)</div>
+              <button onClick={() => { setShowImportModal(v => !v); setImportResult(null); setCsvText(''); }}
+                className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100">
+                {showImportModal ? '✕ Chiudi' : '📥 Importa CSV'}
+              </button>
+            </div>
+            {showImportModal && (
+              <div className="space-y-3">
+                <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500 font-mono">
+                  Formato CSV atteso:<br />
+                  <span className="text-green-700">nome,cognome,email,sede,genere,mansione</span><br />
+                  <span className="text-gray-400">Mario,Rossi,mario.rossi@azienda.it,Torino,M,Operaio</span>
+                </div>
+                <textarea value={csvText} onChange={e => setCsvText(e.target.value)}
+                  placeholder="Incolla il CSV qui..."
+                  rows={5}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                <button onClick={handleImportCSV} disabled={!csvText.trim() || importing}
+                  className={`w-full py-3 rounded-xl text-sm font-semibold ${!csvText.trim() || importing ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                  {importing ? '⏳ Importazione...' : 'Importa dipendenti'}
+                </button>
+                {importResult && (
+                  <div className={`rounded-xl p-3 text-sm ${importResult.error ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-800'}`}>
+                    {importResult.error ? `❌ ${importResult.error}` : (
+                      <>✅ Importati: <strong>{importResult.imported}</strong> · Saltati: {importResult.skipped}
+                        {importResult.errors?.length > 0 && <div className="mt-1 text-xs">{importResult.errors.slice(0,3).map(e => `⚠️ ${e.row}: ${e.error}`).join(' · ')}</div>}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Campagna assessment */}
+          <div className="border-t border-gray-100 pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-gray-500">Campagna assessment email</div>
+              <button
+                onClick={() => setShowCampaignConfirm(true)}
+                disabled={sendingCampaign}
+                className="text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-xl hover:bg-green-100 disabled:opacity-50"
+              >
+                {sendingCampaign ? '⏳ Invio...' : '📧 Invia a tutti i pending'}
+              </button>
+            </div>
+            {campaignResult && (
+              <div className={`rounded-xl p-3 text-sm mt-2 ${campaignResult.error ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-800'}`}>
+                {campaignResult.error
+                  ? `❌ ${campaignResult.error}`
+                  : `✅ Inviati: ${campaignResult.sent} · Falliti: ${campaignResult.failed}`
+                }
+                {campaignResult.message && <div className="text-xs mt-1 text-gray-500">{campaignResult.message}</div>}
+              </div>
+            )}
+          </div>
+
+          {/* PDF Preventivo */}
+          <div className="border-t border-gray-100 pt-4 flex items-center justify-between">
+            <div className="text-xs text-gray-500">PDF preventivo per il cliente</div>
+            <div className="flex gap-2">
+              {quotePdfUrl && (
+                <a href={quotePdfUrl} target="_blank" rel="noreferrer"
+                  className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl">
+                  ⬇️ Scarica PDF
+                </a>
+              )}
+              <button onClick={generateQuotePdf} disabled={generatingQuotePdf}
+                className="text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-xl hover:bg-orange-100 disabled:opacity-50">
+                {generatingQuotePdf ? '⏳ Generazione...' : '📄 Genera PDF preventivo'}
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* Modal conferma campagna */}
+        {showCampaignConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+              <div className="text-lg font-bold text-gray-900 mb-2">📧 Invia campagna assessment</div>
+              <p className="text-sm text-gray-600 mb-4">
+                Stai per inviare l'email di invito assessment a tutti i dipendenti di <strong>{client.name}</strong> con email configurata e assessment non ancora completato.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={sendCampaign} disabled={sendingCampaign}
+                  className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold text-sm disabled:opacity-50">
+                  {sendingCampaign ? 'Invio...' : 'Sì, invia'}
+                </button>
+                <button onClick={() => setShowCampaignConfirm(false)} className="px-5 py-3 rounded-xl border border-gray-300 text-gray-600 text-sm">
+                  Annulla
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </main>
     </div>
@@ -1142,6 +1259,12 @@ ${FIRMA}`;
               <div className="text-xs text-gray-400 mt-0.5">{reportModal.source === 'ai' ? '✨ Generato con Claude AI' : '📋 Generato con template'} · {client.name}</div>
             </div>
             <div className="flex gap-2">
+              {reportModal.pdf_url && (
+                <a href={reportModal.pdf_url} target="_blank" rel="noreferrer"
+                  className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-100">
+                  ⬇️ Scarica PDF
+                </a>
+              )}
               <button onClick={() => { navigator.clipboard?.writeText(reportModal.content); }}
                 className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100">
                 📋 Copia
@@ -1203,6 +1326,9 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
       name: `${p.first_name} ${p.last_name}`.trim(),
       level: p.level || null,
       care_token: p.care_token || null,
+      email: p.email || null,
+      assessment_completed_at: p.assessment_completed_at || null,
+      assessment_invite_sent_at: p.assessment_invite_sent_at || null,
       session_count: closed.length,
       nrs_first: firstClosed?.nrs_pre ?? null,
       nrs_last: lastClosed?.nrs_pre ?? null,

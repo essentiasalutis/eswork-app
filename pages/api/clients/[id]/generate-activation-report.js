@@ -6,7 +6,11 @@ import {
   getResponsesForClient,
   getSessionsForClient,
   insertGeneratedReport,
+  insertDocument,
 } from '../../../../lib/store';
+import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
+
+export const config = { maxDuration: 60 };
 
 export default requireAuth(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -58,8 +62,9 @@ PAZIENTI: ${totalPatients > 0 ? 'Assessment completati' : 'Nessun assessment anc
   // Fallback se manca la chiave
   if (!process.env.ANTHROPIC_API_KEY) {
     const fallback = generateFallbackReport(client, l1Count, l2Count, l3Count, totalPatients, sessions.length, sectorLabel);
-    await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system' }).catch(() => {});
-    return res.json({ report: fallback, source: 'fallback' });
+    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system' }).catch(() => null);
+    const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
+    return res.json({ report: fallback, source: 'fallback', pdf_url: pdfUrl, report_id: rec?.id });
   }
 
   try {
@@ -96,12 +101,14 @@ Tono: professionale, clinico, orientato ai dati. In italiano. Non più di 800 pa
     });
 
     const report = message.content[0]?.text || '';
-    await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin' }).catch(() => {});
-    return res.json({ report, source: 'ai' });
+    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin' }).catch(() => null);
+    const pdfUrl = await tryGeneratePdf(client, 'activation', report, id).catch(() => null);
+    return res.json({ report, source: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
     const fallback = generateFallbackReport(client, l1Count, l2Count, l3Count, totalPatients, sessions.length, sectorLabel);
-    await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system' }).catch(() => {});
-    return res.json({ report: fallback, source: 'fallback', error: e.message });
+    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system' }).catch(() => null);
+    const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
+    return res.json({ report: fallback, source: 'fallback', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
   }
 });
 
@@ -139,4 +146,13 @@ Il piano prevede la presa in carico dei ${l1} pazienti L1 distribuiti in coorti 
 3. **Mese 2-3**: Avvio coorti 2 e 3, prima sessione formativa collettiva
 4. **Mese 3**: Mini-check T3 per pazienti L2
 5. **Mese 6**: Review intermedia con report dati aggregati`;
+}
+
+async function tryGeneratePdf(client, report_type, content_text, client_id) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
+  const html = buildReportHtml({ client, report_type, content_text });
+  const filename = `${report_type}_${client_id}_${Date.now()}.pdf`;
+  const { url } = await generateAndStorePdf(html, filename, 'reports');
+  await insertDocument({ client_id, type: report_type, file_url: url, content_text }).catch(() => {});
+  return url;
 }

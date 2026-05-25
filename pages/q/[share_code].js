@@ -282,6 +282,10 @@ export default function Questionnaire({ assessment, client, error: serverError }
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(serverError || null);
+  const [showResume, setShowResume] = useState(false);
+  const [savedData, setSavedData] = useState(null);
+
+  const STORAGE_KEY = assessment ? `eswork_assessment_${assessment.share_code}` : null;
 
   const steps = useMemo(
     () => assessment ? buildSteps(assessment.include_pss) : [],
@@ -293,6 +297,43 @@ export default function Questionnaire({ assessment, client, error: serverError }
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [step]);
+
+  // Load saved state from localStorage once user consents
+  useEffect(() => {
+    if (!consented || !STORAGE_KEY) return;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data.answers && Object.keys(data.answers).length > 0) {
+          setSavedData(data);
+          setShowResume(true);
+        }
+      }
+    } catch {}
+  }, [consented]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist answers + step to localStorage on every change
+  useEffect(() => {
+    if (!STORAGE_KEY || !consented || showResume) return;
+    if (Object.keys(answers).length === 0) return;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ answers, step }));
+    } catch {}
+  }, [answers, step]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Server-side save every 3 NMQ zones completed
+  useEffect(() => {
+    if (!assessment || step === 0 || steps.length === 0) return;
+    const prev = steps[step - 1];
+    if (prev?.type === 'nmq' && (prev.zi + 1) % 3 === 0) {
+      fetch('/api/assessments/save-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ share_code: assessment.share_code, progress_data: { answers, step } }),
+      }).catch(() => {});
+    }
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalSteps = steps.length;
   const current = steps[step];
@@ -346,6 +387,10 @@ export default function Questionnaire({ assessment, client, error: serverError }
         body: JSON.stringify(answers),
       });
       if (res.ok) {
+        // Clear saved progress on successful submission
+        if (STORAGE_KEY) {
+          try { localStorage.removeItem(STORAGE_KEY); } catch {}
+        }
         setSubmitted(true);
       } else {
         const d = await res.json();
@@ -378,6 +423,47 @@ export default function Questionnaire({ assessment, client, error: serverError }
           assessmentId={assessment.id}
           onConsented={() => setConsented(true)}
         />
+      </>
+    );
+  }
+
+  // ── Resume prompt ─────────────────────────────────────────────────────────────
+  if (consented && showResume && savedData) {
+    return (
+      <>
+        <Head><title>Riprendi — ES Work</title></Head>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 max-w-sm w-full text-center shadow-sm">
+            <div className="text-4xl mb-4">💾</div>
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Questionario non completato</h2>
+            <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+              Hai salvato una sessione precedente. Vuoi riprendere da dove avevi interrotto?
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  setAnswers(savedData.answers || {});
+                  setStep(savedData.step || 0);
+                  setShowResume(false);
+                }}
+                className="py-3 rounded-xl bg-green-600 text-white font-semibold text-sm"
+              >
+                Riprendi da dove avevi interrotto
+              </button>
+              <button
+                onClick={() => {
+                  if (STORAGE_KEY) {
+                    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+                  }
+                  setShowResume(false);
+                }}
+                className="py-3 rounded-xl border border-gray-300 text-gray-600 font-medium text-sm"
+              >
+                Inizia da capo
+              </button>
+            </div>
+          </div>
+        </div>
       </>
     );
   }

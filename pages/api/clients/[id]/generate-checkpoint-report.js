@@ -5,7 +5,11 @@ import {
   getPatientsByClient,
   getSessionsForClient,
   insertGeneratedReport,
+  insertDocument,
 } from '../../../../lib/store';
+import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
+
+export const config = { maxDuration: 60 };
 
 export default requireAuth(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -68,10 +72,13 @@ ${checkpoint === 't6' || checkpoint === 't12' ? `
 
 Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
 
+  const reportType = `checkpoint_${checkpoint}`;
+
   if (!process.env.ANTHROPIC_API_KEY) {
     const fallback = generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, completed, planned, avgDelta);
-    await insertGeneratedReport({ client_id: id, report_type: `checkpoint_${checkpoint}`, content_text: fallback, checkpoint, created_by: 'system' }).catch(() => {});
-    return res.json({ report: fallback, source: 'fallback' });
+    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system' }).catch(() => null);
+    const pdfUrl = await tryGeneratePdf(client, reportType, fallback, id, checkpoint).catch(() => null);
+    return res.json({ report: fallback, source: 'fallback', pdf_url: pdfUrl, report_id: rec?.id });
   }
 
   try {
@@ -82,12 +89,14 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
       messages: [{ role: 'user', content: prompt }],
     });
     const report = message.content[0]?.text || '';
-    await insertGeneratedReport({ client_id: id, report_type: `checkpoint_${checkpoint}`, content_text: report, checkpoint, created_by: 'admin' }).catch(() => {});
-    return res.json({ report, source: 'ai' });
+    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: report, checkpoint, created_by: 'admin' }).catch(() => null);
+    const pdfUrl = await tryGeneratePdf(client, reportType, report, id, checkpoint).catch(() => null);
+    return res.json({ report, source: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
     const fallback = generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, completed, planned, avgDelta);
-    await insertGeneratedReport({ client_id: id, report_type: `checkpoint_${checkpoint}`, content_text: fallback, checkpoint, created_by: 'system' }).catch(() => {});
-    return res.json({ report: fallback, source: 'fallback', error: e.message });
+    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system' }).catch(() => null);
+    const pdfUrl = await tryGeneratePdf(client, reportType, fallback, id, checkpoint).catch(() => null);
+    return res.json({ report: fallback, source: 'fallback', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
   }
 });
 
@@ -123,4 +132,13 @@ Nessuna criticità operativa rilevante da segnalare in questa fase.
 2. Mini-check ${checkpoint === 't3' ? 'T6' : 'T12'} per tutti i dipendenti L2/L3
 3. Review clinica con report intermedio aggiornato
 4. Valutazione candidati per ri-stratificazione L2→L1`;
+}
+
+async function tryGeneratePdf(client, report_type, content_text, client_id, checkpoint) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
+  const html = buildReportHtml({ client, report_type, content_text, checkpoint });
+  const filename = `${report_type}_${client_id}_${Date.now()}.pdf`;
+  const { url } = await generateAndStorePdf(html, filename, 'reports');
+  await insertDocument({ client_id, type: report_type, file_url: url, content_text }).catch(() => {});
+  return url;
 }

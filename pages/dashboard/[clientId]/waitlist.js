@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { requireAuthSsr } from '../../../lib/auth';
 import { getClientById, getWaitlistByClient } from '../../../lib/store';
-import supabase from '../../../lib/db';
 
 const STATUS_LABELS = { pending: 'In attesa', assigned: 'Assegnato', cancelled: 'Annullato' };
 const STATUS_COLORS = {

@@ -325,7 +325,7 @@ function ContactForm({ onSubmit }) {
 
 // ─── Fase 4: NMQ ─────────────────────────────────────────────────────────────
 
-function NMQPhase({ answers, setAnswer, step, onNext, onSubmit, isLast, submitting, wantsContact }) {
+function NMQPhase({ answers, setAnswer, step, onNext, onSubmit, isLast, submitting, submitError, wantsContact }) {
   const zone = BODY_ZONES[step];
   const zi = step;
   const keys = [`nmq_${zi}_0`, `nmq_${zi}_1`, `nmq_${zi}_2`];
@@ -355,13 +355,18 @@ function NMQPhase({ answers, setAnswer, step, onNext, onSubmit, isLast, submitti
 
       <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-4">
         <div className="max-w-lg mx-auto">
+          {submitError && (
+            <div className="mb-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+              ⚠️ {submitError}
+            </div>
+          )}
           {isLast ? (
             <button
               onClick={onSubmit}
               disabled={!allAnswered || submitting}
               className="w-full py-4 rounded-2xl bg-green-600 text-white font-bold text-base disabled:opacity-40"
             >
-              {submitting ? 'Invio...' : '✓ Completa e invia'}
+              {submitting ? 'Invio in corso...' : '✓ Completa e invia'}
             </button>
           ) : (
             <button
@@ -436,6 +441,7 @@ export default function SelfDeclarePage({ client, error: serverError }) {
   const [nmqStep, setNmqStep] = useState(0);
   const [answers, setAnswers] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
   const [level, setLevel] = useState(null);
 
   const STORAGE_KEY = client ? `eswork_q_${client.id}` : null;
@@ -456,6 +462,7 @@ export default function SelfDeclarePage({ client, error: serverError }) {
 
   async function handleSubmit() {
     setSubmitting(true);
+    setSubmitError(null);
     try {
       const body = {
         first_name: contactData?.first_name || null,
@@ -473,13 +480,17 @@ export default function SelfDeclarePage({ client, error: serverError }) {
         body: JSON.stringify(body),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setLevel(data.level);
+        setLevel(data.level || 'level3');
         if (STORAGE_KEY) { try { localStorage.removeItem(STORAGE_KEY); } catch {} }
         setPhase(PHASES.DONE);
+      } else {
+        setSubmitError(data.error || `Errore ${res.status} — riprova tra qualche secondo.`);
       }
-    } catch {}
+    } catch (err) {
+      setSubmitError('Errore di rete — controlla la connessione e riprova.');
+    }
     setSubmitting(false);
   }
 
@@ -543,6 +554,7 @@ export default function SelfDeclarePage({ client, error: serverError }) {
           onSubmit={handleSubmit}
           isLast={nmqStep === BODY_ZONES.length - 1}
           submitting={submitting}
+          submitError={submitError}
           wantsContact={wantsContact}
         />
       )}

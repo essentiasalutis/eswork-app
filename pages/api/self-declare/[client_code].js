@@ -62,33 +62,30 @@ export default async function handler(req, res) {
         wants_to_be_contacted: !!wants_to_be_contacted,
       });
 
-      // 2. Salva risposte NMQ
+      // 2. Calcola livello
+      const computed_level = answers ? computeLevel(answers) : 'level3';
+      const now = new Date().toISOString();
+
+      // 3. Aggiorna livello sul paziente (non-fatale se fallisce)
+      await updatePatient(patient.id, {
+        computed_level,
+        level: computed_level,
+        assessment_completed_at: now,
+      }).catch(e => console.error('updatePatient error:', e.message));
+
+      // 4. Salva risposte NMQ nell'assessment attivo (non-fatale)
       const assessment = await getActiveAssessmentByClient(client.id).catch(() => null);
       if (assessment && answers) {
         await insertResponse({
           id: generateId('r'),
           assessment_id: assessment.id,
           answers,
-          submitted_at: new Date().toISOString(),
-        }).catch(() => {});
+          submitted_at: now,
+        }).catch(e => console.error('insertResponse error:', e.message));
       }
 
-      // 3. Calcola livello e aggiorna paziente
-      const computed_level = answers ? computeLevel(answers) : 'level3';
-      const now = new Date().toISOString();
-
-      await updatePatient(patient.id, {
-        computed_level,
-        assessment_completed_at: now,
-      });
-
-      await updatePatientAssessmentStatus(patient.id, {
-        assessment_completed_at: now,
-      }).catch(() => {});
-
-      // 4. Se vuole essere contattato E risulta L1 → Waitlist
+      // 5. Se vuole essere contattato E risulta L1 → Waitlist
       if (wants_to_be_contacted && computed_level === 'level1') {
-        await updatePatient(patient.id, { level: 'level1', level_status: 'active' });
         await addToWaitlist({
           patient_id: patient.id,
           client_id: client.id,
@@ -96,9 +93,7 @@ export default async function handler(req, res) {
           score: 100,
           source: 'self_declaration',
           status: 'pending',
-        }).catch(() => {});
-      } else if (wants_to_be_contacted && computed_level === 'level2') {
-        await updatePatient(patient.id, { level: 'level2', level_status: 'active' });
+        }).catch(e => console.error('addToWaitlist error:', e.message));
       }
 
       return res.status(201).json({
@@ -107,6 +102,7 @@ export default async function handler(req, res) {
         patient_id: patient.id,
       });
     } catch (e) {
+      console.error('self-declare POST error:', e.message);
       return res.status(500).json({ error: e.message });
     }
   }

@@ -325,7 +325,7 @@ function ContactForm({ onSubmit }) {
 
 // ─── Fase 4: NMQ ─────────────────────────────────────────────────────────────
 
-function NMQPhase({ answers, setAnswer, step, onNext, onSubmit, isLast, submitting, submitError, wantsContact }) {
+function NMQPhase({ answers, setAnswer, step, onNext, onBack, onSubmit, isLast, submitting, submitError, wantsContact }) {
   const zone = BODY_ZONES[step];
   const zi = step;
   const keys = [`nmq_${zi}_0`, `nmq_${zi}_1`, `nmq_${zi}_2`];
@@ -360,23 +360,32 @@ function NMQPhase({ answers, setAnswer, step, onNext, onSubmit, isLast, submitti
               ⚠️ {submitError}
             </div>
           )}
-          {isLast ? (
+          <div className="flex gap-2">
             <button
-              onClick={onSubmit}
-              disabled={!allAnswered || submitting}
-              className="w-full py-4 rounded-2xl bg-green-600 text-white font-bold text-base disabled:opacity-40"
+              onClick={onBack}
+              disabled={submitting}
+              className="py-4 px-5 rounded-2xl border border-gray-300 text-gray-600 font-semibold text-base disabled:opacity-40"
             >
-              {submitting ? 'Invio in corso...' : '✓ Completa e invia'}
+              ←
             </button>
-          ) : (
-            <button
-              onClick={onNext}
-              disabled={!allAnswered}
-              className="w-full py-4 rounded-2xl bg-green-600 text-white font-bold text-base disabled:opacity-40"
-            >
-              Avanti →
-            </button>
-          )}
+            {isLast ? (
+              <button
+                onClick={onSubmit}
+                disabled={!allAnswered || submitting}
+                className="flex-1 py-4 rounded-2xl bg-green-600 text-white font-bold text-base disabled:opacity-40"
+              >
+                {submitting ? 'Invio in corso...' : '✓ Completa e invia'}
+              </button>
+            ) : (
+              <button
+                onClick={onNext}
+                disabled={!allAnswered}
+                className="flex-1 py-4 rounded-2xl bg-green-600 text-white font-bold text-base disabled:opacity-40"
+              >
+                Avanti →
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -551,6 +560,14 @@ export default function SelfDeclarePage({ client, error: serverError }) {
           setAnswer={setAnswer}
           step={nmqStep}
           onNext={() => setNmqStep(s => s + 1)}
+          onBack={() => {
+            if (nmqStep > 0) {
+              setNmqStep(s => s - 1);
+            } else {
+              // Torna alla schermata precedente al NMQ
+              setPhase(wantsContact ? PHASES.CONTACT : PHASES.ANONYMOUS_EXPLAIN);
+            }
+          }}
           onSubmit={handleSubmit}
           isLast={nmqStep === BODY_ZONES.length - 1}
           submitting={submitting}

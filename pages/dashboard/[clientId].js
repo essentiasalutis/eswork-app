@@ -165,6 +165,8 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [sendingCampaign, setSendingCampaign] = useState(false);
   const [campaignResult, setCampaignResult] = useState(null);
   const [showCampaignConfirm, setShowCampaignConfirm] = useState(false);
+  const [copiedAssessmentLink, setCopiedAssessmentLink] = useState(false);
+  const [showAdvancedImport, setShowAdvancedImport] = useState(false);
   const [generatingQuotePdf, setGeneratingQuotePdf] = useState(false);
   const [quotePdfUrl, setQuotePdfUrl] = useState(null);
 
@@ -1105,19 +1107,60 @@ ${FIRMA}`;
         {/* ── Gestione Dipendenti & Campagna Assessment ──────────── */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Dipendenti & Campagna Assessment</div>
+            <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Dipendenti & Assessment</div>
             <Link href={`/dashboard/${client.id}/waitlist`}
               className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-100">
-              📋 Gestisci Waitlist L1
+              📋 Waitlist L1
             </Link>
           </div>
 
-          {/* Monitoring widget */}
+          {/* 🔗 Link assessment generico (nuovo modello auto-dichiarazione) */}
+          {client.assessment_share_code && (() => {
+            const selfDeclareUrl = `${baseUrl}/q/c/${client.assessment_share_code}`;
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(selfDeclareUrl)}`;
+            return (
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
+                <div className="text-xs font-bold text-green-700 uppercase tracking-widest mb-2">🔗 Link questionario (distribuisci internamente)</div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="flex-1 text-xs text-gray-700 font-mono bg-white border border-gray-200 rounded-lg px-2 py-2 truncate">
+                    {selfDeclareUrl}
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(selfDeclareUrl);
+                      setCopiedAssessmentLink(true);
+                      setTimeout(() => setCopiedAssessmentLink(false), 2000);
+                    }}
+                    className="flex-shrink-0 text-xs font-semibold px-3 py-2 rounded-lg border"
+                    style={{
+                      borderColor: copiedAssessmentLink ? '#16a34a' : '#d1d5db',
+                      color: copiedAssessmentLink ? '#16a34a' : '#6b7280',
+                      background: copiedAssessmentLink ? '#f0fdf4' : '#fff',
+                    }}
+                  >
+                    {copiedAssessmentLink ? '✓ Copiato' : 'Copia'}
+                  </button>
+                </div>
+                <div className="flex items-center gap-3">
+                  <a
+                    href={qrUrl}
+                    download={`qr-assessment-${client.name}.png`}
+                    className="text-xs font-semibold text-green-700 bg-white border border-green-300 px-3 py-2 rounded-xl hover:bg-green-50"
+                  >
+                    📱 Scarica QR Code
+                  </a>
+                  <span className="text-xs text-gray-400">Il dipendente scansiona e compila autonomamente</span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Tasso di adesione */}
           {patientsNrs && patientsNrs.length > 0 && (
             <div className="grid grid-cols-4 gap-3">
               {[
                 { label: 'Totale', value: patientsNrs.length, color: 'text-gray-700' },
-                { label: 'Con email', value: patientsNrs.filter(p => p.email).length, color: 'text-blue-700' },
+                { label: 'Auto-dich.', value: patientsNrs.filter(p => p.self_declared).length, color: 'text-blue-700' },
                 { label: 'Completati', value: patientsNrs.filter(p => p.assessment_completed_at).length, color: 'text-green-700' },
                 { label: 'Tasso', value: patientsNrs.length > 0 ? `${Math.round(patientsNrs.filter(p => p.assessment_completed_at).length / patientsNrs.length * 100)}%` : '0%', color: 'text-purple-700' },
               ].map(k => (
@@ -1129,7 +1172,24 @@ ${FIRMA}`;
             </div>
           )}
 
-          {/* Import CSV */}
+          {/* Import CSV — modalità avanzata (richiede DPA con cliente) */}
+          <div className="border-t border-gray-100 pt-3">
+            <button
+              onClick={() => setShowAdvancedImport(v => !v)}
+              className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
+            >
+              ⚙️ Modalità avanzata (import CSV)
+              <span className="text-gray-300">{showAdvancedImport ? '▲' : '▼'}</span>
+            </button>
+            {showAdvancedImport && (
+              <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3 mb-3">
+                <p className="text-xs text-amber-700">
+                  ⚠️ <strong>Modalità avanzata</strong>: richiede DPA firmato con l'azienda cliente. Usare solo se concordato con l'HR del cliente.
+                </p>
+              </div>
+            )}
+          </div>
+          {showAdvancedImport && (
           <div>
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs font-semibold text-gray-500">Importa dipendenti (CSV)</div>
@@ -1165,8 +1225,10 @@ ${FIRMA}`;
               </div>
             )}
           </div>
+          )}
 
-          {/* Campagna assessment */}
+          {/* Campagna email — visibile solo in modalità avanzata */}
+          {showAdvancedImport && (
           <div className="border-t border-gray-100 pt-4">
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs font-semibold text-gray-500">Campagna assessment email</div>
@@ -1188,6 +1250,7 @@ ${FIRMA}`;
               </div>
             )}
           </div>
+          )}
 
           {/* PDF Preventivo */}
           <div className="border-t border-gray-100 pt-4 flex items-center justify-between">

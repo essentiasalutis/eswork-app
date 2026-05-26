@@ -2,20 +2,20 @@
  * /q/c/[client_code] — Auto-dichiarazione dipendente
  *
  * Flusso GDPR-compliant:
- *   Fase 0  — Welcome screen (3 scelte)
+ *   Fase 0  — Welcome screen (2 scelte: con dati / anonima)
  *   Fase 1b — Spiegazione modalità anonima
  *   Fase 2  — Consensi GDPR (solo modalità identificata)
  *   Fase 3  — Raccolta dati contatto (solo modalità identificata)
- *   Fase 4  — NMQ (9 zone, esistente)
+ *   Fase 4  — NMQ (9 zone)
  *   Fine    — Schermata completamento
  */
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Head from 'next/head';
-import { BODY_ZONES, NMQ_LABELS } from '../../../lib/scoring';
+import { BODY_ZONES } from '../../../lib/scoring';
 import { INFORMATIVA_QUESTIONARIO } from '../../../lib/legal-texts';
 
-// ─── NMQ Section (riusa logica da [share_code].js) ────────────────────────────
+// ─── NMQ: bottone Sì/No ───────────────────────────────────────────────────────
 
 function YesNoBtn({ value, selected, onSelect }) {
   return (
@@ -34,6 +34,8 @@ function YesNoBtn({ value, selected, onSelect }) {
   );
 }
 
+// ─── NMQ: zona corpo ──────────────────────────────────────────────────────────
+
 function NMQZone({ zone, zi, answers, setAnswer }) {
   const questions = [
     { key: `nmq_${zi}_0`, label: <>Negli ultimi 12 mesi, hai avuto fastidi o dolori a: <strong>{zone.toLowerCase()}</strong>?</> },
@@ -42,8 +44,8 @@ function NMQZone({ zone, zi, answers, setAnswer }) {
   ];
   return (
     <div className="space-y-4">
+      {/* Intestazione zona — solo nome, senza icona */}
       <div className="bg-green-50 rounded-2xl p-4 text-center">
-        <div className="text-3xl mb-1">{NMQ_LABELS?.[zi]?.icon || '🫀'}</div>
         <div className="font-bold text-green-800 text-lg">{zone}</div>
       </div>
       {questions.map(q => (
@@ -70,28 +72,39 @@ function NMQProgress({ step, total }) {
   );
 }
 
+// ─── Logo ES Work ─────────────────────────────────────────────────────────────
+
+function ESLogo({ size = 56 }) {
+  return (
+    <div
+      className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm flex-shrink-0"
+      style={{ width: size, height: size }}
+    >
+      <img src="/es-logo.svg" alt="ES Work" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+    </div>
+  );
+}
+
 // ─── Fase 0: Welcome screen ───────────────────────────────────────────────────
 
-function WelcomeScreen({ clientName, onIdentified, onAnonymous, onExit }) {
+function WelcomeScreen({ clientName, onIdentified, onAnonymous }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 max-w-lg mx-auto w-full">
-        <div className="w-14 h-14 bg-green-600 rounded-2xl flex items-center justify-center text-2xl mb-5">🌿</div>
-        <div className="text-2xl font-bold text-gray-900 mb-1 text-center">ES Work</div>
+        <ESLogo size={64} />
+        <div className="text-2xl font-bold text-gray-900 mt-4 mb-1 text-center">ES Work</div>
         {clientName && <div className="text-sm text-gray-500 mb-6 text-center">per {clientName}</div>}
 
         <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6 w-full">
           <p className="text-sm text-gray-700 leading-relaxed mb-3">
-            <strong>La tua azienda ha attivato ES Work</strong>, il programma di prevenzione muscolo-scheletrica.
+            <strong>La tua azienda ha attivato ES Work</strong>, il programma di prevenzione e cura dell'apparato muscolo-scheletrico.
           </p>
           <p className="text-sm text-gray-700 leading-relaxed mb-3">
-            Questo questionario raccoglie informazioni sui disturbi fisici nelle zone del corpo. Serve per orientare gli interventi di prevenzione dell'osteopata.
+            Questo questionario raccoglie informazioni sugli eventuali disturbi fisici nelle varie zone del corpo.
           </p>
-          <p className="text-sm text-gray-700 leading-relaxed">
-            <strong>Puoi scegliere come partecipare:</strong>
-          </p>
+          <p className="text-sm text-gray-700 leading-relaxed font-semibold">Puoi scegliere come partecipare:</p>
           <ul className="mt-2 text-sm text-gray-600 space-y-1 pl-4 list-disc">
-            <li><strong>Con i tuoi dati</strong>: puoi essere contattato dall'osteopata se hai bisogno di supporto</li>
+            <li><strong>Con i tuoi dati</strong>: puoi essere contattato se hai bisogno di supporto</li>
             <li><strong>In modo anonimo</strong>: contribuisci ai dati aggregati aziendali, nessuno ti contatterà</li>
           </ul>
         </div>
@@ -109,19 +122,13 @@ function WelcomeScreen({ clientName, onIdentified, onAnonymous, onExit }) {
           >
             👤 Voglio contribuire in modalità anonima
           </button>
-          <button
-            onClick={onExit}
-            className="w-full py-3 rounded-2xl text-gray-400 text-sm"
-          >
-            No, esco
-          </button>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Fase 1b: Spiegazione anonimato ──────────────────────────────────────────
+// ─── Fase 1b: Spiegazione modalità anonima ────────────────────────────────────
 
 function AnonymousExplanation({ onConfirm, onBack }) {
   return (
@@ -136,7 +143,7 @@ function AnonymousExplanation({ onConfirm, onBack }) {
           </p>
           <ul className="text-sm text-gray-600 space-y-2 pl-4 list-disc">
             <li>Le tue risposte contribuiscono ai dati aggregati dell'azienda</li>
-            <li>Non viene registrato nessun dato identificativo (né nome, né email, né telefono)</li>
+            <li>Non viene registrato nessun dato che consenta di identificarti (nome, email, telefono)</li>
             <li>Nessuno potrà contattarti in seguito</li>
             <li>Non potrai accedere al programma di trattamento individuale</li>
           </ul>
@@ -181,7 +188,6 @@ function ConsentScreen({ onContinue }) {
           <h2 className="text-xl font-bold text-gray-900">Informativa e consensi</h2>
         </div>
 
-        {/* Informativa scrollabile */}
         <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-4 max-h-64 overflow-y-auto">
           {INFORMATIVA_QUESTIONARIO.sezioni.map(s => (
             <div key={s.id} className="mb-4">
@@ -191,7 +197,6 @@ function ConsentScreen({ onContinue }) {
           ))}
         </div>
 
-        {/* Checkboxes */}
         <div className="space-y-3 mb-6">
           <label className="flex items-start gap-3 bg-white rounded-2xl border border-gray-200 p-4 cursor-pointer">
             <input
@@ -230,6 +235,26 @@ function ConsentScreen({ onContinue }) {
   );
 }
 
+// ─── Campo input — definito FUORI da ContactForm per evitare remount ──────────
+
+function ContactField({ name, label, type, placeholder, required, value, error, onChange }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
+      <input
+        type={type || 'text'}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className={`w-full rounded-xl border px-4 py-3 text-sm outline-none ${error ? 'border-red-400 bg-red-50' : 'border-gray-300 bg-white'}`}
+      />
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+    </div>
+  );
+}
+
 // ─── Fase 3: Raccolta dati contatto ──────────────────────────────────────────
 
 function ContactForm({ onSubmit }) {
@@ -254,21 +279,12 @@ function ContactForm({ onSubmit }) {
     onSubmit(form);
   }
 
-  const Field = ({ name, label, type = 'text', placeholder, required }) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
-      </label>
-      <input
-        type={type}
-        value={form[name]}
-        onChange={e => { setForm(p => ({ ...p, [name]: e.target.value })); setErrors(p => ({ ...p, [name]: '' })); }}
-        placeholder={placeholder}
-        className={`w-full rounded-xl border px-4 py-3 text-sm outline-none ${errors[name] ? 'border-red-400 bg-red-50' : 'border-gray-300 bg-white'}`}
-      />
-      {errors[name] && <p className="text-xs text-red-500 mt-1">{errors[name]}</p>}
-    </div>
-  );
+  function handleChange(name) {
+    return e => {
+      setForm(p => ({ ...p, [name]: e.target.value }));
+      setErrors(p => ({ ...p, [name]: '' }));
+    };
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -280,15 +296,15 @@ function ContactForm({ onSubmit }) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Field name="first_name" label="Nome" placeholder="Mario" required />
-          <Field name="last_name" label="Cognome" placeholder="Rossi" required />
-          <Field name="email" label="Email" type="email" placeholder="mario.rossi@email.com" required />
-          <Field name="phone" label="Telefono" type="tel" placeholder="3331234567" />
-          <Field name="location" label="Sede di lavoro" placeholder="Es. Milano, Stabilimento Nord…" />
+          <ContactField name="first_name" label="Nome" placeholder="Mario" required value={form.first_name} error={errors.first_name} onChange={handleChange('first_name')} />
+          <ContactField name="last_name" label="Cognome" placeholder="Rossi" required value={form.last_name} error={errors.last_name} onChange={handleChange('last_name')} />
+          <ContactField name="email" label="Email" type="email" placeholder="mario.rossi@email.com" required value={form.email} error={errors.email} onChange={handleChange('email')} />
+          <ContactField name="phone" label="Telefono" type="tel" placeholder="3331234567" value={form.phone} error={errors.phone} onChange={handleChange('phone')} />
+          <ContactField name="location" label="Sede di lavoro" placeholder="Es. Milano, Stabilimento Nord…" value={form.location} error={errors.location} onChange={handleChange('location')} />
 
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
             <p className="text-xs text-blue-700">
-              🔒 I tuoi dati sono trattati da Essentia Salutis come titolare autonomo del trattamento. L'azienda non ha accesso ai tuoi dati personali.
+              🔒 I tuoi dati sono trattati da Essentia Salutis come titolare autonomo del trattamento, nel rispetto del segreto professionale. L'azienda non ha accesso ai tuoi dati personali.
             </p>
           </div>
 
@@ -306,7 +322,7 @@ function ContactForm({ onSubmit }) {
 
 // ─── Fase 4: NMQ ─────────────────────────────────────────────────────────────
 
-function NMQPhase({ answers, setAnswer, step, onNext, onSubmit, isLast, submitting }) {
+function NMQPhase({ answers, setAnswer, step, onNext, onSubmit, isLast, submitting, wantsContact }) {
   const zone = BODY_ZONES[step];
   const zi = step;
   const keys = [`nmq_${zi}_0`, `nmq_${zi}_1`, `nmq_${zi}_2`];
@@ -318,7 +334,9 @@ function NMQPhase({ answers, setAnswer, step, onNext, onSubmit, isLast, submitti
         <div className="max-w-lg mx-auto">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-bold text-gray-900">ES <span className="text-green-600">Work</span></div>
-            <div className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">Anonimo</div>
+            <div className={`text-xs px-2 py-1 rounded-full ${wantsContact ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+              {wantsContact ? 'Con i tuoi dati' : 'Anonimo'}
+            </div>
           </div>
           <NMQProgress step={step} total={BODY_ZONES.length} />
           <div className="flex justify-between mt-1.5">
@@ -391,7 +409,7 @@ function CompletionScreen({ level, wantsContact }) {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex flex-col items-center justify-center px-6 text-center">
       <div className="text-5xl mb-4">✅</div>
       <h2 className="text-2xl font-bold text-gray-900 mb-3">Grazie per il contributo!</h2>
-      <p className="text-gray-600 mb-2">Le tue risposte anonime sono state registrate e contribuiranno all'analisi aggregata del benessere aziendale.</p>
+      <p className="text-gray-600 mb-2">Le tue risposte sono state registrate e contribuiranno all'analisi aggregata del benessere aziendale.</p>
       <p className="text-sm text-gray-400 mt-4">Nessun dato personale è stato salvato.</p>
     </div>
   );
@@ -406,7 +424,6 @@ const PHASES = {
   CONTACT: 'contact',
   NMQ: 'nmq',
   DONE: 'done',
-  EXIT: 'exit',
 };
 
 export default function SelfDeclarePage({ client, error: serverError }) {
@@ -419,7 +436,6 @@ export default function SelfDeclarePage({ client, error: serverError }) {
   const [level, setLevel] = useState(null);
 
   const STORAGE_KEY = client ? `eswork_q_${client.id}` : null;
-  const scrollRef = useRef(null);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -476,18 +492,6 @@ export default function SelfDeclarePage({ client, error: serverError }) {
     );
   }
 
-  if (phase === PHASES.EXIT) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 text-center">
-        <div>
-          <div className="text-4xl mb-4">👋</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Va bene!</h2>
-          <p className="text-gray-500">Grazie. Se cambi idea, puoi sempre tornare al link.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
       <Head>
@@ -500,7 +504,6 @@ export default function SelfDeclarePage({ client, error: serverError }) {
           clientName={client.name}
           onIdentified={() => setPhase(PHASES.CONSENT)}
           onAnonymous={() => setPhase(PHASES.ANONYMOUS_EXPLAIN)}
-          onExit={() => setPhase(PHASES.EXIT)}
         />
       )}
 
@@ -537,6 +540,7 @@ export default function SelfDeclarePage({ client, error: serverError }) {
           onSubmit={handleSubmit}
           isLast={nmqStep === BODY_ZONES.length - 1}
           submitting={submitting}
+          wantsContact={wantsContact}
         />
       )}
 

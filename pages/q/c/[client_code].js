@@ -263,12 +263,15 @@ function ContactForm({ onSubmit }) {
 
   function validate() {
     const e = {};
-    if (!form.first_name.trim()) e.first_name = 'Obbligatorio';
-    if (!form.last_name.trim()) e.last_name = 'Obbligatorio';
+    if (!form.first_name.trim() || form.first_name.trim().length < 2) e.first_name = 'Inserisci il nome (min. 2 caratteri)';
+    if (!form.last_name.trim() || form.last_name.trim().length < 2) e.last_name = 'Inserisci il cognome (min. 2 caratteri)';
     if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Email non valida';
-    if (form.phone && !/^(\+39)?\s?[0-9]{9,10}$/.test(form.phone.replace(/\s/g, ''))) {
+    if (!form.phone.trim()) {
+      e.phone = 'Obbligatorio';
+    } else if (!/^(\+39)?\s?[0-9]{9,10}$/.test(form.phone.replace(/\s/g, ''))) {
       e.phone = 'Formato non valido (es. 3331234567)';
     }
+    if (!form.location.trim()) e.location = 'Obbligatorio';
     return e;
   }
 
@@ -299,8 +302,8 @@ function ContactForm({ onSubmit }) {
           <ContactField name="first_name" label="Nome" placeholder="Mario" required value={form.first_name} error={errors.first_name} onChange={handleChange('first_name')} />
           <ContactField name="last_name" label="Cognome" placeholder="Rossi" required value={form.last_name} error={errors.last_name} onChange={handleChange('last_name')} />
           <ContactField name="email" label="Email" type="email" placeholder="mario.rossi@email.com" required value={form.email} error={errors.email} onChange={handleChange('email')} />
-          <ContactField name="phone" label="Telefono" type="tel" placeholder="3331234567" value={form.phone} error={errors.phone} onChange={handleChange('phone')} />
-          <ContactField name="location" label="Sede di lavoro" placeholder="Es. Milano, Stabilimento Nord…" value={form.location} error={errors.location} onChange={handleChange('location')} />
+          <ContactField name="phone" label="Telefono" type="tel" placeholder="3331234567" required value={form.phone} error={errors.phone} onChange={handleChange('phone')} />
+          <ContactField name="location" label="Sede di lavoro" placeholder="Es. Milano, Stabilimento Nord…" required value={form.location} error={errors.location} onChange={handleChange('location')} />
 
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
             <p className="text-xs text-blue-700">

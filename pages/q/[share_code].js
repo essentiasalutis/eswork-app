@@ -96,7 +96,7 @@ function RoleSection({ answers, setAnswer }) {
           ))}
         </div>
         <p className="text-xs text-gray-400 text-center mt-4">
-          Risposta anonima — usata solo per analisi aggregate
+          Risposta riservata — usata solo per analisi aggregate
         </p>
       </div>
     </div>
@@ -366,7 +366,7 @@ export default function Questionnaire({ assessment, client, error: serverError }
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-3">Grazie!</h1>
             <p className="text-gray-500 text-base leading-relaxed mb-12">
-              Le tue risposte sono state registrate in modo anonimo.<br/>
+              Le tue risposte sono state registrate in modo riservato.<br/>
               Il tuo contributo aiuterà a migliorare il benessere in azienda.
             </p>
             <div className="border-t border-gray-100 pt-10">
@@ -375,7 +375,7 @@ export default function Questionnaire({ assessment, client, error: serverError }
               <div className="text-sm font-medium text-green-600 tracking-widest uppercase mt-1">
                 by Essentia Salutis
               </div>
-              <p className="text-xs text-gray-400 mt-3">Programma di prevenzione muscolo-scheletrica</p>
+              <p className="text-xs text-gray-400 mt-3">Programma di prevenzione e cura dell'apparato muscolo-scheletrico</p>
             </div>
           </div>
         </div>

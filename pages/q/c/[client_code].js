@@ -77,10 +77,10 @@ function NMQProgress({ step, total }) {
 function ESLogo({ size = 56 }) {
   return (
     <div
-      className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm flex-shrink-0"
+      className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm flex-shrink-0 bg-white"
       style={{ width: size, height: size }}
     >
-      <img src="/es-logo.svg" alt="ES Work" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      <img src="/logo-es.png" alt="Essentia Salutis" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} />
     </div>
   );
 }

@@ -550,12 +550,11 @@ export default function SelfDeclarePage({ client, error: serverError }) {
 export async function getServerSideProps({ params }) {
   const { client_code } = params;
   try {
-    const base = process.env.NEXT_PUBLIC_BASE_URL || 'https://eswork-app.vercel.app';
-    const res = await fetch(`${base}/api/self-declare/${client_code}`);
-    if (!res.ok) return { props: { client: null, error: 'Link non valido' } };
-    const { client } = await res.json();
-    return { props: { client: { ...client, share_code: client_code } } };
-  } catch {
-    return { props: { client: null, error: 'Errore di rete' } };
+    const { getClientByAssessmentShareCode } = await import('../../../lib/store');
+    const client = await getClientByAssessmentShareCode(client_code);
+    if (!client) return { props: { client: null, error: 'Link non valido' } };
+    return { props: { client: { id: client.id, name: client.name, share_code: client_code } } };
+  } catch (e) {
+    return { props: { client: null, error: 'Errore interno: ' + e.message } };
   }
 }

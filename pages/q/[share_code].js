@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
 import ConsentScreen from '../../components/ConsentScreen';
 import {
@@ -172,6 +173,9 @@ function ProgressBar({ steps, current }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function Questionnaire({ assessment, client, error: serverError }) {
+  const router = useRouter();
+  const careToken = router.query.p || null; // link personalizzato ?p=care_token
+
   const [consented, setConsented] = useState(false);
   const [answers, setAnswers] = useState({});
   const [step, setStep] = useState(0);
@@ -265,7 +269,7 @@ export default function Questionnaire({ assessment, client, error: serverError }
       const res = await fetch(`/api/respond/${assessment.share_code}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(answers),
+        body: JSON.stringify(careToken ? { ...answers, _care_token: careToken } : answers),
       });
       if (res.ok) {
         // Clear saved progress on successful submission

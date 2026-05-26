@@ -27,7 +27,7 @@ export default requireAuth(async function handler(req, res) {
     return res.status(400).json({ error: 'Nessun assessment attivo per questo cliente. Creane uno prima.' });
   }
 
-  const assessmentLink = `${BASE_URL}/q/${assessment.share_code}`;
+  const assessmentBaseLink = `${BASE_URL}/q/${assessment.share_code}`;
 
   // Dipendenti con email e assessment non ancora completato
   const patients = await getPatientsWithEmailByClient(id).catch(() => []);
@@ -42,10 +42,15 @@ export default requireAuth(async function handler(req, res) {
 
   for (const patient of pending) {
     try {
+      // Link personalizzato con care_token: traccia chi ha risposto
+      const personalLink = patient.care_token
+        ? `${assessmentBaseLink}?p=${patient.care_token}`
+        : assessmentBaseLink;
+
       const html = inviteAssessment({
         employee_name: `${patient.first_name} ${patient.last_name}`,
         company_name: client.name,
-        assessment_link: assessmentLink,
+        assessment_link: personalLink,
       });
 
       const result = await sendEmail({
@@ -82,5 +87,5 @@ export default requireAuth(async function handler(req, res) {
     }
   }
 
-  return res.json({ sent, failed, errors, assessment_link: assessmentLink });
+  return res.json({ sent, failed, errors, assessment_link: assessmentBaseLink });
 });

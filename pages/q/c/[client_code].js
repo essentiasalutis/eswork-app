@@ -401,8 +401,9 @@ function CompletionScreen({ level, wantsContact }) {
   if (wantsContact) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col items-center justify-center px-6 text-center">
-        <div className="text-5xl mb-4">{isL1 ? '📞' : isL2 ? '👁️' : '✅'}</div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-3">Grazie!</h2>
+        <ESLogo size={72} />
+        <div className="mt-4 mb-1 text-lg font-bold text-gray-900">ES Work</div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-3 mt-4">Grazie!</h2>
         {isL1 && (
           <>
             <p className="text-gray-600 mb-2">Dalle tue risposte emerge un quadro che potrebbe beneficiare di un supporto osteopatico.</p>
@@ -424,8 +425,9 @@ function CompletionScreen({ level, wantsContact }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex flex-col items-center justify-center px-6 text-center">
-      <div className="text-5xl mb-4">✅</div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-3">Grazie per il contributo!</h2>
+      <ESLogo size={72} />
+      <div className="mt-4 mb-1 text-lg font-bold text-gray-900">ES Work</div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-3 mt-4">Grazie per il contributo!</h2>
       <p className="text-gray-600 mb-2">Le tue risposte sono state registrate e contribuiranno all'analisi aggregata del benessere aziendale.</p>
       <p className="text-sm text-gray-400 mt-4">Nessun dato personale è stato salvato.</p>
     </div>

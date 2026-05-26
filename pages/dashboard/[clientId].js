@@ -142,7 +142,6 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [assignments, setAssignments] = useState(initialAssignments || []);
   const [showNew, setShowNew] = useState(false);
   const [newType, setNewType] = useState('initial');
-  const [includePSS, setIncludePSS] = useState(true);
   const [saving, setSaving] = useState(false);
   const [reportAssessment, setReportAssessment] = useState(null);
   const [copied, setCopied] = useState(null);
@@ -272,7 +271,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
     const res = await fetch('/api/assessments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: client.id, type: newType, include_pss: includePSS }),
+      body: JSON.stringify({ client_id: client.id, type: newType }),
     });
     if (res.ok) {
       const a = await res.json();
@@ -634,22 +633,6 @@ ${FIRMA}`;
                 </button>
               ))}
             </div>
-            {(newType === 'initial' || newType === 'final') && (
-              <label className="flex items-center gap-3 mb-4 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={includePSS}
-                  onChange={e => setIncludePSS(e.target.checked)}
-                  className="w-5 h-5 rounded accent-green-600"
-                />
-                <span className="text-sm text-gray-700">Includi PSS-10 (stress percepito)</span>
-              </label>
-            )}
-            {(newType === '3month' || newType === '6month') && (
-              <div className="text-xs text-gray-400 bg-gray-50 rounded-xl px-3 py-2 mb-4">
-                PSS-10 non incluso nei checkpoint — viene misurato solo all&apos;assessment iniziale e finale.
-              </div>
-            )}
             <div className="flex gap-3">
               <button type="submit" disabled={saving} className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold disabled:opacity-60">
                 {saving ? 'Creazione...' : 'Crea assessment'}
@@ -896,7 +879,6 @@ ${FIRMA}`;
 
                 <div className="text-sm text-gray-500 mb-3">
                   {rCount} {rCount === 1 ? 'risposta' : 'risposte'} raccolte
-                  {!a.include_pss && ' · senza PSS-10'}
                 </div>
 
                 {a.status === 'active' && (

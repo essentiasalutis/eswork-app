@@ -3,37 +3,26 @@ import Head from 'next/head';
 import ConsentScreen from '../../components/ConsentScreen';
 import {
   BODY_ZONES, NMQ_LABELS,
-  PSS_QUESTIONS, PSS_OPTS,
-  UWES_QUESTIONS, UWES_OPTS,
   TYPE_LABELS,
 } from '../../lib/scoring';
 
 // ─── Step builder ─────────────────────────────────────────────────────────────
 
-function buildSteps(includePSS) {
+function buildSteps() {
   const steps = [];
   steps.push({ type: 'role' });
   BODY_ZONES.forEach((zone, zi) => steps.push({ type: 'nmq', zone, zi }));
-  if (includePSS) steps.push({ type: 'pss' });
-  steps.push({ type: 'uwes' });
-  steps.push({ type: 'enps' });
   return steps;
 }
 
 const SECTION_COLORS = {
   role: '#6b7280',
   nmq: '#16a34a',
-  pss: '#ca8a04',
-  uwes: '#2563eb',
-  enps: '#7c3aed',
 };
 
 const SECTION_TITLES = {
   role: 'Il tuo ruolo',
   nmq: 'Salute fisica',
-  pss: 'Stress percepito',
-  uwes: 'Engagement',
-  enps: 'Clima aziendale',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -146,104 +135,11 @@ function NMQZone({ zone, zi, answers, setAnswer }) {
   );
 }
 
-function PSSSection({ answers, setAnswer }) {
-  const color = SECTION_COLORS.pss;
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-gray-500 leading-relaxed">
-        Indica con che frequenza hai vissuto le seguenti situazioni nell&apos;ultimo mese.
-      </p>
-      {PSS_QUESTIONS.map((q, i) => (
-        <div key={i} className="bg-white rounded-2xl border border-gray-200 p-4">
-          <p className="text-sm text-gray-700 mb-3 leading-relaxed">{q.t}</p>
-          <div className="flex flex-wrap gap-2">
-            {PSS_OPTS.map((opt, oi) => (
-              <LikertBtn
-                key={oi}
-                label={opt}
-                selected={answers[`pss_${i}`] === oi}
-                onSelect={() => setAnswer(`pss_${i}`, oi)}
-                color={color}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function UWESSection({ answers, setAnswer }) {
-  const color = SECTION_COLORS.uwes;
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-gray-500 leading-relaxed">
-        Indica con che frequenza hai vissuto le seguenti esperienze lavorative.
-      </p>
-      {UWES_QUESTIONS.map((q, i) => (
-        <div key={i} className="bg-white rounded-2xl border border-gray-200 p-4">
-          <div className="flex items-start gap-2 mb-3">
-            <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5"
-              style={{ background: color + '20', color }}>
-              {q.d}
-            </span>
-            <p className="text-sm text-gray-700 leading-relaxed">{q.t}</p>
-          </div>
-          <div className="grid grid-cols-4 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
-            {UWES_OPTS.map((opt, oi) => (
-              <LikertBtn
-                key={oi}
-                label={opt}
-                selected={answers[`uwes_${i}`] === oi}
-                onSelect={() => setAnswer(`uwes_${i}`, oi)}
-                color={color}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ENPSSection({ answers, setAnswer }) {
-  const color = SECTION_COLORS.enps;
-  return (
-    <div>
-      <div className="bg-white rounded-2xl border border-gray-200 p-5">
-        <p className="text-base text-gray-700 mb-5 leading-relaxed text-center">
-          Su una scala da <strong>0 a 10</strong>, quanto consiglieresti questa azienda come posto di lavoro a un amico?
-        </p>
-        <div className="grid grid-cols-6 gap-2 mb-4">
-          {Array.from({ length: 11 }, (_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setAnswer('enps', i)}
-              className="aspect-square rounded-xl border-2 text-base font-bold transition-all"
-              style={{
-                borderColor: answers.enps === i ? color : '#e5e7eb',
-                background: answers.enps === i ? color + '20' : '#fff',
-                color: answers.enps === i ? color : '#6b7280',
-              }}
-            >
-              {i}
-            </button>
-          ))}
-        </div>
-        <div className="flex justify-between text-xs text-gray-400 px-1">
-          <span>0 = Per niente</span>
-          <span>10 = Assolutamente sì</span>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Progress bar ─────────────────────────────────────────────────────────────
 
 function ProgressBar({ steps, current }) {
-  const sections = ['role', 'nmq', 'pss', 'uwes', 'enps'].filter(s =>
+  const sections = ['role', 'nmq'].filter(s =>
     steps.some(step => step.type === s)
   );
   return (
@@ -288,8 +184,8 @@ export default function Questionnaire({ assessment, client, error: serverError }
   const STORAGE_KEY = assessment ? `eswork_assessment_${assessment.share_code}` : null;
 
   const steps = useMemo(
-    () => assessment ? buildSteps(assessment.include_pss) : [],
-    [assessment?.include_pss]
+    () => assessment ? buildSteps() : [],
+    [assessment?.id]
   );
 
   const scrollRef = useRef(null);
@@ -352,21 +248,6 @@ export default function Questionnaire({ assessment, client, error: serverError }
       const zi = current.zi;
       const keys = [`nmq_${zi}_0`, `nmq_${zi}_1`, `nmq_${zi}_2`];
       return { answered: keys.filter(k => answers[k] !== undefined).length, total: 3 };
-    }
-    if (current.type === 'pss') {
-      return {
-        answered: Array.from({ length: 10 }, (_, i) => answers[`pss_${i}`]).filter(v => v !== undefined).length,
-        total: 10,
-      };
-    }
-    if (current.type === 'uwes') {
-      return {
-        answered: Array.from({ length: 9 }, (_, i) => answers[`uwes_${i}`]).filter(v => v !== undefined).length,
-        total: 9,
-      };
-    }
-    if (current.type === 'enps') {
-      return { answered: answers.enps !== undefined ? 1 : 0, total: 1 };
     }
     return { answered: 0, total: 0 };
   }
@@ -548,15 +429,6 @@ export default function Questionnaire({ assessment, client, error: serverError }
             )}
             {sectionType === 'nmq' && (
               <NMQZone zone={current.zone} zi={current.zi} answers={answers} setAnswer={setAnswer} />
-            )}
-            {sectionType === 'pss' && (
-              <PSSSection answers={answers} setAnswer={setAnswer} />
-            )}
-            {sectionType === 'uwes' && (
-              <UWESSection answers={answers} setAnswer={setAnswer} />
-            )}
-            {sectionType === 'enps' && (
-              <ENPSSection answers={answers} setAnswer={setAnswer} />
             )}
             {error && (
               <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">

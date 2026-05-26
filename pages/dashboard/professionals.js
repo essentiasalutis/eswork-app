@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
+import NavMenu from '../../components/NavMenu';
 
 export default function ProfessionalsPage({ professionals: initial, clients }) {
   const [professionals, setProfessionals] = useState(initial);
@@ -144,12 +145,15 @@ info@essentiasalutis.it`;
               <span className="text-sm text-gray-500 ml-2">Professionisti</span>
             </div>
           </div>
-          <button
-            onClick={() => setShowNew(true)}
-            className="bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl"
-          >
-            + Professionista
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowNew(true)}
+              className="bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl"
+            >
+              + Professionista
+            </button>
+            <NavMenu />
+          </div>
         </div>
       </header>
 

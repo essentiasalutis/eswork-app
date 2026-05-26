@@ -5,6 +5,7 @@ import { requireAuthSsr } from '../../lib/auth';
 import { getClientById } from '../../lib/store';
 import { calculatePricing, calculateROI, fmt } from '../../lib/calculator';
 import { CONFIG } from '../../lib/config';
+import NavMenu from '../../components/NavMenu';
 
 // ─── Prevalenze L1 per settore + tipo lavoro ──────────────────────────────────
 const L1_PREV = {
@@ -130,6 +131,7 @@ export default function CalculatorPage({ client, prefill }) {
               Genera offerta →
             </button>
           )}
+          <NavMenu />
         </div>
       </header>
 

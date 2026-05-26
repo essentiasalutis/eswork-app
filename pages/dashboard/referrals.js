@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireAuthSsr } from '../../lib/auth';
 import { getAllReferralCodes } from '../../lib/store';
+import NavMenu from '../../components/NavMenu';
 
 // ─── Helper ────────────────────────────────────────────────────────────────────
 
@@ -115,9 +116,7 @@ export default function ReferralsPage({ codes: initialCodes }) {
             <span className="text-gray-300">|</span>
             <span className="text-base font-bold text-orange-700">🔗 Referral B2C</span>
           </div>
-          <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-800 py-2 px-3">
-            Esci
-          </button>
+          <NavMenu onLogout={logout} />
         </div>
       </header>
 

@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
 import { getAdminSettings } from '../../lib/store';
+import NavMenu from '../../components/NavMenu';
 
 const GROUPS = [
   {
@@ -101,10 +102,11 @@ export default function SettingsPage({ settings: initialSettings }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </Link>
-            <div>
+            <div className="flex-1">
               <div className="font-semibold text-gray-900">Impostazioni</div>
               <div className="text-xs text-gray-500">Parametri clinici e business — modifiche tracciate</div>
             </div>
+            <NavMenu />
           </div>
         </header>
 

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
 import { getClients, getPatientsByClient } from '../../lib/store';
 import { calculatePricing, fmt } from '../../lib/calculator';
+import NavMenu from '../../components/NavMenu';
 
 const STAGE_COLORS = {
   prospect: 'bg-gray-100 text-gray-600',
@@ -91,6 +92,7 @@ export default function FinancePage({ clients, patientCounts }) {
               <div className="text-xs text-gray-500">Solo uso interno Essentia Salutis</div>
             </div>
             <span className="ml-auto text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-full font-semibold">🔒 Riservato</span>
+            <NavMenu />
           </div>
         </header>
 

@@ -5,6 +5,7 @@ import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatien
 import { TYPE_LABELS, TYPE_COLORS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
 import { CONFIG } from '../../lib/config';
+import NavMenu from '../../components/NavMenu';
 
 function getTierFromEmployees(employees) {
   const n = parseInt(employees) || 0;
@@ -597,7 +598,7 @@ ${FIRMA}`;
               </span>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Link
               href={`/dashboard/first-meeting?clientId=${client.id}`}
               className="text-sm text-blue-600 border border-blue-200 bg-blue-50 px-3 py-2 rounded-xl whitespace-nowrap"
@@ -610,6 +611,7 @@ ${FIRMA}`;
             >
               + Assessment
             </button>
+            <NavMenu />
           </div>
         </div>
       </header>

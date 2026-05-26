@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Head from 'next/head';
 import { getAllAcuteEvents, updateAcuteEvent } from '../../lib/store';
+import NavMenu from '../../components/NavMenu';
 
 const STATUS_LABELS = {
   pending: 'In attesa',
@@ -74,6 +75,7 @@ export default function AcuteEventsPage({ events: initialEvents }) {
                 {events.filter(e => e.status === 'pending').length} in attesa
               </div>
             </div>
+            <NavMenu />
           </div>
         </header>
 

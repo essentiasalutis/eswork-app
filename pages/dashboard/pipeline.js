@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireAuthSsr } from '../../lib/auth';
 import { CONFIG } from '../../lib/config';
+import NavMenu from '../../components/NavMenu';
 
 // ─── Costanti ─────────────────────────────────────────────────────────────────
 
@@ -172,6 +173,7 @@ export default function PipelinePage({ clients: initialClients }) {
             >
               Lista aziende
             </button>
+            <NavMenu />
           </div>
         </div>
       </header>

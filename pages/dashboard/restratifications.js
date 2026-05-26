@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
 import { getAllRestratAlerts, getAllPatients } from '../../lib/store';
 import { CONFIG } from '../../lib/config';
+import NavMenu from '../../components/NavMenu';
 
 // Sessioni per un nuovo L1 (protocollo Anno 1)
 const SESSIONS_PER_NEW_L1 = (CONFIG.sessions_intensive + CONFIG.sessions_maintenance) * CONFIG.completion_rate;
@@ -88,6 +89,7 @@ export default function RestratificationsPage({ alerts: initialAlerts, bufferByC
                 {pendingCount} da valutare
               </span>
             )}
+            <NavMenu />
           </div>
         </header>
 

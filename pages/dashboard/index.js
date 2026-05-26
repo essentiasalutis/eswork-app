@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { getSessionToken, verifyToken } from '../../lib/auth';
 import { getClients, getAssessmentCounts, getAllAcuteEvents } from '../../lib/store';
+import NavMenu from '../../components/NavMenu';
 import { TYPE_COLORS, TYPE_LABELS } from '../../lib/scoring';
 
 function getTierFromEmployees(employees) {
@@ -61,41 +62,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, c
             <span className="text-sm text-gray-500 ml-2">Dashboard</span>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/dashboard/professionals" className="text-sm text-indigo-700 hover:text-indigo-900 py-2 px-3 border border-indigo-200 rounded-xl bg-indigo-50">
-              Professionisti
-            </Link>
-            <Link href="/dashboard/pipeline" className="text-sm text-purple-700 hover:text-purple-900 py-2 px-3 border border-purple-200 rounded-xl bg-purple-50">
-              Pipeline
-            </Link>
-            <Link href="/dashboard/calculator" className="text-sm text-green-700 hover:text-green-900 py-2 px-3 border border-green-200 rounded-xl bg-green-50">
-              Calcolatore
-            </Link>
-            <Link href="/dashboard/referrals" className="text-sm text-orange-700 hover:text-orange-900 py-2 px-3 border border-orange-200 rounded-xl bg-orange-50">
-              Referral B2C
-            </Link>
-            <Link href="/dashboard/compliance" className="text-sm text-teal-700 hover:text-teal-900 py-2 px-3 border border-teal-200 rounded-xl bg-teal-50">
-              Compliance
-            </Link>
-            <Link href="/dashboard/restratifications" className="text-sm text-rose-700 hover:text-rose-900 py-2 px-3 border border-rose-200 rounded-xl bg-rose-50">
-              Ri-strat.
-            </Link>
-            <Link href="/dashboard/acute-events" className="text-sm text-red-700 hover:text-red-900 py-2 px-3 border border-red-200 rounded-xl bg-red-50 relative">
-              Ev. Acuti
-              {pendingAcuteCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                  {pendingAcuteCount}
-                </span>
-              )}
-            </Link>
-            <Link href="/dashboard/finance" className="text-sm text-emerald-700 hover:text-emerald-900 py-2 px-3 border border-emerald-200 rounded-xl bg-emerald-50">
-              💶 Finance
-            </Link>
-            <Link href="/dashboard/settings" className="text-sm text-gray-700 hover:text-gray-900 py-2 px-3 border border-gray-200 rounded-xl bg-gray-50">
-              ⚙️ Settings
-            </Link>
-            <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-800 py-2 px-3">
-              Esci
-            </button>
+            <NavMenu pendingAcuteCount={pendingAcuteCount} onLogout={logout} />
           </div>
         </div>
       </header>

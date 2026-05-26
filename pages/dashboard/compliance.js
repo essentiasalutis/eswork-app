@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireAuthSsr } from '../../lib/auth';
+import NavMenu from '../../components/NavMenu';
 
 export default function CompliancePage({ data: initialData }) {
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function CompliancePage({ data: initialData }) {
             <span className="text-gray-300">|</span>
             <span className="text-base font-bold text-teal-700">📄 Compliance documenti</span>
           </div>
-          <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-800 py-2 px-3">Esci</button>
+          <NavMenu onLogout={logout} />
         </div>
       </header>
 

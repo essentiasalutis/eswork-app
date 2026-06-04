@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { requireAuthSsr } from '../../lib/auth';
 import { getAssessmentById, getClientById, getResponsesByAssessment } from '../../lib/store';
 import {
-  aggregateNMQ, aggregatePSS, aggregateUWES, aggregateENPS,
+  aggregateNMQ,
   trafficLight, TL_COLOR, TL_BG, TL_BORDER, TYPE_LABELS, generateSummaryText, BODY_ZONES,
 } from '../../lib/scoring';
 import { calculatePricing, calculateROI, fmt } from '../../lib/calculator';
@@ -96,7 +96,7 @@ function Page({ children, className = '' }) {
 
 // ─── Offer Document ───────────────────────────────────────────────────────────
 
-export default function OfferPage({ client, assessment, nmq, pss, uwes, enps, calc, roi, date }) {
+export default function OfferPage({ client, assessment, nmq, calc, roi, date }) {
   const [emailModal, setEmailModal] = useState(null);
   const [aiPlan, setAiPlan] = useState(null);       // null = caricamento, [] = pronto
   const [aiSource, setAiSource] = useState(null);   // 'ai' | 'fallback' | 'fallback_no_key'
@@ -127,7 +127,7 @@ export default function OfferPage({ client, assessment, nmq, pss, uwes, enps, ca
     );
   }
 
-  const summaryText = generateSummaryText(nmq, pss, uwes, enps);
+  const summaryText = generateSummaryText(nmq);
 
   function openOfferEmail() {
     const referente = client.contact_name ? `Gentile ${client.contact_name},` : `Gentile referente,`;
@@ -158,10 +158,9 @@ ${FIRMA}`;
   }
 
   const semaphoreData = [
-    { type: 'nmq', score: nmq.level1.pct, value: `${nmq.level1.pct}%`, label: 'Salute fisica', sub: 'Livello 1' },
-    ...(pss ? [{ type: 'pss', score: pss.mean, value: pss.mean, label: 'Stress PSS-10', sub: 'score medio' }] : []),
-    { type: 'uwes', score: uwes.mean, value: uwes.mean, label: 'Engagement', sub: 'UWES-9 medio' },
-    { type: 'enps', score: enps.score, value: `${enps.score > 0 ? '+' : ''}${enps.score}`, label: 'Clima (eNPS)', sub: '' },
+    { type: 'nmq', score: nmq.level1.pct, value: `${nmq.level1.pct}%`, label: 'Livello 1', sub: 'Trattamento' },
+    { type: 'plain', score: nmq.level2.pct, value: `${nmq.level2.pct}%`, label: 'Livello 2', sub: 'Monitoraggio', color: 'yellow' },
+    { type: 'plain', score: nmq.level3.pct, value: `${nmq.level3.pct}%`, label: 'Livello 3', sub: 'Formazione', color: 'green' },
   ];
 
   return (
@@ -261,8 +260,8 @@ ${FIRMA}`;
 
           <div style={{ marginTop: 48, width: '100%', maxWidth: 480, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 16, padding: '16px 24px', textAlign: 'left' }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Contenuto del documento</div>
-            {['Cruscotto sintetico e dati emersi dall\'assessment', 'Disturbi muscolo-scheletrici — mappa corporea e stratificazione', 'Engagement e clima aziendale (UWES-9, eNPS)', 'Piano di intervento proposto', 'Investimento e analisi costi', 'Metodologia e timeline anno 1'].map((v, i) => (
-              <div key={i} style={{ fontSize: 12, color: '#374151', paddingTop: 5, paddingBottom: 5, borderBottom: i < 5 ? '1px solid #f3f4f6' : 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {['Cruscotto sintetico e dati emersi dall\'assessment', 'Disturbi muscolo-scheletrici — mappa corporea e stratificazione', 'Piano di intervento proposto', 'Investimento e analisi costi', 'Metodologia e timeline anno 1'].map((v, i, arr) => (
+              <div key={i} style={{ fontSize: 12, color: '#374151', paddingTop: 5, paddingBottom: 5, borderBottom: i < arr.length - 1 ? '1px solid #f3f4f6' : 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ color: '#16a34a', fontWeight: 700 }}>{i + 1}.</span> {v}
               </div>
             ))}
@@ -280,7 +279,7 @@ ${FIRMA}`;
 
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${semaphoreData.length}, 1fr)`, gap: 10, marginBottom: 14 }}>
           {semaphoreData.map((s, i) => {
-            const color = trafficLight(s.type, s.score);
+            const color = s.color || trafficLight(s.type, s.score);
             return (
               <div key={i} style={{ background: TL_BG[color], border: `1px solid ${TL_BORDER[color]}`, borderRadius: 14, padding: 12, textAlign: 'center', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
                 <div style={{ width: 12, height: 12, borderRadius: '50%', background: TL_COLOR[color], margin: '0 auto 6px', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
@@ -303,7 +302,7 @@ ${FIRMA}`;
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#1d4ed8', marginBottom: 1 }}>Tecnologia ES Work AI</div>
             <div style={{ fontSize: 10, color: '#3b82f6', lineHeight: 1.5 }}>
-              Piattaforma digitale con intelligenza artificiale per la prevenzione muscolo-scheletrica e la salute dei dipendenti.
+              Piattaforma digitale con intelligenza artificiale per la prevenzione e cura dell'apparato muscolo-scheletrico e la salute dei dipendenti.
               I risultati e il piano di intervento sono elaborati automaticamente dai dati reali della vostra azienda.
             </div>
           </div>
@@ -358,89 +357,9 @@ ${FIRMA}`;
       </Page>
 
       {/* ══════════════════════════════════════════════════════════════
-          PAG 3 — Engagement + Piano di intervento
+          PAG 3 — Piano di intervento
           ══════════════════════════════════════════════════════════════ */}
       <Page className="page-break">
-        {/* — Engagement — */}
-        <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 10 }}>Engagement e clima aziendale</div>
-
-        {/* UWES row */}
-        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: '10px 14px', marginBottom: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ minWidth: 130 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: '#4b5563', textTransform: 'uppercase', marginBottom: 2 }}>UWES-9</div>
-              <div style={{ fontSize: 10, color: '#6b7280' }}>Engagement lavorativo</div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: '#2563eb', marginTop: 4 }}>{uwes.mean} <span style={{ fontSize: 10, fontWeight: 400, color: '#6b7280' }}>/ 6</span></div>
-            </div>
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              {[
-                { l: 'Vigore', v: uwes.vigore },
-                { l: 'Dedizione', v: uwes.dedizione },
-                { l: 'Assorbimento', v: uwes.assorbimento },
-              ].map(d => (
-                <div key={d.l} style={{ textAlign: 'center', background: '#eff6ff', borderRadius: 10, padding: '8px 6px', border: '1px solid #bfdbfe', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                  <div style={{ fontSize: 9, color: '#374151' }}>{d.l}</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#2563eb' }}>{d.v}</div>
-                  <div style={{ height: 3, background: '#dbeafe', borderRadius: 2, marginTop: 4, overflow: 'hidden', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                    <div style={{ width: `${(d.v / 6) * 100}%`, height: '100%', background: '#2563eb', borderRadius: 2, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* PSS row */}
-        {pss && (
-          <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: '10px 14px', marginBottom: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ minWidth: 130 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: '#4b5563', textTransform: 'uppercase', marginBottom: 2 }}>PSS-10</div>
-                <div style={{ fontSize: 10, color: '#6b7280' }}>Stress percepito</div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: '#374151', marginTop: 4 }}>{pss.mean} <span style={{ fontSize: 10, fontWeight: 400, color: '#6b7280' }}>/ 40</span></div>
-              </div>
-              <div style={{ flex: 1, display: 'flex', gap: 8 }}>
-                {[
-                  { val: pss.low, label: 'Basso', sub: '≤13', bg: '#f0fdf4', border: '#bbf7d0', color: '#16a34a' },
-                  { val: pss.mod, label: 'Moderato', sub: '14–26', bg: '#fefce8', border: '#fde68a', color: '#ca8a04' },
-                  { val: pss.high, label: 'Elevato', sub: '≥27', bg: '#fef2f2', border: '#fecaca', color: '#dc2626' },
-                ].map((b, i) => (
-                  <div key={i} style={{ flex: 1, background: b.bg, border: `1px solid ${b.border}`, borderRadius: 10, padding: '8px 4px', textAlign: 'center', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: b.color }}>{b.val}%</div>
-                    <div style={{ fontSize: 9, color: b.color }}>{b.label}</div>
-                    <div style={{ fontSize: 8, color: '#4b5563' }}>{b.sub}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* eNPS row */}
-        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: '10px 14px', marginBottom: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ minWidth: 130 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: '#4b5563', textTransform: 'uppercase', marginBottom: 2 }}>eNPS</div>
-              <div style={{ fontSize: 10, color: '#6b7280' }}>Clima aziendale</div>
-              <div style={{ fontSize: 24, fontWeight: 900, color: enps.score >= 20 ? '#16a34a' : enps.score >= 0 ? '#ca8a04' : '#dc2626', marginTop: 2 }}>
-                {enps.score > 0 ? '+' : ''}{enps.score}
-              </div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', height: 22, borderRadius: 999, overflow: 'hidden', marginBottom: 4, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                {enps.promoters > 0 && <div style={{ width: `${enps.promoters}%`, background: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 9, fontWeight: 600, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>{enps.promoters}%</div>}
-                {enps.passives > 0 && <div style={{ width: `${enps.passives}%`, background: '#ca8a04', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 9, fontWeight: 600, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>{enps.passives}%</div>}
-                {enps.detractors > 0 && <div style={{ width: `${enps.detractors}%`, background: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 9, fontWeight: 600, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>{enps.detractors}%</div>}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#6b7280' }}>
-                <span>Promotori (9-10)</span><span>Passivi (7-8)</span><span>Detrattori (0-6)</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <hr className="section-sep" />
-
         {/* — Piano di intervento — */}
         <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 4 }}>Piano di intervento proposto</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -517,7 +436,7 @@ ${FIRMA}`;
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginBottom: 14 }}>
             <tbody>
               {[
-                ['Assessment iniziale + Report di Attivazione', 'Check-up completo della salute muscolo-scheletrica con strumenti validati'],
+                ['Assessment iniziale + Report di Attivazione', 'Check-up completo della salute dell\'apparato muscolo-scheletrico con strumento validato NMQ'],
                 [`Sportello osteopatico in sede (${calc.days_osteo_y1} gg/anno)`, 'Trattamento individuale in sede per i dipendenti con disturbi — include capacità di ri-stratificazione'],
                 [`Formazione postura ed ergonomia (${calc.training_sessions_y1} sessioni)`, 'Sessioni collettive teoria + pratica per tutti i dipendenti'],
                 ['Piattaforma ES Work con AI', 'Monitoraggio continuo, alert automatici, dashboard aggregata e storico clinico digitale'],
@@ -690,7 +609,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
   const { assessmentId, n, l1, l2 } = ctx.query;
 
   if (!assessmentId) {
-    return { props: { client: null, assessment: null, nmq: null, pss: null, uwes: null, enps: null, calc: null, roi: null, date: today() } };
+    return { props: { client: null, assessment: null, nmq: null, calc: null, roi: null, date: today() } };
   }
 
   try {
@@ -703,9 +622,6 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     ]);
 
     const nmq = aggregateNMQ(responses);
-    const pss = assessment.include_pss ? aggregatePSS(responses) : null;
-    const uwes = aggregateUWES(responses);
-    const enps = aggregateENPS(responses);
 
     const totalN = n ? parseInt(n) : (client?.employees || responses.length);
     const l1v = l1 !== undefined ? parseInt(l1) : nmq.level1.count;
@@ -718,7 +634,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       props: {
         client,
         assessment: { ...assessment, n: responses.length },
-        nmq, pss, uwes, enps,
+        nmq,
         calc,
         roi,
         date: today(),

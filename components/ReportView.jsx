@@ -1,5 +1,5 @@
 import {
-  aggregateNMQ, aggregatePSS, aggregateUWES, aggregateENPS,
+  aggregateNMQ,
   trafficLight, TL_COLOR, TL_BG, TL_BORDER,
   TYPE_LABELS, generateSummaryText,
 } from '../lib/scoring';
@@ -245,7 +245,7 @@ function ReportFooter() {
           </div>
         </div>
         <div className="text-right">
-          <div className="text-xs text-gray-400 italic mb-1">Powered by ES Work AI · Piattaforma digitale per la prevenzione muscolo-scheletrica</div>
+          <div className="text-xs text-gray-400 italic mb-1">Powered by ES Work AI · Piattaforma digitale per la prevenzione e cura dell'apparato muscolo-scheletrico</div>
           <div className="text-xs text-gray-400">
             Documento riservato e confidenziale.<br/>
             Riproduzione vietata senza autorizzazione scritta.
@@ -271,20 +271,10 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
   }
 
   const nmq = aggregateNMQ(responseList);
-  const pss = assessment.include_pss ? aggregatePSS(responseList) : null;
-  const uwes = aggregateUWES(responseList);
-  const enps = aggregateENPS(responseList);
 
   const baseResp = baseline?.responseList || [];
   const baseNmq = baseResp.length > 0 ? aggregateNMQ(baseResp) : null;
-  const basePss = baseline?.include_pss && baseResp.length > 0 ? aggregatePSS(baseResp) : null;
-  const baseUwes = baseResp.length > 0 ? aggregateUWES(baseResp) : null;
-  const baseEnps = baseResp.length > 0 ? aggregateENPS(baseResp) : null;
   const hasBaseline = !!baseNmq;
-
-  // Per checkpoint: mostra PSS dalla baseline come riferimento
-  const isCheckpoint = assessment.type === '3month' || assessment.type === '6month';
-  const pssRef = !pss && isCheckpoint && basePss ? basePss : null;
 
   return (
     <div className="max-w-2xl mx-auto px-4 pb-6" id="report-root">
@@ -343,35 +333,41 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Sintesi</div>
         <div className="flex items-center gap-1.5 mb-2">
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3b82f6', display: 'inline-block', flexShrink: 0 }} />
-          <span className="text-xs text-gray-400 italic">Analisi generata da ES Work AI — sistema di intelligenza artificiale per la prevenzione muscolo-scheletrica</span>
+          <span className="text-xs text-gray-400 italic">Analisi generata da ES Work AI — sistema di intelligenza artificiale per la prevenzione e cura dell'apparato muscolo-scheletrico</span>
         </div>
         <p className="text-sm text-gray-700 leading-relaxed">
-          {generateSummaryText(nmq, pss, uwes, enps)}
+          {generateSummaryText(nmq)}
         </p>
       </div>
 
       {/* KPI Dashboard */}
       <SectionTitle>Cruscotto sintetico</SectionTitle>
-      <div className={`grid gap-3 mb-2 ${pss ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
-        <Semaphore type="nmq" score={nmq.level1.pct} value={`${nmq.level1.pct}%`} label="Salute fisica" subtitle="Livello 1" />
-        {pss && <Semaphore type="pss" score={pss.mean} value={pss.mean} label="Stress (PSS-10)" subtitle="score medio" />}
-        <Semaphore type="uwes" score={uwes.mean} value={uwes.mean} label="Engagement" subtitle="UWES-9 medio" />
-        <Semaphore type="enps" score={enps.score} value={`${enps.score > 0 ? '+' : ''}${enps.score}`} label="Clima (eNPS)" subtitle="" />
+      <div className="grid gap-3 mb-2 grid-cols-3">
+        <Semaphore type="nmq" score={nmq.level1.pct} value={`${nmq.level1.pct}%`} label="Livello 1" subtitle="Trattamento" />
+        <div className="rounded-2xl p-3 text-center bg-yellow-50 border border-yellow-100">
+          <div className="text-xs text-gray-600 mb-0.5">Livello 2</div>
+          <div className="text-xl font-bold text-yellow-600">{nmq.level2.pct}%</div>
+          <div className="text-xs text-gray-400 mt-0.5">Monitoraggio</div>
+        </div>
+        <div className="rounded-2xl p-3 text-center bg-green-50 border border-green-100">
+          <div className="text-xs text-gray-600 mb-0.5">Livello 3</div>
+          <div className="text-xl font-bold text-green-600">{nmq.level3.pct}%</div>
+          <div className="text-xs text-gray-400 mt-0.5">Formazione</div>
+        </div>
       </div>
 
-      {/* Mod 7: legenda semafori */}
+      {/* Legenda semafori */}
       <LegendBox>
-        <div className="font-semibold text-gray-600 mb-1">Come leggere i semafori:</div>
+        <div className="font-semibold text-gray-600 mb-1">Come leggere i dati:</div>
         <div className="flex flex-col gap-0.5">
           <span><span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1.5 align-middle" />Verde = situazione positiva, nessun intervento urgente</span>
           <span><span className="inline-block w-2 h-2 rounded-full bg-yellow-400 mr-1.5 align-middle" />Giallo = area di attenzione, intervento consigliato</span>
           <span><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1.5 align-middle" />Rosso = area critica, intervento prioritario</span>
         </div>
         <div className="mt-1.5 text-gray-400">
-          Salute fisica: % dipendenti con disturbi che impattano le attività (Livello 1) ·
-          Stress: punteggio medio PSS-10 (0–40) ·
-          Engagement: punteggio medio UWES-9 (0–6) ·
-          Clima: eNPS (–100 a +100)
+          Livello 1: % dipendenti con disturbi che impattano le attività (candidati al trattamento) ·
+          Livello 2: dolore presente senza impatto funzionale (monitoraggio) ·
+          Livello 3: nessun disturbo in atto (formazione).
         </div>
       </LegendBox>
 
@@ -437,12 +433,12 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
       <SectionTitle>Stratificazione popolazione — 3 livelli</SectionTitle>
       <LevelBoxes nmq={nmq} />
 
-      {/* Mod 8: legenda livelli */}
+      {/* Legenda livelli — criteri v4 */}
       <LegendBox>
         <div className="font-semibold text-gray-600 mb-1">Come si determinano i livelli:</div>
-        <div className="mb-0.5"><strong className="text-red-600">Livello 1 (Trattamento):</strong> dipendenti i cui disturbi hanno impedito le normali attività, oppure che presentano dolore attuale in 2 o più zone corporee. Necessitano di trattamento osteopatico individuale.</div>
-        <div className="mb-0.5"><strong className="text-yellow-600">Livello 2 (Prevenzione):</strong> dipendenti con disturbi diffusi (3+ zone) o dolore localizzato attuale, che non rientrano nel Livello 1. Candidati alla prevenzione attiva dall&apos;Anno 2.</div>
-        <div><strong className="text-green-600">Livello 3 (Formazione):</strong> dipendenti senza problemi significativi. Partecipano alla formazione collettiva su postura ed ergonomia insieme a tutti gli altri.</div>
+        <div className="mb-0.5"><strong className="text-red-600">Livello 1 (Trattamento):</strong> dipendenti con dolore in atto (ultimi 7 giorni) che ha limitato o impedito le normali attività. Necessitano di trattamento osteopatico individuale.</div>
+        <div className="mb-0.5"><strong className="text-yellow-600">Livello 2 (Monitoraggio):</strong> dipendenti con dolore in atto ma senza impatto funzionale. Candidati alla prevenzione attiva e al self-trigger.</div>
+        <div><strong className="text-green-600">Livello 3 (Formazione):</strong> dipendenti senza dolore in atto. Partecipano alla formazione collettiva su postura ed ergonomia insieme a tutti gli altri.</div>
       </LegendBox>
 
       {/* NMQ Comparison */}
@@ -458,126 +454,6 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         </>
       )}
 
-      {/* PSS attuale */}
-      {pss && (
-        <>
-          <SectionTitle>Distribuzione stress percepito (PSS-10)</SectionTitle>
-          <div className="grid grid-cols-3 gap-3 mb-2 print-page">
-            <div className="bg-green-50 rounded-2xl p-4 text-center border border-green-100">
-              <div className="text-3xl font-bold text-green-600">{pss.low}%</div>
-              <div className="text-xs text-green-700 mt-1">Stress basso</div>
-              <div className="text-xs text-gray-400">≤13</div>
-            </div>
-            <div className="bg-yellow-50 rounded-2xl p-4 text-center border border-yellow-100">
-              <div className="text-3xl font-bold text-yellow-600">{pss.mod}%</div>
-              <div className="text-xs text-yellow-700 mt-1">Moderato</div>
-              <div className="text-xs text-gray-400">14–26</div>
-            </div>
-            <div className="bg-red-50 rounded-2xl p-4 text-center border border-red-100">
-              <div className="text-3xl font-bold text-red-600">{pss.high}%</div>
-              <div className="text-xs text-red-700 mt-1">Stress elevato</div>
-              <div className="text-xs text-gray-400">≥27</div>
-            </div>
-          </div>
-          {/* Mod 9: legenda PSS */}
-          <LegendBox>
-            PSS-10 (Perceived Stress Scale): questionario validato che misura lo stress percepito nell&apos;ultimo mese. Punteggio 0–40. Basso: 0–13 | Moderato: 14–26 | Elevato: 27–40.
-          </LegendBox>
-        </>
-      )}
-
-      {/* PSS da baseline per checkpoint */}
-      {pssRef && (
-        <>
-          <SectionTitle>Stress percepito (PSS-10) — Dato di riferimento</SectionTitle>
-          <div className="grid grid-cols-3 gap-3 mb-2 print-page opacity-75">
-            <div className="bg-green-50 rounded-2xl p-4 text-center border border-green-100">
-              <div className="text-3xl font-bold text-green-600">{pssRef.low}%</div>
-              <div className="text-xs text-green-700 mt-1">Stress basso</div>
-            </div>
-            <div className="bg-yellow-50 rounded-2xl p-4 text-center border border-yellow-100">
-              <div className="text-3xl font-bold text-yellow-600">{pssRef.mod}%</div>
-              <div className="text-xs text-yellow-700 mt-1">Moderato</div>
-            </div>
-            <div className="bg-red-50 rounded-2xl p-4 text-center border border-red-100">
-              <div className="text-3xl font-bold text-red-600">{pssRef.high}%</div>
-              <div className="text-xs text-red-700 mt-1">Stress elevato</div>
-            </div>
-          </div>
-          <LegendBox>
-            Dati dello stress rilevati all&apos;assessment iniziale. La prossima misurazione PSS-10 verrà effettuata all&apos;assessment finale.
-          </LegendBox>
-        </>
-      )}
-
-      {/* UWES + eNPS side by side — evita che eNPS finisca da solo sull'ultima pagina */}
-      <SectionTitle>Engagement e clima aziendale</SectionTitle>
-      <div className="grid grid-cols-2 gap-3 mb-2 print-page">
-        {/* UWES */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-4">
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">UWES-9 — Engagement</div>
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            {[
-              { l: 'Vigore', v: uwes.vigore },
-              { l: 'Dedizione', v: uwes.dedizione },
-              { l: 'Assorbimento', v: uwes.assorbimento },
-            ].map(d => (
-              <div key={d.l} className="text-center">
-                <div className="text-xs text-gray-500 mb-1">{d.l}</div>
-                <div className="text-xl font-bold text-blue-600">{d.v}</div>
-                <div className="mt-2 h-1.5 bg-gray-100 rounded overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded" style={{ width: `${(d.v / 6) * 100}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="text-xs text-gray-500 pt-2 border-t border-gray-100 text-center">
-            Score globale: <strong className="text-blue-600">{uwes.mean}</strong> / 6
-          </div>
-          <div className="mt-2 text-xs text-gray-400 leading-relaxed">
-            Vigore = energia · Dedizione = significato · Assorbimento = concentrazione
-          </div>
-        </div>
-
-        {/* eNPS */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-4">
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Clima aziendale — eNPS</div>
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <div className="text-4xl font-bold" style={{
-              color: enps.score >= 20 ? '#16a34a' : enps.score >= 0 ? '#ca8a04' : '#dc2626'
-            }}>
-              {enps.score > 0 ? '+' : ''}{enps.score}
-            </div>
-            <div className="text-sm text-gray-500">eNPS</div>
-          </div>
-          <div className="flex h-6 rounded-full overflow-hidden">
-            {enps.promoters > 0 && (
-              <div className="bg-green-500 flex items-center justify-center text-white text-xs font-medium" style={{ width: `${enps.promoters}%` }}>
-                {enps.promoters}%
-              </div>
-            )}
-            {enps.passives > 0 && (
-              <div className="bg-yellow-400 flex items-center justify-center text-white text-xs font-medium" style={{ width: `${enps.passives}%` }}>
-                {enps.passives}%
-              </div>
-            )}
-            {enps.detractors > 0 && (
-              <div className="bg-red-500 flex items-center justify-center text-white text-xs font-medium" style={{ width: `${enps.detractors}%` }}>
-                {enps.detractors}%
-              </div>
-            )}
-          </div>
-          <div className="flex justify-between text-xs text-gray-400 mt-1.5 px-0.5">
-            <span>Promotori (9-10)</span>
-            <span>Passivi (7-8)</span>
-            <span>Detrattori (0-6)</span>
-          </div>
-          <div className="mt-2 text-xs text-gray-400 leading-relaxed">
-            Promotori − Detrattori. Positivo = buono, sopra +20 = ottimo.
-          </div>
-        </div>
-      </div>
-
       {/* Baseline comparison summary */}
       {hasBaseline && (
         <>
@@ -585,27 +461,17 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
           <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-3 print-page">
             <div className="grid grid-cols-2 gap-y-2 text-sm text-gray-700">
               <div>
-                L1 MSDs: <strong>{baseNmq.level1.pct}%</strong> → <strong>{nmq.level1.pct}%</strong>
+                L1 (impatto funzionale): <strong>{baseNmq.level1.pct}%</strong> → <strong>{nmq.level1.pct}%</strong>
                 <Delta before={baseNmq.level1.pct} after={nmq.level1.pct} inverse />
               </div>
-              {pss && basePss && (
-                <div>
-                  Stress: <strong>{basePss.mean}</strong> → <strong>{pss.mean}</strong>
-                  <Delta before={basePss.mean} after={pss.mean} inverse />
-                </div>
-              )}
-              {baseUwes && (
-                <div>
-                  Engagement: <strong>{baseUwes.mean}</strong> → <strong>{uwes.mean}</strong>
-                  <Delta before={baseUwes.mean} after={uwes.mean} />
-                </div>
-              )}
-              {baseEnps && (
-                <div>
-                  eNPS: <strong>{baseEnps.score}</strong> → <strong>{enps.score}</strong>
-                  <Delta before={baseEnps.score} after={enps.score} />
-                </div>
-              )}
+              <div>
+                L2 (monitoraggio): <strong>{baseNmq.level2.pct}%</strong> → <strong>{nmq.level2.pct}%</strong>
+                <Delta before={baseNmq.level2.pct} after={nmq.level2.pct} inverse />
+              </div>
+              <div>
+                Prevalenza 12 mesi: <strong>{baseNmq.prevalence.pct}%</strong> → <strong>{nmq.prevalence.pct}%</strong>
+                <Delta before={baseNmq.prevalence.pct} after={nmq.prevalence.pct} inverse />
+              </div>
             </div>
           </div>
         </>

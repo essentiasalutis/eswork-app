@@ -128,7 +128,7 @@ function DashboardL1({ patient, cycles, sessions, onAcuteEvent }) {
         {isCandidate ? (
           <>
             <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>Sei stato identificato come candidato al protocollo di trattamento.</div>
-            <div style={{ fontSize: 13, opacity: .85, marginTop: 8, lineHeight: 1.5 }}>Sarai contattato dal nostro coordinatore per fissare la pre-validazione clinica (videocall di 20 minuti).</div>
+            <div style={{ fontSize: 13, opacity: .85, marginTop: 8, lineHeight: 1.5 }}>Sarai contattato dal nostro coordinatore per fissare la pre-validazione clinica (videocall di 15 minuti).</div>
           </>
         ) : (
           <>
@@ -226,7 +226,7 @@ function DashboardL3({ patient }) {
     <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ background: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)', borderRadius: 18, padding: '20px', color: '#fff' }}>
         <div style={{ fontSize: 12, opacity: .8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Il tuo programma ES Work</div>
-        <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>Ottima salute muscolo-scheletrica! 🎉</div>
+        <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>Ottima salute dell'apparato muscolo-scheletrico! 🎉</div>
         <div style={{ fontSize: 13, opacity: .85, marginTop: 8, lineHeight: 1.6 }}>
           Il tuo assessment indica una buona condizione fisica. Parteciperai alla formazione collettiva per mantenere e migliorare il tuo stato. Il programma resta a tua disposizione tramite i mini-check periodici.
         </div>

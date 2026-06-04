@@ -116,7 +116,7 @@ export default function PrevalidationForm({ patient }) {
         <main className="max-w-2xl mx-auto px-5 py-6">
           {/* Info call */}
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6 text-sm text-blue-800">
-            <strong>📞 Compilare durante o immediatamente dopo la videocall</strong> di pre-validazione (20 min) con il paziente.
+            <strong>📞 Compilare durante o immediatamente dopo la videocall</strong> di pre-validazione (15 min) con il paziente.
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">

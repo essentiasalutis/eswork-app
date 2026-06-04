@@ -10,7 +10,7 @@ import {
 export default requireAuth(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { client_id, type, include_pss } = req.body;
+  const { client_id, type } = req.body;
   if (!client_id || !type) return res.status(400).json({ error: 'Dati mancanti' });
 
   try {
@@ -22,14 +22,12 @@ export default requireAuth(async function handler(req, res) {
       share_code = generateShareCode();
     } while (await shareCodeExists(share_code));
 
-    // PSS-10 solo per assessment iniziale e finale
-    const pssAllowed = type === 'initial' || type === 'final';
+    // v4: strumento unico NMQ. PSS-10/UWES-9/eNPS rimossi dal modello.
     const assessment = await insertAssessment({
       id: generateId('a'),
       client_id,
       type,
       status: 'active',
-      include_pss: pssAllowed && include_pss !== false,
       share_code,
       created_at: new Date().toISOString(),
     });

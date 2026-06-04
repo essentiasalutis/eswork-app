@@ -3,6 +3,7 @@ import {
   getPatientById,
   updatePatient,
   getAssignmentsByProfessional,
+  logAccess,
 } from '../../../../lib/store';
 import supabase from '../../../../lib/db';
 
@@ -23,6 +24,9 @@ export default requireProAuth(async function handler(req, res) {
   if (!allowed) return res.status(403).json({ error: 'Accesso negato' });
 
   if (req.method === 'GET') {
+    // Livello B — accesso alla cartella clinica di dettaglio: tracciato
+    const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
+    await logAccess(proId, 'view_patient', ip, `Cartella paziente ${patientId}`).catch(() => {});
     return res.json(patient);
   }
 

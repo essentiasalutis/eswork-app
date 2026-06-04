@@ -394,9 +394,11 @@ function NMQPhase({ answers, setAnswer, step, onNext, onBack, onSubmit, isLast, 
 
 // ─── Schermata completamento ──────────────────────────────────────────────────
 
-function CompletionScreen({ level, wantsContact }) {
+function CompletionScreen({ level, wantsContact, tier }) {
   const isL1 = level === 'level1';
   const isL2 = level === 'level2';
+  // Plus/Enterprise: i Livello 2 ricevono prevenzione attiva (4 sessioni/anno)
+  const tierSupportsL2Prevention = tier === 'plus' || tier === 'enterprise';
 
   if (wantsContact) {
     return (
@@ -404,20 +406,41 @@ function CompletionScreen({ level, wantsContact }) {
         <ESLogo size={72} />
         <div className="mt-4 mb-1 text-lg font-bold text-gray-900">ES Work</div>
         <h2 className="text-2xl font-bold text-gray-900 mb-3 mt-4">Grazie!</h2>
+
+        {/* L1 — ogni livello di servizio */}
         {isL1 && (
           <>
-            <p className="text-gray-600 mb-2">Dalle tue risposte emerge un quadro che potrebbe beneficiare di un supporto osteopatico.</p>
-            <p className="text-gray-600">Sarai contattato dall'osteopata nei prossimi giorni per una valutazione.</p>
+            <p className="text-gray-600 mb-2">Dalle tue risposte emerge un quadro che può beneficiare di un supporto osteopatico.</p>
+            <p className="text-gray-600">Sarai contattato dall'osteopata per una <strong>pre-validazione clinica</strong> (videochiamata di circa 15 minuti) che confermerà il percorso più adatto a te.</p>
           </>
         )}
-        {isL2 && (
-          <p className="text-gray-600">Hai riportato alcuni fastidi. Il tuo profilo è stato registrato e riceverai aggiornamenti periodici sul programma.</p>
+
+        {/* L2 — Plus/Enterprise: prevenzione attiva */}
+        {isL2 && tierSupportsL2Prevention && (
+          <>
+            <p className="text-gray-600 mb-2">Hai riportato alcuni fastidi, senza un impatto sulle tue attività.</p>
+            <p className="text-gray-600">Sei incluso nel programma di <strong>prevenzione attiva</strong> (sessioni dedicate durante l'anno) e nella formazione collettiva. Se la situazione peggiora, potrai segnalarlo in qualsiasi momento.</p>
+          </>
         )}
+
+        {/* L2 — Core: formazione + self-trigger */}
+        {isL2 && !tierSupportsL2Prevention && (
+          <>
+            <p className="text-gray-600 mb-2">Hai riportato alcuni fastidi, senza un impatto sulle tue attività.</p>
+            <p className="text-gray-600">Parteciperai alla <strong>formazione collettiva</strong> su postura ed ergonomia. Se la situazione peggiora, potrai <strong>segnalarlo</strong> (fino a 2 volte l'anno) per essere ricontattato dall'osteopata.</p>
+          </>
+        )}
+
+        {/* L3 — ogni livello di servizio */}
         {!isL1 && !isL2 && (
-          <p className="text-gray-600">Non hai riportato problemi significativi. Ottimo! Continua a seguire le buone pratiche posturali.</p>
+          <>
+            <p className="text-gray-600 mb-2">Non hai riportato disturbi in atto. Ottimo!</p>
+            <p className="text-gray-600">Parteciperai alla <strong>formazione collettiva</strong> su postura ed ergonomia. Se inizi ad avvertire un disturbo, potrai <strong>segnalarlo</strong> (fino a 2 volte l'anno) per essere ricontattato dall'osteopata.</p>
+          </>
         )}
+
         <div className="mt-6 bg-white rounded-2xl border border-gray-200 p-4 text-sm text-gray-500 text-left w-full max-w-sm">
-          <p>🔒 I tuoi dati sono al sicuro con Essentia Salutis. Puoi richiedere modifica o cancellazione in qualsiasi momento scrivendo a info@essentiasalutis.it</p>
+          <p>🔒 I tuoi dati sono al sicuro con Essentia Salutis, trattati nel rispetto del segreto professionale. Puoi richiedere modifica o cancellazione in qualsiasi momento scrivendo a info@essentiasalutis.it</p>
         </div>
       </div>
     );
@@ -579,7 +602,7 @@ export default function SelfDeclarePage({ client, error: serverError }) {
       )}
 
       {phase === PHASES.DONE && (
-        <CompletionScreen level={level} wantsContact={wantsContact} />
+        <CompletionScreen level={level} wantsContact={wantsContact} tier={client.tier} />
       )}
     </>
   );
@@ -591,7 +614,10 @@ export async function getServerSideProps({ params }) {
     const { getClientByAssessmentShareCode } = await import('../../../lib/store');
     const client = await getClientByAssessmentShareCode(client_code);
     if (!client) return { props: { client: null, error: 'Link non valido' } };
-    return { props: { client: { id: client.id, name: client.name, share_code: client_code } } };
+    // tier: usa il valore salvato o derivalo dal numero di dipendenti
+    const n = parseInt(client.employees) || 0;
+    const tier = client.tier || (n <= 150 ? 'core' : n <= 500 ? 'plus' : 'enterprise');
+    return { props: { client: { id: client.id, name: client.name, share_code: client_code, tier } } };
   } catch (e) {
     return { props: { client: null, error: 'Errore interno: ' + e.message } };
   }

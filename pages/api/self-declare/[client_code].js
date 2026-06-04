@@ -7,25 +7,10 @@ import {
   getActiveAssessmentByClient,
   insertResponse,
   updatePatient,
-  updatePatientAssessmentStatus,
   addToWaitlist,
   generateId,
 } from '../../../lib/store';
-
-// Calcola livello personale dalle risposte NMQ
-function computeLevel(answers) {
-  const zones = Object.keys(answers).filter(k => k.startsWith('nmq_') && k.endsWith('_0'));
-  let hasFunctionalImpact = false;
-  let hasPain7days = false;
-  for (const zoneKey of zones) {
-    const zi = zoneKey.split('_')[1];
-    if (answers[`nmq_${zi}_1`] === 1 || answers[`nmq_${zi}_1`] === true) hasFunctionalImpact = true;
-    if (answers[`nmq_${zi}_2`] === 1 || answers[`nmq_${zi}_2`] === true) hasPain7days = true;
-  }
-  if (hasFunctionalImpact) return 'level1';
-  if (hasPain7days) return 'level2';
-  return 'level3';
-}
+import { computeLevel } from '../../../lib/scoring';
 
 export default async function handler(req, res) {
   const { client_code } = req.query;

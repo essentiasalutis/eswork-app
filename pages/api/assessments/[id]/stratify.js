@@ -3,26 +3,15 @@ import supabase from '../../../../lib/db';
 import { sendEmail } from '../../../../lib/email';
 import { outcomeL1, outcomeL2, outcomeL3 } from '../../../../lib/email-templates';
 import { insertEmailLog } from '../../../../lib/store';
+import { computeLevel } from '../../../../lib/scoring';
 
-// Calcola livello da risposte NMQ
-function computeLevelFromResponses(responses) {
+// Livello aggregato della campagna: la funzione unica computeLevel() è applicata
+// a ogni risposta; vince la severità più alta (L1 > L2 > L3).
+function computeCampaignLevel(responses) {
   if (!responses || responses.length === 0) return 'level3';
-  let hasFunctionalImpact = false;
-  let hasPain7days = false;
-  for (const r of responses) {
-    const a = r.answers || {};
-    if (a.functional_impact === true || a.functional_impact === 'true' || a.functional_impact === 1) {
-      hasFunctionalImpact = true;
-    }
-    if (
-      a.pain_7days === true || a.pain_7days === 'true' || a.pain_7days === 1 ||
-      (typeof a.pain_7days === 'number' && a.pain_7days > 0)
-    ) {
-      hasPain7days = true;
-    }
-  }
-  if (hasFunctionalImpact) return 'level1';
-  if (hasPain7days) return 'level2';
+  const levels = responses.map(r => computeLevel(r.answers || {}));
+  if (levels.includes('level1')) return 'level1';
+  if (levels.includes('level2')) return 'level2';
   return 'level3';
 }
 
@@ -38,8 +27,8 @@ export default async function handler(req, res) {
       .from('assessments').select('*, responses(*)').eq('id', id).single();
     if (ae || !assessment) return res.status(404).json({ error: 'Assessment non trovato' });
 
-    // Calcola livello
-    const computed_level = computeLevelFromResponses(assessment.responses || []);
+    // Calcola livello con la funzione unica
+    const computed_level = computeCampaignLevel(assessment.responses || []);
 
     // Aggiorna assessments.computed_level
     await supabase.from('assessments').update({ computed_level }).eq('id', id);

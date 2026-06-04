@@ -1,14 +1,5 @@
 import { getPatientByCareToken, insertReassessmentT12 } from '../../../lib/store';
-
-function computeLevel(nmqData) {
-  if (!nmqData) return 'level3';
-  const zones = Object.values(nmqData);
-  const hasHighNrs = zones.some(z => z?.nrs >= 6 && z?.functional_impact);
-  const hasPain = zones.some(z => z?.pain_7days);
-  if (hasHighNrs) return 'level1';
-  if (hasPain) return 'level2';
-  return 'level3';
-}
+import { computeLevel } from '../../../lib/scoring';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();

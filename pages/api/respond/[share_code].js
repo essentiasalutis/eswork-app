@@ -8,21 +8,7 @@ import {
   updatePatientAssessmentStatus,
   addToWaitlist,
 } from '../../../lib/store';
-
-// Calcola livello personale dalle risposte NMQ
-function computePersonalLevel(answers) {
-  const zones = Object.keys(answers).filter(k => k.startsWith('nmq_') && k.endsWith('_0'));
-  let hasFunctionalImpact = false;
-  let hasPain7days = false;
-  for (const zoneKey of zones) {
-    const zi = zoneKey.split('_')[1];
-    if (answers[`nmq_${zi}_1`] === 1 || answers[`nmq_${zi}_1`] === true) hasFunctionalImpact = true;
-    if (answers[`nmq_${zi}_2`] === 1 || answers[`nmq_${zi}_2`] === true) hasPain7days = true;
-  }
-  if (hasFunctionalImpact) return 'level1';
-  if (hasPain7days) return 'level2';
-  return 'level3';
-}
+import { computeLevel } from '../../../lib/scoring';
 
 export default async function handler(req, res) {
   const { share_code } = req.query;
@@ -62,7 +48,7 @@ export default async function handler(req, res) {
         try {
           const patient = await getPatientByCareToken(_care_token);
           if (patient) {
-            const computed_level = computePersonalLevel(answers);
+            const computed_level = computeLevel(answers);
 
             // Aggiorna livello paziente
             await updatePatient(patient.id, {

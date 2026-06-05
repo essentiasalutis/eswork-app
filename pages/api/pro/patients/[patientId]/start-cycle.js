@@ -4,7 +4,7 @@ import {
   getCyclesByPatient,
   createTreatmentCycle,
   updatePatient,
-  getAssignmentsByProfessional,
+  proCanAccessPatientClinical,
 } from '../../../../../lib/store';
 
 export default requireProAuth(async function handler(req, res) {
@@ -16,8 +16,8 @@ export default requireProAuth(async function handler(req, res) {
   if (!patient) return res.status(404).json({ error: 'Paziente non trovato' });
   if (patient.level !== 'level1') return res.status(400).json({ error: 'Solo pazienti L1 possono avere cicli di trattamento' });
 
-  const assignments = await getAssignmentsByProfessional(proId);
-  if (!assignments.some(a => a.client_id === patient.client_id)) return res.status(403).json({ error: 'Accesso negato' });
+  // Livello B — avvio ciclo (cartella clinica): solo l'osteopata assegnato al paziente
+  if (!(await proCanAccessPatientClinical(proId, patient))) return res.status(403).json({ error: 'Accesso negato' });
 
   const cycles = await getCyclesByPatient(patientId);
   const closedCycles = cycles.filter(c => c.status === 'closed');

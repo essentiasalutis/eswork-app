@@ -4,18 +4,12 @@ import {
   getSessionsByPatient,
   insertSession,
   updateSession,
-  getAssignmentsByProfessional,
+  proCanAccessPatientClinical,
   generateId,
   logAccess,
   getActiveCycleByPatient,
   updateTreatmentCycle,
 } from '../../../../../lib/store';
-
-async function checkAccess(proId, patient) {
-  if (!patient) return false;
-  const assignments = await getAssignmentsByProfessional(proId);
-  return assignments.some(a => a.client_id === patient.client_id);
-}
 
 export default requireProAuth(async function handler(req, res) {
   const { patientId } = req.query;
@@ -24,7 +18,8 @@ export default requireProAuth(async function handler(req, res) {
   const patient = await getPatientById(patientId);
   if (!patient) return res.status(404).json({ error: 'Paziente non trovato' });
 
-  const allowed = await checkAccess(proId, patient);
+  // Livello B — sessioni (cartella clinica): solo l'osteopata assegnato al paziente
+  const allowed = await proCanAccessPatientClinical(proId, patient);
   if (!allowed) return res.status(403).json({ error: 'Accesso negato' });
 
   if (req.method === 'GET') {

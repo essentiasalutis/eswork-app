@@ -4,21 +4,21 @@ import {
   getActiveCycleByPatient,
   updateTreatmentCycle,
   updatePatient,
-  getAssignmentsByProfessional,
+  proCanAccessPatientClinical,
   getSessionsByPatient,
 } from '../../../../../lib/store';
 
 export default requireProAuth(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   const { patientId } = req.query;
-  const { outcome } = req.body; // 'improved' | 'no_improvement'
+  const { outcome, pgic } = req.body; // outcome: 'improved' | 'no_improvement' · pgic: 1-5 (fine ciclo)
   const proId = req.proSession.proId;
 
   const patient = await getPatientById(patientId);
   if (!patient) return res.status(404).json({ error: 'Paziente non trovato' });
 
-  const assignments = await getAssignmentsByProfessional(proId);
-  if (!assignments.some(a => a.client_id === patient.client_id)) return res.status(403).json({ error: 'Accesso negato' });
+  // Livello B — cartella clinica: solo osteopata assegnato al paziente
+  if (!(await proCanAccessPatientClinical(proId, patient))) return res.status(403).json({ error: 'Accesso negato' });
 
   const activeCycle = await getActiveCycleByPatient(patientId);
   if (!activeCycle) return res.status(404).json({ error: 'Nessun ciclo attivo' });
@@ -28,11 +28,13 @@ export default requireProAuth(async function handler(req, res) {
   const cycleSessions = allSessions.filter(s => s.cycle_id === activeCycle.id && s.closed_at);
   const sessions_completed = cycleSessions.length;
 
+  const pgicVal = pgic != null ? parseInt(pgic, 10) : null;
   const now = new Date().toISOString();
   try {
     const updatedCycle = await updateTreatmentCycle(activeCycle.id, {
       status: 'closed',
       outcome: outcome || null,
+      pgic: pgicVal,
       sessions_completed,
       closed_at: now,
     });

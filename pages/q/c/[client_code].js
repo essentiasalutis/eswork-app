@@ -452,7 +452,7 @@ function CompletionScreen({ level, wantsContact, tier }) {
       <div className="mt-4 mb-1 text-lg font-bold text-gray-900">ES Work</div>
       <h2 className="text-2xl font-bold text-gray-900 mb-3 mt-4">Grazie per il contributo!</h2>
       <p className="text-gray-600 mb-2">Le tue risposte sono state registrate e contribuiranno all'analisi aggregata del benessere aziendale.</p>
-      <p className="text-sm text-gray-400 mt-4">Nessun dato personale è stato salvato.</p>
+      <p className="text-sm text-gray-400 mt-4">Contributo registrato in forma anonima per le statistiche aggregate della popolazione, senza alcun dato identificativo.</p>
     </div>
   );
 }

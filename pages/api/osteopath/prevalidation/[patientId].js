@@ -5,6 +5,7 @@ import {
   updatePatient,
   addToWaitlist,
   generateId,
+  proCanAccessClient,
 } from '../../../../lib/store';
 
 export default requireProAuth(async function handler(req, res) {
@@ -26,6 +27,11 @@ export default requireProAuth(async function handler(req, res) {
     const patient = await getPatientById(patientId).catch(() => null);
     if (!patient) return res.status(404).json({ error: 'Paziente non trovato' });
 
+    // Livello A — la pre-validazione è accessibile agli osteopati assegnati all'AZIENDA
+    if (!(await proCanAccessClient(proId, patient.client_id))) {
+      return res.status(403).json({ error: 'Accesso negato' });
+    }
+
     const preVal = await insertPreValidation({
       patient_id: patientId,
       professional_id: proId,
@@ -38,14 +44,15 @@ export default requireProAuth(async function handler(req, res) {
       outcome,
     });
 
-    // Se confermato L1 → aggiorna livello paziente e mettilo in lista trattamento
+    // Assegnazione automatica: chi fa la pre-validazione prende in carico il paziente
+    // → diventa l'assigned_professional_id (sblocca l'accesso al Livello B per lui solo).
+    const patientUpdate = { assigned_professional_id: proId };
     if (outcome === 'l1_confirmed') {
-      await updatePatient(patientId, {
-        level: 'level1',
-        computed_level: 'level1',
-        level_status: 'active',
-      }).catch(() => {});
+      patientUpdate.level = 'level1';
+      patientUpdate.computed_level = 'level1';
+      patientUpdate.level_status = 'active';
     }
+    await updatePatient(patientId, patientUpdate).catch(() => {});
 
     return res.status(201).json(preVal);
   }

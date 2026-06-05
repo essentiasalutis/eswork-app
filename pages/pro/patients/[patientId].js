@@ -612,6 +612,7 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
   const [cycleLoading, setCycleLoading] = useState(false);
   const [cycleError, setCycleError] = useState('');
   const [showCloseOutcome, setShowCloseOutcome] = useState(false);
+  const [closePgic, setClosePgic] = useState(null);
 
   async function generateCareToken() {
     setGeneratingToken(true);
@@ -687,7 +688,7 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
       const res = await fetch(`/api/pro/patients/${patient.id}/close-cycle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ outcome }),
+        body: JSON.stringify({ outcome, pgic: closePgic }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -803,7 +804,27 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
                       Chiudi ciclo
                     </button>
                   ) : (
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-3 space-y-3">
+                      {/* PGIC a fine ciclo — impressione del paziente */}
+                      <div>
+                        <div className="text-xs text-gray-600 font-medium mb-1">PGIC del paziente a fine ciclo:</div>
+                        <div className="flex gap-1">
+                          {[
+                            { v: 1, l: 'Molto peggio', c: '#dc2626' },
+                            { v: 2, l: 'Peggio', c: '#ea580c' },
+                            { v: 3, l: 'Invariato', c: '#ca8a04' },
+                            { v: 4, l: 'Meglio', c: '#22c55e' },
+                            { v: 5, l: 'Molto meglio', c: '#16a34a' },
+                          ].map(o => (
+                            <button key={o.v} onClick={() => setClosePgic(o.v)} title={o.l}
+                              className="flex-1 py-1.5 rounded-lg border text-xs font-semibold"
+                              style={{ background: closePgic === o.v ? o.c : '#fff', borderColor: closePgic === o.v ? o.c : '#e5e7eb', color: closePgic === o.v ? '#fff' : '#6b7280' }}>
+                              {o.v}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="text-[10px] text-gray-400 mt-1">1 = molto peggio · 5 = molto meglio</div>
+                      </div>
                       <div className="text-xs text-gray-600 font-medium">Seleziona esito del ciclo:</div>
                       <div className="flex gap-2">
                         <button onClick={() => closeCycle('improved')} disabled={cycleLoading}
@@ -815,7 +836,7 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
                           Nessun miglioramento
                         </button>
                       </div>
-                      <button onClick={() => setShowCloseOutcome(false)} className="text-xs text-gray-400 underline w-full text-center">Annulla</button>
+                      <button onClick={() => { setShowCloseOutcome(false); setClosePgic(null); }} className="text-xs text-gray-400 underline w-full text-center">Annulla</button>
                     </div>
                   )}
                 </div>

@@ -6,15 +6,25 @@ import {
   getPreValidationByPatient,
   getReassessmentT12ByPatient,
   getMiniChecksByPatient,
+  proCanAccessPatientClinical,
+  logAccess,
 } from '../../../../lib/store';
 
 export default requireProAuth(async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
 
   const { patientId } = req.query;
+  const proId = req.proSession.proId;
 
   const patient = await getPatientById(patientId).catch(() => null);
   if (!patient) return res.status(404).json({ error: 'Paziente non trovato' });
+
+  // Livello B — cartella clinica completa: solo l'osteopata assegnato al paziente
+  if (!(await proCanAccessPatientClinical(proId, patient))) {
+    return res.status(403).json({ error: 'Accesso negato' });
+  }
+  const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
+  await logAccess(proId, 'view_patient', ip, `Cartella paziente ${patientId}`).catch(() => {});
 
   const [sessions, cycles, preValidation, reassessmentT12, miniChecks] = await Promise.all([
     getSessionsByPatient(patientId).catch(() => []),

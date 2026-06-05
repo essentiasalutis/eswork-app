@@ -5,14 +5,30 @@ import {
   getActiveCycleByPatient,
   updateTreatmentCycle,
   updatePatient,
+  getPatientById,
+  proCanAccessPatientClinical,
 } from '../../../../lib/store';
+
+// Livello B — la sessione fa parte della cartella clinica: solo l'osteopata
+// assegnato al paziente può leggerla/modificarla.
+async function guardSession(proId, session, res) {
+  const patientId = session.patient_id || session.patients?.id;
+  const patient = patientId ? await getPatientById(patientId).catch(() => null) : null;
+  if (!(await proCanAccessPatientClinical(proId, patient))) {
+    res.status(403).json({ error: 'Accesso negato' });
+    return false;
+  }
+  return true;
+}
 
 export default requireProAuth(async function handler(req, res) {
   const { sessionId } = req.query;
+  const proId = req.proSession.proId;
 
   if (req.method === 'GET') {
     const session = await getSessionById(sessionId).catch(() => null);
     if (!session) return res.status(404).json({ error: 'Sessione non trovata' });
+    if (!(await guardSession(proId, session, res))) return;
     return res.json(session);
   }
 
@@ -21,6 +37,7 @@ export default requireProAuth(async function handler(req, res) {
 
     const session = await getSessionById(sessionId).catch(() => null);
     if (!session) return res.status(404).json({ error: 'Sessione non trovata' });
+    if (!(await guardSession(proId, session, res))) return;
 
     const patientId = session.patient_id || session.patients?.id;
 

@@ -154,35 +154,24 @@ export default function ReassessmentT12() {
                 </div>
               </div>
 
-              {/* NRS se sì */}
+              {/* Impatto funzionale se dolore presente — NRS NON è auto-compilato */}
               {zoneData.pain_7days === true && (
-                <>
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
-                      Intensità del dolore: <span style={{ color: '#dc2626', fontWeight: 800 }}>{zoneData.nrs ?? 5}/10</span>
-                    </div>
-                    <input type="range" min={0} max={10} value={zoneData.nrs ?? 5}
-                      onChange={e => updateZone(currentZone.key, 'nrs', +e.target.value)}
-                      style={{ width: '100%', accentColor: '#dc2626' }} />
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 10 }}>
+                    Il dolore limita le tue attività?
                   </div>
-
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 10 }}>
-                      Il dolore limita le tue attività?
-                    </div>
-                    <div style={{ display: 'flex', gap: 10 }}>
-                      {[{ val: false, label: 'No' }, { val: true, label: 'Sì' }].map(({ val, label }) => (
-                        <button key={String(val)} onClick={() => updateZone(currentZone.key, 'functional_impact', val)}
-                          style={{ flex: 1, padding: '10px', borderRadius: 10, border: '2px solid', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                            background: zoneData.functional_impact === val ? '#0369a1' : '#fff',
-                            borderColor: zoneData.functional_impact === val ? '#0369a1' : '#e2e8f0',
-                            color: zoneData.functional_impact === val ? '#fff' : '#374151' }}>
-                          {label}
-                        </button>
-                      ))}
-                    </div>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    {[{ val: false, label: 'No' }, { val: true, label: 'Sì' }].map(({ val, label }) => (
+                      <button key={String(val)} onClick={() => updateZone(currentZone.key, 'functional_impact', val)}
+                        style={{ flex: 1, padding: '10px', borderRadius: 10, border: '2px solid', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                          background: zoneData.functional_impact === val ? '#0369a1' : '#fff',
+                          borderColor: zoneData.functional_impact === val ? '#0369a1' : '#e2e8f0',
+                          color: zoneData.functional_impact === val ? '#fff' : '#374151' }}>
+                        {label}
+                      </button>
+                    ))}
                   </div>
-                </>
+                </div>
               )}
             </div>
 

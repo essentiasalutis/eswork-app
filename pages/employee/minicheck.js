@@ -14,7 +14,14 @@ function Header() {
   );
 }
 
-const NRS_COLORS = ['#16a34a','#22c55e','#4ade80','#86efac','#fde68a','#fcd34d','#fb923c','#f87171','#ef4444','#dc2626','#991b1b'];
+// PGIC — Patient Global Impression of Change (scala 1-5, auto-riferito = corretto)
+const PGIC_OPTIONS = [
+  { value: 5, label: 'Molto meglio', icon: '😄', color: '#16a34a' },
+  { value: 4, label: 'Meglio', icon: '🙂', color: '#22c55e' },
+  { value: 3, label: 'Invariato', icon: '😐', color: '#ca8a04' },
+  { value: 2, label: 'Peggio', icon: '🙁', color: '#ea580c' },
+  { value: 1, label: 'Molto peggio', icon: '😢', color: '#dc2626' },
+];
 
 export default function MiniCheck() {
   const router = useRouter();
@@ -22,8 +29,7 @@ export default function MiniCheck() {
   const checkType = type || 't3';
 
   const [step, setStep] = useState(1);
-  const [nrs, setNrs] = useState(3);
-  const [nrsTouched, setNrsTouched] = useState(false);
+  const [pgic, setPgic] = useState(null);
   const [hasLimitations, setHasLimitations] = useState(null);
   const [wantsContact, setWantsContact] = useState(null);
   const [freeText, setFreeText] = useState('');
@@ -39,7 +45,7 @@ export default function MiniCheck() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token,
-          nrs_current: nrs,
+          pgic,
           has_limitations: hasLimitations,
           wants_contact: wantsContact,
           free_text: freeText || null,
@@ -99,18 +105,24 @@ export default function MiniCheck() {
             </div>
           </div>
 
-          {/* Step 1: NRS */}
+          {/* Step 1: PGIC — cambiamento percepito */}
           {step >= 1 && (
             <div style={{ background: '#fff', borderRadius: 16, border: `2px solid ${step === 1 ? '#0369a1' : '#e2e8f0'}`, padding: '20px', marginBottom: 16 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#374151', marginBottom: 4 }}>
-                1. Quanto fa male oggi? <span style={{ color: NRS_COLORS[nrs] || '#374151', fontWeight: 800 }}>{nrs}/10</span>
+                1. Rispetto all&apos;inizio del programma, come ti senti?
               </div>
-              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>0 = nessun dolore · 10 = il peggior dolore immaginabile</div>
-              <input type="range" min={0} max={10} value={nrs}
-                onChange={e => { setNrs(+e.target.value); setNrsTouched(true); if (step === 1) setStep(2); }}
-                style={{ width: '100%', accentColor: NRS_COLORS[nrs] || '#0369a1' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
-                <span>😊 Nessun dolore</span><span>😣 Insopportabile</span>
+              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>Pensa al tuo benessere muscolo-scheletrico complessivo.</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {PGIC_OPTIONS.map(opt => (
+                  <button key={opt.value} onClick={() => { setPgic(opt.value); if (step === 1) setStep(2); }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, border: '2px solid', fontSize: 15, fontWeight: 700, cursor: 'pointer', transition: 'all .15s', textAlign: 'left',
+                      background: pgic === opt.value ? opt.color : '#fff',
+                      borderColor: pgic === opt.value ? opt.color : '#e2e8f0',
+                      color: pgic === opt.value ? '#fff' : '#374151' }}>
+                    <span style={{ fontSize: 22 }}>{opt.icon}</span>
+                    <span>{opt.label}</span>
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -174,7 +186,7 @@ export default function MiniCheck() {
           )}
 
           <p style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', marginTop: 16 }}>
-            🔒 Risposte anonime · Non visibili al datore di lavoro
+            🔒 Risposte riservate · Non visibili al datore di lavoro
           </p>
         </div>
       </div>

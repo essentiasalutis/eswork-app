@@ -8,20 +8,22 @@ import {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { token, nrs_current, has_limitations, wants_contact, free_text, check_type } = req.body;
+  const { token, pgic, has_limitations, wants_contact, free_text, check_type } = req.body;
   if (!token) return res.status(400).json({ error: 'Token mancante' });
 
   const patient = await getPatientByCareToken(token).catch(() => null);
   if (!patient) return res.status(404).json({ error: 'Link non valido' });
 
-  // Triage: NRS ≥ 6 o limitazioni presenti → richiede contatto
-  const triage_outcome = (nrs_current >= 6 || has_limitations === true) ? 'needs_contact' : 'ok';
+  // PGIC 1-5 (1=molto peggio … 5=molto meglio). Mai NRS (auto-compilato vietato).
+  const pgicVal = pgic != null ? parseInt(pgic, 10) : null;
+  // Triage: peggioramento percepito (PGIC ≤ 2) oppure limitazioni funzionali → contatto
+  const triage_outcome = ((pgicVal != null && pgicVal <= 2) || has_limitations === true) ? 'needs_contact' : 'ok';
 
   await insertMiniCheck({
     patient_id: patient.id,
     client_id: patient.client_id,
     check_type: check_type || 't3',
-    nrs_current: nrs_current != null ? parseInt(nrs_current, 10) : null,
+    pgic: pgicVal,
     has_limitations: !!has_limitations,
     wants_contact: !!wants_contact,
     free_text: free_text || null,
@@ -36,8 +38,8 @@ export default async function handler(req, res) {
       client_id: patient.client_id,
       source: 'checkpoint',
       status: 'pending',
-      form_data: { nrs_current, has_limitations, wants_contact, free_text, check_type },
-      notes: `Mini-check ${(check_type || 't3').toUpperCase()}: NRS ${nrs_current}, limitazioni: ${has_limitations ? 'sì' : 'no'}`,
+      form_data: { pgic: pgicVal, has_limitations, wants_contact, free_text, check_type },
+      notes: `Mini-check ${(check_type || 't3').toUpperCase()}: PGIC ${pgicVal ?? 'n.d.'}/5, limitazioni: ${has_limitations ? 'sì' : 'no'}`,
     }).catch(() => {});
   }
 

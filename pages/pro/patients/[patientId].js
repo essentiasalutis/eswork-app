@@ -663,15 +663,19 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
     }
   }
 
-  async function startCycle() {
+  async function startCycle(type = 'treatment') {
     setCycleLoading(true);
     setCycleError('');
     try {
-      const res = await fetch(`/api/pro/patients/${patient.id}/start-cycle`, { method: 'POST' });
+      const res = await fetch(`/api/pro/patients/${patient.id}/start-cycle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type }),
+      });
       const data = await res.json();
       if (res.ok) {
         setCycles(prev => [...prev, data]);
-        setPatient(prev => ({ ...prev, current_cycle: data.cycle_number }));
+        if (type === 'treatment') setPatient(prev => ({ ...prev, current_cycle: data.cycle_number }));
       } else {
         setCycleError(data.error || 'Errore avvio ciclo');
       }
@@ -709,7 +713,7 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
   const closedSessions = sessions.filter(s => s.closed_at);
   const lastClosed = closedSessions[closedSessions.length - 1];
   const hasOpenSession = sessions.some(s => !s.closed_at);
-  const activeCycle = cycles.find(c => c.status === 'active');
+  const activeCycle = cycles.find(c => c.status === 'active' || c.status === 'pending_pgic');
   const closedCycles = cycles.filter(c => c.status === 'closed');
 
   const levelLabel = { level1: 'Livello 1', level2: 'Livello 2', level3: 'Livello 3' };
@@ -788,7 +792,10 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
               {activeCycle && (
                 <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-3">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-green-800">Ciclo {activeCycle.cycle_number} — in corso</span>
+                    <span className="text-sm font-semibold text-green-800">
+                      {activeCycle.cycle_type === 'prevention' ? 'Ciclo di prevenzione' : `Ciclo di trattamento ${activeCycle.cycle_number}`}
+                      {activeCycle.status === 'pending_pgic' ? ' — in attesa di PGIC' : ' — in corso'}
+                    </span>
                     <span className="text-xs text-green-600">{activeCycle.sessions_completed} / {activeCycle.sessions_planned} sedute</span>
                   </div>
                   <div className="w-full h-2 bg-green-100 rounded-full overflow-hidden">
@@ -845,10 +852,21 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
                 </div>
               )}
 
-              {!activeCycle && patient.level_status !== 'opted_out' && closedCycles.length < 2 && (
-                <button onClick={startCycle} disabled={cycleLoading}
+              {/* L1 — ciclo di trattamento (max 2/anno) */}
+              {!activeCycle && patient.level === 'level1' && patient.level_status !== 'opted_out' &&
+                closedCycles.filter(c => (c.cycle_type || 'treatment') === 'treatment').length < 2 && (
+                <button onClick={() => startCycle('treatment')} disabled={cycleLoading}
                   className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-60">
-                  {cycleLoading ? 'Avvio...' : `+ Avvia ciclo ${closedCycles.length + 1}`}
+                  {cycleLoading ? 'Avvio...' : `+ Avvia ciclo di trattamento`}
+                </button>
+              )}
+
+              {/* L2 idoneo — ciclo di prevenzione attiva (4 sessioni/anno, Plus/Enterprise) */}
+              {!activeCycle && patient.level === 'level2' && patient.prevention_eligible &&
+                !cycles.some(c => c.cycle_type === 'prevention') && (
+                <button onClick={() => startCycle('prevention')} disabled={cycleLoading}
+                  className="w-full py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold disabled:opacity-60">
+                  {cycleLoading ? 'Avvio...' : '+ Avvia ciclo di prevenzione (4 sessioni)'}
                 </button>
               )}
 

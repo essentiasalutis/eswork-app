@@ -12,8 +12,9 @@ const PAIN_ZONES = [
 ];
 
 const OUTCOMES = [
-  { value: 'l1_confirmed', label: '✅ Confermato L1', desc: 'Il paziente soddisfa i criteri per il trattamento attivo', color: 'green' },
-  { value: 'not_l1', label: '❌ Non L1', desc: 'Non soddisfa i criteri — rimane in monitoraggio L2/L3', color: 'red' },
+  { value: 'l1_confirmed', label: '✅ Confermato L1', desc: 'Soddisfa i criteri per il trattamento attivo → apre il ciclo', color: 'green' },
+  { value: 'reclassified_l2', label: '🟡 Riclassificato L2', desc: 'Consulenza breve (indicazioni + esercizi). Registrato L2 per il ricalcolo a T12, senza ciclo di prevenzione fuori programma', color: 'amber' },
+  { value: 'reclassified_l3', label: '🟢 Riclassificato L3', desc: 'Nessun disturbo rilevante in atto — rientra in formazione/prevenzione', color: 'green' },
   { value: 'needs_more_info', label: '⏳ Necessita ulteriori info', desc: 'Serve un\'altra valutazione prima di decidere', color: 'amber' },
 ];
 
@@ -69,13 +70,15 @@ export default function PrevalidationForm({ patient }) {
         <Head><title>Pre-validazione completata — ES Work</title></Head>
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-gray-200 p-8 max-w-md w-full text-center">
-            <div className="text-5xl mb-4">{isL1 ? '✅' : outcome === 'not_l1' ? '📋' : '⏳'}</div>
+            <div className="text-5xl mb-4">{isL1 ? '✅' : outcome === 'reclassified_l2' ? '🟡' : outcome === 'reclassified_l3' ? '🟢' : '⏳'}</div>
             <div className="text-xl font-bold text-gray-900 mb-2">Pre-validazione registrata</div>
             <div className="text-sm text-gray-600 mb-6">
               {isL1
-                ? `${patient?.first_name} ${patient?.last_name} è stato promosso a Livello 1. Il ciclo di trattamento può partire.`
-                : outcome === 'not_l1'
-                ? 'Il paziente rimane in monitoraggio. Nessun cambiamento di livello.'
+                ? `${patient?.first_name} ${patient?.last_name} è confermato Livello 1. Il ciclo di trattamento può partire.`
+                : outcome === 'reclassified_l2'
+                ? 'Riclassificato Livello 2: consulenza breve registrata. La prevenzione attiva (se prevista) parte dall\'anno successivo.'
+                : outcome === 'reclassified_l3'
+                ? 'Riclassificato Livello 3: nessun disturbo rilevante in atto.'
                 : 'Rimane in attesa — servirà un\'ulteriore valutazione.'}
             </div>
             <div className="flex gap-3 justify-center">

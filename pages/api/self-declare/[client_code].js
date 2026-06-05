@@ -51,10 +51,17 @@ export default async function handler(req, res) {
       const computed_level = answers ? computeLevel(answers) : 'level3';
       const now = new Date().toISOString();
 
+      // Diritto alla prevenzione attiva fissato a inizio anno (regola opzione A):
+      // spetta ai L2 dall'assessment SOLO nei tier Plus/Enterprise.
+      const n = parseInt(client.employees) || 0;
+      const tier = client.tier || (n <= 150 ? 'core' : n <= 500 ? 'plus' : 'enterprise');
+      const prevention_eligible = computed_level === 'level2' && (tier === 'plus' || tier === 'enterprise');
+
       // 3. Aggiorna livello sul paziente (non-fatale se fallisce)
       await updatePatient(patient.id, {
         computed_level,
         level: computed_level,
+        prevention_eligible,
         assessment_completed_at: now,
       }).catch(e => console.error('updatePatient error:', e.message));
 

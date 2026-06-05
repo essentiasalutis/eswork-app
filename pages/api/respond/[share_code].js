@@ -50,9 +50,15 @@ export default async function handler(req, res) {
           if (patient) {
             const computed_level = computeLevel(answers);
 
-            // Aggiorna livello paziente
+            // prevention_eligible: L2 da assessment solo nei tier Plus/Enterprise
+            const respClient = await getClientById(patient.client_id).catch(() => null);
+            const rn = parseInt(respClient?.employees) || 0;
+            const rtier = respClient?.tier || (rn <= 150 ? 'core' : rn <= 500 ? 'plus' : 'enterprise');
+            const prevention_eligible = computed_level === 'level2' && (rtier === 'plus' || rtier === 'enterprise');
+
             await updatePatient(patient.id, {
               computed_level,
+              prevention_eligible,
               assessment_completed_at: new Date().toISOString(),
             });
 

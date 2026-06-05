@@ -419,7 +419,7 @@ function CompletionScreen({ level, wantsContact, tier }) {
         {isL2 && tierSupportsL2Prevention && (
           <>
             <p className="text-gray-600 mb-2">Hai riportato alcuni fastidi, senza un impatto sulle tue attività.</p>
-            <p className="text-gray-600">Sei incluso nel programma di <strong>prevenzione attiva</strong> (sessioni dedicate durante l'anno) e nella formazione collettiva. Se la situazione peggiora, potrai segnalarlo in qualsiasi momento.</p>
+            <p className="text-gray-600">Sei incluso nel programma di <strong>prevenzione attiva</strong> (4 sessioni dedicate durante l'anno) e nella formazione collettiva. Se la situazione peggiora, potrai <strong>segnalarlo</strong> (fino a 2 volte l'anno) per essere ricontattato dall'osteopata.</p>
           </>
         )}
 

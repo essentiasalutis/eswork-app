@@ -96,28 +96,29 @@ export default requireProAuth(async function handler(req, res) {
     }
   }
 
-  // PATCH — aggiorna sessione (chiudi visita o modifica se aperta)
+  // PATCH — chiudi una visita aperta OPPURE modifica una seduta (anche già chiusa)
   if (req.method === 'PATCH') {
     try {
-      const { sessionId, nrs_post, treatment_notes, next_session_notes, close } = req.body;
+      const { sessionId, nrs_pre, nrs_post, treatment_notes, next_session_notes, close } = req.body;
       const sessions = await getSessionsByPatient(patientId);
       const session = sessions.find(s => s.id === sessionId);
       if (!session) return res.status(404).json({ error: 'Sessione non trovata' });
 
-      // Blocco: sessione già chiusa non è modificabile
-      if (session.closed_at) {
-        return res.status(409).json({ error: 'Sessione già chiusa. Non è modificabile.' });
-      }
-
       const fields = {};
-      if (nrs_post !== undefined) fields.nrs_post = parseInt(nrs_post);
+      if (nrs_pre !== undefined) fields.nrs_pre = nrs_pre === null || nrs_pre === '' ? null : parseInt(nrs_pre);
+      if (nrs_post !== undefined) fields.nrs_post = nrs_post === null || nrs_post === '' ? null : parseInt(nrs_post);
       if (treatment_notes !== undefined) fields.treatment_notes = treatment_notes?.trim() || null;
       if (next_session_notes !== undefined) fields.next_session_notes = next_session_notes?.trim() || null;
 
-      if (close) {
+      const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
+
+      if (close && !session.closed_at) {
+        // Chiusura di una visita aperta
         fields.closed_at = new Date().toISOString();
-        const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
         await logAccess(proId, 'close_session', ip, `Sessione ${sessionId} chiusa`);
+      } else {
+        // Modifica di una seduta esistente (anche già chiusa) — tracciata per integrità
+        await logAccess(proId, 'edit_session', ip, `Seduta ${sessionId} modificata`);
       }
 
       const updated = await updateSession(sessionId, fields);

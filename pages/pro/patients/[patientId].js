@@ -568,6 +568,86 @@ function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved 
   );
 }
 
+// ─── Seduta chiusa, modificabile ──────────────────────────────────────────────
+
+function ClosedSessionCard({ session: s, patientId, onUpdated }) {
+  const [editing, setEditing] = useState(false);
+  const [nrsPre, setNrsPre] = useState(s.nrs_pre ?? '');
+  const [nrsPost, setNrsPost] = useState(s.nrs_post ?? '');
+  const [notes, setNotes] = useState(s.treatment_notes || '');
+  const [next, setNext] = useState(s.next_session_notes || '');
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/pro/patients/${patientId}/sessions`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: s.id,
+          nrs_pre: nrsPre === '' ? null : nrsPre,
+          nrs_post: nrsPost === '' ? null : nrsPost,
+          treatment_notes: notes,
+          next_session_notes: next,
+        }),
+      });
+      const updated = await res.json();
+      if (res.ok) { onUpdated(updated); setEditing(false); }
+      else alert(updated.error || 'Errore salvataggio');
+    } catch { alert('Errore di rete'); }
+    setSaving(false);
+  }
+
+  if (editing) {
+    return (
+      <div className="bg-white rounded-2xl border-2 border-blue-200 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="font-medium text-gray-700 text-sm">Modifica seduta #{s.session_number}</span>
+          <button onClick={() => setEditing(false)} className="text-gray-400 text-lg leading-none">✕</button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">NRS pre</label>
+            <input type="number" min="0" max="10" value={nrsPre} onChange={e => setNrsPre(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">NRS post</label>
+            <input type="number" min="0" max="10" value={nrsPost} onChange={e => setNrsPost(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm" />
+          </div>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Note trattamento</label>
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm resize-none" />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Indicazioni prossima seduta</label>
+          <textarea value={next} onChange={e => setNext(e.target.value)} rows={2} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm resize-none" />
+        </div>
+        <button onClick={save} disabled={saving} className="w-full py-2 rounded-xl bg-green-600 text-white text-sm font-semibold disabled:opacity-60">
+          {saving ? 'Salvo...' : 'Salva modifiche'}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="font-medium text-gray-700 text-sm">Seduta #{s.session_number}</span>
+        <div className="flex items-center gap-3">
+          {s.nrs_pre !== null && (
+            <span className="text-sm font-semibold" style={{ color: s.nrs_pre <= 3 ? '#16a34a' : s.nrs_pre <= 6 ? '#ca8a04' : '#dc2626' }}>NRS {s.nrs_pre}{s.nrs_post !== null ? `→${s.nrs_post}` : ''}/10</span>
+          )}
+          <span className="text-xs text-gray-400">{new Date(s.date).toLocaleDateString('it-IT')}</span>
+          <button onClick={() => setEditing(true)} className="text-xs text-blue-600 hover:underline">Modifica</button>
+        </div>
+      </div>
+      {s.treatment_notes && <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 mb-1">{s.treatment_notes}</div>}
+      {s.next_session_notes && <div className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2">→ {s.next_session_notes}</div>}
+    </div>
+  );
+}
+
 // ─── Pagina principale ────────────────────────────────────────────────────────
 
 export default function PatientPage({ proName, patient: initialPatient, sessions: initialSessions, client, documents: initialDocs, cycles: initialCycles }) {
@@ -936,25 +1016,12 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
             <div className="space-y-2">
               <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide">Sedute precedenti</h3>
               {closedSessions.map(s => (
-                <div key={s.id} className="bg-white rounded-2xl border border-gray-200 p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-gray-700 text-sm">Seduta #{s.session_number}</span>
-                    <div className="flex items-center gap-3">
-                      {s.nrs_pre !== null && (
-                        <span className="text-sm font-semibold" style={{
-                          color: s.nrs_pre <= 3 ? '#16a34a' : s.nrs_pre <= 6 ? '#ca8a04' : '#dc2626'
-                        }}>NRS {s.nrs_pre}/10</span>
-                      )}
-                      <span className="text-xs text-gray-400">{new Date(s.date).toLocaleDateString('it-IT')}</span>
-                    </div>
-                  </div>
-                  {s.treatment_notes && (
-                    <div className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 mb-1">{s.treatment_notes}</div>
-                  )}
-                  {s.next_session_notes && (
-                    <div className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2">→ {s.next_session_notes}</div>
-                  )}
-                </div>
+                <ClosedSessionCard
+                  key={s.id}
+                  session={s}
+                  patientId={patient.id}
+                  onUpdated={u => setSessions(prev => prev.map(x => x.id === u.id ? u : x))}
+                />
               ))}
             </div>
           )}

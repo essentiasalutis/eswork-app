@@ -6,8 +6,8 @@ import { getAllRestratAlerts, getAllPatients } from '../../lib/store';
 import { CONFIG } from '../../lib/config';
 import NavMenu from '../../components/NavMenu';
 
-// Sessioni per un nuovo L1 (protocollo Anno 1)
-const SESSIONS_PER_NEW_L1 = (CONFIG.sessions_intensive + CONFIG.sessions_maintenance) * CONFIG.completion_rate;
+// Sessioni per un nuovo L1 (protocollo v4: 4 sedute)
+const SESSIONS_PER_NEW_L1 = CONFIG.sessions_per_l1;
 
 // Fonte: tutti grigi/neutri — è solo informazione su chi ha segnalato
 const SOURCE_BADGE = {
@@ -301,9 +301,9 @@ export const getServerSideProps = requireAuthSsr(async () => {
     const bufferByClient = Object.values(clientMap)
       .filter(c => c.l1_count > 0 || c.l2_count > 0)
       .map(c => {
-        const base_sessions = c.l1_count * (CONFIG.sessions_intensive + CONFIG.sessions_maintenance) * CONFIG.completion_rate;
-        const buffer_sessions = Math.round(base_sessions * 0.15);
-        const sessions_per_new_l1 = Math.round((CONFIG.sessions_intensive + CONFIG.sessions_maintenance) * CONFIG.completion_rate);
+        const base_sessions = c.l1_count * CONFIG.sessions_per_l1;
+        const buffer_sessions = Math.round(base_sessions * CONFIG.buffer_pct);
+        const sessions_per_new_l1 = CONFIG.sessions_per_l1;
         const max_new_l1 = sessions_per_new_l1 > 0 ? Math.floor(buffer_sessions / sessions_per_new_l1) : 0;
         return { ...c, buffer_sessions, max_new_l1 };
       });

@@ -141,7 +141,32 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [assessments, setAssessments] = useState(initial);
   const [responses, setResponses] = useState(initialResponses);
   const [assignments, setAssignments] = useState(initialAssignments || []);
+  const [assignBusy, setAssignBusy] = useState(null); // professional_id in corso
   const [showNew, setShowNew] = useState(false);
+
+  // Abilita/disabilita un professionista SOLO per questa azienda (non lo disattiva del tutto)
+  async function toggleAssignment(a) {
+    const proId = a.professional_id || a.professionals?.id;
+    if (!proId) return;
+    const next = !a.active;
+    if (next === false && !confirm(`Disabilitare ${a.professionals?.name} da ${initialClient.name}?\n\nNon vedrà più i pazienti di questa azienda (ma resta attivo sulle altre).`)) return;
+    setAssignBusy(proId);
+    try {
+      const res = await fetch(`/api/professionals/${proId}/assignments`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: initialClient.id, active: next }),
+      });
+      if (res.ok) {
+        setAssignments(prev => prev.map(x => x.id === a.id ? { ...x, active: next } : x));
+      } else {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error || 'Errore aggiornamento assegnazione');
+      }
+    } catch { alert('Errore di rete'); }
+    setAssignBusy(null);
+  }
+
   const [newType, setNewType] = useState('initial');
   const [saving, setSaving] = useState(false);
   const [reportAssessment, setReportAssessment] = useState(null);
@@ -668,14 +693,22 @@ ${FIRMA}`;
           ) : (
             <div className="space-y-2">
               {assignments.map(a => (
-                <div key={a.id} className={`bg-white rounded-xl border px-4 py-2.5 flex items-center justify-between ${a.active ? 'border-gray-200' : 'border-gray-100 opacity-60'}`}>
-                  <div>
+                <div key={a.id} className={`bg-white rounded-xl border px-4 py-2.5 flex items-center justify-between gap-3 ${a.active ? 'border-gray-200' : 'border-gray-100 opacity-70'}`}>
+                  <div className="min-w-0">
                     <span className="text-sm font-medium text-gray-800">{a.professionals?.name}</span>
                     <span className="text-xs text-gray-400 ml-2">{a.professionals?.email}</span>
                   </div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${a.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
-                    {a.active ? 'attivo' : 'revocato'}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${a.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                      {a.active ? 'attivo' : 'disabilitato'}
+                    </span>
+                    <button
+                      onClick={() => toggleAssignment(a)}
+                      disabled={assignBusy === (a.professional_id || a.professionals?.id)}
+                      className={`text-xs font-semibold px-2.5 py-1 rounded-lg border disabled:opacity-50 ${a.active ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-700 hover:bg-green-50'}`}>
+                      {assignBusy === (a.professional_id || a.professionals?.id) ? '…' : (a.active ? 'Disabilita' : 'Riattiva')}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

@@ -2,12 +2,6 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 
-const PAIN_ZONES = [
-  'Collo', 'Spalle', 'Braccia/gomiti', 'Polsi/mani',
-  'Schiena alta', 'Schiena bassa/lombare', 'Anche/glutei',
-  'Ginocchia', 'Caviglie/piedi',
-];
-
 // ─── Header ────────────────────────────────────────────────────────────────────
 function Header() {
   return (
@@ -21,90 +15,109 @@ function Header() {
   );
 }
 
-// ─── Evento acuto modal ────────────────────────────────────────────────────────
-function AcuteEventModal({ token, onClose, onSent }) {
-  const [step, setStep] = useState(1);
-  const [desc, setDesc] = useState('');
-  const [zone, setZone] = useState('');
-  const [nrs, setNrs] = useState(7);
+// ─── Self-trigger modal (mini-triage, NESSUN NRS) ──────────────────────────────
+const DURATIONS = ['Meno di 1 settimana', '1-4 settimane', 'Più di 1 mese'];
+
+function SelfTriggerModal({ token, onClose, onSent }) {
+  const [disturbance, setDisturbance] = useState('');
+  const [functionalImpact, setFunctionalImpact] = useState(null);
+  const [duration, setDuration] = useState('');
+  const [urgent, setUrgent] = useState(false);
+  const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
 
+  const canSubmit = disturbance.trim() && functionalImpact !== null && duration;
+
   async function submit() {
-    if (!zone || !desc) return;
+    if (!canSubmit) return;
     setSending(true);
+    setError('');
     try {
-      const res = await fetch('/api/employee/acute-event', {
+      const res = await fetch('/api/employee/self-trigger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, description: desc, pain_zone: zone, nrs }),
+        body: JSON.stringify({ token, disturbance, functional_impact: functionalImpact, duration, urgent, note: note || null }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Errore'); setSending(false); return; }
-      onSent();
+      onSent(data.remaining);
     } catch { setError('Errore di rete'); setSending(false); }
   }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div style={{ background: '#fff', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 520, padding: '24px 20px 40px', maxHeight: '90vh', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <div>
-            <div style={{ fontWeight: 800, fontSize: 18, color: '#0f172a' }}>🚨 Segnala evento acuto</div>
-            <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>Solo per dolore improvviso nelle ultime 72 ore</div>
+            <div style={{ fontWeight: 800, fontSize: 18, color: '#0f172a' }}>Ho iniziato ad avere un disturbo</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>Poche domande: poi un osteopata ti ricontatta in videochiamata</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#94a3b8' }}>✕</button>
         </div>
 
-        {error && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 16 }}>{error}</div>}
+        {error && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#dc2626', margin: '12px 0' }}>{error}</div>}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Descrizione */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 12 }}>
+          {/* Disturbo */}
           <div>
             <label style={{ fontSize: 14, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
-              Descrivi brevemente cosa è successo
+              Che disturbo hai iniziato ad avvertire?
             </label>
-            <textarea
-              value={desc}
-              onChange={e => setDesc(e.target.value.slice(0, 200))}
-              placeholder="Es. Ho sollevato un peso e ho sentito un dolore alla schiena..."
+            <textarea value={disturbance} onChange={e => setDisturbance(e.target.value.slice(0, 200))}
+              placeholder="Es. dolore alla schiena bassa, fastidio al collo..."
               rows={3}
-              style={{ width: '100%', borderRadius: 10, border: '1.5px solid #e2e8f0', padding: '10px 12px', fontSize: 14, resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
-            />
-            <div style={{ fontSize: 11, color: '#94a3b8', textAlign: 'right' }}>{desc.length}/200</div>
+              style={{ width: '100%', borderRadius: 10, border: '1.5px solid #e2e8f0', padding: '10px 12px', fontSize: 14, resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+            <div style={{ fontSize: 11, color: '#94a3b8', textAlign: 'right' }}>{disturbance.length}/200</div>
           </div>
 
-          {/* Zona dolore */}
+          {/* Impatto funzionale */}
           <div>
-            <label style={{ fontSize: 14, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>Zona principale del dolore</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {PAIN_ZONES.map(z => (
-                <button key={z} onClick={() => setZone(z)}
-                  style={{ padding: '8px 14px', borderRadius: 20, border: '2px solid', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all .15s',
-                    background: zone === z ? '#dc2626' : '#fff',
-                    borderColor: zone === z ? '#dc2626' : '#e2e8f0',
-                    color: zone === z ? '#fff' : '#374151' }}>
-                  {z}
+            <label style={{ fontSize: 14, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>Il disturbo limita le tue attività quotidiane o lavorative?</label>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {[{ val: false, label: '😊 No' }, { val: true, label: '😟 Sì' }].map(({ val, label }) => (
+                <button key={String(val)} onClick={() => setFunctionalImpact(val)}
+                  style={{ flex: 1, padding: '12px', borderRadius: 12, border: '2px solid', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                    background: functionalImpact === val ? (val ? '#dc2626' : '#16a34a') : '#fff',
+                    borderColor: functionalImpact === val ? (val ? '#dc2626' : '#16a34a') : '#e2e8f0',
+                    color: functionalImpact === val ? '#fff' : '#374151' }}>
+                  {label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* NRS */}
+          {/* Durata */}
           <div>
-            <label style={{ fontSize: 14, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
-              Quanto fa male adesso? <span style={{ color: '#dc2626', fontWeight: 800 }}>{nrs}/10</span>
-            </label>
-            <input type="range" min={0} max={10} value={nrs} onChange={e => setNrs(+e.target.value)}
-              style={{ width: '100%', accentColor: '#dc2626' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-              <span>0 — nessun dolore</span><span>10 — insopportabile</span>
+            <label style={{ fontSize: 14, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>Da quanto tempo?</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {DURATIONS.map(d => (
+                <button key={d} onClick={() => setDuration(d)}
+                  style={{ padding: '12px 14px', borderRadius: 12, border: '2px solid', fontSize: 14, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
+                    background: duration === d ? '#0369a1' : '#fff', borderColor: duration === d ? '#0369a1' : '#e2e8f0',
+                    color: duration === d ? '#fff' : '#374151' }}>
+                  {d}
+                </button>
+              ))}
             </div>
           </div>
 
-          <button onClick={submit} disabled={!zone || !desc || sending}
-            style={{ width: '100%', background: (!zone || !desc) ? '#e2e8f0' : '#dc2626', color: (!zone || !desc) ? '#94a3b8' : '#fff',
-              border: 'none', borderRadius: 14, padding: '16px', fontSize: 16, fontWeight: 700, cursor: (!zone || !desc) ? 'not-allowed' : 'pointer' }}>
+          {/* Urgente */}
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: 12, padding: '12px 14px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={urgent} onChange={e => setUrgent(e.target.checked)} style={{ marginTop: 2, width: 18, height: 18, accentColor: '#ea580c' }} />
+            <span style={{ fontSize: 13, color: '#9a3412', lineHeight: 1.5 }}>
+              <strong>È un caso urgente</strong> (evento traumatico recente — caduta, distorsione, sollevamento errato — o dolore intenso e improvviso). Verrà gestito con priorità.
+            </span>
+          </label>
+
+          {/* Note */}
+          <textarea value={note} onChange={e => setNote(e.target.value.slice(0, 200))}
+            placeholder="Aggiungi una nota (facoltativo)..." rows={2}
+            style={{ width: '100%', borderRadius: 10, border: '1.5px solid #e2e8f0', padding: '10px 12px', fontSize: 13, resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+
+          <button onClick={submit} disabled={!canSubmit || sending}
+            style={{ width: '100%', background: !canSubmit ? '#e2e8f0' : '#16a34a', color: !canSubmit ? '#94a3b8' : '#fff',
+              border: 'none', borderRadius: 14, padding: '16px', fontSize: 16, fontWeight: 700, cursor: !canSubmit ? 'not-allowed' : 'pointer' }}>
             {sending ? 'Invio...' : 'Invia segnalazione'}
           </button>
         </div>
@@ -114,8 +127,11 @@ function AcuteEventModal({ token, onClose, onSent }) {
 }
 
 // ─── Dashboard L1 ─────────────────────────────────────────────────────────────
-function DashboardL1({ patient, cycles, sessions, onAcuteEvent }) {
-  const activeCycle = cycles.find(c => c.status === 'active');
+function DashboardL1({ patient, cycles, sessions, onSelfTrigger, remaining }) {
+  const activeCycle = cycles.find(c => c.status === 'active' || c.status === 'pending_pgic');
+  const closedCycles = cycles.filter(c => c.status === 'closed');
+  // Self-trigger per L1 solo a fine ciclo (per richiedere il 2° ciclo), non durante
+  const canSelfTrigger = !activeCycle && closedCycles.length > 0 && closedCycles.length < 2;
   const nrsInitial = sessions[sessions.length - 1]?.nrs_pre;
   const nrsLast = sessions.find(s => s.nrs_post != null)?.nrs_post;
   const isCandidate = !activeCycle && cycles.length === 0;
@@ -179,14 +195,14 @@ function DashboardL1({ patient, cycles, sessions, onAcuteEvent }) {
         </div>
       )}
 
-      {/* Evento acuto */}
-      <AcuteEventButton onPress={onAcuteEvent} />
+      {/* Self-trigger — solo a fine ciclo per richiedere il 2° ciclo */}
+      {canSelfTrigger && <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} label="Richiedi un nuovo ciclo" />}
     </div>
   );
 }
 
 // ─── Dashboard L2 ─────────────────────────────────────────────────────────────
-function DashboardL2({ patient, miniChecks, onAcuteEvent }) {
+function DashboardL2({ patient, miniChecks, onSelfTrigger, remaining }) {
   return (
     <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #0369a1 100%)', borderRadius: 18, padding: '20px', color: '#fff' }}>
@@ -206,22 +222,25 @@ function DashboardL2({ patient, miniChecks, onAcuteEvent }) {
       {miniChecks.length > 0 && (
         <div style={{ background: '#fff', borderRadius: 14, border: '1.5px solid #e2e8f0', padding: '16px' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 10 }}>📋 Storico mini-check</div>
-          {miniChecks.slice(0, 3).map(mc => (
-            <div key={mc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}>
-              <span style={{ color: '#374151' }}>{mc.check_type?.toUpperCase()} · NRS {mc.nrs_current ?? '—'}</span>
-              <span style={{ color: '#64748b', fontSize: 11 }}>{new Date(mc.created_at).toLocaleDateString('it-IT')}</span>
-            </div>
-          ))}
+          {miniChecks.slice(0, 3).map(mc => {
+            const PGIC_LABEL = { 1: 'Molto peggio', 2: 'Peggio', 3: 'Invariato', 4: 'Meglio', 5: 'Molto meglio' };
+            return (
+              <div key={mc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}>
+                <span style={{ color: '#374151' }}>{mc.check_type?.toUpperCase()} · {mc.pgic ? PGIC_LABEL[mc.pgic] : '—'}</span>
+                <span style={{ color: '#64748b', fontSize: 11 }}>{new Date(mc.created_at).toLocaleDateString('it-IT')}</span>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      <AcuteEventButton onPress={onAcuteEvent} />
+      <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} />
     </div>
   );
 }
 
 // ─── Dashboard L3 ─────────────────────────────────────────────────────────────
-function DashboardL3({ patient }) {
+function DashboardL3({ patient, onSelfTrigger, remaining }) {
   return (
     <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ background: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)', borderRadius: 18, padding: '20px', color: '#fff' }}>
@@ -236,20 +255,25 @@ function DashboardL3({ patient }) {
         <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>📚 Formazione collettiva</div>
         <div style={{ fontSize: 13, color: '#64748b' }}>Le sessioni di formazione ergonomica sono incluse nel tuo programma. Riceverai le date via mail dalla tua azienda.</div>
       </div>
+
+      <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} />
     </div>
   );
 }
 
-// ─── Bottone evento acuto (criterio stringente) ───────────────────────────────
-function AcuteEventButton({ onPress }) {
+// ─── Bottone self-trigger (auto-segnalazione, max 2/anno) ──────────────────────
+function SelfTriggerButton({ onPress, remaining = 2, label = 'Ho iniziato ad avere un disturbo' }) {
+  const exhausted = remaining <= 0;
   return (
-    <div style={{ background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: 14, padding: '16px' }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: '#dc2626', marginBottom: 4 }}>🚨 Segnala evento acuto</div>
+    <div style={{ background: exhausted ? '#f8fafc' : '#eff6ff', border: `1.5px solid ${exhausted ? '#e2e8f0' : '#bfdbfe'}`, borderRadius: 14, padding: '16px' }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: exhausted ? '#64748b' : '#1d4ed8', marginBottom: 4 }}>🩺 {label}</div>
       <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12, lineHeight: 1.5 }}>
-        Solo per: eventi traumatici (caduta, distorsione, sollevamento errato) o acutizzazioni nelle <strong>ultime 72 ore</strong> con dolore intenso.
+        Se avverti un nuovo disturbo, segnalalo: un osteopata ti ricontatterà per una breve videochiamata di valutazione.
+        <br /><strong>{remaining}</strong> {remaining === 1 ? 'segnalazione disponibile' : 'segnalazioni disponibili'} quest&apos;anno.
       </div>
-      <button onClick={onPress} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 20px', fontSize: 14, fontWeight: 700, cursor: 'pointer', width: '100%' }}>
-        Segnala ora
+      <button onClick={onPress} disabled={exhausted}
+        style={{ background: exhausted ? '#e2e8f0' : '#0369a1', color: exhausted ? '#94a3b8' : '#fff', border: 'none', borderRadius: 10, padding: '12px 20px', fontSize: 14, fontWeight: 700, cursor: exhausted ? 'not-allowed' : 'pointer', width: '100%' }}>
+        {exhausted ? 'Limite annuale raggiunto' : 'Segnala ora'}
       </button>
     </div>
   );
@@ -276,14 +300,15 @@ export default function EmployeeDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showAcute, setShowAcute] = useState(false);
-  const [acuteSent, setAcuteSent] = useState(false);
+  const [showSelfTrigger, setShowSelfTrigger] = useState(false);
+  const [sentToast, setSentToast] = useState(false);
+  const [remaining, setRemaining] = useState(2);
 
   useEffect(() => {
     if (!token) return;
     fetch(`/api/employee/${token}`)
       .then(r => r.json())
-      .then(d => { setData(d); setLoading(false); })
+      .then(d => { setData(d); setRemaining(d?.selfTriggerBudget?.remaining ?? 2); setLoading(false); })
       .catch(() => { setError('Errore di rete'); setLoading(false); });
   }, [token]);
 
@@ -329,32 +354,32 @@ export default function EmployeeDashboard() {
               {isOptedOut
                 ? <OptedOutScreen patient={patient} />
                 : level === 'level1'
-                  ? <DashboardL1 patient={patient} cycles={cycles} sessions={sessions} onAcuteEvent={() => setShowAcute(true)} />
+                  ? <DashboardL1 patient={patient} cycles={cycles} sessions={sessions} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} />
                   : level === 'level2'
-                    ? <DashboardL2 patient={patient} miniChecks={miniChecks} onAcuteEvent={() => setShowAcute(true)} />
-                    : <DashboardL3 patient={patient} />
+                    ? <DashboardL2 patient={patient} miniChecks={miniChecks} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} />
+                    : <DashboardL3 patient={patient} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} />
               }
 
               {/* Footer */}
               <div style={{ padding: '20px 16px', textAlign: 'center', fontSize: 11, color: '#94a3b8', borderTop: '1px solid #e2e8f0', marginTop: 8 }}>
                 🔒 Dati protetti · Connessione cifrata (HTTPS) · Server UE<br />
-                Le tue risposte sono anonime e non visibili al datore di lavoro.
+                Le tue risposte sono riservate e non visibili al datore di lavoro.
               </div>
             </>
           );
         })()}
 
-        {acuteSent && (
+        {sentToast && (
           <div style={{ position: 'fixed', bottom: 20, left: '50%', transform: 'translateX(-50%)', background: '#16a34a', color: '#fff', padding: '14px 24px', borderRadius: 14, fontWeight: 700, fontSize: 14, zIndex: 100, boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}>
-            ✅ Segnalazione inviata — sarai contattato entro 24h
+            ✅ Segnalazione inviata — un osteopata ti ricontatterà
           </div>
         )}
 
-        {showAcute && (
-          <AcuteEventModal
+        {showSelfTrigger && (
+          <SelfTriggerModal
             token={token}
-            onClose={() => setShowAcute(false)}
-            onSent={() => { setShowAcute(false); setAcuteSent(true); setTimeout(() => setAcuteSent(false), 5000); }}
+            onClose={() => setShowSelfTrigger(false)}
+            onSent={(rem) => { setShowSelfTrigger(false); if (typeof rem === 'number') setRemaining(rem); setSentToast(true); setTimeout(() => setSentToast(false), 5000); }}
           />
         )}
       </div>

@@ -826,13 +826,16 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
                         <div className="text-[10px] text-gray-400 mt-1">1 = molto peggio · 5 = molto meglio</div>
                       </div>
                       <div className="text-xs text-gray-600 font-medium">Seleziona esito del ciclo:</div>
+                      {closePgic == null && (
+                        <div className="text-[11px] text-orange-600">Registra prima il PGIC per poter chiudere il ciclo.</div>
+                      )}
                       <div className="flex gap-2">
-                        <button onClick={() => closeCycle('improved')} disabled={cycleLoading}
-                          className="flex-1 py-2 rounded-xl bg-green-600 text-white text-sm font-semibold disabled:opacity-60">
+                        <button onClick={() => closeCycle('improved')} disabled={cycleLoading || closePgic == null}
+                          className="flex-1 py-2 rounded-xl bg-green-600 text-white text-sm font-semibold disabled:opacity-40">
                           Migliorato
                         </button>
-                        <button onClick={() => closeCycle('no_improvement')} disabled={cycleLoading}
-                          className="flex-1 py-2 rounded-xl bg-orange-500 text-white text-sm font-semibold disabled:opacity-60">
+                        <button onClick={() => closeCycle('no_improvement')} disabled={cycleLoading || closePgic == null}
+                          className="flex-1 py-2 rounded-xl bg-orange-500 text-white text-sm font-semibold disabled:opacity-40">
                           Nessun miglioramento
                         </button>
                       </div>

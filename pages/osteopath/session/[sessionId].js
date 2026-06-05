@@ -16,6 +16,7 @@ export default function SessionForm({ session }) {
   const [notes, setNotes] = useState(session?.notes || '');
   const [present, setPresent] = useState(null);
   const [cycleOutcome, setCycleOutcome] = useState('');
+  const [pgic, setPgic] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -23,6 +24,7 @@ export default function SessionForm({ session }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (present === null) { setError('Indica se il paziente era presente'); return; }
+    if (cycleOutcome && pgic == null) { setError('Per chiudere il ciclo registra il PGIC del paziente'); return; }
     setSaving(true);
     setError('');
     try {
@@ -32,6 +34,7 @@ export default function SessionForm({ session }) {
         notes: notes || null,
         patient_present: present,
         cycle_outcome: cycleOutcome || null,
+        pgic,
       };
       const res = await fetch(`/api/osteopath/session/${sessionId}`, {
         method: 'PATCH',
@@ -165,6 +168,26 @@ export default function SessionForm({ session }) {
                     </button>
                   ))}
                 </div>
+
+                {/* PGIC — obbligatorio per chiudere il ciclo (uno dei 3 KPI) */}
+                {cycleOutcome && (
+                  <div className="mt-4">
+                    <label className="text-sm font-semibold text-amber-800 block mb-1">PGIC del paziente a fine ciclo</label>
+                    <div className="text-xs text-amber-600 mb-2">Impressione globale di cambiamento riferita dal paziente</div>
+                    <div className="flex gap-1.5">
+                      {[
+                        { v: 1, l: 'Molto peggio' }, { v: 2, l: 'Peggio' }, { v: 3, l: 'Invariato' },
+                        { v: 4, l: 'Meglio' }, { v: 5, l: 'Molto meglio' },
+                      ].map(o => (
+                        <button key={o.v} type="button" onClick={() => setPgic(o.v)} title={o.l}
+                          className={`flex-1 py-2 rounded-lg border-2 text-sm font-bold ${pgic === o.v ? 'bg-amber-600 border-amber-600 text-white' : 'border-amber-200 text-amber-700'}`}>
+                          {o.v}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="text-[10px] text-amber-500 mt-1">1 = molto peggio · 5 = molto meglio · obbligatorio per chiudere</div>
+                  </div>
+                )}
               </div>
             </>
           )}

@@ -20,8 +20,11 @@ export default requireProAuth(async function handler(req, res) {
   // Livello B — cartella clinica: solo osteopata assegnato al paziente
   if (!(await proCanAccessPatientClinical(proId, patient))) return res.status(403).json({ error: 'Accesso negato' });
 
+  // REGOLA v4: il PGIC è obbligatorio per chiudere il ciclo (è uno dei 3 KPI)
+  if (pgic == null) return res.status(400).json({ error: 'PGIC obbligatorio per chiudere il ciclo' });
+
   const activeCycle = await getActiveCycleByPatient(patientId);
-  if (!activeCycle) return res.status(404).json({ error: 'Nessun ciclo attivo' });
+  if (!activeCycle) return res.status(404).json({ error: 'Nessun ciclo aperto' });
 
   // Conta sessioni chiuse nel ciclo
   const allSessions = await getSessionsByPatient(patientId);

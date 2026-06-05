@@ -338,12 +338,12 @@ export default function ClientPage({ client: initialClient, assessments: initial
 
 come concordato, le invio il link per l'assessment ES Work dedicato ai dipendenti di ${client.name}.
 
-Il questionario è anonimo, si compila dallo smartphone in circa 5 minuti, e può essere completato in qualsiasi momento entro i prossimi 3 giorni lavorativi.
+Il questionario è riservato, si compila dallo smartphone in circa 5 minuti, e può essere completato in qualsiasi momento entro i prossimi 3 giorni lavorativi.
 
 Può inoltrare questo link a tutti i dipendenti:
 ${url}
 
-Le chiedo di comunicare ai dipendenti che l'azienda ha avviato un'iniziativa di salute organizzativa e che il questionario è completamente anonimo — i risultati saranno usati solo in forma aggregata.
+Le chiedo di comunicare ai dipendenti che l'azienda ha avviato un'iniziativa di salute organizzativa e che i dati sono trattati in modo riservato da Essentia Salutis, nel rispetto del segreto professionale: l'azienda non vedrà mai i dati individuali, ma solo risultati in forma aggregata.
 
 Per qualsiasi domanda, sono a disposizione.
 

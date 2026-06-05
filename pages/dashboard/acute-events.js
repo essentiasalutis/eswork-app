@@ -80,10 +80,15 @@ export default function AcuteEventsPage({ events: initialEvents }) {
         </header>
 
         <main className="max-w-5xl mx-auto px-6 py-6">
+          <div className="mb-5 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
+            🗄️ <strong>Canale storico.</strong> Le nuove auto-segnalazioni (incluse le urgenze)
+            passano dal <strong>self-trigger</strong> e compaiono nella coda di pre-validazione dell'osteopata.
+            Questa vista mostra solo gli eventi acuti registrati prima del consolidamento.
+          </div>
           {events.length === 0 && (
             <div className="text-center py-16 text-gray-400">
               <div className="text-4xl mb-3">✅</div>
-              <p>Nessun evento acuto registrato.</p>
+              <p>Nessun evento acuto storico registrato.</p>
             </div>
           )}
 

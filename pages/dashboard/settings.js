@@ -5,24 +5,26 @@ import { requireAuthSsr } from '../../lib/auth';
 import { getAdminSettings } from '../../lib/store';
 import NavMenu from '../../components/NavMenu';
 
+// Parametri allineati al modello v4 (lib/config.js). Le tariffe e il moltiplicatore
+// L2 si modificano in tempo reale nel Calcolatore; qui restano gli override persistiti.
 const GROUPS = [
   {
     label: 'Protocollo Clinico',
     icon: '🏥',
-    keys: ['sessions_intensive', 'sessions_maintenance', 'sessions_prevention_y2', 'sessions_maintenance_y2', 'sessions_per_cycle', 'max_cycles_per_year', 'min_gap_between_cycles'],
+    keys: ['sessions_per_l1', 'prevention_sessions_per_l2', 'max_cycles_per_year', 'min_gap_between_cycles', 'self_trigger_max_per_year'],
   },
   {
     label: 'Regole Business',
     icon: '📋',
-    keys: ['completion_rate', 'buffer_pct', 'max_acute_events_per_year'],
+    keys: ['buffer_pct', 'l2_multiplier_default', 'classroom_capacity_default'],
   },
   {
-    label: 'Prezzi & Margini',
+    label: 'Tariffe (venduto/costo)',
     icon: '💶',
-    keys: ['hourly_rate', 'margin_y1', 'margin_y2'],
+    keys: ['rate_sportello_sell', 'rate_sportello_cost', 'rate_prevalidation_sell', 'rate_prevalidation_cost', 'rate_training_sell', 'rate_training_cost'],
   },
   {
-    label: 'Tier Aziende',
+    label: 'Tier Aziende (uso interno)',
     icon: '🏢',
     keys: ['tier_core_max', 'tier_plus_max'],
   },

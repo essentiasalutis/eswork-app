@@ -1038,7 +1038,18 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
               sessionNumber={closedSessions.length + 1}
               lastNote={lastClosed?.next_session_notes || null}
               anamnesiNrs={patientDocs.find(d => d.type === 'anamnesi')?.form_data?.nrs}
-              onSaved={s => { setSessions(prev => [...prev, s]); setShowNewSession(false); }}
+              onSaved={s => {
+                setSessions(prev => [...prev, s]);
+                setShowNewSession(false);
+                // Aggiorna in tempo reale il contatore del ciclo (e lo stato a fine ciclo)
+                setCycles(prev => prev.map(c => {
+                  if (c.status !== 'active' && c.status !== 'pending_pgic') return c;
+                  const completed = (c.sessions_completed || 0) + 1;
+                  return { ...c, sessions_completed: completed, status: s.pending_pgic ? 'pending_pgic' : c.status };
+                }));
+                // Alla seduta finale: apri subito il pannello PGIC per chiudere il ciclo
+                if (s.pending_pgic) setShowCloseOutcome(true);
+              }}
             />
           )}
 

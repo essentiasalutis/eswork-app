@@ -10,6 +10,7 @@ import {
   getActiveCycleByPatient,
   updateTreatmentCycle,
 } from '../../../../../lib/store';
+import { sendCyclePgicLink } from '../../../../../lib/notify';
 
 export default requireProAuth(async function handler(req, res) {
   const { patientId } = req.query;
@@ -84,6 +85,8 @@ export default requireProAuth(async function handler(req, res) {
               ...(reachedEnd ? { status: 'pending_pgic' } : {}),
             });
             pendingPgic = reachedEnd;
+            // Alla seduta finale: invia AUTOMATICAMENTE il link PGIC al paziente
+            if (reachedEnd) await sendCyclePgicLink(patient).catch(() => {});
           } catch (_) {
             // ignora errori di aggiornamento ciclo
           }

@@ -663,8 +663,7 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
   const [cycles, setCycles] = useState(initialCycles || []);
   const [cycleLoading, setCycleLoading] = useState(false);
   const [cycleError, setCycleError] = useState('');
-  const [showCloseOutcome, setShowCloseOutcome] = useState(false);
-  const [closePgic, setClosePgic] = useState(null);
+  const [pgicSent, setPgicSent] = useState(false);
   const [reclassifyOpen, setReclassifyOpen] = useState(false);
   const [reclassifyLoading, setReclassifyLoading] = useState(false);
 
@@ -766,29 +765,31 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
     setCycleLoading(false);
   }
 
-  async function closeCycle(outcome) {
+  // Conclude il ciclo e invia/reinvia al PAZIENTE il link per il PGIC (auto-riferito).
+  // Il ciclo passa a 'pending_pgic' e si chiuderà quando il paziente risponde.
+  async function requestPgic() {
     setCycleLoading(true);
     setCycleError('');
     try {
-      const res = await fetch(`/api/pro/patients/${patient.id}/close-cycle`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ outcome, pgic: closePgic }),
-      });
+      const res = await fetch(`/api/pro/patients/${patient.id}/request-pgic`, { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        setCycles(prev => prev.map(c => c.id === data.cycle.id ? data.cycle : c));
-        if (data.opted_out) {
-          setPatient(prev => ({ ...prev, level_status: 'opted_out' }));
+        setCycles(prev => prev.map(c => (c.status === 'active') ? { ...c, status: 'pending_pgic' } : c));
+        setPgicSent(true);
+        if (!data.email_sent) {
+          setCycleError(`Ciclo in attesa di PGIC. Email non inviata (${data.email_reason || 'n/d'}) — usa "Apri su questo dispositivo" per farlo compilare al paziente.`);
         }
-        setShowCloseOutcome(false);
       } else {
-        setCycleError(data.error || 'Errore chiusura ciclo');
+        setCycleError(data.error || 'Errore');
       }
     } catch (e) {
       setCycleError('Errore di rete');
     }
     setCycleLoading(false);
+  }
+
+  function refreshCycles() {
+    router.replace(router.asPath, undefined, { scroll: false });
   }
 
   const closedSessions = sessions.filter(s => s.closed_at);
@@ -915,52 +916,28 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
                     <div className="h-full bg-green-500 rounded-full transition-all"
                       style={{ width: `${(activeCycle.sessions_completed / activeCycle.sessions_planned) * 100}%` }} />
                   </div>
-                  {!showCloseOutcome ? (
-                    <button
-                      onClick={() => setShowCloseOutcome(true)}
-                      disabled={cycleLoading}
-                      className="mt-3 w-full py-2 rounded-xl border border-gray-300 text-sm text-gray-700 disabled:opacity-60"
-                    >
-                      Chiudi ciclo
-                    </button>
-                  ) : (
-                    <div className="mt-3 space-y-3">
-                      {/* PGIC a fine ciclo — impressione del paziente */}
-                      <div>
-                        <div className="text-xs text-gray-600 font-medium mb-1">PGIC del paziente a fine ciclo:</div>
-                        <div className="flex gap-1">
-                          {[
-                            { v: 1, l: 'Molto peggio', c: '#dc2626' },
-                            { v: 2, l: 'Peggio', c: '#ea580c' },
-                            { v: 3, l: 'Invariato', c: '#ca8a04' },
-                            { v: 4, l: 'Meglio', c: '#22c55e' },
-                            { v: 5, l: 'Molto meglio', c: '#16a34a' },
-                          ].map(o => (
-                            <button key={o.v} onClick={() => setClosePgic(o.v)} title={o.l}
-                              className="flex-1 py-1.5 rounded-lg border text-xs font-semibold"
-                              style={{ background: closePgic === o.v ? o.c : '#fff', borderColor: closePgic === o.v ? o.c : '#e5e7eb', color: closePgic === o.v ? '#fff' : '#6b7280' }}>
-                              {o.v}
-                            </button>
-                          ))}
-                        </div>
-                        <div className="text-[10px] text-gray-400 mt-1">1 = molto peggio · 5 = molto meglio</div>
+                  {activeCycle.status === 'pending_pgic' ? (
+                    <div className="mt-3 space-y-2">
+                      <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
+                        In attesa del <strong>PGIC del paziente</strong>. Il PGIC è auto-riferito: lo compila il paziente dal suo telefono. Il ciclo si chiude in automatico alla sua risposta e l'esito (migliorato / nessun miglioramento) viene derivato dal valore.
                       </div>
-                      <div className="text-xs text-gray-600 font-medium">Seleziona esito del ciclo:</div>
-                      {closePgic == null && (
-                        <div className="text-[11px] text-orange-600">Registra prima il PGIC per poter chiudere il ciclo.</div>
+                      <button onClick={requestPgic} disabled={cycleLoading}
+                        className="w-full py-2 rounded-xl bg-green-600 text-white text-sm font-semibold disabled:opacity-60">
+                        {cycleLoading ? '...' : (pgicSent ? '✓ Link inviato — reinvia al paziente' : 'Invia link PGIC al paziente')}
+                      </button>
+                      {patient.care_token && (
+                        <a href={`/employee/cycle-pgic?token=${patient.care_token}`} target="_blank" rel="noreferrer"
+                          className="block w-full py-2 rounded-xl border border-gray-300 text-sm text-gray-700 text-center">
+                          📱 Apri su questo dispositivo (il paziente compila qui)
+                        </a>
                       )}
-                      <div className="flex gap-2">
-                        <button onClick={() => closeCycle('improved')} disabled={cycleLoading || closePgic == null}
-                          className="flex-1 py-2 rounded-xl bg-green-600 text-white text-sm font-semibold disabled:opacity-40">
-                          Migliorato
-                        </button>
-                        <button onClick={() => closeCycle('no_improvement')} disabled={cycleLoading || closePgic == null}
-                          className="flex-1 py-2 rounded-xl bg-orange-500 text-white text-sm font-semibold disabled:opacity-40">
-                          Nessun miglioramento
-                        </button>
-                      </div>
-                      <button onClick={() => { setShowCloseOutcome(false); setClosePgic(null); }} className="text-xs text-gray-400 underline w-full text-center">Annulla</button>
+                      <button onClick={refreshCycles} className="text-xs text-gray-400 underline w-full text-center">Aggiorna stato</button>
                     </div>
+                  ) : (
+                    <button onClick={requestPgic} disabled={cycleLoading}
+                      className="mt-3 w-full py-2 rounded-xl border border-gray-300 text-sm text-gray-700 disabled:opacity-60">
+                      {cycleLoading ? '...' : 'Concludi ciclo → invia PGIC al paziente'}
+                    </button>
                   )}
                 </div>
               )}
@@ -1082,7 +1059,7 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
 
           {activeCycle?.status === 'pending_pgic' && (
             <div className="w-full py-3 px-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800 text-center">
-              Ciclo completato ({activeCycle.sessions_completed}/{activeCycle.sessions_planned}). Registra il <strong>PGIC</strong> e chiudi il ciclo qui sopra.
+              Ciclo completato ({activeCycle.sessions_completed}/{activeCycle.sessions_planned}). In attesa del <strong>PGIC del paziente</strong>: invia/reinvia il link dal riquadro ciclo qui sopra. Il ciclo si chiude alla risposta del paziente.
             </div>
           )}
 
@@ -1114,8 +1091,9 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
                   const completed = (c.sessions_completed || 0) + 1;
                   return { ...c, sessions_completed: completed, status: s.pending_pgic ? 'pending_pgic' : c.status };
                 }));
-                // Alla seduta finale: apri subito il pannello PGIC per chiudere il ciclo
-                if (s.pending_pgic) setShowCloseOutcome(true);
+                // Alla seduta finale il link PGIC parte automaticamente al paziente
+                // (gestito lato server); qui il pannello mostra "in attesa del PGIC".
+                if (s.pending_pgic) setPgicSent(true);
               }}
             />
           )}

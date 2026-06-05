@@ -115,7 +115,7 @@ export default function RestratificationsPage({ alerts: initialAlerts, bufferByC
                 <span className="mt-0.5 text-green-600 text-base">✅</span>
                 <div>
                   <div className="font-semibold text-gray-800">Promosso L1</div>
-                  <div className="text-xs text-gray-500">Hai confermato il passaggio a trattamento attivo. Questo dipendente consuma uno slot del buffer 15% dell'azienda.</div>
+                  <div className="text-xs text-gray-500">Hai confermato il passaggio a trattamento attivo. Questo dipendente consuma uno slot del buffer 20% dell'azienda.</div>
                 </div>
               </div>
               <div className="flex gap-3">
@@ -128,7 +128,7 @@ export default function RestratificationsPage({ alerts: initialAlerts, bufferByC
               <div className="flex gap-3">
                 <span className="mt-0.5 text-gray-500 text-base">📊</span>
                 <div>
-                  <div className="font-semibold text-gray-800">Buffer 15%</div>
+                  <div className="font-semibold text-gray-800">Buffer 20%</div>
                   <div className="text-xs text-gray-500">Slot aggiuntivi inclusi nel preventivo per assorbire nuovi L1 senza rinegoziare il contratto. Esauriti gli slot, ogni nuovo L1 è fuori contratto.</div>
                 </div>
               </div>
@@ -139,7 +139,7 @@ export default function RestratificationsPage({ alerts: initialAlerts, bufferByC
           {bufferByClient && bufferByClient.length > 0 && (
             <div>
               <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
-                Capacità buffer 15% per azienda
+                Capacità buffer 20% per azienda
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {bufferByClient.map(c => {
@@ -170,7 +170,7 @@ export default function RestratificationsPage({ alerts: initialAlerts, bufferByC
                       </div>
                       <BufferBar usedSessions={usedSessions} totalSessions={c.buffer_sessions} />
                       <div className="text-xs text-gray-400 mt-2">
-                        Buffer totale: <strong>{c.buffer_sessions} sessioni</strong> (15% di {c.l1_count} L1 × {sessPerL1} sess.)
+                        Buffer totale: <strong>{c.buffer_sessions} sessioni</strong> (20% di {c.l1_count} L1 × {sessPerL1} sess.)
                         {confirmed > 0 && <span className="ml-1">· {confirmed} promozioni × {sessPerL1} sess. = {usedSessions} impegnate</span>}
                         {isOver && <span className="ml-1 text-red-600 font-semibold"> ⚠️ Fuori budget — rinegoziare il contratto</span>}
                       </div>

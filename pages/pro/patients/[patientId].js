@@ -471,7 +471,6 @@ function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved 
   const [nrsTouched, setNrsTouched] = useState(false);
   const [treatmentNotes, setTreatmentNotes] = useState('');
   const [nextNotes, setNextNotes] = useState('');
-  const [flagRestrat, setFlagRestrat] = useState(false);
   // Prima seduta: salta la fase NRS (già raccolto in anamnesi), vai diretto al trattamento
   const [phase, setPhase] = useState(isFirst ? 'post' : 'pre');
   const [saving, setSaving] = useState(false);
@@ -493,17 +492,6 @@ function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved 
     setSaving(false);
     if (res.ok) {
       const session = await res.json();
-      if (flagRestrat) {
-        try {
-          await fetch(`/api/pro/patients/${patientId}/restratification-flag`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: session?.id, notes: treatmentNotes }),
-          });
-        } catch (e) {
-          console.error('Errore flag ri-stratificazione:', e);
-        }
-      }
       onSaved(session);
     } else {
       if (res.status === 401) {
@@ -569,22 +557,6 @@ function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved 
               placeholder="Esercizi domiciliari, aree da rivalutare, priorità..."
               className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
           </div>
-          {/* Flag ri-stratificazione */}
-          <div className={`rounded-xl border-2 px-4 py-3 ${flagRestrat ? 'bg-amber-50 border-amber-300' : 'bg-gray-50 border-gray-200'}`}>
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={flagRestrat}
-                onChange={e => setFlagRestrat(e.target.checked)}
-                className="w-4 h-4 mt-0.5 rounded accent-amber-500"
-              />
-              <div>
-                <span className="text-sm font-semibold text-amber-800">⬆️ Proponi passaggio a Livello 1</span>
-                <p className="text-xs text-amber-700 mt-0.5">Segnala al referente ES Work — consuma capacità dal buffer 15%</p>
-              </div>
-            </label>
-          </div>
-
           {error && <div className="text-sm text-red-600">{error}</div>}
           <button onClick={closeSession} disabled={saving}
             className="w-full py-3 rounded-xl bg-green-600 text-white font-bold disabled:opacity-60">
@@ -613,6 +585,35 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
   const [cycleError, setCycleError] = useState('');
   const [showCloseOutcome, setShowCloseOutcome] = useState(false);
   const [closePgic, setClosePgic] = useState(null);
+  const [reclassifyOpen, setReclassifyOpen] = useState(false);
+  const [reclassifyLoading, setReclassifyLoading] = useState(false);
+
+  async function reclassify(level) {
+    const labels = { level1: 'Livello 1 (trattamento)', level2: 'Livello 2 (monitoraggio)', level3: 'Livello 3 (formazione)' };
+    const hasOpenCycle = cycles.some(c => c.status === 'active' || c.status === 'pending_pgic');
+    const warn = (level !== 'level1' && hasOpenCycle)
+      ? '\n\nIl ciclo aperto verrà annullato (nessun PGIC).'
+      : '';
+    if (!confirm(`Riclassificare il paziente a ${labels[level]}?${warn}`)) return;
+    setReclassifyLoading(true);
+    try {
+      const res = await fetch(`/api/pro/patients/${patient.id}/reclassify`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPatient(prev => ({ ...prev, level, computed_level: level, level_status: 'active' }));
+        if (data.cancelledCycle) {
+          setCycles(prev => prev.map(c => (c.status === 'active' || c.status === 'pending_pgic') ? { ...c, status: 'closed' } : c));
+        }
+        setReclassifyOpen(false);
+      } else {
+        alert(data.error || 'Errore riclassificazione');
+      }
+    } catch { alert('Errore di rete'); }
+    setReclassifyLoading(false);
+  }
 
   async function generateCareToken() {
     setGeneratingToken(true);
@@ -753,6 +754,38 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
         </header>
 
         <main className="max-w-5xl mx-auto px-6 py-5 space-y-4">
+
+          {/* ── Riclassifica livello clinico ─────────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold text-gray-800">Livello clinico</div>
+                <div className="text-xs text-gray-500">Dopo la visita puoi riclassificare il paziente (es. L1 → L2/L3).</div>
+              </div>
+              {!reclassifyOpen ? (
+                <button onClick={() => setReclassifyOpen(true)} className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg">
+                  Riclassifica
+                </button>
+              ) : (
+                <button onClick={() => setReclassifyOpen(false)} className="text-xs text-gray-400 underline">Annulla</button>
+              )}
+            </div>
+            {reclassifyOpen && (
+              <div className="mt-3 flex gap-2">
+                {[
+                  { lv: 'level1', l: 'L1 — Trattamento', c: '#dc2626' },
+                  { lv: 'level2', l: 'L2 — Monitoraggio', c: '#ca8a04' },
+                  { lv: 'level3', l: 'L3 — Formazione', c: '#16a34a' },
+                ].map(o => (
+                  <button key={o.lv} onClick={() => reclassify(o.lv)} disabled={reclassifyLoading || patient.level === o.lv}
+                    className="flex-1 py-2 rounded-xl border-2 text-xs font-semibold disabled:opacity-40"
+                    style={{ borderColor: o.c, color: patient.level === o.lv ? '#fff' : o.c, background: patient.level === o.lv ? o.c : '#fff' }}>
+                    {patient.level === o.lv ? `● ${o.l}` : o.l}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* ── Documenti e consensi (solo L1) ───────────────────────────── */}
           {patient.level === 'level1' && (

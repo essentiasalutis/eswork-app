@@ -980,7 +980,13 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
             </div>
           )}
 
-          {!showNewSession && (
+          {activeCycle?.status === 'pending_pgic' && (
+            <div className="w-full py-3 px-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-800 text-center">
+              Ciclo completato ({activeCycle.sessions_completed}/{activeCycle.sessions_planned}). Registra il <strong>PGIC</strong> e chiudi il ciclo qui sopra.
+            </div>
+          )}
+
+          {!showNewSession && activeCycle?.status !== 'pending_pgic' && (
             patient.level === 'level1' && !allDocsSigned() ? (
               <div className="w-full py-3 px-4 rounded-xl bg-orange-50 border border-orange-200 text-sm text-orange-700 text-center">
                 ⚠️ Prima di poter avviare il trattamento, completare i 3 documenti nella sezione <strong>"Documenti e consensi"</strong>.

@@ -66,23 +66,31 @@ export default requireProAuth(async function handler(req, res) {
         cycle_id: activeCycle ? activeCycle.id : null,
       });
 
+      let pendingPgic = false;
       if (close) {
         const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
         await logAccess(proId, 'close_session', ip, `Sessione ${session.id} chiusa`);
 
-        // Aggiorna sessions_completed del ciclo
+        // Aggiorna sessions_completed del ciclo; alla seduta finale → in attesa di PGIC
         if (activeCycle) {
           try {
+            const newCompleted = (activeCycle.sessions_completed || 0) + 1;
+            const planned = activeCycle.sessions_planned || 4;
+            // REGOLA v4: alla seduta finale il ciclo NON si chiude da solo: passa a
+            // 'pending_pgic' e si chiude solo registrando il PGIC (via "Chiudi ciclo").
+            const reachedEnd = newCompleted >= planned && activeCycle.status === 'active';
             await updateTreatmentCycle(activeCycle.id, {
-              sessions_completed: activeCycle.sessions_completed + 1,
+              sessions_completed: newCompleted,
+              ...(reachedEnd ? { status: 'pending_pgic' } : {}),
             });
+            pendingPgic = reachedEnd;
           } catch (_) {
             // ignora errori di aggiornamento ciclo
           }
         }
       }
 
-      return res.status(201).json(session);
+      return res.status(201).json({ ...session, pending_pgic: pendingPgic });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }

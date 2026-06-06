@@ -313,8 +313,8 @@ ${FIRMA}`;
         {/* — Disturbi MSK — */}
         <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 12 }}>Disturbi muscolo-scheletrici</div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
-          {/* colonna sinistra: barre */}
+        <div>
+          {/* zone corporee — barre (sopra) */}
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Zone corporee — ultimi 12 mesi</div>
             {nmq.zones.map((z, i) => {
@@ -336,22 +336,24 @@ ${FIRMA}`;
             </div>
           </div>
 
-          {/* colonna destra: 3 livelli */}
-          <div>
+          {/* 3 livelli (sotto le zone corporee) */}
+          <div style={{ marginTop: 18 }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Stratificazione — 3 livelli</div>
-            {[
-              { count: nmq.level1.count, pct: nmq.level1.pct, label: 'Trattamento — Anno 1', sub: 'Impatto funzionale', bg: '#FFEBEE', border: '#E74C3C', color: '#E74C3C' },
-              { count: nmq.level2.count, pct: nmq.level2.pct, label: 'Prevenzione — Anno 2', sub: 'Segnali da monitorare', bg: '#FFF8E1', border: '#F39C12', color: '#F39C12' },
-              { count: nmq.level3.count, pct: nmq.level3.pct, label: 'Solo formazione', sub: 'Postura ed ergonomia', bg: '#E8F5E9', border: '#16a34a', color: '#16a34a' },
-            ].map((l, i) => (
-              <div key={i} style={{ background: l.bg, border: `1px solid ${l.border}`, borderRadius: 12, padding: '10px 14px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 12, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                <div style={{ fontSize: 26, fontWeight: 800, color: l.color, minWidth: 32, textAlign: 'center' }}>{l.count}</div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: l.color }}>{l.label}</div>
-                  <div style={{ fontSize: 10, color: '#4b5563' }}>{l.pct}% dipendenti — {l.sub}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              {[
+                { count: nmq.level1.count, pct: nmq.level1.pct, label: 'Trattamento — Anno 1', sub: 'Impatto funzionale', bg: '#FFEBEE', border: '#E74C3C', color: '#E74C3C' },
+                { count: nmq.level2.count, pct: nmq.level2.pct, label: 'Prevenzione — Anno 2', sub: 'Segnali da monitorare', bg: '#FFF8E1', border: '#F39C12', color: '#F39C12' },
+                { count: nmq.level3.count, pct: nmq.level3.pct, label: 'Solo formazione', sub: 'Postura ed ergonomia', bg: '#E8F5E9', border: '#16a34a', color: '#16a34a' },
+              ].map((l, i) => (
+                <div key={i} style={{ background: l.bg, border: `1px solid ${l.border}`, borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: l.color, minWidth: 30, textAlign: 'center' }}>{l.count}</div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: l.color }}>{l.label}</div>
+                    <div style={{ fontSize: 10, color: '#4b5563' }}>{l.pct}% dipendenti — {l.sub}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </Page>

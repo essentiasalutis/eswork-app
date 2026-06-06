@@ -64,8 +64,13 @@ export default requireProAuth(async function handler(req, res) {
   // Ciclo di TRATTAMENTO — solo L1
   if (patient.level !== 'level1') return res.status(400).json({ error: 'Solo pazienti L1 possono avere cicli di trattamento' });
 
+  const closedTreatment = cycles.filter(c => c.status === 'closed' && (c.cycle_type || 'treatment') === 'treatment');
+  if (closedTreatment.length >= 2) return res.status(400).json({ error: 'Massimo 2 cicli per anno raggiunti' });
+
   // GATE CLINICO INVARIABILE (v4): nessun ciclo di trattamento senza pre-validazione
-  // confermata. L'unico modo di aprire un ciclo è dopo un esito l1_confirmed in videocall.
+  // confermata l1_confirmed. La pre-validazione deve essere RIFERITA al ciclo che si
+  // apre: per il 2°+ ciclo serve una NUOVA pre-validazione successiva alla chiusura
+  // del ciclo precedente (la situazione va rivalutata; non si riusa quella iniziale).
   const preval = await getPreValidationByPatient(patientId).catch(() => null);
   if (!preval || preval.outcome !== 'l1_confirmed') {
     return res.status(400).json({
@@ -73,9 +78,15 @@ export default requireProAuth(async function handler(req, res) {
       needs_prevalidation: true,
     });
   }
-
-  const closedTreatment = cycles.filter(c => c.status === 'closed' && (c.cycle_type || 'treatment') === 'treatment');
-  if (closedTreatment.length >= 2) return res.status(400).json({ error: 'Massimo 2 cicli per anno raggiunti' });
+  const lastClosed = closedTreatment
+    .filter(c => c.closed_at)
+    .sort((a, b) => new Date(b.closed_at) - new Date(a.closed_at))[0];
+  if (lastClosed && new Date(preval.created_at) <= new Date(lastClosed.closed_at)) {
+    return res.status(400).json({
+      error: 'Serve una NUOVA pre-validazione per il prossimo ciclo: deve essere successiva alla chiusura del ciclo precedente. Il paziente la richiede col self-trigger di fine ciclo, poi l\'osteopata rivaluta in videocall.',
+      needs_prevalidation: true,
+    });
+  }
 
   // Controlla 60 giorni da ultimo ciclo
   if (patient.last_cycle_end_date) {

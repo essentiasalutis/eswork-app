@@ -11,31 +11,23 @@ export default requireAuth(async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const {
-        employees, sector, max_people_training, num_locations,
-        absence_days, turnover, remote_work, work_shifts, internal_contact,
-        motivation, notes,
-      } = req.body;
+      // Scheda colloquio: blob ricco in `data` + scalari che alimentano il calcolatore
+      const { data, employees, sector, absence_days, num_locations } = req.body || {};
 
-      const meeting = await upsertFirstMeeting(clientId, {
-        employees: parseInt(employees) || null,
-        sector: parseInt(sector) || null,
-        max_people_training: parseInt(max_people_training) || null,
-        num_locations: parseInt(num_locations) || null,
-        absence_days: parseInt(absence_days) || null,
-        turnover: parseInt(turnover) || null,
-        remote_work: remote_work?.trim() || null,
-        work_shifts: work_shifts?.trim() || null,
-        internal_contact: internal_contact?.trim() || null,
-        motivation: motivation?.trim() || null,
-        notes: notes?.trim() || null,
-      });
+      const fields = { data: data || {} };
+      if (employees != null) fields.employees = parseInt(employees) || null;
+      if (sector != null) fields.sector = parseInt(sector) || null;
+      if (absence_days != null) fields.absence_days = parseInt(absence_days) || null;
+      if (num_locations != null) fields.num_locations = parseInt(num_locations) || null;
 
-      // Aggiorna i dati base del cliente dalla sezione A
-      if (employees) await updateClient(clientId, {
-        employees: parseInt(employees),
-        ...(sector ? { sector: parseInt(sector) } : {}),
-      });
+      const meeting = await upsertFirstMeeting(clientId, fields);
+
+      // Allinea i dati base del cliente (dimensione/settore/tier) per dashboard e calcolatore
+      const clientPatch = {};
+      if (employees != null && parseInt(employees)) clientPatch.employees = parseInt(employees);
+      if (sector != null && parseInt(sector)) clientPatch.sector = parseInt(sector);
+      if (data?.step2?.tier) clientPatch.tier = data.step2.tier;
+      if (Object.keys(clientPatch).length) await updateClient(clientId, clientPatch).catch(() => {});
 
       return res.status(200).json(meeting);
     } catch (e) {

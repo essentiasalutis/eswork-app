@@ -71,100 +71,12 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, c
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-lg font-semibold text-gray-800">Aziende clienti</h1>
           <button
-            onClick={() => setShowNew(true)}
+            onClick={() => router.push('/dashboard/first-meeting')}
             className="bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl active:bg-green-700"
           >
             + Nuova azienda
           </button>
         </div>
-
-        {showNew && (
-          <form onSubmit={createClient} className="bg-white rounded-2xl border border-gray-200 p-5 mb-4 space-y-3">
-            <h2 className="font-semibold text-gray-800">Nuova azienda</h2>
-            <input
-              value={form.name}
-              onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-              placeholder="Nome azienda"
-              required
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-            <div className="flex gap-3">
-              <select
-                value={form.sector}
-                onChange={e => setForm(p => ({ ...p, sector: parseInt(e.target.value) }))}
-                className="flex-1 px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
-              >
-                <option value={1}>Manifattura / Produzione</option>
-                <option value={2}>Ufficio / IT / Servizi</option>
-              </select>
-              <input
-                type="number"
-                value={form.employees}
-                onChange={e => setForm(p => ({ ...p, employees: parseInt(e.target.value) || 0 }))}
-                placeholder="N. dip."
-                min="1"
-                className="w-24 px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-            <div className="text-xs text-gray-500">
-              Tier suggerito: <span className="font-semibold text-gray-700 capitalize">{getTierFromEmployees(form.employees)}</span>
-              {' '}(Core ≤150 · Plus 151-500 · Enterprise &gt;500)
-            </div>
-            <input
-              value={form.contact_name}
-              onChange={e => setForm(p => ({ ...p, contact_name: e.target.value }))}
-              placeholder="Nome referente (opzionale)"
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-            <div className="flex gap-3">
-              <input
-                type="email"
-                value={form.contact_email}
-                onChange={e => setForm(p => ({ ...p, contact_email: e.target.value }))}
-                placeholder="Email referente (opzionale)"
-                className="flex-1 px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-              <input
-                type="tel"
-                value={form.contact_phone}
-                onChange={e => setForm(p => ({ ...p, contact_phone: e.target.value }))}
-                placeholder="Telefono (opz.)"
-                className="w-36 px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Fonte contatto</label>
-              <select
-                value={form.source}
-                onChange={e => setForm(p => ({ ...p, source: e.target.value }))}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
-              >
-                <option value="passaparola">Passaparola</option>
-                <option value="contatto_diretto">Contatto diretto</option>
-                <option value="social">Social media</option>
-                <option value="evento">Evento</option>
-                <option value="sito_web">Sito web</option>
-                <option value="intermediario">Intermediario</option>
-                <option value="altro">Altro</option>
-              </select>
-            </div>
-            <textarea
-              value={form.notes}
-              onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
-              placeholder="Note libere (opzionale)"
-              rows={2}
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-            />
-            <div className="flex gap-3">
-              <button type="submit" disabled={saving} className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold disabled:opacity-60">
-                {saving ? 'Salvataggio...' : 'Crea'}
-              </button>
-              <button type="button" onClick={() => setShowNew(false)} className="px-5 py-3 rounded-xl border border-gray-300 text-gray-600">
-                Annulla
-              </button>
-            </div>
-          </form>
-        )}
 
         {checkpointReminders && checkpointReminders.length > 0 && (
           <div className="mb-4 space-y-2">

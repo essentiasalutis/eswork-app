@@ -6,7 +6,6 @@ const NAV_ITEMS = [
   { href: '/dashboard', label: 'Clienti', icon: '🏢', color: 'gray' },
   { href: '/dashboard/pipeline', label: 'Pipeline', icon: '📊', color: 'purple' },
   { href: '/dashboard/professionals', label: 'Professionisti', icon: '👨‍⚕️', color: 'indigo' },
-  { href: '/dashboard/calculator', label: 'Calcolatore offerta', icon: '🧮', color: 'green' },
   { href: '/dashboard/referrals', label: 'Referral B2C', icon: '🔗', color: 'orange' },
   { href: '/dashboard/compliance', label: 'Compliance', icon: '✅', color: 'teal' },
   { href: '/dashboard/restratifications', label: 'Ri-stratificazioni', icon: '🔄', color: 'rose' },

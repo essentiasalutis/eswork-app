@@ -335,18 +335,13 @@ export default function CalculatorPage({ client, prefill }) {
 }
 
 export const getServerSideProps = requireAuthSsr(async (ctx) => {
-  const { clientId, assessmentId, n, l1, l2 } = ctx.query;
-  let client = null;
-  if (clientId) client = await getClientById(clientId).catch(() => null);
+  // Il calcolatore standalone è stato integrato nella Scheda colloquio (Step 2+4).
+  // Reindirizza per non mantenere due percorsi.
+  const { clientId } = ctx.query;
   return {
-    props: {
-      client: client || null,
-      prefill: {
-        assessmentId: assessmentId || null,
-        n: n ? parseInt(n) : (client?.employees || 100),
-        l1: l1 !== undefined ? parseInt(l1) : null,
-        l2: l2 !== undefined ? parseInt(l2) : null,
-      },
+    redirect: {
+      destination: clientId ? `/dashboard/first-meeting?clientId=${clientId}` : '/dashboard/first-meeting',
+      permanent: false,
     },
   };
 });

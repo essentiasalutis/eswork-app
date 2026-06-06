@@ -1,276 +1,374 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireAuthSsr } from '../../lib/auth';
+import { calculatePricing, calculateROI, getTier, tierIncludesL2Prevention, fmt } from '../../lib/calculator';
+import { CONFIG } from '../../lib/config';
+import NavMenu from '../../components/NavMenu';
 
-// ─── Costanti ─────────────────────────────────────────────────────────────────
-
-const SECTOR_LABELS = {
-  1: 'Manifattura / Produzione',
-  2: 'Ufficio / IT / Servizi',
-};
-
-// ─── Input helpers ─────────────────────────────────────────────────────────────
-
+const STEPS = ['Conosciamo l\'azienda', 'I numeri', 'Logistica', 'Preventivo'];
+const SECTORS = [['services', 'Servizi / Uffici'], ['manufacturing', 'Manifattura'], ['mix', 'Mix']];
+const SECTOR_TO_INT = { services: 2, manufacturing: 1, mix: 1 };
+const DISTURBI = ['Mal di schiena', 'Cervicale', 'Spalle', 'Tunnel carpale', 'Dolori da postura prolungata', 'Dolori da movimentazione'];
+const FATTURATO = [['low', '< 2 M€'], ['mid', '2–10 M€'], ['high', '> 10 M€']];
+const HR = [['low', 'Bassa'], ['medium', 'Media'], ['high', 'Alta']];
+const FASCE = ['Mattina', 'Pausa pranzo', 'Pomeriggio', 'Prima/dopo turno'];
+const TIER_LABELS = { core: 'Core', plus: 'Plus', enterprise: 'Enterprise' };
+const TIER_COLORS = { core: '#6b7280', plus: '#2563eb', enterprise: '#7c3aed' };
+const fatturatoNum = b => (b === 'high' ? 11e6 : b === 'mid' ? 5e6 : 1e6);
+const inputCls = 'w-full px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500 bg-white';
+const seg = (val, cur, set, label) => (
+  <button key={val} type="button" onClick={() => set(val)}
+    className={`flex-1 py-2.5 px-2 text-sm font-semibold rounded-xl transition-colors ${cur === val ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{label}</button>
+);
 function Field({ label, hint, children }) {
+  return <div><label className="block text-sm font-semibold text-gray-700 mb-1">{label}</label>{hint && <p className="text-xs text-gray-400 mb-1.5">{hint}</p>}{children}</div>;
+}
+function Toggle({ checked, onChange, label }) {
   return (
-    <div>
-      <label className="block text-sm font-semibold text-gray-700 mb-1">{label}</label>
-      {hint && <p className="text-xs text-gray-400 mb-1">{hint}</p>}
-      {children}
-    </div>
+    <button type="button" onClick={() => onChange(!checked)} className="flex items-center gap-2 text-sm">
+      <span className={`w-10 h-6 rounded-full transition-colors relative ${checked ? 'bg-green-600' : 'bg-gray-300'}`}>
+        <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all ${checked ? 'left-[18px]' : 'left-0.5'}`} />
+      </span>
+      <span className="text-gray-700">{label}</span>
+    </button>
   );
 }
 
-function NumInput({ value, onChange, placeholder, min = 0 }) {
-  return (
-    <input
-      type="number"
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-      min={min}
-      className="w-full px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
-    />
-  );
-}
-
-function TextInput({ value, onChange, placeholder }) {
-  return (
-    <input
-      type="text"
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500"
-    />
-  );
-}
-
-function TextArea({ value, onChange, placeholder, rows = 3 }) {
-  return (
-    <textarea
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-      rows={rows}
-      className="w-full px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-    />
-  );
-}
-
-// ─── Pagina ────────────────────────────────────────────────────────────────────
-
-export default function FirstMeetingPage({ client, meeting: initialMeeting }) {
+export default function FirstMeetingScheda({ client: initialClient, meeting }) {
   const router = useRouter();
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const d = meeting?.data || {};
+  const s1 = d.step1 || {}, s2 = d.step2 || {}, s3 = d.step3 || {}, sp = d.params || {};
 
-  const m = initialMeeting || {};
+  const [clientId, setClientId] = useState(initialClient?.id || null);
+  const [step, setStep] = useState(1);
+  const [savedAt, setSavedAt] = useState(null);
+  const [busy, setBusy] = useState(false);
 
-  // Sezione A
-  const [employees, setEmployees] = useState(m.employees || client?.employees || '');
-  const [sector, setSector] = useState(m.sector || client?.sector || 1);
-  const [maxPeopleTraining, setMaxPeopleTraining] = useState(m.max_people_training || '');
-  const [numLocations, setNumLocations] = useState(m.num_locations || '');
+  // STEP 1
+  const [nome, setNome] = useState(initialClient?.name || s1.nome || '');
+  const [refNome, setRefNome] = useState(s1.ref_nome || initialClient?.contact_name || '');
+  const [refRuolo, setRefRuolo] = useState(s1.ref_ruolo || '');
+  const [refEmail, setRefEmail] = useState(s1.ref_email || initialClient?.contact_email || '');
+  const [refTel, setRefTel] = useState(s1.ref_tel || initialClient?.contact_phone || '');
+  const [workDesc, setWorkDesc] = useState(s1.work_desc || '');
+  const [sector, setSector] = useState(s1.sector || 'services');
+  const [disturbi, setDisturbi] = useState(s1.disturbi || []);
+  const [disturbiAltro, setDisturbiAltro] = useState(s1.disturbi_altro || '');
+  const [prevFatta, setPrevFatta] = useState(s1.prev_fatta || false);
+  const [prevNote, setPrevNote] = useState(s1.prev_note || '');
+  const [assenteismo, setAssenteismo] = useState(s1.assenteismo || false);
+  const [absenceDays, setAbsenceDays] = useState(s1.absence_days ?? meeting?.absence_days ?? '');
+  const [note1, setNote1] = useState(s1.note || meeting?.notes || '');
 
-  // Sezione B
-  const [absenceDays, setAbsenceDays] = useState(m.absence_days || '');
-  const [turnover, setTurnover] = useState(m.turnover || '');
-  const [remoteWork, setRemoteWork] = useState(m.remote_work || '');
-  const [workShifts, setWorkShifts] = useState(m.work_shifts || '');
-  const [internalContact, setInternalContact] = useState(m.internal_contact || '');
+  // STEP 2
+  const [sedi, setSedi] = useState(s2.sedi || [{ nome: 'Sede principale', employees: initialClient?.employees || 50 }]);
+  const [capienza, setCapienza] = useState(s2.capienza || CONFIG.classroom_capacity_default);
+  const [trainingMode, setTrainingMode] = useState(s2.training_mode || 'per_sede');
+  const [fatturato, setFatturato] = useState(s2.fatturato || 'mid');
+  const [hrMaturity, setHrMaturity] = useState(s2.hr_maturity || 'medium');
+  const [tierOverride, setTierOverride] = useState(s2.tier_override || null);
 
-  // Sezione C
-  const [motivation, setMotivation] = useState(m.motivation || '');
+  // STEP 3
+  const [spazio, setSpazio] = useState(s3.spazio || '');
+  const [spazioNote, setSpazioNote] = useState(s3.spazio_note || '');
+  const [fasce, setFasce] = useState(s3.fasce || []);
+  const [mc, setMc] = useState(s3.mc || '');
+  const [mcNome, setMcNome] = useState(s3.mc_nome || '');
+  const [mcContatti, setMcContatti] = useState(s3.mc_contatti || '');
+  const [esg, setEsg] = useState(s3.esg || false);
+  const [refOpNome, setRefOpNome] = useState(s3.refop_nome || '');
+  const [refOpRuolo, setRefOpRuolo] = useState(s3.refop_ruolo || '');
+  const [refOpContatti, setRefOpContatti] = useState(s3.refop_contatti || '');
 
-  // Sezione E
-  const [notes, setNotes] = useState(m.notes || '');
+  // PARAMS preventivo
+  const [legacy, setLegacy] = useState(sp.legacy || false);
+  const [rates, setRates] = useState(sp.rates || { ...CONFIG.rates_new });
+  const [l2Mult, setL2Mult] = useState(sp.l2_mult ?? CONFIG.l2_multiplier_default);
+  const [vatExempt, setVatExempt] = useState(sp.vat_exempt ?? CONFIG.vat_exempt);
+  const [showParams, setShowParams] = useState(false);
+  const [scenario, setScenario] = useState('avg');
 
-  async function save(e) {
-    e.preventDefault();
-    setSaving(true);
-    const res = await fetch(`/api/first-meeting/${client.id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        employees, sector, max_people_training: maxPeopleTraining, num_locations: numLocations,
-        absence_days: absenceDays, turnover, remote_work: remoteWork,
-        work_shifts: workShifts, internal_contact: internalContact,
-        motivation, notes,
-      }),
+  // ─── Derivati calcolatore ───────────────────────────────────────────────────
+  const n = useMemo(() => sedi.reduce((a, e) => a + (parseInt(e.employees) || 0), 0), [sedi]);
+  const suggestedTier = useMemo(() => getTier(n, { fatturato: fatturatoNum(fatturato), hrMaturity }), [n, fatturato, hrMaturity]);
+  const tier = tierOverride || suggestedTier;
+  const groups = useMemo(() => {
+    const cap = Math.max(1, parseInt(capienza) || 25);
+    if (trainingMode === 'accorpa') return Math.max(1, Math.ceil(n / cap));
+    return sedi.reduce((a, e) => a + Math.ceil((parseInt(e.employees) || 0) / cap), 0) || 1;
+  }, [sedi, capienza, trainingMode, n]);
+  const prev = CONFIG.l1_prevalence[sector] || [0.08, 0.13, 0.19];
+  const scen = useMemo(() => {
+    const mk = p => { const l1 = Math.round(n * p); return { l1, l2: Math.round(l1 * l2Mult) }; };
+    return { min: mk(prev[0]), avg: mk(prev[1]), max: mk(prev[2]) };
+  }, [n, prev, l2Mult]);
+  const priceFor = sc => (n > 0 ? calculatePricing({ n, l1: sc.l1, l2: sc.l2, tier, groups, rates, vatExempt }) : null);
+  const calcMin = useMemo(() => priceFor(scen.min), [scen, tier, groups, rates, vatExempt, n]);
+  const calcAvg = useMemo(() => priceFor(scen.avg), [scen, tier, groups, rates, vatExempt, n]);
+  const calcMax = useMemo(() => priceFor(scen.max), [scen, tier, groups, rates, vatExempt, n]);
+  const calc = scenario === 'min' ? calcMin : scenario === 'max' ? calcMax : calcAvg;
+  const sel = scenario === 'min' ? scen.min : scenario === 'max' ? scen.max : scen.avg;
+  const roi = useMemo(() => calc ? calculateROI(calc.price_y1, parseInt(absenceDays) || 0) : null, [calc, absenceDays]);
+
+  function buildData() {
+    return {
+      step1: { nome, ref_nome: refNome, ref_ruolo: refRuolo, ref_email: refEmail, ref_tel: refTel, work_desc: workDesc, sector, disturbi, disturbi_altro: disturbiAltro, prev_fatta: prevFatta, prev_note: prevNote, assenteismo, absence_days: absenceDays, note: note1 },
+      step2: { sedi, capienza, training_mode: trainingMode, fatturato, hr_maturity: hrMaturity, tier_override: tierOverride, tier },
+      step3: { spazio, spazio_note: spazioNote, fasce, mc, mc_nome: mcNome, mc_contatti: mcContatti, esg, refop_nome: refOpNome, refop_ruolo: refOpRuolo, refop_contatti: refOpContatti },
+      params: { legacy, rates, l2_mult: l2Mult, vat_exempt: vatExempt },
+    };
+  }
+
+  async function ensureClient() {
+    if (clientId) return clientId;
+    if (!nome.trim()) return null;
+    const res = await fetch('/api/clients', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nome.trim(), sector: SECTOR_TO_INT[sector] || 1, employees: n || 50, contact_name: refNome || null, contact_email: refEmail || null, contact_phone: refTel || null, source: 'colloquio' }),
     });
-    setSaving(false);
-    if (res.ok) {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-    }
+    if (!res.ok) return null;
+    const c = await res.json();
+    setClientId(c.id);
+    router.replace(`/dashboard/first-meeting?clientId=${c.id}`, undefined, { shallow: true });
+    return c.id;
   }
 
-  if (!client) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-gray-400">
-        Cliente non trovato.{' '}
-        <Link href="/dashboard" className="text-green-600 ml-1">Torna alla dashboard</Link>
-      </div>
-    );
+  async function save({ silent } = {}) {
+    const id = await ensureClient();
+    if (!id) return false;
+    if (!silent) setBusy(true);
+    try {
+      await fetch(`/api/first-meeting/${id}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: buildData(), employees: n || null, sector: SECTOR_TO_INT[sector], absence_days: absenceDays || null, num_locations: sedi.length }),
+      });
+      setSavedAt(Date.now());
+    } catch {}
+    if (!silent) setBusy(false);
+    return true;
   }
+
+  // Autosave debounce (solo se cliente già creato)
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
+    if (!clientId) return;
+    const t = setTimeout(() => save({ silent: true }), 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nome, refNome, refRuolo, refEmail, refTel, workDesc, sector, disturbi, disturbiAltro, prevFatta, prevNote, assenteismo, absenceDays, note1, sedi, capienza, trainingMode, fatturato, hrMaturity, tierOverride, spazio, spazioNote, fasce, mc, mcNome, mcContatti, esg, refOpNome, refOpRuolo, refOpContatti, legacy, rates, l2Mult, vatExempt]);
+
+  function toggleArr(arr, set, v) { set(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]); }
+  function setSede(i, k, v) { setSedi(prev => prev.map((s, j) => j === i ? { ...s, [k]: k === 'employees' ? (v === '' ? '' : Math.max(0, parseInt(v) || 0)) : v } : s)); }
+
+  async function goToOffer() {
+    const id = await ensureClient();
+    await save({ silent: true });
+    const params = new URLSearchParams({ clientId: id || '', n: String(n), l1: String(sel.l1), l2: String(sel.l2) });
+    router.push(`/dashboard/offer?${params}`);
+  }
+  async function goStep(next) { if (next > step) await save({ silent: true }); setStep(next); window.scrollTo({ top: 0 }); }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <Link href={`/dashboard/${client.id}`} className="text-sm text-gray-500 hover:text-gray-800 shrink-0">
-              ← {client.name}
-            </Link>
+        <div className="max-w-2xl mx-auto px-5 py-3 flex items-center gap-3">
+          <Link href={clientId ? `/dashboard/${clientId}` : '/dashboard'} className="text-gray-400 hover:text-gray-600 p-1">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          </Link>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-gray-900 truncate">Scheda colloquio</div>
+            <div className="text-xs text-gray-500">{nome || 'Nuova azienda'}{savedAt && <span className="text-green-600 ml-2">✓ salvato</span>}</div>
           </div>
-          <div>
-            <span className="text-xl font-bold text-gray-900">ES </span>
-            <span className="text-xl font-bold text-green-600">Work</span>
-          </div>
+          <NavMenu />
+        </div>
+        <div className="max-w-2xl mx-auto px-5 pb-3 flex gap-2">
+          {STEPS.map((label, i) => (
+            <button key={i} onClick={() => goStep(i + 1)} className={`flex-1 text-left ${step === i + 1 ? '' : 'opacity-60'}`}>
+              <div className={`h-1.5 rounded-full mb-1 ${i + 1 <= step ? 'bg-green-500' : 'bg-gray-200'}`} />
+              <div className={`text-[11px] font-semibold ${step === i + 1 ? 'text-green-700' : 'text-gray-400'}`}>{i + 1}. {label}</div>
+            </button>
+          ))}
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-6">
-        <div className="mb-5">
-          <h1 className="text-xl font-bold text-gray-900">Primo colloquio</h1>
-          <p className="text-sm text-gray-500 mt-1">{client.name}</p>
-        </div>
+      <main className="max-w-2xl mx-auto px-5 py-5 space-y-5">
 
-        <form onSubmit={save} className="space-y-6">
-
-          {/* ── SEZIONE A: Dati organizzativi ────────────────────────── */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-5">
-            <div className="text-xs font-bold text-green-700 uppercase tracking-widest mb-4">A — Dati organizzativi</div>
-            <div className="space-y-4">
-
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="N. dipendenti">
-                  <NumInput value={employees} onChange={setEmployees} placeholder="es. 80" min={1} />
-                </Field>
-                <Field label="N. sedi / stabilimenti">
-                  <NumInput value={numLocations} onChange={setNumLocations} placeholder="es. 2" min={1} />
-                </Field>
-              </div>
-
-              <Field label="Settore">
-                <select
-                  value={sector}
-                  onChange={e => setSector(parseInt(e.target.value))}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
-                >
-                  <option value={1}>Manifattura / Produzione</option>
-                  <option value={2}>Ufficio / IT / Servizi</option>
-                </select>
-              </Field>
-
-              <Field label="Max persone in formazione contemporaneamente" hint="Vincoli di turnover o spazio sala">
-                <NumInput value={maxPeopleTraining} onChange={setMaxPeopleTraining} placeholder="es. 15" min={1} />
-              </Field>
-
+        {step === 1 && (
+          <div className="space-y-5">
+            <Field label="Nome azienda *"><input value={nome} onChange={e => setNome(e.target.value)} placeholder="Es. Acme S.p.A." className={inputCls} /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Referente — nome *"><input value={refNome} onChange={e => setRefNome(e.target.value)} placeholder="Mario Rossi" className={inputCls} /></Field>
+              <Field label="Referente — ruolo *"><input value={refRuolo} onChange={e => setRefRuolo(e.target.value)} placeholder="HR / Direzione / Titolare" className={inputCls} /></Field>
             </div>
-          </div>
-
-          {/* ── SEZIONE B: Contesto operativo ───────────────────────── */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-5">
-            <div className="text-xs font-bold text-blue-700 uppercase tracking-widest mb-4">B — Contesto operativo</div>
-            <div className="space-y-4">
-
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Giorni di assenza medi/anno" hint="Per dipendente (dato aggregato)">
-                  <NumInput value={absenceDays} onChange={setAbsenceDays} placeholder="es. 12" />
-                </Field>
-                <Field label="Turnover annuo %" hint="Ricambio personale">
-                  <NumInput value={turnover} onChange={setTurnover} placeholder="es. 8" />
-                </Field>
-              </div>
-
-              <Field label="Smart working / lavoro da remoto" hint="Percentuale o modalità adottata">
-                <TextInput value={remoteWork} onChange={setRemoteWork} placeholder="es. 30% full remote, 40% ibrido..." />
-              </Field>
-
-              <Field label="Turni di lavoro">
-                <TextInput value={workShifts} onChange={setWorkShifts} placeholder="es. 2 turni 6-14 / 14-22, no notturno..." />
-              </Field>
-
-              <Field label="Referente interno per il progetto">
-                <TextInput value={internalContact} onChange={setInternalContact} placeholder="Nome, ruolo, contatto..." />
-              </Field>
-
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Email referente"><input value={refEmail} onChange={e => setRefEmail(e.target.value)} placeholder="email@azienda.it" className={inputCls} /></Field>
+              <Field label="Telefono referente"><input value={refTel} onChange={e => setRefTel(e.target.value)} placeholder="333…" className={inputCls} /></Field>
             </div>
-          </div>
-
-          {/* ── SEZIONE C: Motivazione ──────────────────────────────── */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-5">
-            <div className="text-xs font-bold text-purple-700 uppercase tracking-widest mb-4">C — Motivazione e aspettative</div>
-            <div className="space-y-4">
-              <Field label="Perché sono qui? Cosa vogliono risolvere?" hint="Ascolta, non suggerire. Prendi nota del linguaggio usato.">
-                <TextArea
-                  value={motivation}
-                  onChange={setMotivation}
-                  placeholder="Es. hanno avuto un aumento delle assenze per mal di schiena, il medico competente ha segnalato criticità, vogliono qualcosa per i dipendenti..."
-                  rows={4}
-                />
-              </Field>
-            </div>
-          </div>
-
-          {/* ── SEZIONE D: Promemoria (no input) ────────────────────── */}
-          <div className="bg-amber-50 rounded-2xl border border-amber-200 p-5">
-            <div className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-3">D — Ricorda: cosa NON chiedere</div>
-            <ul className="space-y-2 text-sm text-amber-800">
-              <li className="flex gap-2">
-                <span className="text-amber-500 mt-0.5 shrink-0">✗</span>
-                <span>Non chiedere il budget disponibile (lo scopri dal calcolo, non dalla loro dichiarazione)</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="text-amber-500 mt-0.5 shrink-0">✗</span>
-                <span>Non vendere subito — prima fai parlare, poi presenta dati e soluzioni</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="text-amber-500 mt-0.5 shrink-0">✗</span>
-                <span>Non promettere tempi o prezzi prima di avere i dati dell&apos;assessment</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="text-amber-500 mt-0.5 shrink-0">✗</span>
-                <span>Non chiedere dati sensibili dei singoli dipendenti</span>
-              </li>
-            </ul>
-          </div>
-
-          {/* ── SEZIONE E: Note libere ───────────────────────────────── */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-5">
-            <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4">E — Note libere</div>
-            <Field label="Appunti del colloquio">
-              <TextArea
-                value={notes}
-                onChange={setNotes}
-                placeholder="Tutto ciò che vuoi ricordare: impressioni, dinamiche interne, timing decisionale, competitor menzionati..."
-                rows={5}
-              />
+            <Field label="Che tipo di lavoro fanno i dipendenti?" hint="Descrizione libera dalla conversazione">
+              <textarea value={workDesc} onChange={e => setWorkDesc(e.target.value)} rows={2} className={inputCls + ' resize-none'} placeholder="Es. linea di montaggio, magazzino, uffici…" />
+              <div className="mt-2"><div className="text-xs text-gray-400 mb-1">Classificazione settore (uso interno, per la prevalenza):</div><div className="flex gap-2">{SECTORS.map(([v, l]) => seg(v, sector, setSector, l))}</div></div>
             </Field>
+            <Field label="Che disturbi fisici vedete tra i dipendenti?">
+              <div className="flex flex-wrap gap-2">{DISTURBI.map(dz => (
+                <button key={dz} type="button" onClick={() => toggleArr(disturbi, setDisturbi, dz)} className={`px-3 py-1.5 rounded-full border text-sm ${disturbi.includes(dz) ? 'bg-green-600 border-green-600 text-white' : 'border-gray-300 text-gray-600'}`}>{dz}</button>
+              ))}</div>
+              <input value={disturbiAltro} onChange={e => setDisturbiAltro(e.target.value)} placeholder="Altro…" className={inputCls + ' mt-2'} />
+            </Field>
+            <Field label="Avete già fatto qualcosa in prevenzione/benessere?">
+              <Toggle checked={prevFatta} onChange={setPrevFatta} label={prevFatta ? 'Sì' : 'No'} />
+              {prevFatta && <textarea value={prevNote} onChange={e => setPrevNote(e.target.value)} rows={2} className={inputCls + ' resize-none mt-2'} placeholder="Cosa e com'è andato…" />}
+            </Field>
+            <Field label="L'assenteismo è un problema visibile?">
+              <Toggle checked={assenteismo} onChange={setAssenteismo} label={assenteismo ? 'Sì' : 'No'} />
+              {assenteismo && <div className="mt-2"><div className="text-xs text-gray-400 mb-1">Giorni assenza malattia ultimi 12 mesi (per ROI)</div><input type="number" value={absenceDays} onChange={e => setAbsenceDays(e.target.value)} placeholder="es. 120" className={inputCls} /></div>}
+            </Field>
+            <Field label="Note del colloquio"><textarea value={note1} onChange={e => setNote1(e.target.value)} rows={4} className={inputCls + ' resize-none'} placeholder="Appunti liberi…" /></Field>
+            <button onClick={() => goStep(2)} disabled={!nome.trim()} className="w-full py-3.5 rounded-2xl bg-green-600 text-white font-bold disabled:opacity-40">Avanti →</button>
           </div>
+        )}
 
-          {/* ── Salva ───────────────────────────────────────────────── */}
-          <div className="flex gap-3 pb-8">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold text-base disabled:opacity-60 active:bg-green-700"
-            >
-              {saving ? 'Salvataggio...' : saved ? '✓ Salvato' : 'Salva colloquio'}
-            </button>
-            <Link
-              href={`/dashboard/${client.id}`}
-              className="px-5 py-3 rounded-xl border border-gray-300 text-gray-600 font-medium text-center"
-            >
-              Chiudi
-            </Link>
+        {step === 2 && (
+          <div className="space-y-5">
+            <Field label="Sedi operative" hint="Numero dipendenti per sede (il totale alimenta tier e calcolo)">
+              <div className="space-y-2">{sedi.map((s, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input value={s.nome} onChange={e => setSede(i, 'nome', e.target.value)} placeholder={`Sede ${i + 1}`} className={inputCls + ' flex-1'} />
+                  <input type="number" value={s.employees} onChange={e => setSede(i, 'employees', e.target.value)} placeholder="dip." className={inputCls + ' w-24'} />
+                  {sedi.length > 1 && <button onClick={() => setSedi(sedi.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 px-1 text-lg">×</button>}
+                </div>
+              ))}</div>
+              <button onClick={() => setSedi([...sedi, { nome: '', employees: 0 }])} className="mt-2 text-xs font-semibold text-green-700">+ Aggiungi sede</button>
+              <div className="text-xs text-gray-400 mt-1">Totale dipendenti: <strong className="text-gray-600">{n}</strong> · gruppi formazione: <strong className="text-gray-600">{groups}</strong></div>
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Capienza aula/sala"><input type="number" value={capienza} onChange={e => setCapienza(e.target.value)} className={inputCls} /></Field>
+              <Field label="Formazione"><div className="flex gap-1">{seg('per_sede', trainingMode, setTrainingMode, 'Per sede')}{seg('accorpa', trainingMode, setTrainingMode, 'Accorpa')}</div></Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Fatturato" hint="Dirime i borderline del tier"><div className="flex gap-1">{FATTURATO.map(([v, l]) => seg(v, fatturato, setFatturato, l))}</div></Field>
+              <Field label="Maturità HR"><div className="flex gap-1">{HR.map(([v, l]) => seg(v, hrMaturity, setHrMaturity, l))}</div></Field>
+            </div>
+            <Field label="Tier interno (uso interno, non mostrato al cliente)">
+              <div className="flex items-center gap-2">{['core', 'plus', 'enterprise'].map(t => (
+                <button key={t} onClick={() => setTierOverride(t === suggestedTier ? null : t)} className="flex-1 py-2 rounded-xl border-2 text-sm font-semibold" style={{ borderColor: TIER_COLORS[t], background: tier === t ? TIER_COLORS[t] : '#fff', color: tier === t ? '#fff' : TIER_COLORS[t] }}>{TIER_LABELS[t]}</button>
+              ))}</div>
+              <div className="text-xs text-gray-400 mt-1">Suggerito: <strong>{TIER_LABELS[suggestedTier]}</strong>{tierOverride && ' · override attivo'} · Core ≤150 · Plus 151-500 · Enterprise &gt;500</div>
+            </Field>
+            <div className="flex gap-3">
+              <button onClick={() => goStep(1)} className="py-3.5 px-5 rounded-2xl border border-gray-300 text-gray-600 font-semibold">←</button>
+              <button onClick={() => goStep(3)} className="flex-1 py-3.5 rounded-2xl bg-green-600 text-white font-bold">Avanti →</button>
+            </div>
           </div>
+        )}
 
-        </form>
+        {step === 3 && (
+          <div className="space-y-5">
+            <Field label="Avete uno spazio in sede per lo sportello? *">
+              <div className="flex flex-col gap-2">{[['dedicata', 'Sì, stanza dedicata'], ['condivisa', 'Sì, sala condivisa'], ['da_trovare', 'No, da trovare']].map(([v, l]) => (
+                <button key={v} type="button" onClick={() => setSpazio(v)} className={`py-2.5 px-4 rounded-xl border-2 text-sm font-semibold text-left ${spazio === v ? 'border-green-500 bg-green-50 text-green-800' : 'border-gray-200 text-gray-600'}`}>{l}</button>
+              ))}</div>
+              <input value={spazioNote} onChange={e => setSpazioNote(e.target.value)} placeholder="Dimensioni, privacy, attrezzatura…" className={inputCls + ' mt-2'} />
+            </Field>
+            <Field label="Fasce orarie preferite"><div className="flex flex-wrap gap-2">{FASCE.map(f => (
+              <button key={f} type="button" onClick={() => toggleArr(fasce, setFasce, f)} className={`px-3 py-1.5 rounded-full border text-sm ${fasce.includes(f) ? 'bg-green-600 border-green-600 text-white' : 'border-gray-300 text-gray-600'}`}>{f}</button>
+            ))}</div></Field>
+            <Field label="Avete un Medico Competente attivo?">
+              <div className="flex gap-2">{[['si', 'Sì'], ['no', 'No'], ['nonso', 'Non so']].map(([v, l]) => seg(v, mc, setMc, l))}</div>
+              {mc === 'si' && <div className="grid grid-cols-2 gap-3 mt-2"><input value={mcNome} onChange={e => setMcNome(e.target.value)} placeholder="Nome MC" className={inputCls} /><input value={mcContatti} onChange={e => setMcContatti(e.target.value)} placeholder="Contatti" className={inputCls} /></div>}
+            </Field>
+            <Field label="Sensibilità ESG / bilancio di sostenibilità?"><Toggle checked={esg} onChange={setEsg} label={esg ? 'Sì' : 'No'} /></Field>
+            <Field label="Referente operativo" hint="Chi gestirà comunicazione interna e logistica (può differire dal decisore)">
+              <div className="grid grid-cols-2 gap-3"><input value={refOpNome} onChange={e => setRefOpNome(e.target.value)} placeholder="Nome" className={inputCls} /><input value={refOpRuolo} onChange={e => setRefOpRuolo(e.target.value)} placeholder="Ruolo" className={inputCls} /></div>
+              <input value={refOpContatti} onChange={e => setRefOpContatti(e.target.value)} placeholder="Contatti" className={inputCls + ' mt-2'} />
+            </Field>
+            <div className="flex gap-3">
+              <button onClick={() => goStep(2)} className="py-3.5 px-5 rounded-2xl border border-gray-300 text-gray-600 font-semibold">←</button>
+              <button onClick={() => goStep(4)} className="flex-1 py-3.5 rounded-2xl bg-green-600 text-white font-bold">Vai al preventivo →</button>
+            </div>
+          </div>
+        )}
+
+        {step === 4 && (
+          <div className="space-y-4">
+            {n <= 0 ? (
+              <div className="text-center text-gray-400 py-8 text-sm">Inserisci i dipendenti nello Step 2 per calcolare il preventivo.</div>
+            ) : (
+              <>
+                <div>
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Scenario di prevalenza — Anno 1</div>
+                  <div className="flex gap-2">{[['min', 'Min', scen.min, calcMin], ['avg', 'Medio', scen.avg, calcAvg], ['max', 'Max', scen.max, calcMax]].map(([k, lbl, sc, cc]) => cc && (
+                    <button key={k} onClick={() => setScenario(k)} className={`flex-1 rounded-2xl border-2 p-3 text-left ${scenario === k ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white'}`}>
+                      <div className={`text-[11px] font-bold uppercase ${scenario === k ? 'text-green-700' : 'text-gray-400'}`}>{lbl}</div>
+                      <div className={`text-lg font-bold ${scenario === k ? 'text-green-700' : 'text-gray-800'}`}>{fmt(cc.price_y1)}</div>
+                      <div className="text-[11px] text-gray-500">{sc.l1} L1 · {sc.l2} L2</div>
+                    </button>
+                  ))}</div>
+                  <div className="text-[11px] text-gray-400 mt-2 text-center">Prevalenza {sector === 'services' ? 'Servizi' : sector === 'manufacturing' ? 'Manifattura' : 'Mix'}: {prev.map(p => `${Math.round(p * 100)}%`).join(' / ')} · L2 ≈ {l2Mult}× L1</div>
+                </div>
+
+                <div className="bg-green-600 rounded-2xl p-5 text-white">
+                  <div className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-1">Investimento Anno 1 — scenario {scenario === 'avg' ? 'medio' : scenario}</div>
+                  <div className="text-4xl font-bold mb-1">{fmt(calc.price_y1)}</div>
+                  <div className="text-sm opacity-90">{fmt(calc.price_monthly_y1)}/mese · {fmt(calc.price_per_employee_y1)}/dip · {sel.l1} L1{tierIncludesL2Prevention(tier) ? ` · ${sel.l2} L2 prevenzione` : ''}</div>
+                  <div className="text-xs opacity-80 mt-1">{vatExempt ? 'Esente IVA (forfettario)' : `+ IVA 22% = ${fmt(calc.y1.total_with_vat)}`}</div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-gray-200 p-4">
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Dettaglio voci — Anno 1</div>
+                  <table className="w-full text-sm"><tbody>
+                    {calc.y1.items.map((it, i) => (<tr key={i} className="border-b border-gray-50"><td className="py-2 text-gray-600">{it.label}<span className="block text-[11px] text-gray-400">{it.detail}</span></td><td className="py-2 text-right font-medium text-gray-700">{fmt(it.sell)}</td></tr>))}
+                    <tr className="border-b border-gray-50"><td className="py-2 text-gray-600">Buffer {Math.round(calc.y1.buffer_pct * 100)}%</td><td className="py-2 text-right font-medium text-gray-700">{fmt(calc.y1.buffer_sell)}</td></tr>
+                    <tr className="border-t-2 border-gray-200"><td className="py-2 font-semibold text-gray-800">Totale Anno 1</td><td className="py-2 text-right font-bold text-green-700">{fmt(calc.y1.total_sell)}</td></tr>
+                  </tbody></table>
+                  <div className="text-[11px] text-gray-400 mt-2">Costo professionista {fmt(calc.y1.total_cost)} · margine {fmt(calc.y1.margin)} — uso interno</div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                  <div className="text-xs font-semibold text-blue-600 uppercase tracking-widest mb-1">Stima Anno 2+</div>
+                  <div className="text-2xl font-bold text-blue-700">{fmt(calc.price_y2)}</div>
+                  <div className="text-xs text-blue-500 mt-1">Formazione 1 modulo · nuovi L1 trattati{tierIncludesL2Prevention(tier) ? ' · L2 in prevenzione' : ''}</div>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 leading-relaxed">
+                  <strong>Clausola di adeguamento:</strong> il corrispettivo è confermato dopo l'assessment. Se i L1 reali sono ≤ scenario medio ({scen.avg.l1}) → resta al valore medio ({fmt(calcAvg.price_y1)}); se superiori → sale fino al tetto massimo ({fmt(calcMax.price_y1)}), eccedenza al canale B2C/welfare.
+                </div>
+
+                {roi && (
+                  <div className="bg-white border border-gray-200 rounded-2xl p-4 text-sm text-gray-700 space-y-1.5">
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">ROI ({absenceDays} gg assenza)</div>
+                    <div className="flex justify-between"><span>Costo assenze stimato</span><span className="font-semibold">{fmt(roi.estimated_cost)}</span></div>
+                    <div className="flex justify-between"><span>Riduzione per break-even</span><span className="font-semibold text-amber-700">{roi.breakeven_pct}%</span></div>
+                  </div>
+                )}
+
+                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                  <button onClick={() => setShowParams(v => !v)} className="w-full flex items-center justify-between px-4 py-3"><span className="text-sm font-semibold text-gray-700">⚙️ Parametri preventivo</span><span className="text-gray-400">{showParams ? '▲' : '▼'}</span></button>
+                  {showParams && (
+                    <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-3">
+                      <div className="flex items-center justify-between text-sm"><span className="text-gray-600">Tariffe cliente storico</span>
+                        <button onClick={() => { const v = !legacy; setLegacy(v); setRates({ ...(v ? CONFIG.rates_legacy : CONFIG.rates_new) }); }} className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${legacy ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>{legacy ? '✓ Storico' : 'Nuovo'}</button></div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">{[['sportello_sell', 'Sportello €/h vend.'], ['sportello_cost', 'Sportello €/h costo'], ['prevalidation_sell', 'Pre-val € vend.'], ['prevalidation_cost', 'Pre-val € costo'], ['training_sell', 'Formaz. €/mod vend.'], ['training_cost', 'Formaz. €/mod costo']].map(([k, l]) => (
+                        <div key={k}><label className="text-[11px] text-gray-500 block mb-1">{l}</label><input type="number" value={rates[k]} onChange={e => setRates(r => ({ ...r, [k]: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" /></div>
+                      ))}</div>
+                      <div className="grid grid-cols-2 gap-3 items-end">
+                        <div><label className="text-[11px] text-gray-500 block mb-1">Moltiplicatore L2 (da tarare)</label><input type="number" step="0.1" value={l2Mult} onChange={e => setL2Mult(parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" /></div>
+                        <label className="flex items-center gap-2 text-sm text-gray-600 pb-2"><input type="checkbox" checked={vatExempt} onChange={e => setVatExempt(e.target.checked)} className="w-4 h-4 accent-green-600" />Esente IVA</label>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3">
+                  <button onClick={() => goStep(3)} className="py-3.5 px-5 rounded-2xl border border-gray-300 text-gray-600 font-semibold">←</button>
+                  <button onClick={() => save()} disabled={busy} className="py-3.5 px-5 rounded-2xl border border-gray-300 text-gray-700 font-semibold disabled:opacity-50">{busy ? '…' : 'Salva scheda'}</button>
+                  <button onClick={goToOffer} className="flex-1 py-3.5 rounded-2xl bg-green-600 text-white font-bold">Genera offerta PDF →</button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </main>
     </div>
   );
@@ -279,19 +377,8 @@ export default function FirstMeetingPage({ client, meeting: initialMeeting }) {
 export const getServerSideProps = requireAuthSsr(async (ctx) => {
   const { getClientById, getFirstMeeting } = require('../../lib/store');
   const { clientId } = ctx.query;
-  if (!clientId) return { notFound: true };
-
-  const [client, meeting] = await Promise.all([
-    getClientById(clientId),
-    getFirstMeeting(clientId),
-  ]);
-
+  if (!clientId) return { props: { client: null, meeting: null } };
+  const [client, meeting] = await Promise.all([getClientById(clientId), getFirstMeeting(clientId)]);
   if (!client) return { notFound: true };
-
-  return {
-    props: {
-      client,
-      meeting: meeting || null,
-    },
-  };
+  return { props: { client, meeting: meeting || null } };
 });

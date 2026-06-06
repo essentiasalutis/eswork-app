@@ -605,8 +605,65 @@ ${FIRMA}`;
   );
 }
 
+// Parametri custom dalla scheda colloquio (tier, gruppi, tariffe, IVA) → il PDF
+// usa ESATTAMENTE gli stessi numeri della scheda.
+function readPricingParams(q) {
+  const has = q.rs != null || q.tier || q.groups != null || q.vat != null;
+  if (!has) return null;
+  return {
+    tier: q.tier || undefined,
+    groups: q.groups != null ? parseInt(q.groups) : undefined,
+    vatExempt: q.vat != null ? q.vat === '1' : undefined,
+    rates: q.rs != null ? {
+      sportello_sell: +q.rs, sportello_cost: +q.rsc,
+      prevalidation_sell: +q.rps, prevalidation_cost: +q.rpc,
+      training_sell: +q.rts, training_cost: +q.rtc,
+    } : undefined,
+  };
+}
+function syntheticNmq(n, l1, l2) {
+  const l3 = Math.max(0, n - l1 - l2);
+  const pct = c => (n > 0 ? Math.round((c / n) * 100) : 0);
+  const empty = { count: 0, pct: 0 };
+  return {
+    zones: [],
+    level1: { count: l1, pct: pct(l1) },
+    level2: { count: l2, pct: pct(l2) },
+    level3: { count: l3, pct: pct(l3) },
+    prevalence: { count: l1 + l2, pct: pct(l1 + l2) },
+    byRole: { production: { n: 0, level1: empty, level2: empty, level3: empty, zones: [] }, office: { n: 0, level1: empty, level2: empty, level3: empty, zones: [] }, unknown: { n: 0, level1: empty, level2: empty, level3: empty, zones: [] } },
+    n,
+  };
+}
+
 export const getServerSideProps = requireAuthSsr(async (ctx) => {
-  const { assessmentId, n, l1, l2 } = ctx.query;
+  const q = ctx.query;
+  const { assessmentId, clientId, n, l1, l2 } = q;
+  const custom = readPricingParams(q);
+
+  // MODALITÀ PREVENTIVO da scheda colloquio: clientId + numeri stimati, nessun assessment
+  if (!assessmentId && clientId) {
+    try {
+      const client = await getClientById(clientId);
+      if (!client) return { notFound: true };
+      const totalN = n ? parseInt(n) : (client.employees || 0);
+      const l1v = l1 != null ? parseInt(l1) : 0;
+      const l2v = l2 != null ? parseInt(l2) : 0;
+      const calc = custom
+        ? calculatePricing({ n: totalN, l1: l1v, l2: l2v, ...custom })
+        : calculatePricing(totalN, l1v, l2v);
+      return {
+        props: {
+          client,
+          assessment: { type: 'initial', n: totalN, client_id: clientId, estimate: true },
+          nmq: syntheticNmq(totalN, l1v, l2v),
+          calc,
+          roi: null,
+          date: today(),
+        },
+      };
+    } catch (e) { console.error(e); return { notFound: true }; }
+  }
 
   if (!assessmentId) {
     return { props: { client: null, assessment: null, nmq: null, calc: null, roi: null, date: today() } };
@@ -627,7 +684,9 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     const l1v = l1 !== undefined ? parseInt(l1) : nmq.level1.count;
     const l2v = l2 !== undefined ? parseInt(l2) : nmq.level2.count;
 
-    const calc = calculatePricing(totalN, l1v, l2v);
+    const calc = custom
+      ? calculatePricing({ n: totalN, l1: l1v, l2: l2v, ...custom })
+      : calculatePricing(totalN, l1v, l2v);
     const roi = null; // ROI only from calculator (requires absence days input)
 
     return {

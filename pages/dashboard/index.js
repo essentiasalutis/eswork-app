@@ -6,42 +6,13 @@ import { getClients, getAssessmentCounts, getAllAcuteEvents } from '../../lib/st
 import NavMenu from '../../components/NavMenu';
 import { TYPE_COLORS, TYPE_LABELS } from '../../lib/scoring';
 
-function getTierFromEmployees(employees) {
-  const n = parseInt(employees) || 0;
-  if (n <= 150) return 'core';
-  if (n <= 500) return 'plus';
-  return 'enterprise';
-}
-
-
 export default function Dashboard({ clients: initialClients, assessmentCounts, checkpointReminders, pendingAcuteCount }) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
-  const [showNew, setShowNew] = useState(false);
-  const [form, setForm] = useState({ name: '', sector: 1, employees: 50, contact_name: '', contact_email: '', contact_phone: '', source: 'passaparola', notes: '' });
-  const [saving, setSaving] = useState(false);
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/');
-  }
-
-  async function createClient(e) {
-    e.preventDefault();
-    setSaving(true);
-    const tier = getTierFromEmployees(form.employees);
-    const res = await fetch('/api/clients', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, tier }),
-    });
-    if (res.ok) {
-      const client = await res.json();
-      setClients(prev => [...prev, client]);
-      setShowNew(false);
-      setForm({ name: '', sector: 1, employees: 50, contact_name: '', contact_email: '', contact_phone: '', source: 'passaparola', notes: '' });
-    }
-    setSaving(false);
   }
 
   async function deleteClient(id, e) {
@@ -95,7 +66,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, c
         )}
 
         <div className="space-y-3">
-          {clients.length === 0 && !showNew && (
+          {clients.length === 0 && (
             <div className="text-center py-16 text-gray-400">
               <div className="text-4xl mb-3">🏢</div>
               <p>Nessuna azienda. Aggiungine una per iniziare.</p>

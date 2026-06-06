@@ -165,7 +165,14 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
   async function goToOffer() {
     const id = await ensureClient();
     await save({ silent: true });
-    const params = new URLSearchParams({ clientId: id || '', n: String(n), l1: String(sel.l1), l2: String(sel.l2) });
+    // Passa TUTTI i parametri custom così il PDF mostra ESATTAMENTE gli stessi numeri della scheda
+    const params = new URLSearchParams({
+      clientId: id || '', n: String(n), l1: String(sel.l1), l2: String(sel.l2),
+      tier, groups: String(groups), vat: vatExempt ? '1' : '0',
+      rs: String(rates.sportello_sell), rsc: String(rates.sportello_cost),
+      rps: String(rates.prevalidation_sell), rpc: String(rates.prevalidation_cost),
+      rts: String(rates.training_sell), rtc: String(rates.training_cost),
+    });
     router.push(`/dashboard/offer?${params}`);
   }
   async function goStep(next) { if (next > step) await save({ silent: true }); setStep(next); window.scrollTo({ top: 0 }); }

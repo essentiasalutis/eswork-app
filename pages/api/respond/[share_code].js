@@ -62,9 +62,10 @@ export default async function handler(req, res) {
               assessment_completed_at: new Date().toISOString(),
             });
 
-            // Se L1 e non è già in trattamento: aggiungi in waitlist
+            // Se L1: CANDIDATO in coda pre-validazione (level_status='pending'),
+            // NON confermato. Il level active lo dà solo la pre-validazione l1_confirmed.
             if (computed_level === 'level1' && patient.level !== 'level1') {
-              await updatePatient(patient.id, { level: 'level1', level_status: 'active' });
+              await updatePatient(patient.id, { level: 'level1', level_status: 'pending' });
               await addToWaitlist({
                 id: generateId('wl'),
                 patient_id: patient.id,

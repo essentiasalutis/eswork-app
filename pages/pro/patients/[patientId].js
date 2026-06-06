@@ -670,9 +670,9 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
   async function reclassify(level) {
     const labels = { level1: 'Livello 1 (trattamento)', level2: 'Livello 2 (monitoraggio)', level3: 'Livello 3 (formazione)' };
     const hasOpenCycle = cycles.some(c => c.status === 'active' || c.status === 'pending_pgic');
-    const warn = (level !== 'level1' && hasOpenCycle)
-      ? '\n\nIl ciclo aperto verrà annullato (nessun PGIC).'
-      : '';
+    let warn = '';
+    if (level !== 'level1' && hasOpenCycle) warn = '\n\nIl ciclo aperto verrà annullato (nessun PGIC).';
+    if (level === 'level1') warn = '\n\nIl paziente entra tra i CANDIDATI: dovrà passare dalla pre-validazione in videocall prima del trattamento. Non si apre subito un ciclo.';
     if (!confirm(`Riclassificare il paziente a ${labels[level]}?${warn}`)) return;
     setReclassifyLoading(true);
     try {
@@ -682,11 +682,14 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
       });
       const data = await res.json();
       if (res.ok) {
-        setPatient(prev => ({ ...prev, level, computed_level: level, level_status: 'active' }));
+        setPatient(prev => ({ ...prev, level, computed_level: level, level_status: level === 'level1' ? 'pending' : 'active' }));
         if (data.cancelledCycle) {
           setCycles(prev => prev.map(c => (c.status === 'active' || c.status === 'pending_pgic') ? { ...c, status: 'closed' } : c));
         }
         setReclassifyOpen(false);
+        if (data.queued_for_prevalidation) {
+          alert('Paziente messo tra i candidati Livello 1 → comparirà nella coda "Pre-validazioni da fare". Apri la pre-validazione per confermarlo prima del trattamento.');
+        }
       } else {
         alert(data.error || 'Errore riclassificazione');
       }
@@ -942,8 +945,16 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
                 </div>
               )}
 
-              {/* L1 — ciclo di trattamento (max 2/anno) */}
-              {!activeCycle && patient.level === 'level1' && patient.level_status !== 'opted_out' &&
+              {/* L1 CANDIDATO (pending) — deve passare dalla pre-validazione */}
+              {!activeCycle && patient.level === 'level1' && patient.level_status === 'pending' && (
+                <div className="w-full py-3 px-4 rounded-xl bg-blue-50 border border-blue-200 text-sm text-blue-800 text-center">
+                  🎥 Candidato Livello 1 — <strong>in attesa di pre-validazione</strong>. Aprila dalla coda
+                  "Pre-validazioni da fare" (Area Osteopata). Il ciclo si potrà avviare solo dopo l'esito <strong>L1 confermato</strong>.
+                </div>
+              )}
+
+              {/* L1 CONFERMATO (active) — ciclo di trattamento (max 2/anno) */}
+              {!activeCycle && patient.level === 'level1' && patient.level_status === 'active' &&
                 closedCycles.filter(c => (c.cycle_type || 'treatment') === 'treatment').length < 2 && (
                 <button onClick={() => startCycle('treatment')} disabled={cycleLoading}
                   className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-60">

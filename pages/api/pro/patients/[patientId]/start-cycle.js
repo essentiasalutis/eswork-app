@@ -6,6 +6,7 @@ import {
   updatePatient,
   proCanAccessPatientClinical,
   getClientById,
+  getPreValidationByPatient,
 } from '../../../../../lib/store';
 
 function tierOf(client) {
@@ -62,6 +63,17 @@ export default requireProAuth(async function handler(req, res) {
 
   // Ciclo di TRATTAMENTO — solo L1
   if (patient.level !== 'level1') return res.status(400).json({ error: 'Solo pazienti L1 possono avere cicli di trattamento' });
+
+  // GATE CLINICO INVARIABILE (v4): nessun ciclo di trattamento senza pre-validazione
+  // confermata. L'unico modo di aprire un ciclo è dopo un esito l1_confirmed in videocall.
+  const preval = await getPreValidationByPatient(patientId).catch(() => null);
+  if (!preval || preval.outcome !== 'l1_confirmed') {
+    return res.status(400).json({
+      error: 'Pre-validazione richiesta: il paziente deve essere confermato L1 in videocall (esito l1_confirmed) prima di aprire un ciclo di trattamento.',
+      needs_prevalidation: true,
+    });
+  }
+
   const closedTreatment = cycles.filter(c => c.status === 'closed' && (c.cycle_type || 'treatment') === 'treatment');
   if (closedTreatment.length >= 2) return res.status(400).json({ error: 'Massimo 2 cicli per anno raggiunti' });
 

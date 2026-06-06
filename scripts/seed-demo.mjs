@@ -64,10 +64,10 @@ const mk = (i, first, last, level, opts = {}) => ({
 });
 const patients = [
   // L1 (4)
-  mk(1, 'Marco', 'Rossi', 'level1', { assigned_professional_id: PRO_ID }),   // in trattamento
-  mk(2, 'Luca', 'Ferrari', 'level1', { assigned_professional_id: PRO_ID }),  // pre-validato
-  mk(3, 'Sara', 'Conti', 'level1'),   // in waitlist
-  mk(4, 'Elena', 'Greco', 'level1'),  // in waitlist
+  mk(1, 'Marco', 'Rossi', 'level1', { assigned_professional_id: PRO_ID }),                  // confermato + in trattamento
+  mk(2, 'Luca', 'Ferrari', 'level1', { assigned_professional_id: PRO_ID }),                 // confermato (pre-validato), nessun ciclo
+  mk(3, 'Sara', 'Conti', 'level1', { level_status: 'pending' }),   // CANDIDATO in coda pre-validazione
+  mk(4, 'Elena', 'Greco', 'level1', { level_status: 'pending' }),  // CANDIDATO in coda pre-validazione
   // L2 (5)
   mk(5, 'Paolo', 'Riva', 'level2'),
   mk(6, 'Anna', 'Moretti', 'level2'),
@@ -110,12 +110,20 @@ function nmqAnswers(level) {
 }
 
 // ─── 7. Pre-validazione completata (Marco Rossi → L1 confermato) ───────────────
-await sb.from('pre_validations').insert({
-  id: 'pv_demo_1', patient_id: 'pat_demo_1', professional_id: PRO_ID, client_id: CLIENT_ID,
-  duration_minutes: 15, nrs_during_call: 7, pain_zone: 'Schiena bassa/lombare',
-  symptom_duration_months: 3, clinical_notes: 'Lombalgia con impatto funzionale. Confermato L1.',
-  outcome: 'l1_confirmed', created_at: daysAgo(15),
-}).then(r => log('pre-validazione completata (L1 confermato)', r.error));
+await sb.from('pre_validations').insert([
+  {
+    id: 'pv_demo_1', patient_id: 'pat_demo_1', professional_id: PRO_ID, client_id: CLIENT_ID,
+    duration_minutes: 15, nrs_during_call: 7, pain_zone: 'Schiena bassa/lombare',
+    symptom_duration_months: 3, clinical_notes: 'Lombalgia con impatto funzionale. Confermato L1.',
+    outcome: 'l1_confirmed', created_at: daysAgo(15),
+  },
+  {
+    id: 'pv_demo_2', patient_id: 'pat_demo_2', professional_id: PRO_ID, client_id: CLIENT_ID,
+    duration_minutes: 15, nrs_during_call: 6, pain_zone: 'Collo',
+    symptom_duration_months: 2, clinical_notes: 'Cervicalgia con impatto. Confermato L1.',
+    outcome: 'l1_confirmed', created_at: daysAgo(8),
+  },
+]).then(r => log('2 pre-validazioni (Marco, Luca → L1 confermati)', r.error));
 
 // ─── 8. Ciclo di trattamento attivo + 2 sessioni con NRS ───────────────────────
 await sb.from('treatment_cycles').insert({

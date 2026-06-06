@@ -58,9 +58,13 @@ export default async function handler(req, res) {
       const prevention_eligible = computed_level === 'level2' && (tier === 'plus' || tier === 'enterprise');
 
       // 3. Aggiorna livello sul paziente (non-fatale se fallisce)
+      //    L1 dall'assessment è solo CANDIDATO: level_status='pending' finché non
+      //    passa dalla pre-validazione. Il level confermato (active) lo dà solo la
+      //    pre-validazione con esito l1_confirmed. L2/L3 non richiedono conferma.
       await updatePatient(patient.id, {
         computed_level,
         level: computed_level,
+        level_status: computed_level === 'level1' ? 'pending' : 'active',
         prevention_eligible,
         assessment_completed_at: now,
       }).catch(e => console.error('updatePatient error:', e.message));

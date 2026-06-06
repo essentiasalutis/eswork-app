@@ -346,12 +346,10 @@ ${FIRMA}`;
                 { count: nmq.level2.count, pct: nmq.level2.pct, label: 'Prevenzione — Anno 2', sub: 'Segnali da monitorare', bg: '#FFF8E1', border: '#F39C12', color: '#F39C12' },
                 { count: nmq.level3.count, pct: nmq.level3.pct, label: 'Solo formazione', sub: 'Postura ed ergonomia', bg: '#E8F5E9', border: '#16a34a', color: '#16a34a' },
               ].map((l, i) => (
-                <div key={i} style={{ background: l.bg, border: `1px solid ${l.border}`, borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                  <div style={{ fontSize: 26, fontWeight: 800, color: l.color, minWidth: 30, textAlign: 'center' }}>{l.count}</div>
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: l.color }}>{l.label}</div>
-                    <div style={{ fontSize: 10, color: '#4b5563' }}>{l.pct}% dipendenti — {l.sub}</div>
-                  </div>
+                <div key={i} style={{ background: l.bg, border: `1px solid ${l.border}`, borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: l.color, lineHeight: 1 }}>{l.count}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: l.color }}>{l.label}</div>
+                  <div style={{ fontSize: 10, color: '#4b5563', lineHeight: 1.4 }}>{l.pct}% dipendenti — {l.sub}</div>
                 </div>
               ))}
             </div>

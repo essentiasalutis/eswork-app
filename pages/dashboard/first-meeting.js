@@ -82,7 +82,6 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
   const [refOpContatti, setRefOpContatti] = useState(s3.refop_contatti || '');
 
   // PARAMS preventivo
-  const [legacy, setLegacy] = useState(sp.legacy || false);
   const [rates, setRates] = useState(sp.rates || { ...CONFIG.rates_new });
   const [l2Mult, setL2Mult] = useState(sp.l2_mult ?? CONFIG.l2_multiplier_default);
   const [vatExempt, setVatExempt] = useState(sp.vat_exempt ?? CONFIG.vat_exempt);
@@ -116,7 +115,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
       step1: { nome, ref_nome: refNome, ref_ruolo: refRuolo, ref_email: refEmail, ref_tel: refTel, work_desc: workDesc, sector, disturbi, disturbi_altro: disturbiAltro, prev_fatta: prevFatta, prev_note: prevNote, assenteismo, absence_days: absenceDays, note: note1 },
       step2: { sedi, capienza, training_mode: trainingMode, fatturato, hr_maturity: hrMaturity, tier_override: tierOverride, tier },
       step3: { spazio, spazio_note: spazioNote, fasce, mc, mc_nome: mcNome, mc_contatti: mcContatti, esg, refop_nome: refOpNome, refop_ruolo: refOpRuolo, refop_contatti: refOpContatti },
-      params: { legacy, rates, l2_mult: l2Mult, vat_exempt: vatExempt },
+      params: { rates, l2_mult: l2Mult, vat_exempt: vatExempt },
     };
   }
 
@@ -157,7 +156,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
     const t = setTimeout(() => save({ silent: true }), 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nome, refNome, refRuolo, refEmail, refTel, workDesc, sector, disturbi, disturbiAltro, prevFatta, prevNote, assenteismo, absenceDays, note1, sedi, capienza, trainingMode, fatturato, hrMaturity, tierOverride, spazio, spazioNote, fasce, mc, mcNome, mcContatti, esg, refOpNome, refOpRuolo, refOpContatti, legacy, rates, l2Mult, vatExempt]);
+  }, [nome, refNome, refRuolo, refEmail, refTel, workDesc, sector, disturbi, disturbiAltro, prevFatta, prevNote, assenteismo, absenceDays, note1, sedi, capienza, trainingMode, fatturato, hrMaturity, tierOverride, spazio, spazioNote, fasce, mc, mcNome, mcContatti, esg, refOpNome, refOpRuolo, refOpContatti, rates, l2Mult, vatExempt]);
 
   function toggleArr(arr, set, v) { set(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]); }
   function setSede(i, k, v) { setSedi(prev => prev.map((s, j) => j === i ? { ...s, [k]: k === 'employees' ? (v === '' ? '' : Math.max(0, parseInt(v) || 0)) : v } : s)); }
@@ -354,13 +353,19 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
                   <button onClick={() => setShowParams(v => !v)} className="w-full flex items-center justify-between px-4 py-3"><span className="text-sm font-semibold text-gray-700">⚙️ Parametri preventivo</span><span className="text-gray-400">{showParams ? '▲' : '▼'}</span></button>
                   {showParams && (
                     <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-3">
-                      <div className="flex items-center justify-between text-sm"><span className="text-gray-600">Tariffe cliente storico</span>
-                        <button onClick={() => { const v = !legacy; setLegacy(v); setRates({ ...(v ? CONFIG.rates_legacy : CONFIG.rates_new) }); }} className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${legacy ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>{legacy ? '✓ Storico' : 'Nuovo'}</button></div>
+                      <div className="text-[11px] text-gray-400">Tariffe cliente (modificabili liberamente per questo cliente).</div>
                       <div className="grid grid-cols-2 gap-2 text-sm">{[['sportello_sell', 'Sportello €/h vend.'], ['sportello_cost', 'Sportello €/h costo'], ['prevalidation_sell', 'Pre-val € vend.'], ['prevalidation_cost', 'Pre-val € costo'], ['training_sell', 'Formaz. €/mod vend.'], ['training_cost', 'Formaz. €/mod costo']].map(([k, l]) => (
                         <div key={k}><label className="text-[11px] text-gray-500 block mb-1">{l}</label><input type="number" value={rates[k]} onChange={e => setRates(r => ({ ...r, [k]: parseFloat(e.target.value) || 0 }))} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" /></div>
                       ))}</div>
                       <div className="grid grid-cols-2 gap-3 items-end">
-                        <div><label className="text-[11px] text-gray-500 block mb-1">Moltiplicatore L2 (da tarare)</label><input type="number" step="0.1" value={l2Mult} onChange={e => setL2Mult(parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" /></div>
+                        <div>
+                          <label className="text-[11px] text-gray-500 mb-1 flex items-center gap-1">
+                            Moltiplicatore L2 (da tarare)
+                            <span title="Stima dei Livello 2 attesi = L1 attesi × questo moltiplicatore. Incide sul preventivo SOLO per i tier Plus/Enterprise (dove i L2 ricevono prevenzione attiva); per i Core non cambia il prezzo. È un'ipotesi: il numero reale di L2 emerge dopo l'assessment NMQ."
+                              className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold flex items-center justify-center cursor-help">?</span>
+                          </label>
+                          <input type="number" step="0.1" value={l2Mult} onChange={e => setL2Mult(parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" />
+                        </div>
                         <label className="flex items-center gap-2 text-sm text-gray-600 pb-2"><input type="checkbox" checked={vatExempt} onChange={e => setVatExempt(e.target.checked)} className="w-4 h-4 accent-green-600" />Esente IVA</label>
                       </div>
                     </div>

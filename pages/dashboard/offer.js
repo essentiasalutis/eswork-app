@@ -184,6 +184,7 @@ ${FIRMA}`;
           padding: 28px 32px;
         }
         .page-break { page-break-after: always; }
+        .page-before { page-break-before: always; break-inside: avoid; page-break-inside: avoid; }
         .section-sep {
           border: none;
           border-top: 1px solid #e5e7eb;
@@ -507,9 +508,9 @@ ${FIRMA}`;
       )}
 
       {/* ══════════════════════════════════════════════════════════════
-          PAG 5 — Come funziona + Footer
+          PAG 5 — Come funziona + Footer (pagina dedicata)
           ══════════════════════════════════════════════════════════════ */}
-      <Page>
+      <Page className="page-before">
         <div>
         {/* — Come funziona — */}
         <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 14 }}>Come funziona</div>

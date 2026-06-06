@@ -129,6 +129,15 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, date }) 
 
   const summaryText = generateSummaryText(nmq);
 
+  // ─── Blocco B — Servizi di piattaforma e gestione (differenziato per tier) ────
+  // I nomi dei tier NON compaiono nel PDF: cambia solo il contenuto mostrato.
+  const offerTier = calc?.tier || 'core';
+  const withPrevention = offerTier === 'plus' || offerTier === 'enterprise';
+  const showMgmtValues = offerTier === 'plus' || offerTier === 'enterprise';
+  const mgmtServices = (CONFIG.management_services && CONFIG.management_services[offerTier])
+    || (CONFIG.management_services && CONFIG.management_services.core) || [];
+  const mgmtTotal = mgmtServices.reduce((s, x) => s + (x.value || 0), 0);
+
   function openOfferEmail() {
     const referente = client.contact_name ? `Gentile ${client.contact_name},` : `Gentile referente,`;
     const prezzoY1 = calc ? fmt(calc.price_y1) : '–';
@@ -432,27 +441,54 @@ ${FIRMA}`;
             </div>
           </div>
 
-          {/* Tabella servizi */}
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Il programma include</div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginBottom: 14 }}>
+          {/* ── BLOCCO A — Servizi clinici ── */}
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#1e293b', marginBottom: 8 }}>Il programma include</div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 6 }}>Servizi clinici</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginBottom: 16 }}>
             <tbody>
               {[
-                ['Assessment iniziale + Report di Attivazione', 'Check-up completo della salute dell\'apparato muscolo-scheletrico con strumento validato NMQ'],
-                [`Sportello osteopatico in sede (${calc.days_osteo_y1} gg/anno)`, 'Trattamento individuale in sede per i dipendenti con disturbi — include capacità di ri-stratificazione'],
-                [`Formazione postura ed ergonomia (${calc.training_sessions_y1} sessioni)`, 'Sessioni collettive teoria + pratica per tutti i dipendenti'],
-                ['Piattaforma ES Work con AI', 'Monitoraggio continuo, alert automatici, dashboard aggregata e storico clinico digitale'],
-                ['2 Review intermedie (3 e 6 mesi)', 'Assessment di monitoraggio + report alla direzione con KPI aggiornati'],
-                ['Assessment finale + Report annuale', 'Confronto baseline vs risultati, documentazione per OT23 INAIL'],
-                ['Coordinamento e regia ES Work', 'Un unico interlocutore: professionisti, calendario, logistica, report'],
-                ['Documentazione OT23 INAIL', 'Documentazione per la riduzione del premio assicurativo INAIL'],
+                ['Assessment iniziale + Report di Attivazione', 'Fotografia clinica della salute muscolo-scheletrica dell\'intera popolazione aziendale. Ogni dipendente compila un questionario validato in meno di 5 minuti. Produce la stratificazione dei bisogni e il piano di intervento personalizzato per la vostra azienda.'],
+                [`Sportello osteopatico in sede (${calc.days_osteo_y1} gg/anno)`, 'Trattamento osteopatico individuale erogato direttamente nella vostra sede, riservato ai dipendenti con reale indicazione clinica. Ogni percorso è preceduto da una pre-validazione con l\'osteopata e monitorato sessione per sessione con misure di esito oggettive.'],
+                ['Pre-validazioni cliniche', 'Valutazione clinica iniziale con l\'osteopata prima di ogni percorso di trattamento: conferma l\'indicazione, definisce gli obiettivi e garantisce che le risorse vadano a chi ne ha realmente bisogno.'],
+                ...(withPrevention ? [['Prevenzione attiva L2', 'Sessioni di prevenzione attiva dedicate ai dipendenti con segnali precoci, per intervenire prima che il disturbo evolva in patologia conclamata.']] : []),
+                [`Formazione postura ed ergonomia (${calc.training_sessions_y1} sessioni)`, 'Sessioni collettive in piccoli gruppi su postura, ergonomia e prevenzione dei disturbi muscolo-scheletrici, calibrate sul vostro settore. Anno 1: due moduli dedicati (prevenzione attiva). Anni successivi: un modulo avanzato (correlazione con alimentazione, attività motoria e benessere psicofisico).'],
               ].map(([servizio, dettaglio], i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  <td style={{ padding: '7px 10px', fontWeight: 600, color: '#1e293b', width: '40%' }}>{servizio}</td>
-                  <td style={{ padding: '7px 10px', color: '#4b5563' }}>{dettaglio}</td>
+                  <td style={{ padding: '7px 10px', fontWeight: 600, color: '#1e293b', width: '34%', verticalAlign: 'top' }}>{servizio}</td>
+                  <td style={{ padding: '7px 10px', color: '#4b5563', lineHeight: 1.5 }}>{dettaglio}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+
+          {/* ── BLOCCO B — Servizi di piattaforma e gestione (sfondo distinto) ── */}
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 14, padding: '14px 16px', marginBottom: 14, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#16a34a', textTransform: 'uppercase', marginBottom: 10 }}>Servizi di piattaforma e gestione</div>
+            {mgmtServices.map((s, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, padding: '7px 0', borderBottom: i < mgmtServices.length - 1 ? '1px solid #dcfce7' : 'none' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#1e293b' }}>{s.label}</div>
+                  {s.desc && <div style={{ fontSize: 10, color: '#4b5563', lineHeight: 1.5, marginTop: 2 }}>{s.desc}</div>}
+                </div>
+                {showMgmtValues && s.value != null && (
+                  <div style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap', flexShrink: 0, paddingTop: 1 }}>valore {fmt(s.value)}/anno</div>
+                )}
+              </div>
+            ))}
+            {showMgmtValues ? (
+              <div style={{ marginTop: 12, paddingTop: 10, borderTop: '2px solid #16a34a' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b' }}>Valore servizi di gestione</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#1e293b' }}>{fmt(mgmtTotal)}/anno</div>
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', textAlign: 'right', marginTop: 2 }}>Incluso nel programma annuale</div>
+              </div>
+            ) : (
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #dcfce7', fontSize: 11, fontWeight: 600, color: '#16a34a' }}>
+                Tutti i servizi di piattaforma e gestione sono inclusi nel programma annuale.
+              </div>
+            )}
+          </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
             {/* Anno 2 */}

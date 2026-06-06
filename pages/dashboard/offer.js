@@ -270,9 +270,9 @@ ${FIRMA}`;
       </Page>
 
       {/* ══════════════════════════════════════════════════════════════
-          PAG 2 — Cruscotto + Disturbi MSK
+          PAG 2 — Cruscotto + Disturbi MSK (flusso continuo, niente interruzioni forzate)
           ══════════════════════════════════════════════════════════════ */}
-      <Page className="page-break">
+      <Page>
         {/* — Cruscotto — */}
         <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 2 }}>Cruscotto sintetico</div>
         <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 14 }}>{client.name} · {TYPE_LABELS[assessment.type]} · {assessment.n} risposte</div>
@@ -357,9 +357,9 @@ ${FIRMA}`;
       </Page>
 
       {/* ══════════════════════════════════════════════════════════════
-          PAG 3 — Piano di intervento
+          Piano di intervento (subito sotto i disturbi, niente interruzione)
           ══════════════════════════════════════════════════════════════ */}
-      <Page className="page-break">
+      <Page>
         {/* — Piano di intervento — */}
         <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 4 }}>Piano di intervento proposto</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -416,10 +416,10 @@ ${FIRMA}`;
       </Page>
 
       {/* ══════════════════════════════════════════════════════════════
-          PAG 4 — Investimento
+          Investimento (subito sotto, niente interruzione)
           ══════════════════════════════════════════════════════════════ */}
       {calc && (
-        <Page className="page-break">
+        <Page>
           <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 16 }}>Investimento</div>
 
           {/* Anno 1 */}

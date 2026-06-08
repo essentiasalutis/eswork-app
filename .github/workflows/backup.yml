@@ -32,13 +32,30 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: node scripts/backup.js
 
-      - name: Commit backup to repository
+      - name: Commit backup to 'backups' branch (no Vercel deploy)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          DATE=$(date +%Y-%m-%d)
+          SRC=$(ls backups/eswork-backup-*.json | head -1)
+          # Committa su un branch dedicato 'backups' (isolato da main → nessun deploy
+          # di produzione; il branch è escluso anche dai preview via vercel.json).
+          git fetch origin backups || true
+          if git show-ref --verify --quiet refs/remotes/origin/backups; then
+            git worktree add /tmp/bkp backups
+          else
+            git worktree add --detach /tmp/bkp
+            git -C /tmp/bkp checkout --orphan backups
+            git -C /tmp/bkp rm -rf . >/dev/null 2>&1 || true
+          fi
+          mkdir -p /tmp/bkp/backups
+          cp "$SRC" "/tmp/bkp/backups/eswork-backup-$DATE.json"
+          cd /tmp/bkp
+          # Mantieni solo gli ultimi 8 backup sul branch
+          ls -1t backups/eswork-backup-*.json | tail -n +9 | xargs -r rm -f
           git add -f backups/
-          git commit -m "Backup automatico $(date +%Y-%m-%d)" || echo "Nessun file nuovo da committare"
-          git push
+          git commit -m "Backup automatico $DATE" || { echo "Nessuna modifica"; exit 0; }
+          git push origin backups
 
       - name: Notify on failure
         if: failure()

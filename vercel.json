@@ -8,5 +8,10 @@
       "path": "/api/cron/minicheck-invites",
       "schedule": "0 7 * * *"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "backups": false
+    }
+  }
 }

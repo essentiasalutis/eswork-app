@@ -263,15 +263,30 @@ export default function CarePage({ code, clientName, type, expiresAt, valid, dis
 
 export async function getServerSideProps({ params }) {
   const code = (params.code || '').toUpperCase();
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  // Solo il numero dello sconto viene esposto al bundle pubblico (non tutto CONFIG).
+  // Lettura diretta dal DB (no fetch HTTP a NEXT_PUBLIC_BASE_URL, che su Vercel
+  // poteva non risolvere e rendeva la landing sempre "codice non valido").
+  const { getReferralCodeByCode } = require('../../lib/store');
   const { CONFIG } = require('../../lib/config');
   const discountPct = CONFIG.referral_discount_pct ?? 10;
   try {
-    const res = await fetch(`${baseUrl}/api/referrals/${code}`);
-    if (!res.ok) return { props: { code, clientName: '', valid: false, discountPct } };
-    const data = await res.json();
-    return { props: { code: data.code, clientName: data.clientName, type: data.type || 'P', expiresAt: data.expiresAt || null, valid: true, discountPct } };
+    const referral = await getReferralCodeByCode(code);
+    let valid = !!referral;
+    if (referral) {
+      if (referral.expires_at && new Date(referral.expires_at) < new Date()) valid = false;
+      const usesCount = referral.referral_uses?.length || 0;
+      if (referral.max_uses !== null && usesCount >= referral.max_uses) valid = false;
+    }
+    if (!valid) return { props: { code, clientName: '', valid: false, discountPct } };
+    return {
+      props: {
+        code: referral.code,
+        clientName: referral.clients?.name || '',
+        type: referral.type || 'P',
+        expiresAt: referral.expires_at || null,
+        valid: true,
+        discountPct,
+      },
+    };
   } catch {
     return { props: { code, clientName: '', valid: false, discountPct } };
   }

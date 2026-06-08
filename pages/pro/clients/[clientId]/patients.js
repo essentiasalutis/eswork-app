@@ -95,7 +95,7 @@ function NewPatientForm({ clientId, proName, onCreated, onCancel }) {
   );
 }
 
-export default function PatientsPage({ proName, client, patients: initial }) {
+export default function PatientsPage({ proName, client, patients: initial, proId }) {
   const [patients, setPatients] = useState(initial);
   const [showNew, setShowNew] = useState(false);
 
@@ -153,7 +153,15 @@ export default function PatientsPage({ proName, client, patients: initial }) {
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="font-semibold text-gray-900">{p.first_name} {p.last_name}</div>
+                  <div className="font-semibold text-gray-900 flex items-center gap-2">
+                    {p.first_name} {p.last_name}
+                    {p.assigned_professional_id === proId && (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">assegnato a te</span>
+                    )}
+                    {p.assigned_professional_id && p.assigned_professional_id !== proId && (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">altro professionista</span>
+                    )}
+                  </div>
                   <div className="text-sm text-gray-500 mt-0.5">
                     {p.age ? `${p.age} anni · ` : ''}{p.gender} · {p.job_activity || '—'}
                   </div>
@@ -194,5 +202,5 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   ]);
 
   if (!client) return { notFound: true };
-  return { props: { proName, client, patients } };
+  return { props: { proName, client, patients, proId } };
 });

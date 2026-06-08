@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getPatientsWithEmailByClient, getDocumentsByClient } from '../../lib/store';
+import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getPatientsWithEmailByClient, getDocumentsByClient, getProfessionals } from '../../lib/store';
 import { TYPE_LABELS, TYPE_COLORS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
 import { CONFIG } from '../../lib/config';
@@ -135,21 +135,27 @@ function NrsBar({ value, max = 10 }) {
   );
 }
 
-export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist, generatedReports: initialReports }) {
+export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist, generatedReports: initialReports, allProfessionals }) {
   const router = useRouter();
   const [client, setClient] = useState(initialClient);
   const [assessments, setAssessments] = useState(initial);
   const [responses, setResponses] = useState(initialResponses);
-  const [assignments, setAssignments] = useState(initialAssignments || []);
+  // Mappa professionista→stato assegnazione (attivo) per QUESTA azienda
+  const [assignedActive, setAssignedActive] = useState(() => {
+    const m = {};
+    (initialAssignments || []).forEach(a => {
+      const pid = a.professional_id || a.professionals?.id;
+      if (pid) m[pid] = !!a.active;
+    });
+    return m;
+  });
   const [assignBusy, setAssignBusy] = useState(null); // professional_id in corso
   const [showNew, setShowNew] = useState(false);
 
-  // Abilita/disabilita un professionista SOLO per questa azienda (non lo disattiva del tutto)
-  async function toggleAssignment(a) {
-    const proId = a.professional_id || a.professionals?.id;
-    if (!proId) return;
-    const next = !a.active;
-    if (next === false && !confirm(`Disabilitare ${a.professionals?.name} da ${initialClient.name}?\n\nNon vedrà più i pazienti di questa azienda (ma resta attivo sulle altre).`)) return;
+  // Assegna / togli un professionista a questa azienda (flag on/off)
+  async function togglePro(pro) {
+    const proId = pro.id;
+    const next = !assignedActive[proId];
     setAssignBusy(proId);
     try {
       const res = await fetch(`/api/professionals/${proId}/assignments`, {
@@ -158,13 +164,44 @@ export default function ClientPage({ client: initialClient, assessments: initial
         body: JSON.stringify({ client_id: initialClient.id, active: next }),
       });
       if (res.ok) {
-        setAssignments(prev => prev.map(x => x.id === a.id ? { ...x, active: next } : x));
+        setAssignedActive(prev => ({ ...prev, [proId]: next }));
       } else {
         const d = await res.json().catch(() => ({}));
         alert(d.error || 'Errore aggiornamento assegnazione');
       }
     } catch { alert('Errore di rete'); }
     setAssignBusy(null);
+  }
+
+  // Professionisti assegnati attivi (opzioni per l'assegnazione dei pazienti)
+  const assignedPros = (allProfessionals || []).filter(p => assignedActive[p.id]);
+
+  // Mappa paziente→professionista referente
+  const [patientPro, setPatientPro] = useState(() =>
+    Object.fromEntries((patientsNrs || []).map(p => [p.id, p.assigned_professional_id || '']))
+  );
+  const [patientProBusy, setPatientProBusy] = useState(null);
+
+  async function assignPatientPro(patientId, proId) {
+    setPatientProBusy(patientId);
+    const prev = patientPro[patientId] || '';
+    setPatientPro(p => ({ ...p, [patientId]: proId }));
+    try {
+      const res = await fetch(`/api/admin/patients/${patientId}/assign-professional`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ professional_id: proId || null }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error || 'Errore assegnazione paziente');
+        setPatientPro(p => ({ ...p, [patientId]: prev })); // rollback
+      }
+    } catch {
+      alert('Errore di rete');
+      setPatientPro(p => ({ ...p, [patientId]: prev }));
+    }
+    setPatientProBusy(null);
   }
 
   const [newType, setNewType] = useState('initial');
@@ -673,33 +710,35 @@ ${FIRMA}`;
         <div className="mb-5">
           <div className="flex items-center justify-between mb-2">
             <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Professionisti assegnati</h2>
-            <Link href="/dashboard/professionals" className="text-xs text-blue-600 hover:underline">Gestisci →</Link>
           </div>
-          {assignments.length === 0 ? (
+          {(!allProfessionals || allProfessionals.length === 0) ? (
             <div className="bg-gray-50 rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-400">
-              Nessun professionista assegnato. <Link href="/dashboard/professionals" className="text-blue-500 hover:underline">Assegna</Link>
+              Nessun professionista creato. Creane uno dal menu <Link href="/dashboard/professionals" className="text-blue-500 hover:underline">Professionisti</Link>.
             </div>
           ) : (
             <div className="space-y-2">
-              {assignments.map(a => (
-                <div key={a.id} className={`bg-white rounded-xl border px-4 py-2.5 flex items-center justify-between gap-3 ${a.active ? 'border-gray-200' : 'border-gray-100 opacity-70'}`}>
-                  <div className="min-w-0">
-                    <span className="text-sm font-medium text-gray-800">{a.professionals?.name}</span>
-                    <span className="text-xs text-gray-400 ml-2">{a.professionals?.email}</span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${a.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
-                      {a.active ? 'attivo' : 'disabilitato'}
-                    </span>
+              {allProfessionals.map(pro => {
+                const active = !!assignedActive[pro.id];
+                return (
+                  <div key={pro.id} className={`bg-white rounded-xl border px-4 py-2.5 flex items-center justify-between gap-3 ${active ? 'border-green-200' : 'border-gray-200'}`}>
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium text-gray-800">{pro.name}</span>
+                      <span className="text-xs text-gray-400 ml-2">{pro.email}</span>
+                      {pro.active === false && <span className="text-xs text-red-400 ml-2">(account disattivato)</span>}
+                    </div>
                     <button
-                      onClick={() => toggleAssignment(a)}
-                      disabled={assignBusy === (a.professional_id || a.professionals?.id)}
-                      className={`text-xs font-semibold px-2.5 py-1 rounded-lg border disabled:opacity-50 ${a.active ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-700 hover:bg-green-50'}`}>
-                      {assignBusy === (a.professional_id || a.professionals?.id) ? '…' : (a.active ? 'Disabilita' : 'Riattiva')}
+                      onClick={() => togglePro(pro)}
+                      disabled={assignBusy === pro.id}
+                      role="switch"
+                      aria-checked={active}
+                      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${active ? 'bg-green-500' : 'bg-gray-300'}`}
+                      title={active ? 'Assegnato — clicca per togliere' : 'Non assegnato — clicca per assegnare'}
+                    >
+                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${active ? 'translate-x-5' : 'translate-x-0.5'}`} />
                     </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -753,6 +792,7 @@ ${FIRMA}`;
                     <th className="text-center px-3 py-2">NRS inizio</th>
                     <th className="text-center px-3 py-2">NRS fine</th>
                     <th className="text-center px-3 py-2">Delta</th>
+                    <th className="text-left px-3 py-2">Professionista</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -779,6 +819,23 @@ ${FIRMA}`;
                               {delta > 0 ? '+' : ''}{delta}
                             </span>
                           ) : '—'}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {assignedPros.length === 0 ? (
+                            <span className="text-xs text-gray-300">— assegna prima un professionista all&apos;azienda</span>
+                          ) : (
+                            <select
+                              value={patientPro[p.id] || ''}
+                              onChange={e => assignPatientPro(p.id, e.target.value)}
+                              disabled={patientProBusy === p.id}
+                              className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                            >
+                              <option value="">— non assegnato</option>
+                              {assignedPros.map(pro => (
+                                <option key={pro.id} value={pro.id}>{pro.name}</option>
+                              ))}
+                            </select>
+                          )}
                         </td>
                       </tr>
                     );
@@ -1364,12 +1421,13 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
   const client = await getClientById(clientId);
   if (!client) return { notFound: true };
 
-  const [{ assessments, responses }, assignments, patientsRaw, sessionsRaw, referralCodes] = await Promise.all([
+  const [{ assessments, responses }, assignments, patientsRaw, sessionsRaw, referralCodes, allProfessionals] = await Promise.all([
     getResponsesForClient(clientId),
     getAssignmentsByClient(clientId),
     getPatientsByClient(clientId),
     getSessionsForClient(clientId),
     getReferralCodesByClient(clientId),
+    getProfessionals().catch(() => []),
   ]);
 
   // Carica consensi per ogni assessment chiuso
@@ -1396,6 +1454,7 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
       level: p.level || null,
       care_token: p.care_token || null,
       email: p.email || null,
+      assigned_professional_id: p.assigned_professional_id || null,
       assessment_completed_at: p.assessment_completed_at || null,
       assessment_invite_sent_at: p.assessment_invite_sent_at || null,
       session_count: closed.length,
@@ -1417,5 +1476,5 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     generatedReports = await getGeneratedReportsByClient(clientId);
   } catch (_) {}
 
-  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist, generatedReports } };
+  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist, generatedReports, allProfessionals } };
 });

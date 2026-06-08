@@ -180,8 +180,8 @@ info@essentiasalutis.it`;
                   className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Password iniziale *</label>
-                <input type="password" value={form.password} onChange={e => set('password', e.target.value)} required minLength={8}
+                <label className="text-xs text-gray-500 block mb-1">Password iniziale * <span className="text-gray-300">(visibile)</span></label>
+                <input type="text" value={form.password} onChange={e => set('password', e.target.value)} required minLength={8}
                   placeholder="min. 8 caratteri"
                   className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               </div>

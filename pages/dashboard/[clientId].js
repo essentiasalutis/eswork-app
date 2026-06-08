@@ -951,7 +951,7 @@ ${FIRMA}`;
           </div>
           {referralCodes.length === 0 ? (
             <div className="bg-orange-50 rounded-xl border border-orange-200 px-4 py-3 text-sm text-orange-600">
-              Nessun codice ancora generato. I codici vengono creati automaticamente alla chiusura di un assessment.
+              Nessun codice ancora generato. Crea un codice con i pulsanti “+ Codice P/F” quando vuoi attivare il referral B2C per questa azienda.
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">

@@ -1,17 +1,10 @@
 import { requireAuth } from '../../../lib/auth';
 import {
   getAssessmentById,
-  getClientById,
   getResponsesByAssessment,
   updateAssessment,
   deleteAssessmentById,
-  buildReferralCode,
-  countReferralPairsForClient,
-  insertReferralCode,
 } from '../../../lib/store';
-
-const DISCOUNT_PRICE = 65.00; // prezzo scontato 20% (su base ~81€)
-const VALIDITY_MONTHS = 12;
 
 export default requireAuth(async function handler(req, res) {
   const { id } = req.query;
@@ -28,45 +21,8 @@ export default requireAuth(async function handler(req, res) {
     try {
       const { status } = req.body;
       const updated = await updateAssessment(id, { status });
-
-      // Auto-genera coppia P+F alla chiusura
-      if (status === 'closed' && assessment.status !== 'closed') {
-        try {
-          const client = await getClientById(assessment.client_id);
-          if (client) {
-            const pairs = await countReferralPairsForClient(assessment.client_id);
-            const seq = pairs + 1;
-            const expiresAt = new Date();
-            expiresAt.setMonth(expiresAt.getMonth() + VALIDITY_MONTHS);
-
-            const [codeP, codeF] = await Promise.all([
-              insertReferralCode({
-                client_id: assessment.client_id,
-                assessment_id: id,
-                code: buildReferralCode(client.name, seq, 'P'),
-                type: 'P',
-                expires_at: expiresAt.toISOString(),
-                max_uses: null,   // illimitato
-                session_price: DISCOUNT_PRICE,
-              }),
-              insertReferralCode({
-                client_id: assessment.client_id,
-                assessment_id: id,
-                code: buildReferralCode(client.name, seq, 'F'),
-                type: 'F',
-                expires_at: expiresAt.toISOString(),
-                max_uses: 1,      // una sola intestazione familiare
-                session_price: DISCOUNT_PRICE,
-              }),
-            ]);
-
-            return res.json({ ...updated, referral_code_p: codeP.code, referral_code_f: codeF.code });
-          }
-        } catch (refErr) {
-          console.error('[referral] auto-generate failed:', refErr.message);
-        }
-      }
-
+      // I codici referral B2C NON si generano più in automatico alla chiusura:
+      // sono opt-in (l'admin li crea coi pulsanti "+ Codice P/F" sulla scheda azienda).
       return res.json(updated);
     } catch (e) {
       return res.status(500).json({ error: e.message });

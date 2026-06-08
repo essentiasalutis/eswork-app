@@ -11,7 +11,7 @@ const WA_ICON = (
   </svg>
 );
 
-export default function CarePage({ code, clientName, type, expiresAt, valid }) {
+export default function CarePage({ code, clientName, type, expiresAt, valid, discountPct = 10 }) {
   const [name, setName] = useState('');
 
   function handleWhatsApp(e) {
@@ -132,8 +132,8 @@ export default function CarePage({ code, clientName, type, expiresAt, valid }) {
 
               <p style={{ color: '#475569', fontSize: 14, margin: '0 0 6px', lineHeight: 1.6 }}>
                 {type === 'F'
-                  ? <>Sei il familiare convivente di un dipendente{clientName ? <> di <strong>{clientName}</strong></> : ''} che partecipa al programma <strong>ES Work</strong>. Hai diritto alla <strong>tariffa agevolata (sconto 20%)</strong> per le tue sedute osteopatiche.</>
-                  : <>{clientName ? <>La tua azienda (<strong>{clientName}</strong>) ti ha </> : 'Hai '}fornito questo codice per accedere alle prestazioni osteopatiche a <strong>tariffa agevolata (sconto 20%)</strong> tramite il programma <strong>ES Work</strong>.</>
+                  ? <>Sei il familiare convivente di un dipendente{clientName ? <> di <strong>{clientName}</strong></> : ''} che partecipa al programma <strong>ES Work</strong>. Hai diritto alla <strong>tariffa agevolata (sconto {discountPct}%)</strong> per le tue sedute osteopatiche.</>
+                  : <>{clientName ? <>La tua azienda (<strong>{clientName}</strong>) ti ha </> : 'Hai '}fornito questo codice per accedere alle prestazioni osteopatiche a <strong>tariffa agevolata (sconto {discountPct}%)</strong> tramite il programma <strong>ES Work</strong>.</>
                 }
               </p>
 
@@ -264,12 +264,15 @@ export default function CarePage({ code, clientName, type, expiresAt, valid }) {
 export async function getServerSideProps({ params }) {
   const code = (params.code || '').toUpperCase();
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  // Solo il numero dello sconto viene esposto al bundle pubblico (non tutto CONFIG).
+  const { CONFIG } = require('../../lib/config');
+  const discountPct = CONFIG.referral_discount_pct ?? 10;
   try {
     const res = await fetch(`${baseUrl}/api/referrals/${code}`);
-    if (!res.ok) return { props: { code, clientName: '', valid: false } };
+    if (!res.ok) return { props: { code, clientName: '', valid: false, discountPct } };
     const data = await res.json();
-    return { props: { code: data.code, clientName: data.clientName, type: data.type || 'P', expiresAt: data.expiresAt || null, valid: true } };
+    return { props: { code: data.code, clientName: data.clientName, type: data.type || 'P', expiresAt: data.expiresAt || null, valid: true, discountPct } };
   } catch {
-    return { props: { code, clientName: '', valid: false } };
+    return { props: { code, clientName: '', valid: false, discountPct } };
   }
 }

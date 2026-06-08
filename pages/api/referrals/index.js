@@ -8,8 +8,8 @@ import {
   countReferralPairsForClient,
   insertReferralCode,
 } from '../../../lib/store';
+import { CONFIG } from '../../../lib/config';
 
-const DISCOUNT_PRICE = 65.00;
 const VALIDITY_MONTHS = 12;
 
 export default requireAuth(async function handler(req, res) {
@@ -54,7 +54,7 @@ export default requireAuth(async function handler(req, res) {
         type,
         expires_at: expiresAt.toISOString(),
         max_uses: type === 'F' ? 1 : null,
-        session_price: DISCOUNT_PRICE,
+        session_price: CONFIG.referral_session_price ?? 65,
       });
 
       return res.json(referral);

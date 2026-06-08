@@ -133,10 +133,10 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, date }) 
   // I nomi dei tier NON compaiono nel PDF: cambia solo il contenuto mostrato.
   const offerTier = calc?.tier || 'core';
   const withPrevention = offerTier === 'plus' || offerTier === 'enterprise';
-  const showMgmtValues = offerTier === 'plus' || offerTier === 'enterprise';
   const mgmtServices = (CONFIG.management_services && CONFIG.management_services[offerTier])
     || (CONFIG.management_services && CONFIG.management_services.core) || [];
   const mgmtTotal = mgmtServices.reduce((s, x) => s + (x.value || 0), 0);
+  const showMgmtValues = mgmtTotal > 0;
 
   function openOfferEmail() {
     const referente = client.contact_name ? `Gentile ${client.contact_name},` : `Gentile referente,`;
@@ -194,6 +194,7 @@ ${FIRMA}`;
         }
         .page-break { page-break-after: always; }
         .page-before { page-break-before: always; break-inside: avoid; page-break-inside: avoid; }
+        .page-keep { break-inside: avoid; page-break-inside: avoid; }
         .section-sep {
           border: none;
           border-top: 1px solid #e5e7eb;
@@ -429,22 +430,22 @@ ${FIRMA}`;
           Investimento (subito sotto, niente interruzione)
           ══════════════════════════════════════════════════════════════ */}
       {calc && (
-        <Page>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 16 }}>Investimento</div>
+        <Page className="page-keep">
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginBottom: 10 }}>Investimento</div>
 
           {/* Anno 1 */}
-          <div style={{ background: '#16a34a', borderRadius: 18, padding: '18px 24px', color: 'white', marginBottom: 14, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-            <div style={{ fontSize: 10, opacity: 0.9, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>Anno 1 — Programma completo</div>
-            <div style={{ fontSize: 40, fontWeight: 900 }}>{fmt(calc.price_y1)}</div>
-            <div style={{ fontSize: 13, opacity: 0.95, marginTop: 2 }}>
+          <div style={{ background: '#16a34a', borderRadius: 14, padding: '12px 18px', color: 'white', marginBottom: 10, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+            <div style={{ fontSize: 9, opacity: 0.9, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 1 }}>Anno 1 — Programma completo</div>
+            <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1.1 }}>{fmt(calc.price_y1)}</div>
+            <div style={{ fontSize: 12, opacity: 0.95, marginTop: 1 }}>
               {fmt(calc.price_monthly_y1)}/mese · {fmt(calc.price_per_employee_y1)}/dipendente
             </div>
           </div>
 
           {/* ── BLOCCO A — Servizi clinici ── */}
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#1e293b', marginBottom: 8 }}>Il programma include</div>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 6 }}>Servizi clinici</div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#1e293b', marginBottom: 3 }}>Il programma include</div>
+          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 3 }}>Servizi clinici</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 9.5, marginBottom: 10 }}>
             <tbody>
               {[
                 ['Assessment iniziale + Report di Attivazione', 'Fotografia clinica della salute muscolo-scheletrica dell\'intera popolazione aziendale. Ogni dipendente compila un questionario validato in meno di 5 minuti. Produce la stratificazione dei bisogni e il piano di intervento personalizzato per la vostra azienda.'],
@@ -454,89 +455,79 @@ ${FIRMA}`;
                 [`Formazione postura ed ergonomia (${calc.training_sessions_y1} sessioni)`, 'Sessioni collettive in piccoli gruppi su postura, ergonomia e prevenzione dei disturbi muscolo-scheletrici, calibrate sul vostro settore. Anno 1: due moduli dedicati (prevenzione attiva). Anni successivi: un modulo avanzato (correlazione con alimentazione, attività motoria e benessere psicofisico).'],
               ].map(([servizio, dettaglio], i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  <td style={{ padding: '7px 10px', fontWeight: 600, color: '#1e293b', width: '34%', verticalAlign: 'top' }}>{servizio}</td>
-                  <td style={{ padding: '7px 10px', color: '#4b5563', lineHeight: 1.5 }}>{dettaglio}</td>
+                  <td style={{ padding: '4px 8px', fontWeight: 600, color: '#1e293b', width: '34%', verticalAlign: 'top' }}>{servizio}</td>
+                  <td style={{ padding: '4px 8px', color: '#4b5563', lineHeight: 1.4 }}>{dettaglio}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
           {/* ── BLOCCO B — Servizi di piattaforma e gestione (sfondo distinto) ── */}
-          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 14, padding: '14px 16px', marginBottom: 14, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#16a34a', textTransform: 'uppercase', marginBottom: 10 }}>Servizi di piattaforma e gestione</div>
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '10px 12px', marginBottom: 10, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: '#16a34a', textTransform: 'uppercase', marginBottom: 6 }}>Servizi di piattaforma e gestione</div>
             {mgmtServices.map((s, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, padding: '7px 0', borderBottom: i < mgmtServices.length - 1 ? '1px solid #dcfce7' : 'none' }}>
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, padding: '4px 0', borderBottom: i < mgmtServices.length - 1 ? '1px solid #dcfce7' : 'none' }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#1e293b' }}>{s.label}</div>
-                  {s.desc && <div style={{ fontSize: 10, color: '#4b5563', lineHeight: 1.5, marginTop: 2 }}>{s.desc}</div>}
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#1e293b' }}>{s.label}</div>
+                  {s.note && <div style={{ fontSize: 9, color: '#4b5563', lineHeight: 1.4, marginTop: 1 }}>{s.note}</div>}
                 </div>
                 {showMgmtValues && s.value != null && (
-                  <div style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap', flexShrink: 0, paddingTop: 1 }}>valore {fmt(s.value)}/anno</div>
+                  <div style={{ fontSize: 10, color: '#6b7280', whiteSpace: 'nowrap', flexShrink: 0, paddingTop: 1 }}>valore {fmt(s.value)}/anno</div>
                 )}
               </div>
             ))}
             {showMgmtValues ? (
-              <div style={{ marginTop: 12, paddingTop: 10, borderTop: '2px solid #16a34a' }}>
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '2px solid #16a34a' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b' }}>Valore dei servizi di piattaforma e gestione</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#1e293b' }}>{fmt(mgmtTotal)}/anno</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#1e293b' }}>Valore dei servizi di piattaforma e gestione</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#1e293b' }}>{fmt(mgmtTotal)}/anno</div>
                 </div>
-                <div style={{ fontSize: 10.5, color: '#15803d', lineHeight: 1.6, marginTop: 6 }}>
+                <div style={{ fontSize: 9.5, color: '#15803d', lineHeight: 1.5, marginTop: 4 }}>
                   Tutte queste voci sono parte integrante del programma e sono <strong>già comprese nell&apos;investimento annuale di {fmt(calc.price_y1)}</strong>: l&apos;azienda riceve questo valore in aggiunta ai servizi clinici, all&apos;interno dello stesso investimento.
                 </div>
               </div>
             ) : (
-              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #dcfce7', fontSize: 11, fontWeight: 600, color: '#16a34a' }}>
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #dcfce7', fontSize: 10, fontWeight: 600, color: '#16a34a' }}>
                 Tutti i servizi di piattaforma e gestione sono inclusi nel programma annuale.
               </div>
             )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-            {/* Anno 2 */}
-            <div style={{ background: '#eff6ff', borderRadius: 14, padding: 14, border: '1px solid #bfdbfe', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-              <div style={{ fontSize: 10, color: '#2563eb', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Stima Anno 2+</div>
-              <div style={{ fontSize: 26, fontWeight: 800, color: '#1d4ed8' }}>{fmt(calc.price_y2)}</div>
-              <div style={{ fontSize: 11, color: '#2563eb' }}>Estensione a {calc.pop_y2} dip. (mantenimento + prevenzione)</div>
+          {/* Anno 2 — descrizione + cifra (perché quel valore) */}
+          <div style={{ background: '#eff6ff', borderRadius: 12, padding: '10px 14px', border: '1px solid #bfdbfe', marginBottom: 10, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+              <div style={{ fontSize: 9, color: '#2563eb', letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700 }}>Stima Anno 2+</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#1d4ed8' }}>{fmt(calc.price_y2)}/anno</div>
             </div>
-            {/* ROI */}
-            {roi ? (
-              <div style={{ background: '#fffbeb', borderRadius: 14, padding: 14, border: '1px solid #fde68a', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                <div style={{ fontSize: 10, color: '#ca8a04', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>Analisi ROI</div>
-                <div style={{ fontSize: 11, color: '#374151' }}>Stima costo assenze: <strong>{fmt(roi.estimated_cost)}</strong></div>
-                <div style={{ fontSize: 11, color: '#374151', marginTop: 4 }}>Break-even con riduzione: <strong style={{ color: '#ca8a04' }}>{roi.breakeven_pct}%</strong></div>
-                {roi.saving_15pct > 0 && (
-                  <div style={{ fontSize: 11, color: '#374151', marginTop: 4 }}>Risparmio netto (−15% assenze): <strong style={{ color: '#16a34a' }}>{fmt(roi.saving_15pct)}</strong></div>
-                )}
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <div style={{ background: '#fef2f2', borderRadius: 12, padding: 12, border: '1px solid #fecaca', textAlign: 'center', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', marginBottom: 4 }}>Dip. TRATTATO</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#dc2626' }}>{calc.hours_treated}h/anno</div>
-                  <div style={{ fontSize: 9, color: '#4b5563', marginTop: 2 }}>Tratt. + formazione</div>
-                </div>
-                <div style={{ background: '#f0fdf4', borderRadius: 12, padding: 12, border: '1px solid #bbf7d0', textAlign: 'center', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#16a34a', marginBottom: 4 }}>Dip. NON trattato</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#16a34a' }}>{calc.hours_untreated}h/anno</div>
-                  <div style={{ fontSize: 9, color: '#4b5563', marginTop: 2 }}>Solo formazione</div>
-                </div>
-              </div>
-            )}
+            <div style={{ fontSize: 9.5, color: '#1e3a8a', lineHeight: 1.5, marginTop: 4 }}>
+              Dal secondo anno il programma entra nella fase di <strong>mantenimento e prevenzione</strong>, estesa ai dipendenti di Livello 1 e Livello 2 ({calc.pop_y2} persone): sportello osteopatico per consolidare i risultati, prevenzione attiva, un modulo formativo avanzato, piattaforma con AI, monitoraggio continuo e Report Annuale. L&apos;investimento si riduce rispetto all&apos;Anno 1 perché la fase intensiva iniziale di trattamento è già stata completata: si protegge il risultato raggiunto e si previene la ricaduta.
+            </div>
           </div>
 
-          {/* Tempo dipendenti (se ROI presente, mostralo in riga separata) */}
+          {/* Tempo dipendenti */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: roi ? 10 : 0 }}>
+            <div style={{ background: '#fef2f2', borderRadius: 12, padding: '8px 10px', border: '1px solid #fecaca', textAlign: 'center', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#dc2626', marginBottom: 2 }}>Dipendente TRATTATO</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#dc2626' }}>{calc.hours_treated}h/anno</div>
+              <div style={{ fontSize: 8.5, color: '#4b5563' }}>Trattamento + formazione · meno di 1h/mese</div>
+            </div>
+            <div style={{ background: '#f0fdf4', borderRadius: 12, padding: '8px 10px', border: '1px solid #bbf7d0', textAlign: 'center', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#16a34a', marginBottom: 2 }}>Dipendente NON trattato</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#16a34a' }}>{calc.hours_untreated}h/anno</div>
+              <div style={{ fontSize: 8.5, color: '#4b5563' }}>Solo formazione collettiva</div>
+            </div>
+          </div>
+
+          {/* ROI (solo se disponibili i giorni di assenza) */}
           {roi && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div style={{ background: '#fef2f2', borderRadius: 12, padding: 12, border: '1px solid #fecaca', textAlign: 'center', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', marginBottom: 4 }}>Dipendente TRATTATO</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#dc2626' }}>{calc.hours_treated}h/anno</div>
-                <div style={{ fontSize: 9, color: '#4b5563' }}>Trattamento + formazione · meno di 1h/mese</div>
-              </div>
-              <div style={{ background: '#f0fdf4', borderRadius: 12, padding: 12, border: '1px solid #bbf7d0', textAlign: 'center', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#16a34a', marginBottom: 4 }}>Dipendente NON trattato</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#16a34a' }}>{calc.hours_untreated}h/anno</div>
-                <div style={{ fontSize: 9, color: '#4b5563' }}>Solo formazione collettiva</div>
+            <div style={{ background: '#fffbeb', borderRadius: 12, padding: '10px 14px', border: '1px solid #fde68a', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+              <div style={{ fontSize: 9, color: '#ca8a04', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Analisi ROI</div>
+              <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', fontSize: 10, color: '#374151' }}>
+                <span>Stima costo assenze: <strong>{fmt(roi.estimated_cost)}</strong></span>
+                <span>Break-even con riduzione: <strong style={{ color: '#ca8a04' }}>{roi.breakeven_pct}%</strong></span>
+                {roi.saving_15pct > 0 && (
+                  <span>Risparmio netto (−15% assenze): <strong style={{ color: '#16a34a' }}>{fmt(roi.saving_15pct)}</strong></span>
+                )}
               </div>
             </div>
           )}
@@ -544,9 +535,9 @@ ${FIRMA}`;
       )}
 
       {/* ══════════════════════════════════════════════════════════════
-          PAG 5 — Come funziona + Footer (pagina dedicata)
+          PAG 5 — Come funziona + Footer (flusso continuo, tenuta insieme)
           ══════════════════════════════════════════════════════════════ */}
-      <Page className="page-before">
+      <Page className="page-keep">
         <div>
         {/* — Come funziona — */}
         <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 14 }}>Come funziona</div>

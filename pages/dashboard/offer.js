@@ -478,10 +478,12 @@ ${FIRMA}`;
             {showMgmtValues ? (
               <div style={{ marginTop: 12, paddingTop: 10, borderTop: '2px solid #16a34a' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b' }}>Valore servizi di gestione</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#1e293b' }}>Valore dei servizi di piattaforma e gestione</div>
                   <div style={{ fontSize: 16, fontWeight: 800, color: '#1e293b' }}>{fmt(mgmtTotal)}/anno</div>
                 </div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', textAlign: 'right', marginTop: 2 }}>Incluso nel programma annuale</div>
+                <div style={{ fontSize: 10.5, color: '#15803d', lineHeight: 1.6, marginTop: 6 }}>
+                  Tutte queste voci sono parte integrante del programma e sono <strong>già comprese nell&apos;investimento annuale di {fmt(calc.price_y1)}</strong>: l&apos;azienda riceve questo valore in aggiunta ai servizi clinici, all&apos;interno dello stesso investimento.
+                </div>
               </div>
             ) : (
               <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #dcfce7', fontSize: 11, fontWeight: 600, color: '#16a34a' }}>

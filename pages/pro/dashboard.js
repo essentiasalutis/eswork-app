@@ -100,7 +100,8 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   const clients = await Promise.all(
     assignments.map(async (a) => {
       const patients = await getPatientsByClient(a.client_id);
-      return { client: a.clients, patientCount: patients.length };
+      const mine = (patients || []).filter(p => p.assigned_professional_id === proId);
+      return { client: a.clients, patientCount: mine.length };
     })
   );
 

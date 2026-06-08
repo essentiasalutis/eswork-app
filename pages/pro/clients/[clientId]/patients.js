@@ -96,8 +96,7 @@ function NewPatientForm({ clientId, proName, onCreated, onCancel }) {
 }
 
 export default function PatientsPage({ proName, client, patients: initial, proId }) {
-  const [patients, setPatients] = useState(initial);
-  const [showNew, setShowNew] = useState(false);
+  const [patients] = useState(initial);
 
   async function logout() {
     await fetch('/api/pro/auth/logout', { method: 'POST' });
@@ -117,30 +116,15 @@ export default function PatientsPage({ proName, client, patients: initial, proId
             <div className="font-semibold text-gray-900 truncate">{client.name}</div>
             <div className="text-xs text-gray-500">Pazienti assegnati</div>
           </div>
-          <button
-            onClick={() => setShowNew(true)}
-            className="bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl whitespace-nowrap"
-          >
-            + Paziente
-          </button>
         </div>
         <div className="text-center text-xs text-gray-300 pb-1">{proName} — Essentia Salutis</div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-5">
-        {showNew && (
-          <NewPatientForm
-            clientId={client.id}
-            proName={proName}
-            onCreated={p => { setPatients(prev => [p, ...prev]); setShowNew(false); }}
-            onCancel={() => setShowNew(false)}
-          />
-        )}
-
-        {patients.length === 0 && !showNew && (
+        {patients.length === 0 && (
           <div className="text-center py-16 text-gray-400">
             <div className="text-4xl mb-3">👤</div>
-            <p>Nessun paziente ancora.<br />Crea il primo paziente con il pulsante in alto.</p>
+            <p>Nessun paziente assegnato a te in quest&apos;azienda.<br />I pazienti compaiono qui dopo l&apos;assegnazione (da admin) o la pre-validazione dalla lista d&apos;attesa.</p>
           </div>
         )}
 
@@ -153,15 +137,7 @@ export default function PatientsPage({ proName, client, patients: initial, proId
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="font-semibold text-gray-900 flex items-center gap-2">
-                    {p.first_name} {p.last_name}
-                    {p.assigned_professional_id === proId && (
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">assegnato a te</span>
-                    )}
-                    {p.assigned_professional_id && p.assigned_professional_id !== proId && (
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">altro professionista</span>
-                    )}
-                  </div>
+                  <div className="font-semibold text-gray-900">{p.first_name} {p.last_name}</div>
                   <div className="text-sm text-gray-500 mt-0.5">
                     {p.age ? `${p.age} anni · ` : ''}{p.gender} · {p.job_activity || '—'}
                   </div>
@@ -196,11 +172,13 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   const allowed = assignments.some(a => a.client_id === clientId);
   if (!allowed) return { notFound: true };
 
-  const [client, patients] = await Promise.all([
+  const [client, allPatients] = await Promise.all([
     getClientById(clientId),
     getPatientsByClient(clientId),
   ]);
 
   if (!client) return { notFound: true };
+  // v4: solo i pazienti assegnati a questo professionista
+  const patients = (allPatients || []).filter(p => p.assigned_professional_id === proId);
   return { props: { proName, client, patients, proId } };
 });

@@ -150,6 +150,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
     return m;
   });
   const [assignBusy, setAssignBusy] = useState(null); // professional_id in corso
+  const [showProList, setShowProList] = useState(false); // elenco professionisti a scomparsa
   const [showNew, setShowNew] = useState(false);
 
   // Assegna / togli un professionista a questa azienda (flag on/off)
@@ -175,6 +176,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
 
   // Professionisti assegnati attivi (opzioni per l'assegnazione dei pazienti)
   const assignedPros = (allProfessionals || []).filter(p => assignedActive[p.id]);
+  const assignedCount = assignedPros.length;
 
   // Mappa paziente→professionista referente
   const [patientPro, setPatientPro] = useState(() =>
@@ -706,40 +708,51 @@ ${FIRMA}`;
           </div>
         )}
 
-        {/* ── Professionisti assegnati ────────────────────────────────── */}
+        {/* ── Professionisti assegnati (elenco a scomparsa) ───────────── */}
         <div className="mb-5">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Professionisti assegnati</h2>
-          </div>
-          {(!allProfessionals || allProfessionals.length === 0) ? (
-            <div className="bg-gray-50 rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-400">
-              Nessun professionista creato. Creane uno dal menu <Link href="/dashboard/professionals" className="text-blue-500 hover:underline">Professionisti</Link>.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {allProfessionals.map(pro => {
-                const active = !!assignedActive[pro.id];
-                return (
-                  <div key={pro.id} className={`bg-white rounded-xl border px-4 py-2.5 flex items-center justify-between gap-3 ${active ? 'border-green-200' : 'border-gray-200'}`}>
-                    <div className="min-w-0">
-                      <span className="text-sm font-medium text-gray-800">{pro.name}</span>
-                      <span className="text-xs text-gray-400 ml-2">{pro.email}</span>
-                      {pro.active === false && <span className="text-xs text-red-400 ml-2">(account disattivato)</span>}
+          <button
+            onClick={() => setShowProList(v => !v)}
+            className="w-full flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50"
+          >
+            <span className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Professionisti</span>
+            <span className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">{assignedCount > 0 ? `${assignedCount} assegnat${assignedCount === 1 ? 'o' : 'i'}` : 'nessuno assegnato'}</span>
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${showProList ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </span>
+          </button>
+          {showProList && (
+            (!allProfessionals || allProfessionals.length === 0) ? (
+              <div className="mt-2 bg-gray-50 rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-400">
+                Nessun professionista creato. Creane uno dal menu <Link href="/dashboard/professionals" className="text-blue-500 hover:underline">Professionisti</Link>.
+              </div>
+            ) : (
+              <div className="mt-2 space-y-2">
+                {allProfessionals.map(pro => {
+                  const active = !!assignedActive[pro.id];
+                  return (
+                    <div key={pro.id} className={`bg-white rounded-xl border px-4 py-2.5 flex items-center justify-between gap-3 ${active ? 'border-green-200' : 'border-gray-200'}`}>
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium text-gray-800">{pro.name}</span>
+                        <span className="text-xs text-gray-400 ml-2">{pro.email}</span>
+                        {pro.active === false && <span className="text-xs text-red-400 ml-2">(account disattivato)</span>}
+                      </div>
+                      <button
+                        onClick={() => togglePro(pro)}
+                        disabled={assignBusy === pro.id}
+                        role="switch"
+                        aria-checked={active}
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${active ? 'bg-green-500' : 'bg-gray-300'}`}
+                        title={active ? 'Assegnato — clicca per togliere' : 'Non assegnato — clicca per assegnare'}
+                      >
+                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${active ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => togglePro(pro)}
-                      disabled={assignBusy === pro.id}
-                      role="switch"
-                      aria-checked={active}
-                      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${active ? 'bg-green-500' : 'bg-gray-300'}`}
-                      title={active ? 'Assegnato — clicca per togliere' : 'Non assegnato — clicca per assegnare'}
-                    >
-                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${active ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )
           )}
         </div>
 

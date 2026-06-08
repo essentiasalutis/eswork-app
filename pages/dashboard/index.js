@@ -6,7 +6,7 @@ import { getClients, getAssessmentCounts, getAllAcuteEvents } from '../../lib/st
 import NavMenu from '../../components/NavMenu';
 import { TYPE_COLORS, TYPE_LABELS } from '../../lib/scoring';
 
-export default function Dashboard({ clients: initialClients, assessmentCounts, checkpointReminders, pendingAcuteCount }) {
+export default function Dashboard({ clients: initialClients, assessmentCounts, pendingAcuteCount }) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
 
@@ -48,22 +48,6 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, c
             + Nuova azienda
           </button>
         </div>
-
-        {checkpointReminders && checkpointReminders.length > 0 && (
-          <div className="mb-4 space-y-2">
-            {checkpointReminders.map(r => (
-              <Link key={r.clientId + r.type} href={`/dashboard/${r.clientId}`}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium ${r.overdue ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
-                <span>📅</span>
-                <span className="flex-1">
-                  <strong>{r.clientName}</strong> — Checkpoint {r.type.toUpperCase()}
-                  {r.overdue ? ` scaduto ${Math.abs(r.days)} giorni fa` : ` tra ${r.days} giorni`}
-                </span>
-                <span>→</span>
-              </Link>
-            ))}
-          </div>
-        )}
 
         <div className="space-y-3">
           {clients.length === 0 && (
@@ -132,27 +116,5 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     pendingAcuteCount = 0;
   }
 
-  // Calcola reminder checkpoint
-  const checkpointReminders = [];
-  clients.forEach(c => {
-    if (!c.contract_start_date) return;
-    const start = new Date(c.contract_start_date);
-    const now = new Date();
-    [{ type: 't3', months: 3 }, { type: 't6', months: 6 }].forEach(({ type, months }) => {
-      const date = new Date(start);
-      date.setMonth(date.getMonth() + months);
-      const days = Math.round((date - now) / (1000*60*60*24));
-      if (days <= 14 && days >= -30) {
-        checkpointReminders.push({
-          clientId: c.id,
-          clientName: c.name,
-          type,
-          days,
-          overdue: days < 0,
-        });
-      }
-    });
-  });
-
-  return { props: { clients, assessmentCounts, checkpointReminders, pendingAcuteCount } };
+  return { props: { clients, assessmentCounts, pendingAcuteCount } };
 });

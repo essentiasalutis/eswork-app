@@ -83,42 +83,6 @@ function EmailModal({ to, subject, body, onClose }) {
 
 // ─── Checkpoint Patient Row ───────────────────────────────────────────────────
 
-function CheckpointPatientRow({ patient }) {
-  const [copied, setCopied] = useState(null); // 't3' | 't6' | null
-
-  function copy(type) {
-    const base = `${window.location.origin}/checkin/${patient.care_token}`;
-    const url = `${base}?mode=checkpoint&type=${type}`;
-    navigator.clipboard.writeText(url).then(() => {
-      setCopied(type);
-      setTimeout(() => setCopied(null), 2000);
-    });
-  }
-
-  const levelLabels = { level1: 'L1', level2: 'L2', level3: 'L3' };
-  const levelColors = { level1: '#dc2626', level2: '#ca8a04', level3: '#16a34a' };
-
-  return (
-    <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2">
-      <span className="text-xs font-bold px-1.5 py-0.5 rounded shrink-0"
-        style={{ color: levelColors[patient.level], background: levelColors[patient.level] + '20' }}>
-        {levelLabels[patient.level]}
-      </span>
-      <span className="text-sm text-gray-700 flex-1 truncate">{patient.name}</span>
-      <button onClick={() => copy('t3')}
-        className="text-xs px-2 py-1 rounded-lg border border-blue-200 text-blue-700 bg-blue-50 font-medium shrink-0">
-        {copied === 't3' ? '✓' : 'T3'}
-      </button>
-      <button onClick={() => copy('t6')}
-        className="text-xs px-2 py-1 rounded-lg border border-indigo-200 text-indigo-700 bg-indigo-50 font-medium shrink-0">
-        {copied === 't6' ? '✓' : 'T6'}
-      </button>
-    </div>
-  );
-}
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
 // ─── NRS bar inline ───────────────────────────────────────────────────────────
 
 function NrsBar({ value, max = 10 }) {
@@ -217,8 +181,6 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [referralCodes, setReferralCodes] = useState(initialReferralCodes || []);
   const [copiedReferral, setCopiedReferral] = useState(null);
   const [generatingCode, setGeneratingCode] = useState(null); // 'P' | 'F' | null
-  const [contractStart, setContractStart] = useState(initialClient.contract_start_date || '');
-  const [savingDate, setSavingDate] = useState(false);
   const [waitlist, setWaitlist] = useState(initialWaitlist || []);
   const [generatedReports, setGeneratedReports] = useState(initialReports || []);
   const [generatingReport, setGeneratingReport] = useState(null); // 'activation'|'t3'|'t6'|null
@@ -469,16 +431,6 @@ ${FIRMA}`;
     if (!confirm(msg)) return;
     const res = await fetch(`/api/referrals/manage/${rc.id}`, { method: 'DELETE' });
     if (res.ok) setReferralCodes(prev => prev.filter(c => c.id !== rc.id));
-  }
-
-  async function saveContractDate() {
-    setSavingDate(true);
-    await fetch(`/api/clients/${client.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contract_start_date: contractStart || null }),
-    });
-    setSavingDate(false);
   }
 
   function openCalculator(a) {
@@ -858,86 +810,6 @@ ${FIRMA}`;
             </div>
           </div>
         )}
-
-        {/* ── Campagna Checkpoint ─────────────────────────────── */}
-        <div className="mb-5 bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <div className="font-semibold text-gray-900 text-sm">📅 Campagna Checkpoint</div>
-              <div className="text-xs text-gray-500 mt-0.5">Link T3/T6 da inviare ai dipendenti L2/L3</div>
-            </div>
-          </div>
-
-          {!contractStart ? (
-            <div className="p-5">
-              <p className="text-sm text-gray-600 mb-3">Imposta la data di inizio contratto per calcolare le scadenze T3 e T6.</p>
-              <div className="flex gap-2">
-                <input type="date" value={contractStart} onChange={e => setContractStart(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                <button onClick={saveContractDate} disabled={!contractStart || savingDate}
-                  className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50">
-                  {savingDate ? '...' : 'Salva'}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="p-5 space-y-4">
-              {/* Date T3 e T6 */}
-              {(() => {
-                const start = new Date(contractStart);
-                const t3 = new Date(start); t3.setMonth(t3.getMonth() + 3);
-                const t6 = new Date(start); t6.setMonth(t6.getMonth() + 6);
-                const now = new Date();
-                const daysToT3 = Math.round((t3 - now) / (1000*60*60*24));
-                const daysToT6 = Math.round((t6 - now) / (1000*60*60*24));
-                const fmt = d => d.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
-                return (
-                  <div className="grid grid-cols-2 gap-3">
-                    {[{ label: 'Checkpoint T3', date: t3, days: daysToT3, type: 't3', color: 'blue' },
-                      { label: 'Checkpoint T6', date: t6, days: daysToT6, type: 't6', color: 'indigo' }].map(({ label, date, days, color }) => (
-                      <div key={label} className={`rounded-xl p-3 border ${color === 'blue' ? 'bg-blue-50 border-blue-200' : 'bg-indigo-50 border-indigo-200'}`}>
-                        <div className={`text-xs font-bold ${color === 'blue' ? 'text-blue-700' : 'text-indigo-700'} mb-1`}>{label}</div>
-                        <div className={`text-sm font-semibold ${color === 'blue' ? 'text-blue-900' : 'text-indigo-900'}`}>{fmt(date)}</div>
-                        <div className={`text-xs mt-1 ${days < 0 ? 'text-red-600 font-semibold' : days <= 14 ? 'text-amber-600 font-semibold' : color === 'blue' ? 'text-blue-600' : 'text-indigo-600'}`}>
-                          {days < 0 ? `${Math.abs(days)} giorni fa` : days === 0 ? 'Oggi!' : `tra ${days} giorni`}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-
-              {/* Modifica data */}
-              <div className="flex gap-2 items-center">
-                <input type="date" value={contractStart} onChange={e => setContractStart(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-xs text-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-300" />
-                <button onClick={saveContractDate} disabled={savingDate}
-                  className="px-3 py-2 border border-gray-200 text-gray-500 rounded-xl text-xs font-medium disabled:opacity-50">
-                  {savingDate ? '...' : 'Aggiorna'}
-                </button>
-              </div>
-
-              {/* Lista pazienti L2/L3 con link */}
-              {patientsNrs && patientsNrs.filter(p => p.level === 'level2' || p.level === 'level3').length > 0 ? (
-                <div>
-                  <div className="text-xs font-semibold text-gray-500 mb-2">Link da inviare ai dipendenti monitorati:</div>
-                  <div className="space-y-1.5">
-                    {patientsNrs.filter(p => (p.level === 'level2' || p.level === 'level3') && p.care_token).map(p => (
-                      <CheckpointPatientRow key={p.id} patient={p} />
-                    ))}
-                    {patientsNrs.filter(p => (p.level === 'level2' || p.level === 'level3') && !p.care_token).length > 0 && (
-                      <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                        ⚠️ {patientsNrs.filter(p => (p.level === 'level2' || p.level === 'level3') && !p.care_token).length} dipendenti senza link generato — vai alla cartella paziente per generarlo
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-xs text-gray-400 text-center py-4">Nessun dipendente L2/L3 con link attivo</div>
-              )}
-            </div>
-          )}
-        </div>
 
         <div className="space-y-3">
           {sortedAssessments.map(a => {

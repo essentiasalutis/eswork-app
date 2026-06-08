@@ -1,15 +1,14 @@
 /**
- * ES Work — Backup Supabase → Google Drive
- * Esporta tutte le tabelle in JSON e carica il file su Google Drive.
- * Viene eseguito da GitHub Actions ogni domenica alle 02:00.
+ * ES Work — Backup Supabase → GitHub repository
+ * Esporta tutte le tabelle in JSON nella cartella backups/.
+ * Il commit/push viene fatto dal workflow GitHub Actions (con git add -f,
+ * perché backups/ è in .gitignore). Eseguito ogni domenica alle 02:00.
  *
- * I dati contengono informazioni cliniche/personali dei pazienti: NON vengono
- * mai committati nel repository, ma caricati su Google Drive (cartella dedicata)
- * tramite service account.
+ * NB: il file contiene dati clinici/personali dei pazienti → il repository
+ * DEVE restare privato.
  */
 
 const { createClient } = require('@supabase/supabase-js');
-const { google } = require('googleapis');
 const ws = require('ws');
 const fs = require('fs');
 const path = require('path');
@@ -90,44 +89,20 @@ async function main() {
   const sizeMb = (fs.statSync(filepath).size / 1024 / 1024).toFixed(2);
   console.log(`📦 File salvato: ${filename} (${sizeMb} MB)`);
 
-  // ── 4. Upload su Google Drive ────────────────────────────────────────────────
-  await uploadToDrive(filepath, filename);
+  // Mantieni solo gli ultimi 8 backup (≈ 2 mesi)
+  const files = fs.readdirSync('backups')
+    .filter(f => f.startsWith('eswork-backup-') && f.endsWith('.json'))
+    .sort();
 
-  console.log('✅ Backup completato e caricato su Google Drive.');
-}
-
-// ── Upload del file su Google Drive tramite service account ────────────────────
-async function uploadToDrive(filepath, filename) {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT;
-  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
-  if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT mancante');
-  if (!folderId) throw new Error('GOOGLE_DRIVE_FOLDER_ID mancante');
-
-  let creds;
-  try {
-    creds = JSON.parse(raw);
-  } catch (e) {
-    throw new Error('GOOGLE_SERVICE_ACCOUNT non è un JSON valido: ' + e.message);
+  if (files.length > 8) {
+    const toDelete = files.slice(0, files.length - 8);
+    for (const f of toDelete) {
+      fs.unlinkSync(path.join('backups', f));
+      console.log(`🗑️  Eliminato vecchio backup: ${f}`);
+    }
   }
-  // Normalizza eventuali newline escappati nella private key
-  if (creds.private_key) creds.private_key = creds.private_key.replace(/\\n/g, '\n');
 
-  const auth = new google.auth.JWT(
-    creds.client_email,
-    null,
-    creds.private_key,
-    ['https://www.googleapis.com/auth/drive']
-  );
-  await auth.authorize();
-
-  const drive = google.drive({ version: 'v3', auth });
-  const res = await drive.files.create({
-    requestBody: { name: filename, parents: [folderId] },
-    media: { mimeType: 'application/json', body: fs.createReadStream(filepath) },
-    fields: 'id, name',
-    supportsAllDrives: true,
-  });
-  console.log(`☁️  Caricato su Google Drive: ${res.data.name} (id ${res.data.id})`);
+  console.log('✅ Backup completato! Il commit verrà fatto dal workflow.');
 }
 
 main().catch(err => {

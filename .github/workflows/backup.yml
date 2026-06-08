@@ -11,6 +11,8 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -22,15 +24,21 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install @supabase/supabase-js googleapis ws
+        run: npm install @supabase/supabase-js ws
 
       - name: Run backup
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          GOOGLE_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
-          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
         run: node scripts/backup.js
+
+      - name: Commit backup to repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f backups/
+          git commit -m "Backup automatico $(date +%Y-%m-%d)" || echo "Nessun file nuovo da committare"
+          git push
 
       - name: Notify on failure
         if: failure()

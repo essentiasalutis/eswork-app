@@ -934,24 +934,26 @@ ${FIRMA}`;
             <div className="flex items-center gap-2">
               <button
                 onClick={() => generateCode('P')}
-                disabled={!!generatingCode}
+                disabled={!!generatingCode || referralCodes.some(c => (c.type || 'P') === 'P')}
                 className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50"
+                title={referralCodes.some(c => (c.type || 'P') === 'P') ? 'Codice Dipendenti già presente' : 'Crea codice Dipendenti'}
               >
-                {generatingCode === 'P' ? '…' : '+ Codice P'}
+                {generatingCode === 'P' ? '…' : '+ Dipendenti'}
               </button>
               <button
                 onClick={() => generateCode('F')}
-                disabled={!!generatingCode}
+                disabled={!!generatingCode || referralCodes.some(c => c.type === 'F')}
                 className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 disabled:opacity-50"
+                title={referralCodes.some(c => c.type === 'F') ? 'Codice Famigliari già presente' : 'Crea codice Famigliari'}
               >
-                {generatingCode === 'F' ? '…' : '+ Codice F'}
+                {generatingCode === 'F' ? '…' : '+ Famigliari'}
               </button>
               <Link href="/dashboard/referrals" className="text-xs text-orange-600 hover:underline">Tutti →</Link>
             </div>
           </div>
           {referralCodes.length === 0 ? (
             <div className="bg-orange-50 rounded-xl border border-orange-200 px-4 py-3 text-sm text-orange-600">
-              Nessun codice ancora generato. Crea un codice con i pulsanti “+ Codice P/F” quando vuoi attivare il referral B2C per questa azienda.
+              Nessun codice ancora generato. Crea un codice con i pulsanti “+ Dipendenti” / “+ Famigliari” quando vuoi attivare il referral B2C per questa azienda.
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
@@ -973,7 +975,7 @@ ${FIRMA}`;
                           <div className="flex items-center gap-1.5">
                             <span className="font-mono font-semibold text-blue-700 text-xs">{rc.code}</span>
                             <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${(rc.type||'P') === 'F' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
-                              {(rc.type||'P') === 'F' ? '👨‍👩‍👧 F' : '👤 P'}
+                              {(rc.type||'P') === 'F' ? '👨‍👩‍👧 Famigliari' : '👤 Dipendenti'}
                             </span>
                           </div>
                           <div className="text-xs text-gray-400 mt-0.5">{new Date(rc.created_at).toLocaleDateString('it-IT')}</div>
@@ -1027,7 +1029,7 @@ ${FIRMA}`;
         </div>
 
         {/* ── Sezione AI Reports ─────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 mt-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Report AI</div>

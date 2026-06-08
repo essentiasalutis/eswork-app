@@ -5,7 +5,6 @@ import {
   getClientById,
   getAssessmentsByClient,
   buildReferralCode,
-  countReferralPairsForClient,
   insertReferralCode,
 } from '../../../lib/store';
 import { CONFIG } from '../../../lib/config';
@@ -36,24 +35,29 @@ export default requireAuth(async function handler(req, res) {
       const client = await getClientById(client_id);
       if (!client) return res.status(404).json({ error: 'Cliente non trovato' });
 
-      // Usa l'assessment chiuso più recente come riferimento
-      const assessments = await getAssessmentsByClient(client_id);
-      const lastClosed = assessments.find(a => a.status === 'closed');
-      if (!lastClosed) return res.status(400).json({ error: 'Nessun assessment chiuso per questa azienda. Chiudi prima un assessment.' });
+      // 1 solo codice per tipo per azienda (Dipendenti / Famigliari)
+      const existing = await getReferralCodesByClient(client_id);
+      if (existing.some(c => (c.type || 'P') === type)) {
+        return res.status(400).json({
+          error: `Esiste già un codice ${type === 'F' ? 'Famigliari' : 'Dipendenti'} per questa azienda.`,
+        });
+      }
 
-      const pairs = await countReferralPairsForClient(client_id);
-      const seq = pairs + 1;
+      // assessment_id è opzionale (opt-in): si collega all'assessment più recente
+      // se presente, altrimenti resta null (richiede migration v25).
+      const assessments = await getAssessmentsByClient(client_id).catch(() => []);
+      const refAssessmentId = assessments[0]?.id || null;
 
       const expiresAt = new Date();
       expiresAt.setMonth(expiresAt.getMonth() + VALIDITY_MONTHS);
 
       const referral = await insertReferralCode({
         client_id,
-        assessment_id: lastClosed.id,
-        code: buildReferralCode(client.name, seq, type),
+        assessment_id: refAssessmentId,
+        code: buildReferralCode(client.name, type),
         type,
         expires_at: expiresAt.toISOString(),
-        max_uses: type === 'F' ? 1 : null,
+        max_uses: null,
         session_price: CONFIG.referral_session_price ?? 65,
       });
 

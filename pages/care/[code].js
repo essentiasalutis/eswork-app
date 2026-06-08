@@ -120,7 +120,7 @@ export default function CarePage({ code, clientName, type, expiresAt, valid, dis
                   fontWeight: 700,
                   letterSpacing: '0.5px',
                 }}>
-                  {type === 'F' ? '👨‍👩‍👧 Codice Familiare' : '👤 Codice Personale'}
+                  {type === 'F' ? '👨‍👩‍👧 Codice Famigliari' : '👤 Codice Dipendenti'}
                 </span>
               </div>
 

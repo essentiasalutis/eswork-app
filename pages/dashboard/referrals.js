@@ -154,10 +154,10 @@ export default function ReferralsPage({ codes: initialCodes }) {
               <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
                 <tr>
                   <th className="px-5 py-3 text-left">Azienda</th>
-                  <th className="px-4 py-3 text-center">👤 P dist.</th>
-                  <th className="px-4 py-3 text-center">👤 P usati</th>
-                  <th className="px-4 py-3 text-center">👨‍👩‍👧 F dist.</th>
-                  <th className="px-4 py-3 text-center">👨‍👩‍👧 F usati</th>
+                  <th className="px-4 py-3 text-center">👤 Dip. dist.</th>
+                  <th className="px-4 py-3 text-center">👤 Dip. usati</th>
+                  <th className="px-4 py-3 text-center">👨‍👩‍👧 Fam. dist.</th>
+                  <th className="px-4 py-3 text-center">👨‍👩‍👧 Fam. usati</th>
                   <th className="px-4 py-3 text-center">Conv.</th>
                   <th className="px-4 py-3 text-center text-emerald-700">Revenue</th>
                 </tr>
@@ -255,7 +255,7 @@ export default function ReferralsPage({ codes: initialCodes }) {
                         <div className="flex items-center gap-2">
                           <span className="font-mono font-semibold text-blue-700 text-xs">{c.code}</span>
                           <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${(c.type||'P') === 'F' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
-                            {c.type || 'P'}
+                            {(c.type || 'P') === 'F' ? 'Fam.' : 'Dip.'}
                           </span>
                         </div>
                       </td>

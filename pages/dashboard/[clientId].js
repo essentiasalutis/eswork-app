@@ -982,8 +982,9 @@ ${FIRMA}`;
                         </td>
                         <td className="px-3 py-2.5 text-center">
                           {uses.length > 0 ? (
-                            <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">
-                              {uses.length}
+                            <span className="text-xs">
+                              <span className="bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">{uses.filter(u => u.status === 'redeemed').length} redenti</span>
+                              <span className="text-gray-400 ml-1">/ {uses.length} rich.</span>
                             </span>
                           ) : (
                             <span className="text-gray-300 text-xs">—</span>

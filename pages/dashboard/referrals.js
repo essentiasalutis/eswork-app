@@ -59,8 +59,13 @@ export default function ReferralsPage({ codes: initialCodes }) {
   const totalUsesP = codesP.reduce((s, c) => s + (c.referral_uses?.length || 0), 0);
   const totalUsesF = codesF.reduce((s, c) => s + (c.referral_uses?.length || 0), 0);
   const totalUses = totalUsesP + totalUsesF;
-  const globalConversion = pct(totalUses, totalCodes);
-  const totalRevenue = codes.reduce((s, c) => s + (c.referral_uses?.length || 0) * (c.session_price || 65), 0);
+  // Conversione reale = redenti / richiesti (non più click/codici)
+  const totalRedeemed = codes.reduce((s, c) => s + (c.referral_uses || []).filter(u => u.status === 'redeemed').length, 0);
+  const globalConversion = pct(totalRedeemed, totalUses);
+  // Revenue reale = somma degli importi dei buoni REDENTI (fallback al prezzo stimato)
+  const totalRevenue = codes.reduce((s, c) => s + (c.referral_uses || [])
+    .filter(u => u.status === 'redeemed')
+    .reduce((a, u) => a + (u.amount != null ? Number(u.amount) : (c.session_price || 65)), 0), 0);
 
   // ── Report mensile ────────────────────────────────────────────────────────
   const availableMonths = useMemo(() => {
@@ -125,20 +130,20 @@ export default function ReferralsPage({ codes: initialCodes }) {
         {/* KPI globali */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <div className="text-2xl font-bold text-gray-900">{codesP.length} / {codesF.length}</div>
-            <div className="text-xs text-gray-500 mt-1">Codici P / F distribuiti</div>
+            <div className="text-2xl font-bold text-gray-900">{totalUses}</div>
+            <div className="text-xs text-gray-500 mt-1">Buoni richiesti (Dip {totalUsesP} / Fam {totalUsesF})</div>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">{totalUsesP} / {totalUsesF}</div>
-            <div className="text-xs text-gray-500 mt-1">Usi P / F</div>
+            <div className="text-2xl font-bold text-green-600">{totalRedeemed}</div>
+            <div className="text-xs text-gray-500 mt-1">Buoni redenti (visite)</div>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
             <div className="text-2xl font-bold text-blue-600">{globalConversion}%</div>
-            <div className="text-xs text-gray-500 mt-1">Tasso di conversione</div>
+            <div className="text-xs text-gray-500 mt-1">Conversione (redenti / richiesti)</div>
           </div>
           <div className="bg-white rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
             <div className="text-2xl font-bold text-emerald-700">€{totalRevenue.toLocaleString('it-IT', { minimumFractionDigits: 0 })}</div>
-            <div className="text-xs text-emerald-600 mt-1">Revenue stimata</div>
+            <div className="text-xs text-emerald-600 mt-1">Revenue reale (redenti)</div>
           </div>
         </div>
 
@@ -154,22 +159,24 @@ export default function ReferralsPage({ codes: initialCodes }) {
               <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
                 <tr>
                   <th className="px-5 py-3 text-left">Azienda</th>
-                  <th className="px-4 py-3 text-center">👤 Dip. dist.</th>
-                  <th className="px-4 py-3 text-center">👤 Dip. usati</th>
-                  <th className="px-4 py-3 text-center">👨‍👩‍👧 Fam. dist.</th>
-                  <th className="px-4 py-3 text-center">👨‍👩‍👧 Fam. usati</th>
+                  <th className="px-4 py-3 text-center">👤 Dip. rich.</th>
+                  <th className="px-4 py-3 text-center">👤 Dip. redenti</th>
+                  <th className="px-4 py-3 text-center">👨‍👩‍👧 Fam. rich.</th>
+                  <th className="px-4 py-3 text-center">👨‍👩‍👧 Fam. redenti</th>
                   <th className="px-4 py-3 text-center">Conv.</th>
                   <th className="px-4 py-3 text-center text-emerald-700">Revenue</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {byClient.map(({ clientName, clientId, codesP: cp, codesF: cf }) => {
-                  const usedP = cp.reduce((s, c) => s + (c.referral_uses?.length || 0), 0);
-                  const usedF = cf.reduce((s, c) => s + (c.referral_uses?.length || 0), 0);
-                  const totalDist = cp.length + cf.length;
-                  const totalUsed = usedP + usedF;
-                  const conv = pct(totalUsed, totalDist);
-                  const revenue = [...cp, ...cf].reduce((s, c) => s + (c.referral_uses?.length || 0) * (c.session_price || 65), 0);
+                  const reqP = cp.reduce((s, c) => s + (c.referral_uses?.length || 0), 0);
+                  const reqF = cf.reduce((s, c) => s + (c.referral_uses?.length || 0), 0);
+                  const redP = cp.reduce((s, c) => s + (c.referral_uses || []).filter(u => u.status === 'redeemed').length, 0);
+                  const redF = cf.reduce((s, c) => s + (c.referral_uses || []).filter(u => u.status === 'redeemed').length, 0);
+                  const conv = pct(redP + redF, reqP + reqF);
+                  const revenue = [...cp, ...cf].reduce((s, c) => s + (c.referral_uses || [])
+                    .filter(u => u.status === 'redeemed')
+                    .reduce((a, u) => a + (u.amount != null ? Number(u.amount) : (c.session_price || 65)), 0), 0);
                   return (
                     <tr key={clientId} className="hover:bg-gray-50">
                       <td className="px-5 py-3">
@@ -177,10 +184,10 @@ export default function ReferralsPage({ codes: initialCodes }) {
                           {clientName}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 text-center text-gray-600">{cp.length}</td>
-                      <td className="px-4 py-3 text-center font-semibold text-green-600">{usedP}</td>
-                      <td className="px-4 py-3 text-center text-gray-600">{cf.length}</td>
-                      <td className="px-4 py-3 text-center font-semibold text-purple-600">{usedF}</td>
+                      <td className="px-4 py-3 text-center text-gray-600">{reqP}</td>
+                      <td className="px-4 py-3 text-center font-semibold text-green-600">{redP}</td>
+                      <td className="px-4 py-3 text-center text-gray-600">{reqF}</td>
+                      <td className="px-4 py-3 text-center font-semibold text-purple-600">{redF}</td>
                       <td className="px-4 py-3 text-center">
                         <span className={`font-semibold ${conv >= 50 ? 'text-green-600' : conv >= 20 ? 'text-yellow-600' : 'text-gray-400'}`}>
                           {conv}%

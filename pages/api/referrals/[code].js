@@ -1,4 +1,4 @@
-import { getReferralCodeByCode, insertReferralUse } from '../../../lib/store';
+import { getReferralCodeByCode, insertReferralUse, buildVoucherCode } from '../../../lib/store';
 import { getClientIp } from '../../../lib/rate-limit';
 
 export default async function handler(req, res) {
@@ -45,14 +45,27 @@ export default async function handler(req, res) {
 
     const { patient_name } = req.body || {};
     const ip = getClientIp(req);
+    const voucher_code = buildVoucherCode();
 
-    await insertReferralUse({
-      referral_code_id: referral.id,
-      patient_name: patient_name?.trim() || null,
-      ip,
-    });
+    try {
+      await insertReferralUse({
+        referral_code_id: referral.id,
+        patient_name: patient_name?.trim() || null,
+        ip,
+        voucher_code,
+        status: 'requested',
+      });
+    } catch (e) {
+      // Fallback se la migration v26 (colonne voucher) non è ancora stata applicata:
+      // registra comunque l'uso senza i nuovi campi, così /care non si rompe.
+      await insertReferralUse({
+        referral_code_id: referral.id,
+        patient_name: patient_name?.trim() || null,
+        ip,
+      }).catch(() => {});
+    }
 
-    return res.json({ ok: true });
+    return res.json({ ok: true, voucher_code });
   }
 
   res.status(405).end();

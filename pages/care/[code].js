@@ -13,32 +13,42 @@ const WA_ICON = (
 
 export default function CarePage({ code, clientName, type, expiresAt, valid, discountPct = 10 }) {
   const [name, setName] = useState('');
+  const [voucher, setVoucher] = useState(null);
+  const [requesting, setRequesting] = useState(false);
+
+  // Genera il buono visita (registra la richiesta e ottiene il voucher univoco)
+  async function requestVoucher() {
+    if (!name.trim() || requesting) return;
+    setRequesting(true);
+    try {
+      const res = await fetch(`/api/referrals/${code}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patient_name: name }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.voucher_code) setVoucher(data.voucher_code);
+      else alert(data.error || 'Errore nella generazione del buono. Riprova.');
+    } catch {
+      alert('Errore di rete. Riprova.');
+    }
+    setRequesting(false);
+  }
 
   function handleWhatsApp(e) {
     e.preventDefault();
     const msg = encodeURIComponent(
-      `Buongiorno, vorrei prenotare una visita con la tariffa agevolata ES Work.\nCodice referral: *${code}*\nNome: ${name}`
+      `Buongiorno, vorrei prenotare una visita con la tariffa agevolata ES Work.\nBuono visita: *${voucher}*\nNome: ${name}`
     );
-    // Registra uso in background (fire & forget)
-    fetch(`/api/referrals/${code}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ patient_name: name }),
-    }).catch(() => {});
     window.open(`https://wa.me/${WHATSAPP_PHONE}?text=${msg}`, '_blank');
   }
 
   function handleEmail(e) {
     e.preventDefault();
-    const subject = encodeURIComponent(`Prenotazione tariffa agevolata ES Work — codice ${code}`);
+    const subject = encodeURIComponent(`Prenotazione tariffa agevolata ES Work — buono ${voucher}`);
     const body = encodeURIComponent(
-      `Buongiorno,\n\nVorrei prenotare una visita osteopatica con la tariffa agevolata ES Work.\n\nCodice referral: ${code}\nNome: ${name}\n\nGrazie`
+      `Buongiorno,\n\nVorrei prenotare una visita osteopatica con la tariffa agevolata ES Work.\n\nBuono visita: ${voucher}\nNome: ${name}\n\nGrazie`
     );
-    fetch(`/api/referrals/${code}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ patient_name: name }),
-    }).catch(() => {});
     window.location.href = `mailto:${BOOKING_EMAIL}?subject=${subject}&body=${body}`;
   }
 
@@ -158,6 +168,7 @@ export default function CarePage({ code, clientName, type, expiresAt, valid, dis
                   type="text"
                   required
                   value={name}
+                  disabled={!!voucher}
                   onChange={e => setName(e.target.value)}
                   placeholder="es. Mario Rossi"
                   style={{
@@ -175,51 +186,65 @@ export default function CarePage({ code, clientName, type, expiresAt, valid, dis
                 />
               </div>
 
-              {/* Pulsanti — ordine: WA, Email, Sito */}
+              {/* Pulsanti — passo 1: ottieni buono · passo 2: prenota col buono */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-                {/* 1 — WhatsApp */}
-                <button
-                  onClick={handleWhatsApp}
-                  disabled={!name.trim()}
-                  style={{
-                    width: '100%',
-                    background: name.trim() ? '#25d366' : '#d1fae5',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 10,
-                    padding: '14px',
-                    fontSize: 16,
-                    fontWeight: 700,
-                    cursor: name.trim() ? 'pointer' : 'not-allowed',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 9,
-                  }}
-                >
-                  {WA_ICON}
-                  Contattaci su WhatsApp
-                </button>
+                {!voucher ? (
+                  /* Passo 1 — genera il buono visita */
+                  <button
+                    onClick={requestVoucher}
+                    disabled={!name.trim() || requesting}
+                    style={{
+                      width: '100%',
+                      background: name.trim() && !requesting ? '#16a34a' : '#bbf7d0',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 10,
+                      padding: '14px',
+                      fontSize: 16,
+                      fontWeight: 700,
+                      cursor: name.trim() && !requesting ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    {requesting ? 'Generazione…' : '🎟️ Ottieni il buono visita'}
+                  </button>
+                ) : (
+                  <>
+                    {/* Buono visita generato — da mostrare al professionista */}
+                    <div style={{ background: '#f0fdf4', border: '2px dashed #16a34a', borderRadius: 12, padding: '14px 16px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: '#15803d', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Il tuo buono visita</div>
+                      <div style={{ fontSize: 26, fontWeight: 900, color: '#0f172a', letterSpacing: 2, fontFamily: 'monospace' }}>{voucher}</div>
+                      <div style={{ fontSize: 12, color: '#374151', marginTop: 6, lineHeight: 1.5 }}>
+                        <strong>Mostra questo codice al professionista</strong> per ottenere lo sconto del {discountPct}%. Conserva questo messaggio.
+                      </div>
+                    </div>
 
-                {/* 2 — Email */}
-                <button
-                  onClick={handleEmail}
-                  disabled={!name.trim()}
-                  style={{
-                    width: '100%',
-                    background: '#fff',
-                    color: name.trim() ? '#0369a1' : '#94a3b8',
-                    border: `1.5px solid ${name.trim() ? '#bae6fd' : '#e2e8f0'}`,
-                    borderRadius: 10,
-                    padding: '13px',
-                    fontSize: 15,
-                    fontWeight: 600,
-                    cursor: name.trim() ? 'pointer' : 'not-allowed',
-                  }}
-                >
-                  ✉️ Invia una email
-                </button>
+                    {/* WhatsApp (col buono nel messaggio) */}
+                    <button
+                      onClick={handleWhatsApp}
+                      style={{
+                        width: '100%', background: '#25d366', color: '#fff', border: 'none',
+                        borderRadius: 10, padding: '14px', fontSize: 16, fontWeight: 700,
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
+                      }}
+                    >
+                      {WA_ICON}
+                      Prenota su WhatsApp
+                    </button>
+
+                    {/* Email (col buono nel messaggio) */}
+                    <button
+                      onClick={handleEmail}
+                      style={{
+                        width: '100%', background: '#fff', color: '#0369a1',
+                        border: '1.5px solid #bae6fd', borderRadius: 10, padding: '13px',
+                        fontSize: 15, fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >
+                      ✉️ Prenota via email
+                    </button>
+                  </>
+                )}
 
                 {/* Divisore */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0' }}>

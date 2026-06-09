@@ -209,7 +209,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
       const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json();
       if (data.report) {
-        const title = type === 'activation' ? 'Report di Attivazione' : `Report Intermedio ${type.toUpperCase()}`;
+        const title = type === 'activation' ? 'Report di Attivazione' : type === 't12' ? 'Report Annuale (12 mesi)' : `Report Intermedio ${type.toUpperCase()}`;
         setReportModal({ title, content: data.report, source: data.source, pdf_url: data.pdf_url });
         setGeneratedReports(prev => [{ id: data.report_id || Date.now(), report_type: type === 'activation' ? 'activation' : `checkpoint_${type}`, created_at: new Date().toISOString(), pdf_url: data.pdf_url }, ...prev]);
       }
@@ -1073,16 +1073,18 @@ ${FIRMA}`;
               <div className="text-xs text-gray-400 mt-0.5">Generati con Claude Sonnet — richiedono 15-30 secondi</div>
             </div>
           </div>
-          <div className="grid sm:grid-cols-3 gap-3 mb-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             {[
               { type: 'activation', label: '📋 Report Attivazione', desc: 'Mappa clinica + piano operativo', color: 'green' },
               { type: 't3', label: '📊 Report T3 (3 mesi)', desc: 'KPI intermedi + trend NRS', color: 'blue' },
-              { type: 't6', label: '📈 Report T6 (6 mesi)', desc: 'Analisi + doc. INAIL OT23', color: 'purple' },
+              { type: 't6', label: '📈 Report T6 (6 mesi)', desc: 'Review intermedia + KPI', color: 'purple' },
+              { type: 't12', label: '🏆 Report Annuale (12 mesi)', desc: '3 KPI esito + prevalenza + OT23', color: 'amber' },
             ].map(({ type, label, desc, color }) => {
               const colorCls = {
                 green: 'bg-green-600 hover:bg-green-700 disabled:bg-green-300',
                 blue: 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300',
                 purple: 'bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300',
+                amber: 'bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300',
               }[color];
               return (
                 <button key={type} onClick={() => generateReport(type)} disabled={generatingReport !== null}
@@ -1101,7 +1103,7 @@ ${FIRMA}`;
               <div className="text-xs text-gray-400 mb-2">Report generati di recente</div>
               {generatedReports.slice(0, 5).map(r => (
                 <div key={r.id} className="flex items-center justify-between py-1.5 text-xs text-gray-500">
-                  <span>{r.report_type === 'activation' ? '📋 Attivazione' : `📊 ${r.report_type?.replace('checkpoint_', '').toUpperCase()}`}</span>
+                  <span>{r.report_type === 'activation' ? '📋 Attivazione' : r.report_type === 'checkpoint_t12' ? '🏆 Annuale' : `📊 ${r.report_type?.replace('checkpoint_', '').toUpperCase()}`}</span>
                   <span>{new Date(r.created_at).toLocaleDateString('it-IT')}</span>
                 </div>
               ))}

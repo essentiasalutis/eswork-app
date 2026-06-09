@@ -4,6 +4,7 @@ import {
   getClientById,
   getPatientsByClient,
   getSessionsForClient,
+  getReassessmentsT12ByClient,
   insertGeneratedReport,
   insertDocument,
 } from '../../../../lib/store';
@@ -36,9 +37,57 @@ export default requireAuth(async function handler(req, res) {
     ? (sessionsWithNrs.reduce((a, s) => a + (s.nrs_pre - s.nrs_post), 0) / sessionsWithNrs.length).toFixed(1)
     : 'n.d.';
 
-  const checkLabel = checkpoint === 't3' ? '3 mesi' : checkpoint === 't6' ? '6 mesi' : '12 mesi';
+  const isAnnual = checkpoint === 't12';
+  const checkLabel = checkpoint === 't3' ? '3 mesi' : checkpoint === 't6' ? '6 mesi' : '12 mesi (Annuale)';
 
-  const prompt = `Sei un consulente clinico ES Work. Genera un Report Intermedio professionale a ${checkLabel} per il cliente ${client.name}.
+  // ── KPI del Report Annuale (T12): prevalenza baseline↔T12 + PGIC ──────────────
+  let t12 = null;
+  if (isAnnual) {
+    const reass = await getReassessmentsT12ByClient(id).catch(() => []);
+    const r1 = reass.filter(r => r.computed_level === 'level1').length;
+    const r2 = reass.filter(r => r.computed_level === 'level2').length;
+    const r3 = reass.filter(r => r.computed_level === 'level3').length;
+    const pgicVals = reass.map(r => r.pgic).filter(v => v != null);
+    const avgPgic = pgicVals.length ? (pgicVals.reduce((a, b) => a + b, 0) / pgicVals.length).toFixed(1) : 'n.d.';
+    const improved = pgicVals.filter(v => v >= 4).length; // PGIC 4-5 = migliorato
+    const improvedPct = pgicVals.length ? Math.round(improved / pgicVals.length * 100) : null;
+    const baselineTreat = l1; // L1 all'intake (necessitano trattamento)
+    const t12Treat = r1;      // L1 al re-assessment
+    const prevalenceDelta = baselineTreat > 0 ? Math.round((baselineTreat - t12Treat) / baselineTreat * 100) : null;
+    t12 = { count: reass.length, r1, r2, r3, avgPgic, improvedPct, baselineTreat, t12Treat, prevalenceDelta };
+  }
+
+  const prompt = isAnnual ? `Sei un consulente clinico ES Work. Genera il REPORT ANNUALE (12 mesi) per ${client.name}, da consegnare alla direzione e utilizzabile per il bilancio di sostenibilità.
+
+DATI ANNO 1:
+- Popolazione all'intake: L1 ${l1}, L2 ${l2}, L3 ${l3}
+- Sessioni completate/pianificate: ${completed}/${planned}
+- Re-assessment a 12 mesi completati: ${t12.count}
+- Distribuzione livelli a T12: L1 ${t12.r1}, L2 ${t12.r2}, L3 ${t12.r3}
+- Settore: ${client.sector === 1 ? 'Manifattura' : 'Servizi'}
+
+STRUTTURA (markdown, ## per titoli):
+
+## Sintesi dei risultati a 12 mesi
+(3-4 punti chiave per la direzione)
+
+## I tre KPI di risultato
+Presenta in tabella i tre indicatori v4:
+1. **Riduzione del dolore** — riduzione media NRS per sessione: ${avgDelta} punti.
+2. **Miglioramento percepito (PGIC)** — PGIC medio ${t12.avgPgic}/5${t12.improvedPct != null ? `, ${t12.improvedPct}% dei dipendenti rivalutati riporta un miglioramento (PGIC 4-5)` : ''}.
+3. **Variazione della prevalenza** — dipendenti che necessitano trattamento (L1): da ${t12.baselineTreat} all'intake a ${t12.t12Treat} a 12 mesi${t12.prevalenceDelta != null ? ` (${t12.prevalenceDelta >= 0 ? '−' : '+'}${Math.abs(t12.prevalenceDelta)}%)` : ''}.
+
+## Confronto prima/dopo
+(commento al cambiamento della distribuzione L1/L2/L3 intake → T12)
+
+## Documentazione INAIL OT23
+(elementi per la richiesta di riduzione del tasso: interventi erogati, dipendenti coinvolti, ore, monitoraggio continuo)
+
+## Raccomandazioni per l'Anno 2
+(3-4 azioni: mantenimento, prevenzione L2, formazione avanzata)
+
+${t12.count === 0 ? 'NOTA: nessun re-assessment a 12 mesi ancora registrato — segnala che i KPI di esito saranno disponibili al completamento dei re-assessment.' : ''}
+Tono: clinico, orientato ai risultati e alla direzione. Italiano. Max 650 parole.` : `Sei un consulente clinico ES Work. Genera un Report Intermedio professionale a ${checkLabel} per il cliente ${client.name}.
 
 DATI CLINICI:
 - Pazienti L1 (trattamento): ${l1}
@@ -65,17 +114,12 @@ STRUTTURA REPORT (markdown, ## per titoli):
 ## Prossimi Passi
 (3-4 azioni per i prossimi ${checkpoint === 't3' ? '3' : '6'} mesi)
 
-${checkpoint === 't6' || checkpoint === 't12' ? `
-## Documentazione INAIL OT23
-(elementi chiave per la richiesta di riduzione del tasso: data interventi, dipendenti coinvolti, ore erogate)
-` : ''}
-
 Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
 
   const reportType = `checkpoint_${checkpoint}`;
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    const fallback = generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, completed, planned, avgDelta);
+    const fallback = generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12);
     const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system' }).catch(() => null);
     const pdfUrl = await tryGeneratePdf(client, reportType, fallback, id, checkpoint).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', pdf_url: pdfUrl, report_id: rec?.id });
@@ -93,14 +137,42 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
     const pdfUrl = await tryGeneratePdf(client, reportType, report, id, checkpoint).catch(() => null);
     return res.json({ report, source: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
-    const fallback = generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, completed, planned, avgDelta);
+    const fallback = generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12);
     const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system' }).catch(() => null);
     const pdfUrl = await tryGeneratePdf(client, reportType, fallback, id, checkpoint).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
   }
 });
 
-function generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, completed, planned, avgDelta) {
+function generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12) {
+  if (checkpoint === 't12' && t12) {
+    return `## Report Annuale — ${client.name}
+
+Sintesi dei risultati del programma ES Work al termine dell'Anno 1${t12.count === 0 ? ' (re-assessment a 12 mesi non ancora completati: i KPI di esito saranno disponibili al loro completamento).' : '.'}
+
+## I tre KPI di risultato
+
+| KPI | Valore |
+|-----|--------|
+| Riduzione del dolore (NRS media/seduta) | ${avgDelta} punti |
+| Miglioramento percepito (PGIC medio) | ${t12.avgPgic}/5${t12.improvedPct != null ? ` · ${t12.improvedPct}% migliorati` : ''} |
+| Dipendenti che necessitano trattamento (L1) | ${t12.baselineTreat} → ${t12.t12Treat}${t12.prevalenceDelta != null ? ` (${t12.prevalenceDelta >= 0 ? '−' : '+'}${Math.abs(t12.prevalenceDelta)}%)` : ''} |
+
+## Confronto prima/dopo
+
+Distribuzione livelli all'intake: L1 ${l1}, L2 ${l2}, L3 ${l3}. A 12 mesi (su ${t12.count} re-assessment): L1 ${t12.r1}, L2 ${t12.r2}, L3 ${t12.r3}.
+
+## Documentazione INAIL OT23
+
+Elementi per la richiesta di riduzione del tasso (modello OT23): ${completed} interventi erogati su ${planned} pianificati, monitoraggio continuo dei dipendenti, formazione collettiva e sportello osteopatico in sede.
+
+## Raccomandazioni per l'Anno 2
+
+1. Mantenimento dei risultati per i dipendenti trattati
+2. Prevenzione attiva per i L2 idonei
+3. Modulo formativo avanzato
+4. Re-assessment annuale di controllo`;
+  }
   return `## Highlights Principali a ${checkLabel}
 
 Il programma ES Work per **${client.name}** ha raggiunto il checkpoint a ${checkLabel} con risultati in linea con le aspettative cliniche.

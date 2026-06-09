@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { requireProAuthSsr } from '../../lib/pro-auth';
-import { getAssignmentsByProfessional, getPatientsByClient } from '../../lib/store';
+import { getAssignmentsByProfessional, getPatientsByClient, getReferralLeadsByProfessional } from '../../lib/store';
 
 // ── Redenzione buono visita B2C ────────────────────────────────────────────────
 function RedeemVoucher() {
@@ -91,7 +91,31 @@ function ProHeader({ proName, onLogout }) {
   );
 }
 
-export default function ProDashboard({ proName, clients }) {
+function LeadsList({ leads }) {
+  if (!leads || leads.length === 0) return null;
+  return (
+    <div className="bg-white border border-amber-200 rounded-2xl p-4 mb-5">
+      <div className="font-semibold text-gray-800 text-sm mb-1">📥 Lead B2C in attesa ({leads.length})</div>
+      <div className="text-xs text-gray-500 mb-3">Persone che hanno richiesto un buono visita e non sono ancora state redente. Redimi il buono qui sopra quando svolgi la visita.</div>
+      <div className="space-y-2">
+        {leads.map(l => (
+          <div key={l.id} className="border border-gray-100 rounded-xl px-3 py-2 text-sm flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <span className="font-medium text-gray-800">{l.patient_name || '—'}</span>
+              <span className="text-xs text-gray-400 ml-2">{l.referral_codes?.clients?.name || ''}</span>
+              <div className="text-xs text-gray-500 mt-0.5">
+                {l.patient_phone ? `📞 ${l.patient_phone}` : ''}{l.patient_email ? ` · ✉️ ${l.patient_email}` : ''}{l.preferred_when ? ` · 🕐 ${l.preferred_when}` : ''}
+              </div>
+            </div>
+            <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">{l.voucher_code || '—'}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function ProDashboard({ proName, clients, leads }) {
   async function logout() {
     await fetch('/api/pro/auth/logout', { method: 'POST' });
     window.location.href = '/pro/login';
@@ -116,6 +140,8 @@ export default function ProDashboard({ proName, clients }) {
         </Link>
 
         <RedeemVoucher />
+
+        <LeadsList leads={leads} />
 
         <h1 className="text-xl font-bold text-gray-900 mb-1">Le tue aziende</h1>
         <p className="text-sm text-gray-500 mb-5">Seleziona un&apos;azienda per vedere i pazienti assegnati.</p>
@@ -171,5 +197,7 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
     })
   );
 
-  return { props: { proName, clients } };
+  const leads = await getReferralLeadsByProfessional(proId).catch(() => []);
+
+  return { props: { proName, clients, leads } };
 });

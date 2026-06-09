@@ -13,18 +13,22 @@ const WA_ICON = (
 
 export default function CarePage({ code, clientName, type, expiresAt, valid, discountPct = 10 }) {
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [when, setWhen] = useState('');
   const [voucher, setVoucher] = useState(null);
   const [requesting, setRequesting] = useState(false);
+  const canSubmit = name.trim() && phone.trim();
 
-  // Genera il buono visita (registra la richiesta e ottiene il voucher univoco)
+  // Registra la prenotazione (lead) e ottiene il voucher univoco
   async function requestVoucher() {
-    if (!name.trim() || requesting) return;
+    if (!canSubmit || requesting) return;
     setRequesting(true);
     try {
       const res = await fetch(`/api/referrals/${code}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ patient_name: name }),
+        body: JSON.stringify({ patient_name: name, patient_phone: phone, patient_email: email, preferred_when: when }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.voucher_code) setVoucher(data.voucher_code);
@@ -186,6 +190,30 @@ export default function CarePage({ code, clientName, type, expiresAt, valid, dis
                 />
               </div>
 
+              {/* Telefono (obbligatorio) + email + disponibilità */}
+              {[
+                { label: 'Telefono', val: phone, set: setPhone, ph: 'es. 333 1234567', type: 'tel', req: true },
+                { label: 'Email (facoltativa)', val: email, set: setEmail, ph: 'es. mario@email.it', type: 'email', req: false },
+                { label: 'Quando preferisci (facoltativo)', val: when, set: setWhen, ph: 'es. mattina, sabato, dal 15…', type: 'text', req: false },
+              ].map(f => (
+                <div key={f.label} style={{ marginBottom: 16, textAlign: 'left' }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                    {f.label} {f.req && <span style={{ color: '#ef4444' }}>*</span>}
+                  </label>
+                  <input
+                    type={f.type}
+                    required={f.req}
+                    value={f.val}
+                    disabled={!!voucher}
+                    onChange={e => f.set(e.target.value)}
+                    placeholder={f.ph}
+                    style={{ width: '100%', padding: '11px 14px', border: '1.5px solid #e2e8f0', borderRadius: 9, fontSize: 15, boxSizing: 'border-box', outline: 'none' }}
+                    onFocus={e => e.target.style.borderColor = '#93c5fd'}
+                    onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+                  />
+                </div>
+              ))}
+
               {/* Pulsanti — passo 1: ottieni buono · passo 2: prenota col buono */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
@@ -193,20 +221,20 @@ export default function CarePage({ code, clientName, type, expiresAt, valid, dis
                   /* Passo 1 — genera il buono visita */
                   <button
                     onClick={requestVoucher}
-                    disabled={!name.trim() || requesting}
+                    disabled={!canSubmit || requesting}
                     style={{
                       width: '100%',
-                      background: name.trim() && !requesting ? '#16a34a' : '#bbf7d0',
+                      background: canSubmit && !requesting ? '#16a34a' : '#bbf7d0',
                       color: '#fff',
                       border: 'none',
                       borderRadius: 10,
                       padding: '14px',
                       fontSize: 16,
                       fontWeight: 700,
-                      cursor: name.trim() && !requesting ? 'pointer' : 'not-allowed',
+                      cursor: canSubmit && !requesting ? 'pointer' : 'not-allowed',
                     }}
                   >
-                    {requesting ? 'Generazione…' : '🎟️ Ottieni il buono visita'}
+                    {requesting ? 'Invio…' : '📅 Prenota e ricevi il buono'}
                   </button>
                 ) : (
                   <>

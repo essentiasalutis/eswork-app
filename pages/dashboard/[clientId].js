@@ -1027,6 +1027,36 @@ ${FIRMA}`;
               </table>
             </div>
           )}
+          {(() => {
+            const leads = referralCodes
+              .flatMap(c => (c.referral_uses || []).map(u => ({ ...u, codeType: c.type || 'P' })))
+              .sort((a, b) => new Date(b.used_at || 0) - new Date(a.used_at || 0));
+            if (leads.length === 0) return null;
+            return (
+              <div className="mt-3 bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                <div className="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">Lead recenti</div>
+                <div className="divide-y divide-gray-50">
+                  {leads.slice(0, 30).map(l => (
+                    <div key={l.id} className="px-4 py-2.5 text-sm flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="font-medium text-gray-800">{l.patient_name || '—'}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ml-2 ${l.codeType === 'F' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>{l.codeType === 'F' ? 'Fam.' : 'Dip.'}</span>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {l.patient_phone ? `📞 ${l.patient_phone}` : ''}{l.patient_email ? ` · ✉️ ${l.patient_email}` : ''}{l.preferred_when ? ` · 🕐 ${l.preferred_when}` : ''}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {l.voucher_code && <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">{l.voucher_code}</span>}
+                        {l.status === 'redeemed'
+                          ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">redento{l.amount != null ? ` · €${l.amount}` : ''}</span>
+                          : <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">richiesto</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* ── Sezione AI Reports ─────────────────────────────────── */}

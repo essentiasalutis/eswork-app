@@ -147,6 +147,29 @@ export default function ReferralsPage({ codes: initialCodes }) {
           </div>
         </div>
 
+        {/* Alert d'incrocio: confermata dal paziente ma NON redenta dal pro */}
+        {(() => {
+          const mismatches = codes.flatMap(c => (c.referral_uses || [])
+            .filter(u => u.confirm_response === 'done' && u.status !== 'redeemed')
+            .map(u => ({ ...u, clientName: c.clients?.name || '', codeType: c.type || 'P' })));
+          if (mismatches.length === 0) return null;
+          return (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <div className="font-semibold text-red-800 text-sm mb-1">🚨 Visite confermate dal paziente ma NON redente dal professionista ({mismatches.length})</div>
+              <div className="text-xs text-red-700 mb-2">Possibile elusione: il paziente dichiara di aver fatto la visita, ma il professionista non ha redento il buono. Da verificare.</div>
+              <div className="space-y-1">
+                {mismatches.map(m => (
+                  <div key={m.id} className="text-sm text-red-800 flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{m.patient_name || '—'}</span>
+                    <span className="text-xs text-red-500">{m.clientName}</span>
+                    <span className="font-mono text-xs bg-white border border-red-200 px-1.5 py-0.5 rounded">{m.voucher_code || '—'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Stats per azienda */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100">

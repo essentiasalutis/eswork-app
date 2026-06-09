@@ -245,6 +245,9 @@ export default function CarePage({ code, clientName, type, expiresAt, valid, dis
                       <div style={{ fontSize: 12, color: '#374151', marginTop: 6, lineHeight: 1.5 }}>
                         <strong>Mostra questo codice al professionista</strong> per ottenere lo sconto del {discountPct}%. Conserva questo messaggio.
                       </div>
+                      <div style={{ fontSize: 11, color: '#15803d', marginTop: 8, lineHeight: 1.5, borderTop: '1px solid #bbf7d0', paddingTop: 8 }}>
+                        Dopo la visita, <a href={`/care/conferma?v=${encodeURIComponent(voucher)}`} style={{ color: '#15803d', fontWeight: 700 }}>conferma qui</a> di averla svolta.
+                      </div>
                     </div>
 
                     {/* WhatsApp (col buono nel messaggio) */}

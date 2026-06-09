@@ -1050,6 +1050,12 @@ ${FIRMA}`;
                         {l.status === 'redeemed'
                           ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">redento{l.amount != null ? ` · €${l.amount}` : ''}</span>
                           : <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">richiesto</span>}
+                        {l.confirm_response === 'done' && l.status !== 'redeemed' && (
+                          <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full" title="Paziente conferma la visita ma il pro non ha redento">⚠ conf. paziente</span>
+                        )}
+                        {l.confirm_response === 'done' && l.status === 'redeemed' && (
+                          <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full">✓ conf. paziente</span>
+                        )}
                       </div>
                     </div>
                   ))}

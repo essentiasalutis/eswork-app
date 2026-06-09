@@ -211,10 +211,28 @@ export default function ClientPage({ client: initialClient, assessments: initial
       if (data.report) {
         const title = type === 'activation' ? 'Report di Attivazione' : type === 't12' ? 'Report Annuale (12 mesi)' : `Report Intermedio ${type.toUpperCase()}`;
         setReportModal({ title, content: data.report, source: data.source, pdf_url: data.pdf_url });
-        setGeneratedReports(prev => [{ id: data.report_id || Date.now(), report_type: type === 'activation' ? 'activation' : `checkpoint_${type}`, created_at: new Date().toISOString(), pdf_url: data.pdf_url }, ...prev]);
+        setGeneratedReports(prev => [{ id: data.report_id || Date.now(), report_type: type === 'activation' ? 'activation' : `checkpoint_${type}`, created_at: new Date().toISOString(), pdf_url: data.pdf_url, content_text: data.report }, ...prev]);
       }
     } catch {}
     setGeneratingReport(null);
+  }
+
+  function reportTitleFromType(t) {
+    if (t === 'activation') return 'Report di Attivazione';
+    if (t === 'checkpoint_t12') return 'Report Annuale (12 mesi)';
+    if (t?.startsWith('checkpoint_')) return `Report Intermedio ${t.replace('checkpoint_', '').toUpperCase()}`;
+    return 'Report';
+  }
+
+  // Riapre un report già generato (dal testo salvato), senza rigenerarlo
+  function openSavedReport(r) {
+    if (r.content_text) {
+      setReportModal({ title: reportTitleFromType(r.report_type), content: r.content_text, source: 'salvato', pdf_url: r.pdf_url });
+    } else if (r.pdf_url) {
+      window.open(r.pdf_url, '_blank');
+    } else {
+      alert('Contenuto del report non disponibile.');
+    }
   }
 
   async function sendCampaign() {
@@ -1069,7 +1087,7 @@ ${FIRMA}`;
         <div className="bg-white rounded-2xl border border-gray-200 p-5 mt-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Report AI</div>
+              <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">🤖 Report AI</h2>
               <div className="text-xs text-gray-400 mt-0.5">Generati con Claude Sonnet — richiedono 15-30 secondi</div>
             </div>
           </div>
@@ -1102,19 +1120,23 @@ ${FIRMA}`;
             <div className="border-t border-gray-100 pt-3">
               <div className="text-xs text-gray-400 mb-2">Report generati di recente</div>
               {generatedReports.slice(0, 5).map(r => (
-                <div key={r.id} className="flex items-center justify-between py-1.5 text-xs text-gray-500">
+                <button key={r.id} onClick={() => openSavedReport(r)}
+                  className="w-full flex items-center justify-between py-1.5 px-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded transition-colors">
                   <span>{r.report_type === 'activation' ? '📋 Attivazione' : r.report_type === 'checkpoint_t12' ? '🏆 Annuale' : `📊 ${r.report_type?.replace('checkpoint_', '').toUpperCase()}`}</span>
-                  <span>{new Date(r.created_at).toLocaleDateString('it-IT')}</span>
-                </div>
+                  <span className="flex items-center gap-2">
+                    <span className="text-gray-400">{new Date(r.created_at).toLocaleDateString('it-IT')}</span>
+                    <span className="text-blue-600 font-medium">Apri →</span>
+                  </span>
+                </button>
               ))}
             </div>
           )}
         </div>
 
         {/* ── Gestione Dipendenti & Campagna Assessment ──────────── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4 mt-6">
           <div className="flex items-center justify-between">
-            <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Dipendenti & Assessment</div>
+            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">👥 Dipendenti &amp; Assessment</h2>
             <Link href={`/dashboard/${client.id}/waitlist`}
               className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-100">
               📋 Waitlist L1

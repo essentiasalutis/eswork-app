@@ -235,6 +235,28 @@ export default function ClientPage({ client: initialClient, assessments: initial
     }
   }
 
+  // Stampa / salva PDF dal browser (funziona per qualsiasi report, anche riaperto)
+  function printReport() {
+    if (!reportModal) return;
+    const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const body = (reportModal.content || '').split('\n').map(line => {
+      if (line.startsWith('## ')) return `<h2>${esc(line.slice(3))}</h2>`;
+      if (line.startsWith('### ')) return `<h3>${esc(line.slice(4))}</h3>`;
+      if (line.startsWith('**') && line.endsWith('**')) return `<p><strong>${esc(line.slice(2, -2))}</strong></p>`;
+      if (line.startsWith('- ')) return `<li>${esc(line.slice(2))}</li>`;
+      if (line.match(/^\d+\. /)) return `<li>${esc(line.replace(/^\d+\. /, ''))}</li>`;
+      if (line.trim() === '') return '';
+      return `<p>${esc(line)}</p>`;
+    }).join('\n');
+    const w = window.open('', '_blank');
+    if (!w) { alert('Consenti i popup per stampare il PDF.'); return; }
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(reportModal.title)}</title>
+<style>body{font-family:system-ui,-apple-system,sans-serif;max-width:720px;margin:24px auto;padding:0 24px;color:#1e293b;line-height:1.6}h1{font-size:22px;margin-bottom:2px}h2{font-size:17px;margin-top:20px;border-bottom:1px solid #e5e7eb;padding-bottom:4px}h3{font-size:15px}li{margin:2px 0}.muted{color:#64748b;font-size:12px;margin-bottom:12px}</style>
+</head><body><h1>${esc(reportModal.title)}</h1><div class="muted">${esc(client.name)} · ES Work</div>${body}
+<script>window.onload=function(){window.print();}<\/script></body></html>`);
+    w.document.close();
+  }
+
   async function sendCampaign() {
     setSendingCampaign(true);
     setCampaignResult(null);
@@ -1330,7 +1352,7 @@ ${FIRMA}`;
           <div className="flex items-center justify-between p-5 border-b border-gray-200">
             <div>
               <div className="font-bold text-gray-900">{reportModal.title}</div>
-              <div className="text-xs text-gray-400 mt-0.5">{reportModal.source === 'ai' ? '✨ Generato con Claude AI' : '📋 Generato con template'} · {client.name}</div>
+              <div className="text-xs text-gray-400 mt-0.5">{reportModal.source === 'ai' ? '✨ Generato con Claude AI' : reportModal.source === 'salvato' ? '📂 Report salvato' : '📋 Generato con template'} · {client.name}</div>
             </div>
             <div className="flex gap-2">
               {reportModal.pdf_url && (
@@ -1339,6 +1361,10 @@ ${FIRMA}`;
                   ⬇️ Scarica PDF
                 </a>
               )}
+              <button onClick={printReport}
+                className="text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-xl hover:bg-green-100">
+                🖨️ Stampa / PDF
+              </button>
               <button onClick={() => { navigator.clipboard?.writeText(reportModal.content); }}
                 className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100">
                 📋 Copia

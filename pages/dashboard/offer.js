@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { requireAuthSsr } from '../../lib/auth';
-import { getAssessmentById, getClientById, getResponsesByAssessment } from '../../lib/store';
+import { getAssessmentById, getClientById, getResponsesByAssessment, getFirstMeeting } from '../../lib/store';
 import {
   aggregateNMQ,
   trafficLight, TL_COLOR, TL_BG, TL_BORDER, TYPE_LABELS, generateSummaryText, BODY_ZONES,
@@ -96,7 +96,7 @@ function Page({ children, className = '' }) {
 
 // ─── Offer Document ───────────────────────────────────────────────────────────
 
-export default function OfferPage({ client, assessment, nmq, calc, roi, date }) {
+export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, date }) {
   const [emailModal, setEmailModal] = useState(null);
   const [aiPlan, setAiPlan] = useState(null);       // null = caricamento, [] = pronto
   const [aiSource, setAiSource] = useState(null);   // 'ai' | 'fallback' | 'fallback_no_key'
@@ -243,6 +243,19 @@ ${FIRMA}`;
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-xs text-amber-800">
           <strong>Per un PDF pulito:</strong> nel dialog di stampa Chrome → <em>Altre impostazioni</em> → deseleziona <strong>&quot;Intestazioni e piè di pagina&quot;</strong> → salva come PDF
         </div>
+
+        {/* Confronto con la stima del colloquio — SOLO vista admin, mai nel PDF */}
+        {forchetta && calc && (() => {
+          const inRange = calc.price_y1 >= forchetta.min && calc.price_y1 <= forchetta.max;
+          return (
+            <div className={`mt-2 rounded-xl px-4 py-2.5 text-xs border ${inRange ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+              📐 <strong>Forchetta colloquio</strong> (scenari min–max, stessi parametri): {fmt(forchetta.min)} – {fmt(forchetta.max)} (medio {fmt(forchetta.avg)}) ·
+              <strong> Questo preventivo (dati reali): {fmt(calc.price_y1)}</strong> {inRange
+                ? '✓ dentro la forchetta presentata al colloquio'
+                : '⚠ FUORI forchetta — rivedi i parametri o prepara la motivazione col cliente'}
+            </div>
+          );
+        })()}
       </div>
 
       {emailModal && <EmailModal modal={emailModal} onClose={() => setEmailModal(null)} />}
@@ -714,8 +727,46 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     const l1v = l1 !== undefined ? parseInt(l1) : nmq.level1.count;
     const l2v = l2 !== undefined ? parseInt(l2) : nmq.level2.count;
 
-    const calc = custom
-      ? calculatePricing({ n: totalN, l1: l1v, l2: l2v, ...custom })
+    // ── Parametri salvati dalla scheda colloquio ─────────────────────────────
+    // Il preventivo post-assessment usa le STESSE condizioni concordate al
+    // colloquio (tier, tariffe, IVA, gruppi) con i numeri REALI dell'assessment.
+    // Priorità: override in query > parametri scheda > default di config.
+    let schedaDefaults = null;
+    let forchetta = null; // stima colloquio min/med/max (vista admin, non nel PDF)
+    try {
+      const fm = await getFirstMeeting(assessment.client_id);
+      const fmd = fm?.data;
+      if (fmd) {
+        const s2 = fmd.step2 || {};
+        const sp = fmd.params || {};
+        const sedi = Array.isArray(s2.sedi) ? s2.sedi : [];
+        const cap = Math.max(1, parseInt(s2.capienza) || CONFIG.classroom_capacity_default);
+        const fmN = sedi.reduce((a, e) => a + (parseInt(e.employees) || 0), 0) || totalN;
+        const fmGroups = s2.training_mode === 'accorpa'
+          ? Math.max(1, Math.ceil(fmN / cap))
+          : (sedi.reduce((a, e) => a + Math.ceil((parseInt(e.employees) || 0) / cap), 0) || Math.max(1, Math.ceil(totalN / cap)));
+        schedaDefaults = {
+          tier: s2.tier || undefined,
+          groups: fmGroups,
+          rates: sp.rates || undefined,
+          vatExempt: sp.vat_exempt,
+        };
+        // Forchetta del colloquio: scenari di prevalenza min/med/max con gli stessi parametri
+        const sectorKey = fmd.step1?.sector || (client?.sector === 1 ? 'manufacturing' : 'services');
+        const prevs = CONFIG.l1_prevalence[sectorKey] || CONFIG.l1_prevalence.mix;
+        const l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
+        const prices = prevs.map(p => {
+          const fl1 = Math.round(fmN * p);
+          const c = calculatePricing({ n: fmN, l1: fl1, l2: Math.round(fl1 * l2Mult), ...schedaDefaults });
+          return c ? c.price_y1 : null;
+        });
+        if (prices.every(p => p != null)) forchetta = { min: prices[0], avg: prices[1], max: prices[2] };
+      }
+    } catch (_) {}
+
+    const effective = custom || schedaDefaults;
+    const calc = effective
+      ? calculatePricing({ n: totalN, l1: l1v, l2: l2v, ...effective })
       : calculatePricing(totalN, l1v, l2v);
     const roi = null; // ROI only from calculator (requires absence days input)
 
@@ -726,6 +777,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         nmq,
         calc,
         roi,
+        forchetta,
         date: today(),
       },
     };

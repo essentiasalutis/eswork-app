@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getPatientsWithEmailByClient, getDocumentsByClient, getProfessionals } from '../../lib/store';
-import { TYPE_LABELS, TYPE_COLORS } from '../../lib/scoring';
+import { TYPE_LABELS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
 import { CONFIG } from '../../lib/config';
 import NavMenu from '../../components/NavMenu';
@@ -115,7 +115,6 @@ export default function ClientPage({ client: initialClient, assessments: initial
   });
   const [assignBusy, setAssignBusy] = useState(null); // professional_id in corso
   const [showProList, setShowProList] = useState(false); // elenco professionisti a scomparsa
-  const [showNew, setShowNew] = useState(false);
 
   // Assegna / togli un professionista a questa azienda (flag on/off)
   async function togglePro(pro) {
@@ -170,10 +169,8 @@ export default function ClientPage({ client: initialClient, assessments: initial
     setPatientProBusy(null);
   }
 
-  const [newType, setNewType] = useState('initial');
   const [saving, setSaving] = useState(false);
   const [reportAssessment, setReportAssessment] = useState(null);
-  const [copied, setCopied] = useState(null);
   const [emailModal, setEmailModal] = useState(null); // { to, subject, body }
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState({});
@@ -185,17 +182,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [generatedReports, setGeneratedReports] = useState(initialReports || []);
   const [generatingReport, setGeneratingReport] = useState(null); // 'activation'|'t3'|'t6'|null
   const [reportModal, setReportModal] = useState(null); // { title, content, pdf_url }
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [csvText, setCsvText] = useState('');
-  const [importResult, setImportResult] = useState(null);
-  const [importing, setImporting] = useState(false);
-  const [sendingCampaign, setSendingCampaign] = useState(false);
-  const [campaignResult, setCampaignResult] = useState(null);
-  const [showCampaignConfirm, setShowCampaignConfirm] = useState(false);
   const [copiedAssessmentLink, setCopiedAssessmentLink] = useState(false);
-  const [showAdvancedImport, setShowAdvancedImport] = useState(false);
-  const [generatingQuotePdf, setGeneratingQuotePdf] = useState(false);
-  const [quotePdfUrl, setQuotePdfUrl] = useState(null);
 
   const tier = client.tier || getTierFromEmployees(client.employees);
 
@@ -257,48 +244,6 @@ export default function ClientPage({ client: initialClient, assessments: initial
     w.document.close();
   }
 
-  async function sendCampaign() {
-    setSendingCampaign(true);
-    setCampaignResult(null);
-    try {
-      const res = await fetch(`/api/admin/clients/${client.id}/send-assessments`, { method: 'POST' });
-      const data = await res.json();
-      setCampaignResult(data);
-    } catch { setCampaignResult({ error: 'Errore di rete' }); }
-    setSendingCampaign(false);
-    setShowCampaignConfirm(false);
-  }
-
-  async function generateQuotePdf() {
-    setGeneratingQuotePdf(true);
-    try {
-      const res = await fetch(`/api/admin/clients/${client.id}/generate-quote-pdf`, { method: 'POST' });
-      const data = await res.json();
-      if (data.url) setQuotePdfUrl(data.url);
-      else if (data.html_preview) alert('BLOB_READ_WRITE_TOKEN non configurata — PDF non salvato. Configura la variabile ambiente su Vercel.');
-    } catch {}
-    setGeneratingQuotePdf(false);
-  }
-
-  async function handleImportCSV() {
-    if (!csvText.trim()) return;
-    setImporting(true);
-    try {
-      const lines = csvText.trim().split('\n');
-      const header = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[""]/g, ''));
-      const rows = lines.slice(1).map(line => {
-        const vals = line.split(',').map(v => v.trim().replace(/[""]/g, ''));
-        return Object.fromEntries(header.map((h, i) => [h, vals[i] || '']));
-      });
-      const res = await fetch(`/api/clients/${client.id}/import-employees`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows }),
-      });
-      const result = await res.json();
-      setImportResult(result);
-    } catch { setImportResult({ error: 'Errore di rete' }); }
-    setImporting(false);
-  }
-
   function openEdit() {
     setEditForm({
       name: client.name || '',
@@ -334,18 +279,18 @@ export default function ClientPage({ client: initialClient, assessments: initial
 
   const FIRMA = `Cordiali saluti,\nDott. Enrico Maiolo — founder @ Essentia Salutis\nTel: ${CONFIG.contact_phone}\n${CONFIG.contact_email}`;
 
-  async function createAssessment(e) {
-    e.preventDefault();
+  // v4: si crea solo l'assessment INIZIALE (uno per ciclo). I checkpoint T3/T6
+  // sono mini-check automatici; il T12 è il re-assessment con link personali.
+  async function createAssessment() {
     setSaving(true);
     const res = await fetch('/api/assessments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: client.id, type: newType }),
+      body: JSON.stringify({ client_id: client.id, type: 'initial' }),
     });
     if (res.ok) {
       const a = await res.json();
       setAssessments(prev => [a, ...prev]);
-      setShowNew(false);
     }
     setSaving(false);
   }
@@ -389,27 +334,21 @@ export default function ClientPage({ client: initialClient, assessments: initial
     }
   }
 
-  function copyLink(shareCode, id) {
-    const url = `${baseUrl}/q/${shareCode}`;
-    navigator.clipboard.writeText(url).catch(() => {});
-    setCopied(id);
-    setTimeout(() => setCopied(null), 2000);
-  }
-
-  // Mod 3: email link assessment
-  function emailLink(a) {
-    const url = `${baseUrl}/q/${a.share_code}`;
+  // Email al referente HR col link generico di auto-dichiarazione (v4):
+  // è LUI a distribuirlo internamente (figura autorevole → più adesione).
+  function emailGenericLink() {
+    const url = `${baseUrl}/q/c/${client.assessment_share_code}`;
     const referente = client.contact_name || 'referente';
     const body = `Gentile ${referente},
 
 come concordato, le invio il link per l'assessment ES Work dedicato ai dipendenti di ${client.name}.
 
-Il questionario è riservato, si compila dallo smartphone in circa 5 minuti, e può essere completato in qualsiasi momento entro i prossimi 3 giorni lavorativi.
+Il questionario è riservato, si compila dallo smartphone in circa 5 minuti.
 
-Può inoltrare questo link a tutti i dipendenti:
+Le chiedo di inoltrare questo link a tutti i dipendenti tramite i vostri canali interni:
 ${url}
 
-Le chiedo di comunicare ai dipendenti che l'azienda ha avviato un'iniziativa di salute organizzativa e che i dati sono trattati in modo riservato da Essentia Salutis, nel rispetto del segreto professionale: l'azienda non vedrà mai i dati individuali, ma solo risultati in forma aggregata.
+Le chiedo inoltre di comunicare ai dipendenti che l'azienda ha avviato un'iniziativa di salute organizzativa e che i dati sono trattati in modo riservato da Essentia Salutis, nel rispetto del segreto professionale: l'azienda non vedrà mai i dati individuali, ma solo risultati in forma aggregata.
 
 Per qualsiasi domanda, sono a disposizione.
 
@@ -473,18 +412,10 @@ ${FIRMA}`;
     if (res.ok) setReferralCodes(prev => prev.filter(c => c.id !== rc.id));
   }
 
-  function openCalculator(a) {
-    const { aggregateNMQ } = require('../../lib/scoring');
-    const rList = responses[a.id] || [];
-    const nmq = aggregateNMQ(rList);
-    const params = new URLSearchParams({
-      clientId: client.id,
-      assessmentId: a.id,
-      n: client.employees,
-      l1: nmq.level1.count,
-      l2: nmq.level2.count,
-    });
-    router.push(`/dashboard/calculator?${params}`);
+  // Preventivo POST-ASSESSMENT: dati REALI (L1/L2 dall'assessment) + condizioni
+  // della scheda colloquio (tier/tariffe/IVA caricati server-side da first_meetings).
+  function openRealQuote(a) {
+    router.push(`/dashboard/offer?assessmentId=${a.id}&clientId=${client.id}&n=${client.employees}`);
   }
 
   function getBaseline(assessment) {
@@ -509,7 +440,7 @@ ${FIRMA}`;
           assessment={reportAssessment}
           client={client}
           baseline={getBaseline(reportAssessment)}
-          onOpenCalculator={reportAssessment.type === 'initial' ? () => openCalculator(reportAssessment) : null}
+          onOpenCalculator={reportAssessment.type === 'initial' ? () => openRealQuote(reportAssessment) : null}
         />
       </div>
     );
@@ -650,56 +581,12 @@ ${FIRMA}`;
             >
               Colloquio
             </Link>
-            <button
-              onClick={() => setShowNew(true)}
-              className="bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl whitespace-nowrap"
-            >
-              + Assessment
-            </button>
             <NavMenu />
           </div>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-6">
-        {showNew && (
-          <form onSubmit={createAssessment} className="bg-white rounded-2xl border border-gray-200 p-5 mb-5">
-            <h2 className="font-semibold text-gray-800 mb-4">Nuovo assessment</h2>
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              {Object.entries(TYPE_LABELS).map(([k, v]) => (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => setNewType(k)}
-                  className="py-3 px-2 rounded-xl border-2 text-sm font-medium transition-all text-center"
-                  style={{
-                    borderColor: newType === k ? TYPE_COLORS[k] : '#e5e7eb',
-                    background: newType === k ? TYPE_COLORS[k] + '18' : '#fff',
-                    color: newType === k ? TYPE_COLORS[k] : '#6b7280',
-                  }}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-3">
-              <button type="submit" disabled={saving} className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold disabled:opacity-60">
-                {saving ? 'Creazione...' : 'Crea assessment'}
-              </button>
-              <button type="button" onClick={() => setShowNew(false)} className="px-5 py-3 rounded-xl border border-gray-300 text-gray-600">
-                Annulla
-              </button>
-            </div>
-          </form>
-        )}
-
-        {sortedAssessments.length === 0 && !showNew && (
-          <div className="text-center py-16 text-gray-400">
-            <div className="text-4xl mb-3">📋</div>
-            <p>Nessun assessment. Creane uno per iniziare.</p>
-          </div>
-        )}
-
         {/* ── Professionisti assegnati (elenco a scomparsa) ───────────── */}
         <div className="mb-5">
           <button
@@ -850,122 +737,6 @@ ${FIRMA}`;
             </div>
           </div>
         )}
-
-        <div className="space-y-3">
-          {sortedAssessments.map(a => {
-            const rCount = (responses[a.id] || []).length;
-            const color = TYPE_COLORS[a.type];
-            const shareUrl = `${baseUrl}/q/${a.share_code}`;
-            return (
-              <div
-                key={a.id}
-                className="bg-white rounded-2xl border p-4"
-                style={{ borderColor: a.status === 'active' ? color + '80' : '#e5e7eb' }}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
-                    <span className="font-semibold text-gray-900 text-sm truncate">{TYPE_LABELS[a.type]}</span>
-                    {a.status === 'active' && (
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium flex-shrink-0">ATTIVO</span>
-                    )}
-                    {a.status === 'closed' && (
-                      <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full flex-shrink-0">CHIUSO</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                    <span className="text-xs text-gray-400">
-                      {new Date(a.created_at).toLocaleDateString('it-IT')}
-                    </span>
-                    <button onClick={e => deleteAssessment(a.id, e)} className="p-1 text-gray-300 hover:text-red-400">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="text-sm text-gray-500 mb-3">
-                  {rCount} {rCount === 1 ? 'risposta' : 'risposte'} raccolte
-                </div>
-
-                {a.status === 'active' && (
-                  <div className="bg-gray-50 rounded-xl p-3 mb-3">
-                    <div className="text-xs text-gray-500 mb-1">Link questionario:</div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 text-xs text-gray-700 font-mono bg-white border border-gray-200 rounded-lg px-2 py-1.5 truncate">
-                        {shareUrl}
-                      </div>
-                      <button
-                        onClick={() => copyLink(a.share_code, a.id)}
-                        className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-lg border"
-                        style={{
-                          borderColor: copied === a.id ? '#16a34a' : '#d1d5db',
-                          color: copied === a.id ? '#16a34a' : '#6b7280',
-                          background: copied === a.id ? '#f0fdf4' : '#fff',
-                        }}
-                      >
-                        {copied === a.id ? '✓ Copiato' : 'Copia'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-2">
-                  {a.status === 'active' && (
-                    <>
-                      <button
-                        onClick={() => closeAssessment(a.id)}
-                        className="text-sm px-4 py-2 rounded-xl border border-gray-300 text-gray-600"
-                      >
-                        Chiudi raccolta
-                      </button>
-                      <button
-                        onClick={() => emailLink(a)}
-                        className="text-sm px-4 py-2 rounded-xl border border-blue-200 text-blue-600 bg-blue-50"
-                      >
-                        Invia link email
-                      </button>
-                    </>
-                  )}
-                  {a.status === 'closed' && (
-                    <button
-                      onClick={() => reopenAssessment(a.id)}
-                      className="text-sm px-4 py-2 rounded-xl border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100"
-                    >
-                      🔓 Riapri raccolta
-                    </button>
-                  )}
-                  {/* Consensi raccolti */}
-                  {a.status === 'closed' && a.consents && a.consents.length > 0 && (
-                    <div className="w-full mt-1 px-3 py-2 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700">
-                      ✅ <strong>{a.consents.length}</strong> consenso/i GDPR raccolto/i
-                      <span className="text-green-500 ml-2">· IP anonimizzato · {new Date(a.consents[0].consent_privacy_at).toLocaleDateString('it-IT')}</span>
-                    </div>
-                  )}
-
-                  {rCount > 0 && (
-                    <button
-                      onClick={() => openReport(a)}
-                      className="text-sm px-4 py-2 rounded-xl border font-medium"
-                      style={{ borderColor: color + '60', color: color, background: color + '10' }}
-                    >
-                      Visualizza report
-                    </button>
-                  )}
-                  {rCount > 0 && a.type === 'initial' && (
-                    <button
-                      onClick={() => openCalculator(a)}
-                      className="text-sm px-4 py-2 rounded-xl border border-green-300 text-green-700 bg-green-50 font-medium"
-                    >
-                      Preventivo
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
 
         {/* ── Referral B2C ────────────────────────────────────────────── */}
         <div className="mt-6">
@@ -1223,124 +994,88 @@ ${FIRMA}`;
             </div>
           )}
 
-          {/* Import CSV — modalità avanzata (richiede DPA con cliente) */}
-          <div className="border-t border-gray-100 pt-3">
-            <button
-              onClick={() => setShowAdvancedImport(v => !v)}
-              className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
-            >
-              ⚙️ Modalità avanzata (import CSV)
-              <span className="text-gray-300">{showAdvancedImport ? '▲' : '▼'}</span>
-            </button>
-            {showAdvancedImport && (
-              <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3 mb-3">
-                <p className="text-xs text-amber-700">
-                  ⚠️ <strong>Modalità avanzata</strong>: richiede DPA firmato con l'azienda cliente. Usare solo se concordato con l'HR del cliente.
-                </p>
-              </div>
-            )}
-          </div>
-          {showAdvancedImport && (
-          <div>
+          {/* ── Assessment iniziale: ciclo di vita (hub unico v4) ── */}
+          <div className="border-t border-gray-100 pt-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-semibold text-gray-500">Importa dipendenti (CSV)</div>
-              <button onClick={() => { setShowImportModal(v => !v); setImportResult(null); setCsvText(''); }}
-                className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100">
-                {showImportModal ? '✕ Chiudi' : '📥 Importa CSV'}
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Assessment iniziale</div>
+              <button
+                onClick={emailGenericLink}
+                className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100"
+              >
+                ✉️ Invia link al referente HR
               </button>
             </div>
-            {showImportModal && (
-              <div className="space-y-3">
-                <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500 font-mono">
-                  Formato CSV atteso:<br />
-                  <span className="text-green-700">nome,cognome,email,sede,genere,mansione</span><br />
-                  <span className="text-gray-400">Mario,Rossi,mario.rossi@azienda.it,Torino,M,Operaio</span>
-                </div>
-                <textarea value={csvText} onChange={e => setCsvText(e.target.value)}
-                  placeholder="Incolla il CSV qui..."
-                  rows={5}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-300" />
-                <button onClick={handleImportCSV} disabled={!csvText.trim() || importing}
-                  className={`w-full py-3 rounded-xl text-sm font-semibold ${!csvText.trim() || importing ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-                  {importing ? '⏳ Importazione...' : 'Importa dipendenti'}
+
+            {sortedAssessments.length === 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 rounded-xl px-4 py-3">
+                <p className="text-sm text-gray-500">Nessun assessment. Avvialo, poi fai distribuire il link qui sopra dal referente HR.</p>
+                <button onClick={createAssessment} disabled={saving}
+                  className="text-sm font-semibold bg-green-600 text-white px-4 py-2 rounded-xl disabled:opacity-50">
+                  {saving ? 'Creazione…' : '▶️ Avvia assessment'}
                 </button>
-                {importResult && (
-                  <div className={`rounded-xl p-3 text-sm ${importResult.error ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-800'}`}>
-                    {importResult.error ? `❌ ${importResult.error}` : (
-                      <>✅ Importati: <strong>{importResult.imported}</strong> · Saltati: {importResult.skipped}
-                        {importResult.errors?.length > 0 && <div className="mt-1 text-xs">{importResult.errors.slice(0,3).map(e => `⚠️ ${e.row}: ${e.error}`).join(' · ')}</div>}
-                      </>
-                    )}
-                  </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {sortedAssessments.map(a => {
+                  const rCount = (responses[a.id] || []).length;
+                  return (
+                    <div key={a.id} className="rounded-xl border border-gray-200 px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-gray-800 text-sm">{TYPE_LABELS[a.type] || 'Assessment'}</span>
+                        {a.status === 'active'
+                          ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">ATTIVO</span>
+                          : <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">CHIUSO</span>}
+                        <span className="text-xs text-gray-400">
+                          {new Date(a.created_at).toLocaleDateString('it-IT')} · {rCount} {rCount === 1 ? 'risposta' : 'risposte'}
+                        </span>
+                        {a.consents && a.consents.length > 0 && (
+                          <span className="text-xs text-green-600">✅ {a.consents.length} consensi GDPR</span>
+                        )}
+                        <div className="ml-auto flex flex-wrap items-center gap-2">
+                          {rCount > 0 && (
+                            <button onClick={() => openReport(a)}
+                              className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-100">
+                              📊 Report
+                            </button>
+                          )}
+                          {rCount > 0 && a.type === 'initial' && (
+                            <button onClick={() => openRealQuote(a)}
+                              className="text-xs font-semibold text-green-700 bg-green-50 border border-green-300 px-3 py-1.5 rounded-xl hover:bg-green-100"
+                              title="Preventivo con i dati reali dell'assessment e le condizioni della scheda colloquio">
+                              📄 Preventivo (PDF)
+                            </button>
+                          )}
+                          {a.status === 'active' ? (
+                            <button onClick={() => closeAssessment(a.id)}
+                              className="text-xs font-medium text-gray-600 border border-gray-300 px-3 py-1.5 rounded-xl hover:bg-gray-50">
+                              Chiudi raccolta
+                            </button>
+                          ) : (
+                            <button onClick={() => reopenAssessment(a.id)}
+                              className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl hover:bg-amber-100">
+                              🔓 Riapri
+                            </button>
+                          )}
+                          <button onClick={e => deleteAssessment(a.id, e)} className="p-1.5 text-gray-300 hover:text-red-400" title="Elimina">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {!sortedAssessments.some(a => a.status === 'active') && (
+                  <button onClick={createAssessment} disabled={saving}
+                    className="text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-xl hover:bg-green-100 disabled:opacity-50">
+                    {saving ? 'Creazione…' : '+ Nuovo assessment iniziale (nuovo ciclo annuale)'}
+                  </button>
                 )}
               </div>
             )}
           </div>
-          )}
-
-          {/* Campagna email — visibile solo in modalità avanzata */}
-          {showAdvancedImport && (
-          <div className="border-t border-gray-100 pt-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-semibold text-gray-500">Campagna assessment email</div>
-              <button
-                onClick={() => setShowCampaignConfirm(true)}
-                disabled={sendingCampaign}
-                className="text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-xl hover:bg-green-100 disabled:opacity-50"
-              >
-                {sendingCampaign ? '⏳ Invio...' : '📧 Invia a tutti i pending'}
-              </button>
-            </div>
-            {campaignResult && (
-              <div className={`rounded-xl p-3 text-sm mt-2 ${campaignResult.error ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-800'}`}>
-                {campaignResult.error
-                  ? `❌ ${campaignResult.error}`
-                  : `✅ Inviati: ${campaignResult.sent} · Falliti: ${campaignResult.failed}`
-                }
-                {campaignResult.message && <div className="text-xs mt-1 text-gray-500">{campaignResult.message}</div>}
-              </div>
-            )}
-          </div>
-          )}
-
-          {/* PDF Preventivo */}
-          <div className="border-t border-gray-100 pt-4 flex items-center justify-between">
-            <div className="text-xs text-gray-500">PDF preventivo per il cliente</div>
-            <div className="flex gap-2">
-              {quotePdfUrl && (
-                <a href={quotePdfUrl} target="_blank" rel="noreferrer"
-                  className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl">
-                  ⬇️ Scarica PDF
-                </a>
-              )}
-              <button onClick={generateQuotePdf} disabled={generatingQuotePdf}
-                className="text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-xl hover:bg-orange-100 disabled:opacity-50">
-                {generatingQuotePdf ? '⏳ Generazione...' : '📄 Genera PDF preventivo'}
-              </button>
-            </div>
-          </div>
         </div>
-
-        {/* Modal conferma campagna */}
-        {showCampaignConfirm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
-              <div className="text-lg font-bold text-gray-900 mb-2">📧 Invia campagna assessment</div>
-              <p className="text-sm text-gray-600 mb-4">
-                Stai per inviare l'email di invito assessment a tutti i dipendenti di <strong>{client.name}</strong> con email configurata e assessment non ancora completato.
-              </p>
-              <div className="flex gap-3">
-                <button onClick={sendCampaign} disabled={sendingCampaign}
-                  className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold text-sm disabled:opacity-50">
-                  {sendingCampaign ? 'Invio...' : 'Sì, invia'}
-                </button>
-                <button onClick={() => setShowCampaignConfirm(false)} className="px-5 py-3 rounded-xl border border-gray-300 text-gray-600 text-sm">
-                  Annulla
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
       </main>
     </div>

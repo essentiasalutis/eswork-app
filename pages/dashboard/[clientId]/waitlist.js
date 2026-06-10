@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { requireAuthSsr } from '../../../lib/auth';
 import { getClientById, getWaitlistByClient } from '../../../lib/store';
 
+// Nota terminologia v4: i "turni di avvio" scaglionano l'inizio dei trattamenti L1
+// (capienza sportello). La colonna DB resta `cohort` (solo storage).
 const STATUS_LABELS = { pending: 'In attesa', assigned: 'Assegnato', cancelled: 'Annullato' };
 const STATUS_COLORS = {
   pending: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -11,28 +13,28 @@ const STATUS_COLORS = {
   cancelled: 'bg-gray-100 text-gray-500 border-gray-200',
 };
 
-const COHORT_COLORS = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500'];
-const COHORT_MONTHS = ['Mese 1–2', 'Mese 2–3', 'Mese 3–4', 'Mese 4–5'];
+const TURNO_COLORS = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500'];
+const TURNO_MONTHS = ['Mese 1–2', 'Mese 2–3', 'Mese 3–4', 'Mese 4–5'];
 
 export default function WaitlistPage({ client, waitlist: initialWaitlist }) {
   const [waitlist, setWaitlist] = useState(initialWaitlist);
-  const [filterCohort, setFilterCohort] = useState('');
+  const [filterTurno, setFilterTurno] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [distributing, setDistributing] = useState(false);
 
   const filtered = waitlist.filter(e => {
-    if (filterCohort && String(e.cohort) !== filterCohort) return false;
+    if (filterTurno && String(e.cohort) !== filterTurno) return false;
     if (filterStatus && e.status !== filterStatus) return false;
     return true;
   });
 
-  async function distributeCohorts() {
-    if (!confirm(`Distribuire ${waitlist.filter(e => e.status === 'pending' && !e.cohort).length} candidati in 4 coorti automaticamente?`)) return;
+  async function distributeTurni() {
+    if (!confirm(`Distribuire ${waitlist.filter(e => e.status === 'pending' && !e.cohort).length} candidati in 4 turni di avvio automaticamente?`)) return;
     setDistributing(true);
     try {
       const pending = waitlist.filter(e => e.status === 'pending').sort((a, b) => (b.score || 0) - (a.score || 0));
-      const cohortSize = Math.ceil(pending.length / 4);
-      const updates = pending.map((e, i) => ({ id: e.id, cohort: Math.min(4, Math.floor(i / cohortSize) + 1) }));
+      const turnoSize = Math.ceil(pending.length / 4);
+      const updates = pending.map((e, i) => ({ id: e.id, cohort: Math.min(4, Math.floor(i / turnoSize) + 1) }));
 
       await Promise.all(updates.map(u =>
         fetch(`/api/waitlist/${u.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cohort: u.cohort }) })
@@ -48,14 +50,14 @@ export default function WaitlistPage({ client, waitlist: initialWaitlist }) {
     setDistributing(false);
   }
 
-  const cohortStats = [1, 2, 3, 4].map(c => ({
-    cohort: c,
-    count: waitlist.filter(e => e.cohort === c).length,
+  const turnoStats = [1, 2, 3, 4].map(t => ({
+    turno: t,
+    count: waitlist.filter(e => e.cohort === t).length,
   }));
 
   return (
     <>
-      <Head><title>Waitlist — {client.name}</title></Head>
+      <Head><title>Waitlist L1 — Turni di avvio — {client.name}</title></Head>
       <div className="min-h-screen bg-gray-50">
         <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
           <div className="max-w-5xl mx-auto px-6 py-3 flex items-center gap-3">
@@ -65,16 +67,16 @@ export default function WaitlistPage({ client, waitlist: initialWaitlist }) {
               </svg>
             </Link>
             <div>
-              <div className="font-semibold text-gray-900">Waitlist L1 — {client.name}</div>
+              <div className="font-semibold text-gray-900">Waitlist L1 — Turni di avvio — {client.name}</div>
               <div className="text-xs text-gray-500">{waitlist.filter(e => e.status === 'pending').length} candidati in attesa · ordinati per priority score</div>
             </div>
             <div className="ml-auto flex gap-2">
               <button
-                onClick={distributeCohorts}
+                onClick={distributeTurni}
                 disabled={distributing}
                 className="text-sm bg-indigo-600 text-white px-4 py-2 rounded-xl font-medium disabled:opacity-50"
               >
-                {distributing ? 'Distribuzione...' : '🎯 Distribuisci in coorti'}
+                {distributing ? 'Distribuzione...' : '🎯 Distribuisci in turni'}
               </button>
             </div>
           </div>
@@ -82,26 +84,26 @@ export default function WaitlistPage({ client, waitlist: initialWaitlist }) {
 
         <main className="max-w-5xl mx-auto px-6 py-6 space-y-5">
 
-          {/* Timeline coorti */}
+          {/* Timeline turni di avvio */}
           <div className="bg-white rounded-2xl border border-gray-200 p-5">
-            <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Timeline coorti</div>
+            <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Timeline turni di avvio</div>
             <div className="flex gap-3">
-              {cohortStats.map((c, i) => (
-                <div key={c.cohort} className="flex-1 text-center">
-                  <div className={`h-3 rounded-full mb-2 ${COHORT_COLORS[i]}`} />
-                  <div className="text-xs font-bold text-gray-600">Coorte {c.cohort}</div>
-                  <div className="text-xs text-gray-400">{COHORT_MONTHS[i]}</div>
-                  <div className="text-lg font-bold text-gray-800 mt-1">{c.count}</div>
+              {turnoStats.map((t, i) => (
+                <div key={t.turno} className="flex-1 text-center">
+                  <div className={`h-3 rounded-full mb-2 ${TURNO_COLORS[i]}`} />
+                  <div className="text-xs font-bold text-gray-600">Turno {t.turno}</div>
+                  <div className="text-xs text-gray-400">{TURNO_MONTHS[i]}</div>
+                  <div className="text-lg font-bold text-gray-800 mt-1">{t.count}</div>
                   <div className="text-xs text-gray-400">candidati</div>
                 </div>
               ))}
             </div>
             <div className="mt-4 flex h-3 rounded-full overflow-hidden bg-gray-100">
-              {cohortStats.map((c, i) => {
+              {turnoStats.map((t, i) => {
                 const total = waitlist.length || 1;
-                const pct = Math.round(c.count / total * 100);
+                const pct = Math.round(t.count / total * 100);
                 return pct > 0 ? (
-                  <div key={c.cohort} className={`${COHORT_COLORS[i]} h-full`} style={{ width: `${pct}%` }} />
+                  <div key={t.turno} className={`${TURNO_COLORS[i]} h-full`} style={{ width: `${pct}%` }} />
                 ) : null;
               })}
             </div>
@@ -110,13 +112,12 @@ export default function WaitlistPage({ client, waitlist: initialWaitlist }) {
           {/* Filtri */}
           <div className="flex gap-3">
             <select
-              value={filterCohort}
-              onChange={e => setFilterCohort(e.target.value)}
+              value={filterTurno}
+              onChange={e => setFilterTurno(e.target.value)}
               className="px-4 py-2 rounded-xl border border-gray-300 text-sm bg-white"
             >
-              <option value="">Tutte le coorti</option>
-              {[1, 2, 3, 4].map(c => <option key={c} value={c}>Coorte {c}</option>)}
-              <option value="">Nessuna coorte</option>
+              <option value="">Tutti i turni</option>
+              {[1, 2, 3, 4].map(t => <option key={t} value={t}>Turno {t}</option>)}
             </select>
             <select
               value={filterStatus}
@@ -134,7 +135,7 @@ export default function WaitlistPage({ client, waitlist: initialWaitlist }) {
             <table className="w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
-                  {['Dipendente', 'Sede', 'Score', 'Fonte', 'Coorte', 'Stato', 'Data'].map(h => (
+                  {['Dipendente', 'Sede', 'Score', 'Fonte', 'Turno', 'Stato', 'Data'].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
@@ -159,7 +160,7 @@ export default function WaitlistPage({ client, waitlist: initialWaitlist }) {
                       <td className="px-4 py-3 text-gray-500 text-xs capitalize">{entry.source || '—'}</td>
                       <td className="px-4 py-3">
                         {entry.cohort
-                          ? <span className={`text-xs font-bold text-white px-2 py-0.5 rounded-full ${COHORT_COLORS[(entry.cohort - 1) % 4]}`}>C{entry.cohort}</span>
+                          ? <span className={`text-xs font-bold text-white px-2 py-0.5 rounded-full ${TURNO_COLORS[(entry.cohort - 1) % 4]}`}>T{entry.cohort}</span>
                           : <span className="text-xs text-gray-400">—</span>
                         }
                       </td>

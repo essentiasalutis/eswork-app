@@ -5,6 +5,7 @@ import {
   getPatientsByClient,
   getSessionsForClient,
   getReassessmentsT12ByClient,
+  getMiniChecksByClient,
   insertGeneratedReport,
   insertDocument,
 } from '../../../../lib/store';
@@ -39,6 +40,21 @@ export default requireAuth(async function handler(req, res) {
 
   const isAnnual = checkpoint === 't12';
   const checkLabel = checkpoint === 't3' ? '3 mesi' : checkpoint === 't6' ? '6 mesi' : '12 mesi (Annuale)';
+
+  // ── Mini-check del checkpoint (risposte REALI dei dipendenti a T3/T6) ─────────
+  let mc = null;
+  if (!isAnnual) {
+    const allChecks = await getMiniChecksByClient(id).catch(() => []);
+    const phase = allChecks.filter(c => c.check_type === checkpoint);
+    const nrsVals = phase.map(c => c.nrs_current).filter(v => v != null);
+    mc = {
+      count: phase.length,
+      avgNrs: nrsVals.length ? (nrsVals.reduce((a, b) => a + b, 0) / nrsVals.length).toFixed(1) : 'n.d.',
+      limitationsPct: phase.length ? Math.round(phase.filter(c => c.has_limitations).length / phase.length * 100) : null,
+      wantsContact: phase.filter(c => c.wants_contact).length,
+      needsContact: phase.filter(c => c.triage_outcome === 'needs_contact').length,
+    };
+  }
 
   // ── KPI del Report Annuale (T12): prevalenza baseline↔T12 + PGIC ──────────────
   let t12 = null;
@@ -97,13 +113,20 @@ DATI CLINICI:
 - Riduzione media NRS per sessione: ${avgDelta} punti
 - Settore: ${client.sector === 1 ? 'Manifattura' : 'Servizi'}
 
+MINI-CHECK ${checkpoint.toUpperCase()} (questionari compilati dai dipendenti a ${checkLabel}):
+- Compilati: ${mc.count}
+- NRS medio dichiarato: ${mc.avgNrs}
+${mc.limitationsPct != null ? `- Con limitazioni funzionali: ${mc.limitationsPct}%` : ''}
+- Richiedono contatto: ${mc.wantsContact} (triage: ${mc.needsContact} da ricontattare)
+${mc.count === 0 ? 'NOTA: nessun mini-check ancora compilato — segnala che i KPI di percezione arriveranno coi questionari.' : ''}
+
 STRUTTURA REPORT (markdown, ## per titoli):
 
 ## Highlights Principali a ${checkLabel}
 (3-4 punti chiave di rilievo clinico e operativo)
 
 ## KPI Clinici
-(tabella o lista strutturata: sessioni, NRS, completamento, pazienti per livello)
+(tabella o lista strutturata: sessioni, NRS sedute, mini-check ${checkpoint.toUpperCase()} con NRS dichiarato e limitazioni, pazienti per livello)
 
 ## Trend e Analisi
 (andamento NRS, compliance pazienti, situazioni da monitorare)
@@ -119,7 +142,7 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
   const reportType = `checkpoint_${checkpoint}`;
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    const fallback = generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12);
+    const fallback = generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc);
     // PDF prima dell'insert: così pdf_url resta sul record e il report è riapribile col PDF
     const pdfUrl = await tryGeneratePdf(client, reportType, fallback, id, checkpoint).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system', pdf_url: pdfUrl }).catch(() => null);
@@ -138,14 +161,14 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
     const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: report, checkpoint, created_by: 'admin', pdf_url: pdfUrl }).catch(() => null);
     return res.json({ report, source: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
-    const fallback = generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12);
+    const fallback = generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc);
     const pdfUrl = await tryGeneratePdf(client, reportType, fallback, id, checkpoint).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system', pdf_url: pdfUrl }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
   }
 });
 
-function generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12) {
+function generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc) {
   if (checkpoint === 't12' && t12) {
     return `## Report Annuale — ${client.name}
 
@@ -187,7 +210,11 @@ Il programma ES Work per **${client.name}** ha raggiunto il checkpoint a ${check
 | Indicatore | Valore |
 |-----------|--------|
 | Sessioni completate | ${completed} / ${planned} |
-| Riduzione NRS media | ${avgDelta} punti |
+| Riduzione NRS media (sedute) | ${avgDelta} punti |
+| Mini-check ${checkpoint.toUpperCase()} compilati | ${mc ? mc.count : 0} |
+| NRS medio dichiarato (mini-check) | ${mc ? mc.avgNrs : 'n.d.'} |
+| Con limitazioni funzionali | ${mc && mc.limitationsPct != null ? mc.limitationsPct + '%' : 'n.d.'} |
+| Richiedono contatto | ${mc ? mc.needsContact : 0} |
 | Pazienti L1 attivi | ${l1} |
 | Pazienti L2 monitorati | ${l2} |
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getPatientsWithEmailByClient, getDocumentsByClient, getProfessionals } from '../../lib/store';
+import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getPatientsWithEmailByClient, getDocumentsByClient, getProfessionals, getMonitoringByClient } from '../../lib/store';
 import { TYPE_LABELS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
 import { CONFIG } from '../../lib/config';
@@ -99,7 +99,7 @@ function NrsBar({ value, max = 10 }) {
   );
 }
 
-export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist, generatedReports: initialReports, allProfessionals }) {
+export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist, generatedReports: initialReports, allProfessionals, monitoring }) {
   const router = useRouter();
   const [client, setClient] = useState(initialClient);
   const [assessments, setAssessments] = useState(initial);
@@ -183,6 +183,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [generatingReport, setGeneratingReport] = useState(null); // 'activation'|'t3'|'t6'|null
   const [reportModal, setReportModal] = useState(null); // { title, content, pdf_url }
   const [copiedAssessmentLink, setCopiedAssessmentLink] = useState(false);
+  const [copiedMonitor, setCopiedMonitor] = useState(null); // patient_id+fase copiato
 
   const tier = client.tier || getTierFromEmployees(client.employees);
 
@@ -416,6 +417,48 @@ ${FIRMA}`;
   // della scheda colloquio (tier/tariffe/IVA caricati server-side da first_meetings).
   function openRealQuote(a) {
     router.push(`/dashboard/offer?assessmentId=${a.id}&clientId=${client.id}&n=${client.employees}`);
+  }
+
+  // ── Monitoraggio T3/T6/T12 (v4) ──────────────────────────────────────────────
+  // T3/T6: ancorati al 1° ciclo del paziente (90/180 gg) — il cron invia le email,
+  // qui i link per l'invio manuale (HR/WhatsApp) finché il dominio email non è attivo.
+  // T12: re-assessment dell'intera popolazione (campagna annuale, invio manuale).
+  const monit = (() => {
+    const m = monitoring || { cycles: [], checks: [], reassessments: [] };
+    const now = Date.now();
+    const checksBy = {};
+    (m.checks || []).forEach(c => { (checksBy[c.patient_id] = checksBy[c.patient_id] || new Set()).add(c.check_type); });
+    const reassSet = new Set((m.reassessments || []).map(r => r.patient_id));
+    const firstCycle = {};
+    (m.cycles || []).forEach(c => {
+      if (!firstCycle[c.patient_id] || new Date(c.started_at) < new Date(firstCycle[c.patient_id])) firstCycle[c.patient_id] = c.started_at;
+    });
+    const byId = Object.fromEntries((patientsNrs || []).map(p => [p.id, p]));
+    const dueT3 = [], dueT6 = [];
+    Object.entries(firstCycle).forEach(([pid, started]) => {
+      const p = byId[pid];
+      if (!p || !p.care_token) return;
+      const days = Math.floor((now - new Date(started)) / 86400000);
+      const done = checksBy[pid] || new Set();
+      if (days >= 90 && !done.has('t3')) dueT3.push({ ...p, days });
+      if (days >= 180 && !done.has('t6')) dueT6.push({ ...p, days });
+    });
+    const dueT12 = (patientsNrs || []).filter(p => p.care_token && p.assessment_completed_at && !reassSet.has(p.id));
+    return {
+      dueT3, dueT6, dueT12,
+      doneT3: (m.checks || []).filter(c => c.check_type === 't3').length,
+      doneT6: (m.checks || []).filter(c => c.check_type === 't6').length,
+      doneT12: (m.reassessments || []).length,
+    };
+  })();
+
+  function copyMonitorLink(p, fase) {
+    const url = fase === 't12'
+      ? `${baseUrl}/employee/reassessment?token=${p.care_token}`
+      : `${baseUrl}/employee/minicheck?token=${p.care_token}&type=${fase}`;
+    navigator.clipboard.writeText(url).catch(() => {});
+    setCopiedMonitor(p.id + fase);
+    setTimeout(() => setCopiedMonitor(null), 2000);
   }
 
   function getBaseline(assessment) {
@@ -737,6 +780,47 @@ ${FIRMA}`;
             </div>
           </div>
         )}
+
+        {/* ── Monitoraggio T3 / T6 / T12 ──────────────────────────────── */}
+        <div className="mt-6 bg-white rounded-2xl border border-gray-200 p-5">
+          <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">📡 Monitoraggio T3 / T6 / T12</h2>
+          <div className="text-xs text-gray-400 mt-0.5 mb-4">
+            T3/T6: mini-check ancorati al 1° ciclo del paziente — invio email automatico ogni mattina (richiede dominio email verificato).
+            T12: re-assessment annuale con PGIC di tutta la popolazione. Qui i link personali per l&apos;invio manuale (HR/WhatsApp).
+          </div>
+          <div className="grid sm:grid-cols-3 gap-3">
+            {[
+              { fase: 't3', label: 'Mini-check T3 (3 mesi)', done: monit.doneT3, due: monit.dueT3, color: 'blue' },
+              { fase: 't6', label: 'Mini-check T6 (6 mesi)', done: monit.doneT6, due: monit.dueT6, color: 'purple' },
+              { fase: 't12', label: 'Re-assessment T12 + PGIC', done: monit.doneT12, due: monit.dueT12, color: 'amber' },
+            ].map(({ fase, label, done, due, color }) => {
+              const colorCls = { blue: 'text-blue-700 border-blue-200 bg-blue-50', purple: 'text-purple-700 border-purple-200 bg-purple-50', amber: 'text-amber-700 border-amber-200 bg-amber-50' }[color];
+              return (
+                <div key={fase} className="border border-gray-100 rounded-xl p-3">
+                  <div className={`text-xs font-bold px-2 py-1 rounded-lg border inline-block ${colorCls}`}>{label}</div>
+                  <div className="text-xs text-gray-500 mt-2 mb-2">
+                    <span className="font-semibold text-green-700">{done} compilati</span> · <span className={due.length > 0 ? 'font-semibold text-amber-700' : ''}>{due.length} da invitare</span>
+                  </div>
+                  {due.length === 0 ? (
+                    <div className="text-xs text-gray-300">{done > 0 ? 'Tutti invitati o completati ✓' : fase === 't12' ? 'Nessun dipendente pronto' : 'Nessun ciclo arrivato a scadenza'}</div>
+                  ) : (
+                    <div className="space-y-1 max-h-44 overflow-y-auto">
+                      {due.map(p => (
+                        <div key={p.id} className="flex items-center justify-between gap-2 text-xs bg-gray-50 rounded-lg px-2 py-1.5">
+                          <span className="truncate text-gray-700">{p.first_name} {p.last_name}{p.days != null ? <span className="text-gray-400"> · {p.days}gg</span> : ''}</span>
+                          <button onClick={() => copyMonitorLink(p, fase)}
+                            className={`shrink-0 font-medium px-2 py-0.5 rounded border ${copiedMonitor === p.id + fase ? 'border-green-300 text-green-700 bg-green-50' : 'border-gray-200 text-gray-500 bg-white hover:bg-gray-50'}`}>
+                            {copiedMonitor === p.id + fase ? '✓' : '🔗 Link'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
         {/* ── Referral B2C ────────────────────────────────────────────── */}
         <div className="mt-6">
@@ -1185,5 +1269,10 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     generatedReports = await getGeneratedReportsByClient(clientId);
   } catch (_) {}
 
-  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist, generatedReports, allProfessionals } };
+  let monitoring = { cycles: [], checks: [], reassessments: [] };
+  try {
+    monitoring = await getMonitoringByClient(clientId);
+  } catch (_) {}
+
+  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist, generatedReports, allProfessionals, monitoring } };
 });

@@ -62,8 +62,8 @@ PAZIENTI: ${totalPatients > 0 ? 'Assessment completati' : 'Nessun assessment anc
   // Fallback se manca la chiave
   if (!process.env.ANTHROPIC_API_KEY) {
     const fallback = generateFallbackReport(client, l1Count, l2Count, l3Count, totalPatients, sessions.length, sectorLabel);
-    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system' }).catch(() => null);
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
+    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', pdf_url: pdfUrl, report_id: rec?.id });
   }
 
@@ -101,13 +101,13 @@ Tono: professionale, clinico, orientato ai dati. In italiano. Non più di 800 pa
     });
 
     const report = message.content[0]?.text || '';
-    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin' }).catch(() => null);
     const pdfUrl = await tryGeneratePdf(client, 'activation', report, id).catch(() => null);
+    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', pdf_url: pdfUrl }).catch(() => null);
     return res.json({ report, source: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
     const fallback = generateFallbackReport(client, l1Count, l2Count, l3Count, totalPatients, sessions.length, sectorLabel);
-    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system' }).catch(() => null);
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
+    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
   }
 });

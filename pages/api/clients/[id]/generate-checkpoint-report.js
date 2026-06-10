@@ -120,8 +120,9 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
 
   if (!process.env.ANTHROPIC_API_KEY) {
     const fallback = generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12);
-    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system' }).catch(() => null);
+    // PDF prima dell'insert: così pdf_url resta sul record e il report è riapribile col PDF
     const pdfUrl = await tryGeneratePdf(client, reportType, fallback, id, checkpoint).catch(() => null);
+    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system', pdf_url: pdfUrl }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', pdf_url: pdfUrl, report_id: rec?.id });
   }
 
@@ -133,13 +134,13 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
       messages: [{ role: 'user', content: prompt }],
     });
     const report = message.content[0]?.text || '';
-    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: report, checkpoint, created_by: 'admin' }).catch(() => null);
     const pdfUrl = await tryGeneratePdf(client, reportType, report, id, checkpoint).catch(() => null);
+    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: report, checkpoint, created_by: 'admin', pdf_url: pdfUrl }).catch(() => null);
     return res.json({ report, source: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
     const fallback = generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12);
-    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system' }).catch(() => null);
     const pdfUrl = await tryGeneratePdf(client, reportType, fallback, id, checkpoint).catch(() => null);
+    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system', pdf_url: pdfUrl }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
   }
 });

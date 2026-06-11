@@ -184,6 +184,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [reportModal, setReportModal] = useState(null); // { title, content, pdf_url }
   const [copiedAssessmentLink, setCopiedAssessmentLink] = useState(false);
   const [copiedMonitor, setCopiedMonitor] = useState(null); // patient_id+fase copiato
+  const [showNrsTable, setShowNrsTable] = useState(false);  // tabella NRS a scomparsa
 
   const tier = client.tier || getTierFromEmployees(client.employees);
 
@@ -716,7 +717,35 @@ ${FIRMA}`;
         {/* ── Pazienti / NRS (solo coord., niente note cliniche) ──────── */}
         {patientsNrs && patientsNrs.length > 0 && (
           <div className="mb-5">
-            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-2">Pazienti — NRS</h2>
+            {/* Cruscotto sintetico stratificazione */}
+            <div className="grid grid-cols-4 gap-3 mb-3">
+              {[
+                { label: 'L1 — Trattamento', value: patientsNrs.filter(p => p.level === 'level1').length, color: '#dc2626' },
+                { label: 'L2 — Monitoraggio', value: patientsNrs.filter(p => p.level === 'level2').length, color: '#ca8a04' },
+                { label: 'L3 — Formazione', value: patientsNrs.filter(p => p.level === 'level3').length, color: '#16a34a' },
+                { label: 'Totale', value: patientsNrs.length, color: '#374151' },
+              ].map(k => (
+                <div key={k.label} className="bg-white rounded-xl border border-gray-200 p-3 text-center">
+                  <div className="text-xl font-bold" style={{ color: k.color }}>{k.value}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{k.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Tabella NRS a scomparsa (cruscotto operativo: si apre solo se serve) */}
+            <button
+              onClick={() => setShowNrsTable(v => !v)}
+              className="w-full flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 mb-2"
+            >
+              <span className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Pazienti — NRS</span>
+              <span className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">{patientsNrs.length} pazienti</span>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${showNrsTable ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </span>
+            </button>
+            {showNrsTable && (
             <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
@@ -778,6 +807,7 @@ ${FIRMA}`;
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         )}
 

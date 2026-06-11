@@ -37,11 +37,46 @@ function YesNoBtn({ value, selected, onSelect }) {
 // ─── NMQ: zona corpo ──────────────────────────────────────────────────────────
 
 function NMQZone({ zone, zi, answers, setAnswer }) {
+  // Ordine: 7 giorni → 12 mesi → impatto. Le chiavi salvate restano invariate
+  // (nmq_z_0 = 12 mesi, _1 = impatto, _2 = 7 giorni) per stratificazione e report.
+  // Coerenza automatica (riduce risposte logicamente impossibili):
+  //   7gg = SÌ  → 12 mesi auto-SÌ (bloccata) · impatto scelta libera
+  //   7gg = NO  → 12 mesi scelta libera
+  //     12 mesi = NO → impatto auto-NO (bloccato)
+  //     12 mesi = SÌ → impatto scelta libera
+  const k7 = `nmq_${zi}_2`, k12 = `nmq_${zi}_0`, kImp = `nmq_${zi}_1`;
+  const v7 = answers[k7], v12 = answers[k12];
+
+  const lock12 = v7 === 1;                  // dolore recente ⇒ rientra nei 12 mesi
+  const lockImp = v7 === 0 && v12 === 0;    // nessun dolore ⇒ nessun impatto
+  const impDisabled = v7 === undefined || (v7 === 0 && v12 === undefined) || lockImp;
+
+  function set7(v) {
+    setAnswer(k7, v);
+    if (v === 1) {
+      setAnswer(k12, 1);          // auto-flag 12 mesi
+      setAnswer(kImp, undefined); // impatto: scelta esplicita
+    } else {
+      setAnswer(k12, undefined);  // 12 mesi torna scelta libera
+      setAnswer(kImp, undefined);
+    }
+  }
+  function set12(v) {
+    if (lock12) return;
+    setAnswer(k12, v);
+    setAnswer(kImp, v === 0 ? 0 : undefined); // no+no → impatto auto-NO; sì → scelta
+  }
+  function setImp(v) {
+    if (impDisabled) return;
+    setAnswer(kImp, v);
+  }
+
   const questions = [
-    { key: `nmq_${zi}_0`, label: <>Negli ultimi 12 mesi, hai avuto fastidi o dolori a: <strong>{zone.toLowerCase()}</strong>?</> },
-    { key: `nmq_${zi}_1`, label: <>Questo problema ti ha impedito di svolgere le normali attività?</> },
-    { key: `nmq_${zi}_2`, label: <>Negli ultimi 7 giorni, hai avuto fastidi o dolori a: <strong>{zone.toLowerCase()}</strong>?</> },
+    { key: k7, label: <>Negli ultimi <strong>7 giorni</strong>, hai avuto fastidi o dolori a: <strong>{zone.toLowerCase()}</strong>?</>, onSelect: set7, locked: false, note: null },
+    { key: k12, label: <>E negli ultimi <strong>12 mesi</strong>?</>, onSelect: set12, locked: lock12, note: lock12 ? 'Compilata in automatico: se hai dolore negli ultimi 7 giorni, rientra anche negli ultimi 12 mesi.' : null },
+    { key: kImp, label: <>Questo problema ti ha impedito di svolgere le normali attività?</>, onSelect: setImp, locked: impDisabled, note: lockImp ? 'Compilata in automatico: nessun dolore indicato.' : (v7 === undefined || (v7 === 0 && v12 === undefined)) ? 'Rispondi prima alle domande sopra.' : null },
   ];
+
   return (
     <div className="space-y-4">
       {/* Intestazione zona — solo nome, senza icona */}
@@ -49,12 +84,13 @@ function NMQZone({ zone, zi, answers, setAnswer }) {
         <div className="font-bold text-green-800 text-lg">{zone}</div>
       </div>
       {questions.map(q => (
-        <div key={q.key} className="bg-white rounded-2xl border border-gray-200 p-4">
+        <div key={q.key} className={`bg-white rounded-2xl border border-gray-200 p-4 ${q.locked ? 'opacity-70' : ''}`}>
           <p className="text-sm text-gray-700 mb-3 leading-relaxed">{q.label}</p>
           <div className="flex gap-2">
-            <YesNoBtn value={1} selected={answers[q.key] === 1} onSelect={v => setAnswer(q.key, v)} />
-            <YesNoBtn value={0} selected={answers[q.key] === 0} onSelect={v => setAnswer(q.key, v)} />
+            <YesNoBtn value={1} selected={answers[q.key] === 1} onSelect={v => q.onSelect(v)} />
+            <YesNoBtn value={0} selected={answers[q.key] === 0} onSelect={v => q.onSelect(v)} />
           </div>
+          {q.note && <p className="text-xs text-gray-400 mt-2">{q.note}</p>}
         </div>
       ))}
     </div>
@@ -87,7 +123,7 @@ function ESLogo({ size = 56 }) {
 
 // ─── Fase 0: Welcome screen ───────────────────────────────────────────────────
 
-function WelcomeScreen({ clientName, onIdentified, onAnonymous }) {
+function WelcomeScreen({ clientName, onIdentified }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 max-w-lg mx-auto w-full">
@@ -100,13 +136,11 @@ function WelcomeScreen({ clientName, onIdentified, onAnonymous }) {
             <strong>La tua azienda ha attivato ES Work</strong>, il programma di prevenzione e cura dell'apparato muscolo-scheletrico.
           </p>
           <p className="text-sm text-gray-700 leading-relaxed mb-3">
-            Questo questionario raccoglie informazioni sugli eventuali disturbi fisici nelle varie zone del corpo.
+            Questo questionario raccoglie informazioni sugli eventuali disturbi fisici nelle varie zone del corpo. Si compila in circa 5 minuti.
           </p>
-          <p className="text-sm text-gray-700 leading-relaxed font-semibold">Puoi scegliere come partecipare:</p>
-          <ul className="mt-2 text-sm text-gray-600 space-y-1 pl-4 list-disc">
-            <li><strong>Con i tuoi dati</strong>: puoi essere contattato se hai bisogno di supporto</li>
-            <li><strong>In modo anonimo</strong>: contribuisci ai dati aggregati aziendali, nessuno ti contatterà</li>
-          </ul>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            I tuoi dati sono trattati in modo <strong>riservato</strong> da Essentia Salutis, nel rispetto del segreto professionale: la tua azienda non vedrà mai le tue risposte individuali, solo risultati aggregati.
+          </p>
         </div>
 
         <div className="w-full space-y-3">
@@ -116,57 +150,10 @@ function WelcomeScreen({ clientName, onIdentified, onAnonymous }) {
           >
             ✅ Sì, ho capito e proseguo
           </button>
-          <button
-            onClick={onAnonymous}
-            className="w-full py-4 rounded-2xl bg-white border-2 border-gray-300 text-gray-700 font-semibold text-base"
-          >
-            👤 Voglio contribuire in modalità anonima
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Fase 1b: Spiegazione modalità anonima ────────────────────────────────────
-
-function AnonymousExplanation({ onConfirm, onBack }) {
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <div className="flex-1 flex flex-col justify-center px-6 py-10 max-w-lg mx-auto w-full">
-        <div className="text-4xl mb-4 text-center">👤</div>
-        <h2 className="text-xl font-bold text-gray-900 mb-4 text-center">Modalità anonima</h2>
-
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6 space-y-3">
-          <p className="text-sm text-gray-700 leading-relaxed">
-            Compilando in <strong>modalità anonima</strong>:
+          <p className="text-xs text-gray-400 text-center leading-relaxed px-2">
+            Se preferisci non compilare il questionario puoi semplicemente chiudere questa pagina.
+            In quel caso però non potrai essere contattato né accedere al programma di trattamento e prevenzione ES Work.
           </p>
-          <ul className="text-sm text-gray-600 space-y-2 pl-4 list-disc">
-            <li>Le tue risposte contribuiscono ai dati aggregati dell'azienda</li>
-            <li>Non viene registrato nessun dato che consenta di identificarti (nome, email, telefono)</li>
-            <li>Nessuno potrà contattarti in seguito</li>
-            <li>Non potrai accedere al programma di trattamento individuale</li>
-          </ul>
-          <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
-            <p className="text-xs text-amber-700">
-              Se hai dolori frequenti o limitazioni funzionali, ti consigliamo di scegliere la modalità con i tuoi dati per poter essere contattato dall'osteopata.
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <button
-            onClick={onConfirm}
-            className="w-full py-4 rounded-2xl bg-gray-700 text-white font-semibold text-base"
-          >
-            Sì, procedo anonimamente
-          </button>
-          <button
-            onClick={onBack}
-            className="w-full py-3 rounded-2xl border border-gray-300 text-gray-600 text-sm"
-          >
-            ← No, torno indietro
-          </button>
         </div>
       </div>
     </div>
@@ -461,7 +448,6 @@ function CompletionScreen({ level, wantsContact, tier }) {
 
 const PHASES = {
   WELCOME: 'welcome',
-  ANONYMOUS_EXPLAIN: 'anonymous_explain',
   CONSENT: 'consent',
   CONTACT: 'contact',
   NMQ: 'nmq',
@@ -551,17 +537,6 @@ export default function SelfDeclarePage({ client, error: serverError }) {
         <WelcomeScreen
           clientName={client.name}
           onIdentified={() => setPhase(PHASES.CONSENT)}
-          onAnonymous={() => setPhase(PHASES.ANONYMOUS_EXPLAIN)}
-        />
-      )}
-
-      {phase === PHASES.ANONYMOUS_EXPLAIN && (
-        <AnonymousExplanation
-          onConfirm={() => {
-            setWantsContact(false);
-            setPhase(PHASES.NMQ);
-          }}
-          onBack={() => setPhase(PHASES.WELCOME)}
         />
       )}
 
@@ -589,8 +564,7 @@ export default function SelfDeclarePage({ client, error: serverError }) {
             if (nmqStep > 0) {
               setNmqStep(s => s - 1);
             } else {
-              // Torna alla schermata precedente al NMQ
-              setPhase(wantsContact ? PHASES.CONTACT : PHASES.ANONYMOUS_EXPLAIN);
+              setPhase(PHASES.CONTACT);
             }
           }}
           onSubmit={handleSubmit}

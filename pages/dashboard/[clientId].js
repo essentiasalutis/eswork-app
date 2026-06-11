@@ -185,6 +185,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [copiedAssessmentLink, setCopiedAssessmentLink] = useState(false);
   const [copiedMonitor, setCopiedMonitor] = useState(null); // patient_id+fase copiato
   const [showNrsTable, setShowNrsTable] = useState(false);  // tabella NRS a scomparsa
+  const [showWaitlistTable, setShowWaitlistTable] = useState(false); // lista d'attesa a scomparsa
 
   const tier = client.tier || getTierFromEmployees(client.employees);
 
@@ -679,10 +680,22 @@ ${FIRMA}`;
           )}
         </div>
 
-        {/* ── Lista d'attesa L1 ───────────────────────────────────────── */}
+        {/* ── Lista d'attesa L1 (a scomparsa) ─────────────────────────── */}
         {waitlist && waitlist.length > 0 && (
           <div className="mb-5">
-            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-2">Lista d'attesa L1</h2>
+            <button
+              onClick={() => setShowWaitlistTable(v => !v)}
+              className="w-full flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 mb-2"
+            >
+              <span className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Lista d&apos;attesa L1</span>
+              <span className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">{waitlist.filter(w => w.status === 'pending').length} in attesa · {waitlist.length} totali</span>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${showWaitlistTable ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </span>
+            </button>
+            {showWaitlistTable && (
             <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
@@ -711,6 +724,7 @@ ${FIRMA}`;
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         )}
 

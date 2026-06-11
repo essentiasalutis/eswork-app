@@ -46,11 +46,34 @@ export default function ReassessmentT12() {
 
   const currentZone = NMQ_ZONES[zoneIndex];
 
-  function updateZone(key, field, value) {
-    setNmqData(prev => ({
-      ...prev,
-      [key]: { ...(prev[key] || {}), [field]: value },
-    }));
+  // Stessa gerarchia del questionario iniziale: 7 giorni → 12 mesi → impatto,
+  // con coerenza automatica (7gg=Sì ⇒ 12m auto-Sì; nessun dolore ⇒ impatto auto-No).
+  function setPain7(key, val) {
+    setNmqData(prev => {
+      const z = { ...(prev[key] || {}) };
+      z.pain_7days = val;
+      if (val) { z.pain_12m = true; delete z.functional_impact; }
+      else { delete z.pain_12m; delete z.functional_impact; }
+      return { ...prev, [key]: z };
+    });
+  }
+  function setPain12(key, val) {
+    setNmqData(prev => {
+      const z = { ...(prev[key] || {}) };
+      if (z.pain_7days === true) return prev; // bloccata: auto-Sì
+      z.pain_12m = val;
+      if (val === false) z.functional_impact = false; // nessun dolore ⇒ nessun impatto
+      else delete z.functional_impact;
+      return { ...prev, [key]: z };
+    });
+  }
+  function setImpact(key, val) {
+    setNmqData(prev => {
+      const z = { ...(prev[key] || {}) };
+      if (z.pain_7days == null || (z.pain_7days === false && z.pain_12m !== true)) return prev;
+      z.functional_impact = val;
+      return { ...prev, [key]: z };
+    });
   }
 
   function nextZone() {
@@ -136,14 +159,14 @@ export default function ReassessmentT12() {
               <div style={{ fontSize: 24, marginBottom: 8 }}>{currentZone.icon}</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', marginBottom: 16 }}>{currentZone.label}</div>
 
-              {/* Pain 7 days */}
+              {/* 1 — Ultimi 7 giorni */}
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 10 }}>
-                  Hai avuto dolore in questa zona negli ultimi 7 giorni?
+                  Negli ultimi <strong>7 giorni</strong>, hai avuto dolore in questa zona?
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  {[{ val: false, label: '😊 No' }, { val: true, label: '😟 Sì' }].map(({ val, label }) => (
-                    <button key={String(val)} onClick={() => updateZone(currentZone.key, 'pain_7days', val)}
+                  {[{ val: true, label: '😟 Sì' }, { val: false, label: '😊 No' }].map(({ val, label }) => (
+                    <button key={String(val)} onClick={() => setPain7(currentZone.key, val)}
                       style={{ flex: 1, padding: '12px', borderRadius: 12, border: '2px solid', fontSize: 14, fontWeight: 700, cursor: 'pointer',
                         background: zoneData.pain_7days === val ? (val ? '#fef2f2' : '#f0fdf4') : '#fff',
                         borderColor: zoneData.pain_7days === val ? (val ? '#dc2626' : '#16a34a') : '#e2e8f0',
@@ -154,33 +177,69 @@ export default function ReassessmentT12() {
                 </div>
               </div>
 
-              {/* Impatto funzionale se dolore presente — NRS NON è auto-compilato */}
-              {zoneData.pain_7days === true && (
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 10 }}>
-                    Il dolore limita le tue attività?
+              {/* 2 — Ultimi 12 mesi (auto-Sì se dolore recente) */}
+              {(() => {
+                const lock12 = zoneData.pain_7days === true;
+                const dis12 = zoneData.pain_7days == null || lock12;
+                return (
+                  <div style={{ marginBottom: 16, opacity: dis12 && !lock12 ? 0.5 : lock12 ? 0.7 : 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 10 }}>
+                      E negli ultimi <strong>12 mesi</strong>?
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      {[{ val: true, label: 'Sì' }, { val: false, label: 'No' }].map(({ val, label }) => (
+                        <button key={String(val)} onClick={() => setPain12(currentZone.key, val)}
+                          style={{ flex: 1, padding: '10px', borderRadius: 10, border: '2px solid', fontSize: 14, fontWeight: 700, cursor: dis12 ? 'not-allowed' : 'pointer',
+                            background: zoneData.pain_12m === val ? '#0369a1' : '#fff',
+                            borderColor: zoneData.pain_12m === val ? '#0369a1' : '#e2e8f0',
+                            color: zoneData.pain_12m === val ? '#fff' : '#374151' }}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {lock12 && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6 }}>Compilata in automatico: se hai dolore negli ultimi 7 giorni, rientra anche negli ultimi 12 mesi.</div>}
+                    {zoneData.pain_7days == null && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6 }}>Rispondi prima alla domanda sopra.</div>}
                   </div>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    {[{ val: false, label: 'No' }, { val: true, label: 'Sì' }].map(({ val, label }) => (
-                      <button key={String(val)} onClick={() => updateZone(currentZone.key, 'functional_impact', val)}
-                        style={{ flex: 1, padding: '10px', borderRadius: 10, border: '2px solid', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                          background: zoneData.functional_impact === val ? '#0369a1' : '#fff',
-                          borderColor: zoneData.functional_impact === val ? '#0369a1' : '#e2e8f0',
-                          color: zoneData.functional_impact === val ? '#fff' : '#374151' }}>
-                        {label}
-                      </button>
-                    ))}
+                );
+              })()}
+
+              {/* 3 — Impatto funzionale (auto-No se nessun dolore) */}
+              {(() => {
+                const lockNo = zoneData.pain_7days === false && zoneData.pain_12m === false;
+                const disImp = zoneData.pain_7days == null || (zoneData.pain_7days === false && zoneData.pain_12m == null) || lockNo;
+                return (
+                  <div style={{ opacity: disImp && !lockNo ? 0.5 : lockNo ? 0.7 : 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 10 }}>
+                      Questo problema ti ha impedito di svolgere le normali attività?
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      {[{ val: true, label: 'Sì' }, { val: false, label: 'No' }].map(({ val, label }) => (
+                        <button key={String(val)} onClick={() => setImpact(currentZone.key, val)}
+                          style={{ flex: 1, padding: '10px', borderRadius: 10, border: '2px solid', fontSize: 14, fontWeight: 700, cursor: disImp ? 'not-allowed' : 'pointer',
+                            background: zoneData.functional_impact === val ? '#0369a1' : '#fff',
+                            borderColor: zoneData.functional_impact === val ? '#0369a1' : '#e2e8f0',
+                            color: zoneData.functional_impact === val ? '#fff' : '#374151' }}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {lockNo && <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6 }}>Compilata in automatico: nessun dolore indicato.</div>}
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
 
-            <button onClick={nextZone}
-              disabled={zoneData.pain_7days == null}
-              style={{ width: '100%', background: zoneData.pain_7days == null ? '#e2e8f0' : '#0369a1', color: zoneData.pain_7days == null ? '#94a3b8' : '#fff',
-                border: 'none', borderRadius: 14, padding: '16px', fontSize: 16, fontWeight: 700, cursor: zoneData.pain_7days == null ? 'not-allowed' : 'pointer' }}>
-              {zoneIndex < NMQ_ZONES.length - 1 ? 'Zona successiva →' : 'Ultima domanda →'}
-            </button>
+            {(() => {
+              const zoneDone = zoneData.pain_7days != null && zoneData.pain_12m != null && zoneData.functional_impact != null;
+              return (
+                <button onClick={nextZone}
+                  disabled={!zoneDone}
+                  style={{ width: '100%', background: !zoneDone ? '#e2e8f0' : '#0369a1', color: !zoneDone ? '#94a3b8' : '#fff',
+                    border: 'none', borderRadius: 14, padding: '16px', fontSize: 16, fontWeight: 700, cursor: !zoneDone ? 'not-allowed' : 'pointer' }}>
+                  {zoneIndex < NMQ_ZONES.length - 1 ? 'Zona successiva →' : 'Ultima domanda →'}
+                </button>
+              );
+            })()}
           </div>
         )}
       </div>

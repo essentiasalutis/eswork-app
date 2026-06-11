@@ -169,6 +169,18 @@ export default function ClientPage({ client: initialClient, assessments: initial
     setPatientProBusy(null);
   }
 
+  // Elimina un paziente/dipendente e tutti i suoi dati collegati
+  async function deletePatient(p) {
+    if (!confirm(`Eliminare ${p.first_name} ${p.last_name}?\n\nVerranno rimossi anche cicli, sedute, mini-check, pre-validazioni, segnalazioni e voci in lista d'attesa. Le risposte anonime dell'assessment restano negli aggregati.\n\nL'operazione non è reversibile.`)) return;
+    const res = await fetch(`/api/admin/patients/${p.id}`, { method: 'DELETE' });
+    if (res.ok) {
+      router.replace(router.asPath); // ricarica i dati della pagina
+    } else {
+      const d = await res.json().catch(() => ({}));
+      alert(d.error || 'Errore eliminazione');
+    }
+  }
+
   const [saving, setSaving] = useState(false);
   const [reportAssessment, setReportAssessment] = useState(null);
   const [emailModal, setEmailModal] = useState(null); // { to, subject, body }
@@ -669,470 +681,8 @@ ${FIRMA}`;
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-6">
-        {/* ── Professionisti assegnati (elenco a scomparsa) ───────────── */}
-        <div className="mb-5">
-          <button
-            onClick={() => setShowProList(v => !v)}
-            className="w-full flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50"
-          >
-            <span className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Professionisti</span>
-            <span className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">{assignedCount > 0 ? `${assignedCount} assegnat${assignedCount === 1 ? 'o' : 'i'}` : 'nessuno assegnato'}</span>
-              <svg className={`w-4 h-4 text-gray-400 transition-transform ${showProList ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </span>
-          </button>
-          {showProList && (
-            (!allProfessionals || allProfessionals.length === 0) ? (
-              <div className="mt-2 bg-gray-50 rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-400">
-                Nessun professionista creato. Creane uno dal menu <Link href="/dashboard/professionals" className="text-blue-500 hover:underline">Professionisti</Link>.
-              </div>
-            ) : (
-              <div className="mt-2 space-y-2">
-                {allProfessionals.map(pro => {
-                  const active = !!assignedActive[pro.id];
-                  return (
-                    <div key={pro.id} className={`bg-white rounded-xl border px-4 py-2.5 flex items-center justify-between gap-3 ${active ? 'border-green-200' : 'border-gray-200'}`}>
-                      <div className="min-w-0">
-                        <span className="text-sm font-medium text-gray-800">{pro.name}</span>
-                        <span className="text-xs text-gray-400 ml-2">{pro.email}</span>
-                        {pro.active === false && <span className="text-xs text-red-400 ml-2">(account disattivato)</span>}
-                      </div>
-                      <button
-                        onClick={() => togglePro(pro)}
-                        disabled={assignBusy === pro.id}
-                        role="switch"
-                        aria-checked={active}
-                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${active ? 'bg-green-500' : 'bg-gray-300'}`}
-                        title={active ? 'Assegnato — clicca per togliere' : 'Non assegnato — clicca per assegnare'}
-                      >
-                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${active ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )
-          )}
-        </div>
-
-        {/* ── Lista d'attesa L1 (a scomparsa) ─────────────────────────── */}
-        {waitlist && waitlist.length > 0 && (
-          <div className="mb-5">
-            <button
-              onClick={() => setShowWaitlistTable(v => !v)}
-              className="w-full flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 mb-2"
-            >
-              <span className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Lista d&apos;attesa L1</span>
-              <span className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">{waitlist.filter(w => w.status === 'pending').length} in attesa · {waitlist.length} totali</span>
-                <svg className={`w-4 h-4 text-gray-400 transition-transform ${showWaitlistTable ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </span>
-            </button>
-            {showWaitlistTable && (
-            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
-                    <th className="text-left px-4 py-2">Paziente</th>
-                    <th className="text-center px-3 py-2">Punteggio</th>
-                    <th className="text-center px-3 py-2">Fonte</th>
-                    <th className="text-center px-3 py-2">Stato</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {waitlist.map(w => (
-                    <tr key={w.id} className="border-b border-gray-50 last:border-0">
-                      <td className="px-4 py-2 text-gray-800">
-                        {w.patients ? `${w.patients.first_name} ${w.patients.last_name}` : '—'}
-                      </td>
-                      <td className="px-3 py-2 text-center font-semibold text-blue-700">{w.score}</td>
-                      <td className="px-3 py-2 text-center text-xs text-gray-500 capitalize">{w.source}</td>
-                      <td className="px-3 py-2 text-center">
-                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                          {w.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Pazienti / NRS (solo coord., niente note cliniche) ──────── */}
-        {patientsNrs && patientsNrs.length > 0 && (
-          <div className="mb-5">
-            {/* Cruscotto sintetico stratificazione */}
-            <div className="grid grid-cols-4 gap-3 mb-3">
-              {[
-                { label: 'L1 — Trattamento', value: patientsNrs.filter(p => p.level === 'level1').length, color: '#dc2626' },
-                { label: 'L2 — Monitoraggio', value: patientsNrs.filter(p => p.level === 'level2').length, color: '#ca8a04' },
-                { label: 'L3 — Formazione', value: patientsNrs.filter(p => p.level === 'level3').length, color: '#16a34a' },
-                { label: 'Totale', value: patientsNrs.length, color: '#374151' },
-              ].map(k => (
-                <div key={k.label} className="bg-white rounded-xl border border-gray-200 p-3 text-center">
-                  <div className="text-xl font-bold" style={{ color: k.color }}>{k.value}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">{k.label}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Capacità contrattuale trattamenti (L1 contratto + buffer 20%) */}
-            {capacity && capacity.budget > 0 && (() => {
-              const pct = Math.min(100, Math.round(capacity.committed / capacity.budget * 100));
-              const barColor = capacity.intakeSaturated ? '#dc2626' : pct >= 80 ? '#ca8a04' : '#16a34a';
-              return (
-                <div className="bg-white rounded-xl border border-gray-200 p-4 mb-3">
-                  <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">🎯 Capacità trattamenti (anno)</div>
-                    {capacity.intakeSaturated ? (
-                      <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">ESAURITA — self-trigger bloccati</span>
-                    ) : pct >= 80 ? (
-                      <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{pct}% impegnata</span>
-                    ) : (
-                      <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{capacity.remaining} percorsi disponibili</span>
-                    )}
-                  </div>
-                  <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-2">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: barColor }} />
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    <strong className="text-gray-700">{capacity.used}</strong> cicli avviati · <strong className="text-gray-700">{capacity.pending}</strong> in coda · budget <strong className="text-gray-700">{capacity.budget}</strong> percorsi
-                    <span className="text-gray-400"> = {capacity.contracted} L1 {capacity.source === 'contratto' ? 'a contratto' : 'da assessment'} + buffer {Math.round(capacity.buffer_pct * 100)}%</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <label className="text-xs text-gray-400">L1 a contratto:</label>
-                    <input type="number" min="0" value={contractedInput}
-                      onChange={e => setContractedInput(e.target.value)}
-                      placeholder={`auto (${(patientsNrs || []).filter(p => p.level === 'level1').length})`}
-                      className="w-24 px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
-                    <button onClick={saveContractedL1} disabled={savingContracted}
-                      className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-50 disabled:opacity-50">
-                      {savingContracted ? '…' : 'Salva'}
-                    </button>
-                    <span className="text-xs text-gray-300">vuoto = usa gli L1 reali dell&apos;assessment</span>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Tabella NRS a scomparsa (cruscotto operativo: si apre solo se serve) */}
-            <button
-              onClick={() => setShowNrsTable(v => !v)}
-              className="w-full flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 mb-2"
-            >
-              <span className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Pazienti — NRS</span>
-              <span className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">{patientsNrs.length} pazienti</span>
-                <svg className={`w-4 h-4 text-gray-400 transition-transform ${showNrsTable ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </span>
-            </button>
-            {showNrsTable && (
-            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
-                    <th className="text-left px-4 py-2">Paziente</th>
-                    <th className="text-center px-3 py-2">Livello</th>
-                    <th className="text-center px-3 py-2">Sedute</th>
-                    <th className="text-center px-3 py-2">NRS inizio</th>
-                    <th className="text-center px-3 py-2">NRS fine</th>
-                    <th className="text-center px-3 py-2">Delta</th>
-                    <th className="text-left px-3 py-2">Professionista</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {patientsNrs.map(p => {
-                    const delta = (p.nrs_first !== null && p.nrs_last !== null) ? p.nrs_last - p.nrs_first : null;
-                    const levelColors = { level1: '#dc2626', level2: '#ca8a04', level3: '#16a34a' };
-                    const levelLabels = { level1: 'L1', level2: 'L2', level3: 'L3' };
-                    return (
-                      <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
-                        <td className="px-4 py-2.5 font-medium text-gray-800">{p.first_name} {p.last_name}</td>
-                        <td className="px-3 py-2.5 text-center">
-                          {p.level ? (
-                            <span className="text-xs font-bold px-1.5 py-0.5 rounded" style={{ color: levelColors[p.level], background: levelColors[p.level] + '18' }}>
-                              {levelLabels[p.level]}
-                            </span>
-                          ) : '—'}
-                        </td>
-                        <td className="px-3 py-2.5 text-center text-gray-600">{p.session_count}</td>
-                        <td className="px-3 py-2.5 text-center"><NrsBar value={p.nrs_first} /></td>
-                        <td className="px-3 py-2.5 text-center"><NrsBar value={p.nrs_last} /></td>
-                        <td className="px-3 py-2.5 text-center font-bold">
-                          {delta !== null ? (
-                            <span className={delta < 0 ? 'text-green-600' : delta > 0 ? 'text-red-600' : 'text-gray-400'}>
-                              {delta > 0 ? '+' : ''}{delta}
-                            </span>
-                          ) : '—'}
-                        </td>
-                        <td className="px-3 py-2.5">
-                          {assignedPros.length === 0 ? (
-                            <span className="text-xs text-gray-300">— assegna prima un professionista all&apos;azienda</span>
-                          ) : (
-                            <select
-                              value={patientPro[p.id] || ''}
-                              onChange={e => assignPatientPro(p.id, e.target.value)}
-                              disabled={patientProBusy === p.id}
-                              className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
-                            >
-                              <option value="">— non assegnato</option>
-                              {assignedPros.map(pro => (
-                                <option key={pro.id} value={pro.id}>{pro.name}</option>
-                              ))}
-                            </select>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Monitoraggio T3 / T6 / T12 ──────────────────────────────── */}
-        <div className="mt-6 bg-white rounded-2xl border border-gray-200 p-5">
-          <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">📡 Monitoraggio T3 / T6 / T12</h2>
-          <div className="text-xs text-gray-400 mt-0.5 mb-4">
-            T3/T6: mini-check ancorati al 1° ciclo del paziente — invio email automatico ogni mattina (richiede dominio email verificato).
-            T12: re-assessment annuale con PGIC di tutta la popolazione. Qui i link personali per l&apos;invio manuale (HR/WhatsApp).
-          </div>
-          <div className="grid sm:grid-cols-3 gap-3">
-            {[
-              { fase: 't3', label: 'Mini-check T3 (3 mesi)', done: monit.doneT3, due: monit.dueT3, color: 'blue' },
-              { fase: 't6', label: 'Mini-check T6 (6 mesi)', done: monit.doneT6, due: monit.dueT6, color: 'purple' },
-              { fase: 't12', label: 'Re-assessment T12 + PGIC', done: monit.doneT12, due: monit.dueT12, color: 'amber' },
-            ].map(({ fase, label, done, due, color }) => {
-              const colorCls = { blue: 'text-blue-700 border-blue-200 bg-blue-50', purple: 'text-purple-700 border-purple-200 bg-purple-50', amber: 'text-amber-700 border-amber-200 bg-amber-50' }[color];
-              return (
-                <div key={fase} className="border border-gray-100 rounded-xl p-3">
-                  <div className={`text-xs font-bold px-2 py-1 rounded-lg border inline-block ${colorCls}`}>{label}</div>
-                  <div className="text-xs text-gray-500 mt-2 mb-2">
-                    <span className="font-semibold text-green-700">{done} compilati</span> · <span className={due.length > 0 ? 'font-semibold text-amber-700' : ''}>{due.length} da invitare</span>
-                  </div>
-                  {due.length === 0 ? (
-                    <div className="text-xs text-gray-300">{done > 0 ? 'Tutti invitati o completati ✓' : fase === 't12' ? 'Nessun dipendente pronto' : 'Nessun ciclo arrivato a scadenza'}</div>
-                  ) : (
-                    <div className="space-y-1 max-h-44 overflow-y-auto">
-                      {due.map(p => (
-                        <div key={p.id} className="flex items-center justify-between gap-2 text-xs bg-gray-50 rounded-lg px-2 py-1.5">
-                          <span className="truncate text-gray-700">{p.first_name} {p.last_name}{p.days != null ? <span className="text-gray-400"> · {p.days}gg</span> : ''}</span>
-                          <button onClick={() => copyMonitorLink(p, fase)}
-                            className={`shrink-0 font-medium px-2 py-0.5 rounded border ${copiedMonitor === p.id + fase ? 'border-green-300 text-green-700 bg-green-50' : 'border-gray-200 text-gray-500 bg-white hover:bg-gray-50'}`}>
-                            {copiedMonitor === p.id + fase ? '✓' : '🔗 Link'}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* ── Referral B2C ────────────────────────────────────────────── */}
-        <div className="mt-6">
-          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">🔗 Referral B2C</h2>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => generateCode('P')}
-                disabled={!!generatingCode || referralCodes.some(c => (c.type || 'P') === 'P')}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50"
-                title={referralCodes.some(c => (c.type || 'P') === 'P') ? 'Codice Dipendenti già presente' : 'Crea codice Dipendenti'}
-              >
-                {generatingCode === 'P' ? '…' : '+ Dipendenti'}
-              </button>
-              <button
-                onClick={() => generateCode('F')}
-                disabled={!!generatingCode || referralCodes.some(c => c.type === 'F')}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 disabled:opacity-50"
-                title={referralCodes.some(c => c.type === 'F') ? 'Codice Famigliari già presente' : 'Crea codice Famigliari'}
-              >
-                {generatingCode === 'F' ? '…' : '+ Famigliari'}
-              </button>
-              <Link href="/dashboard/referrals" className="text-xs text-orange-600 hover:underline">Tutti →</Link>
-            </div>
-          </div>
-          {referralCodes.length === 0 ? (
-            <div className="bg-orange-50 rounded-xl border border-orange-200 px-4 py-3 text-sm text-orange-600">
-              Nessun codice ancora generato. Crea un codice con i pulsanti “+ Dipendenti” / “+ Famigliari” quando vuoi attivare il referral B2C per questa azienda.
-            </div>
-          ) : (
-            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide border-b border-gray-100">
-                  <tr>
-                    <th className="px-4 py-2.5 text-left">Codice</th>
-                    <th className="px-3 py-2.5 text-center">Utilizzi</th>
-                    <th className="px-3 py-2.5 text-center">Stato</th>
-                    <th className="px-3 py-2.5 text-center">Azioni</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {referralCodes.map(rc => {
-                    const uses = rc.referral_uses || [];
-                    return (
-                      <tr key={rc.id} className={`hover:bg-gray-50 ${!rc.is_active ? 'opacity-50' : ''}`}>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-mono font-semibold text-blue-700 text-xs">{rc.code}</span>
-                            <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${(rc.type||'P') === 'F' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
-                              {(rc.type||'P') === 'F' ? '👨‍👩‍👧 Famigliari' : '👤 Dipendenti'}
-                            </span>
-                          </div>
-                          <div className="text-xs text-gray-400 mt-0.5">{new Date(rc.created_at).toLocaleDateString('it-IT')}</div>
-                        </td>
-                        <td className="px-3 py-2.5 text-center">
-                          {uses.length > 0 ? (
-                            <span className="text-xs">
-                              <span className="bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">{uses.filter(u => u.status === 'redeemed').length} redenti</span>
-                              <span className="text-gray-400 ml-1">/ {uses.length} rich.</span>
-                            </span>
-                          ) : (
-                            <span className="text-gray-300 text-xs">—</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5 text-center">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${rc.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                            {rc.is_active ? 'Attivo' : 'Stoppato'}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2.5 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => copyReferralLink(rc.code)}
-                              className="text-xs text-gray-400 hover:text-blue-600 transition-colors"
-                              title="Copia link"
-                            >
-                              {copiedReferral === rc.code ? '✅' : '🔗'}
-                            </button>
-                            <button
-                              onClick={() => toggleReferral(rc)}
-                              className={`text-xs font-medium transition-colors ${rc.is_active ? 'text-yellow-600 hover:text-yellow-800' : 'text-green-600 hover:text-green-800'}`}
-                              title={rc.is_active ? 'Stoppa link' : 'Riattiva link'}
-                            >
-                              {rc.is_active ? '⏸' : '▶'}
-                            </button>
-                            <button
-                              onClick={() => deleteReferral(rc)}
-                              className="text-xs text-red-400 hover:text-red-600 transition-colors"
-                              title="Elimina"
-                            >
-                              🗑
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {(() => {
-            const leads = referralCodes
-              .flatMap(c => (c.referral_uses || []).map(u => ({ ...u, codeType: c.type || 'P' })))
-              .sort((a, b) => new Date(b.used_at || 0) - new Date(a.used_at || 0));
-            if (leads.length === 0) return null;
-            return (
-              <div className="mt-3 bg-white rounded-2xl border border-gray-200 overflow-hidden">
-                <div className="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">Lead recenti</div>
-                <div className="divide-y divide-gray-50">
-                  {leads.slice(0, 30).map(l => (
-                    <div key={l.id} className="px-4 py-2.5 text-sm flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <span className="font-medium text-gray-800">{l.patient_name || '—'}</span>
-                        <span className={`text-xs px-1.5 py-0.5 rounded ml-2 ${l.codeType === 'F' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>{l.codeType === 'F' ? 'Fam.' : 'Dip.'}</span>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          {l.patient_phone ? `📞 ${l.patient_phone}` : ''}{l.patient_email ? ` · ✉️ ${l.patient_email}` : ''}{l.preferred_when ? ` · 🕐 ${l.preferred_when}` : ''}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {l.voucher_code && <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">{l.voucher_code}</span>}
-                        {l.status === 'redeemed'
-                          ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">redento{l.amount != null ? ` · €${l.amount}` : ''}</span>
-                          : <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">richiesto</span>}
-                        {l.confirm_response === 'done' && l.status !== 'redeemed' && (
-                          <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full" title="Paziente conferma la visita ma il pro non ha redento">⚠ conf. paziente</span>
-                        )}
-                        {l.confirm_response === 'done' && l.status === 'redeemed' && (
-                          <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full">✓ conf. paziente</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-
-        {/* ── Sezione AI Reports ─────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 mt-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">🤖 Report AI</h2>
-              <div className="text-xs text-gray-400 mt-0.5">Generati con Claude Sonnet — richiedono 15-30 secondi</div>
-            </div>
-          </div>
-          {/* Il Report di Attivazione vive nel report dati dell'assessment (📊 Report,
-              sezione "Commento clinico AI") — qui solo i checkpoint successivi. */}
-          <div className="grid sm:grid-cols-3 gap-3 mb-4">
-            {[
-              { type: 't3', label: '📊 Report T3 (3 mesi)', desc: 'KPI intermedi + trend NRS', color: 'blue' },
-              { type: 't6', label: '📈 Report T6 (6 mesi)', desc: 'Review intermedia + KPI', color: 'purple' },
-              { type: 't12', label: '🏆 Report Annuale (12 mesi)', desc: '3 KPI esito + prevalenza + OT23', color: 'amber' },
-            ].map(({ type, label, desc, color }) => {
-              const colorCls = {
-                green: 'bg-green-600 hover:bg-green-700 disabled:bg-green-300',
-                blue: 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300',
-                purple: 'bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300',
-                amber: 'bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300',
-              }[color];
-              return (
-                <button key={type} onClick={() => generateReport(type)} disabled={generatingReport !== null}
-                  className={`${colorCls} text-white rounded-xl p-4 text-left transition-colors disabled:cursor-not-allowed`}>
-                  <div className="font-semibold text-sm mb-1">{label}</div>
-                  <div className="text-xs opacity-80">{desc}</div>
-                  {generatingReport === type && (
-                    <div className="mt-2 text-xs opacity-90 animate-pulse">⏳ Generazione in corso...</div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          {generatedReports.length > 0 && (
-            <div className="border-t border-gray-100 pt-3">
-              <div className="text-xs text-gray-400 mb-2">Report generati di recente</div>
-              {generatedReports.slice(0, 5).map(r => (
-                <button key={r.id} onClick={() => openSavedReport(r)}
-                  className="w-full flex items-center justify-between py-1.5 px-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded transition-colors">
-                  <span>{r.report_type === 'activation' ? '📋 Attivazione' : r.report_type === 'checkpoint_t12' ? '🏆 Annuale' : `📊 ${r.report_type?.replace('checkpoint_', '').toUpperCase()}`}</span>
-                  <span className="flex items-center gap-2">
-                    <span className="text-gray-400">{new Date(r.created_at).toLocaleDateString('it-IT')}</span>
-                    <span className="text-blue-600 font-medium">Apri →</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* ── Gestione Dipendenti & Campagna Assessment ──────────── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4 mt-6">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">👥 Dipendenti &amp; Assessment</h2>
             <Link href={`/dashboard/${client.id}/waitlist`}
@@ -1280,6 +830,478 @@ ${FIRMA}`;
               </div>
             )}
           </div>
+        </div>
+
+
+        {/* ── Lista d'attesa L1 (a scomparsa) ─────────────────────────── */}
+        {waitlist && waitlist.length > 0 && (
+          <div className="mb-5">
+            <button
+              onClick={() => setShowWaitlistTable(v => !v)}
+              className="w-full flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 mb-2"
+            >
+              <span className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Lista d&apos;attesa L1</span>
+              <span className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">{waitlist.filter(w => w.status === 'pending').length} in attesa · {waitlist.length} totali</span>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${showWaitlistTable ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </span>
+            </button>
+            {showWaitlistTable && (
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
+                    <th className="text-left px-4 py-2">Paziente</th>
+                    <th className="text-center px-3 py-2">Punteggio</th>
+                    <th className="text-center px-3 py-2">Fonte</th>
+                    <th className="text-center px-3 py-2">Stato</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {waitlist.map(w => (
+                    <tr key={w.id} className="border-b border-gray-50 last:border-0">
+                      <td className="px-4 py-2 text-gray-800">
+                        {w.patients ? `${w.patients.first_name} ${w.patients.last_name}` : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-center font-semibold text-blue-700">{w.score}</td>
+                      <td className="px-3 py-2 text-center text-xs text-gray-500 capitalize">{w.source}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                          {w.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Pazienti / NRS (solo coord., niente note cliniche) ──────── */}
+        {patientsNrs && patientsNrs.length > 0 && (
+          <div className="mb-5">
+            {/* Cruscotto sintetico stratificazione */}
+            <div className="grid grid-cols-4 gap-3 mb-3">
+              {[
+                { label: 'L1 — Trattamento', value: patientsNrs.filter(p => p.level === 'level1').length, color: '#dc2626' },
+                { label: 'L2 — Monitoraggio', value: patientsNrs.filter(p => p.level === 'level2').length, color: '#ca8a04' },
+                { label: 'L3 — Formazione', value: patientsNrs.filter(p => p.level === 'level3').length, color: '#16a34a' },
+                { label: 'Totale', value: patientsNrs.length, color: '#374151' },
+              ].map(k => (
+                <div key={k.label} className="bg-white rounded-xl border border-gray-200 p-3 text-center">
+                  <div className="text-xl font-bold" style={{ color: k.color }}>{k.value}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{k.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Tabella NRS a scomparsa (cruscotto operativo: si apre solo se serve) */}
+            <button
+              onClick={() => setShowNrsTable(v => !v)}
+              className="w-full flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 mb-2"
+            >
+              <span className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Pazienti — NRS</span>
+              <span className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">{patientsNrs.length} pazienti</span>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${showNrsTable ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </span>
+            </button>
+            {showNrsTable && (
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
+                    <th className="text-left px-4 py-2">Paziente</th>
+                    <th className="text-center px-3 py-2">Livello</th>
+                    <th className="text-center px-3 py-2">Sedute</th>
+                    <th className="text-center px-3 py-2">NRS inizio</th>
+                    <th className="text-center px-3 py-2">NRS fine</th>
+                    <th className="text-center px-3 py-2">Delta</th>
+                    <th className="text-left px-3 py-2">Professionista</th>
+                    <th className="px-2 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {patientsNrs.map(p => {
+                    const delta = (p.nrs_first !== null && p.nrs_last !== null) ? p.nrs_last - p.nrs_first : null;
+                    const levelColors = { level1: '#dc2626', level2: '#ca8a04', level3: '#16a34a' };
+                    const levelLabels = { level1: 'L1', level2: 'L2', level3: 'L3' };
+                    return (
+                      <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
+                        <td className="px-4 py-2.5 font-medium text-gray-800">{p.first_name} {p.last_name}</td>
+                        <td className="px-3 py-2.5 text-center">
+                          {p.level ? (
+                            <span className="text-xs font-bold px-1.5 py-0.5 rounded" style={{ color: levelColors[p.level], background: levelColors[p.level] + '18' }}>
+                              {levelLabels[p.level]}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-3 py-2.5 text-center text-gray-600">{p.session_count}</td>
+                        <td className="px-3 py-2.5 text-center"><NrsBar value={p.nrs_first} /></td>
+                        <td className="px-3 py-2.5 text-center"><NrsBar value={p.nrs_last} /></td>
+                        <td className="px-3 py-2.5 text-center font-bold">
+                          {delta !== null ? (
+                            <span className={delta < 0 ? 'text-green-600' : delta > 0 ? 'text-red-600' : 'text-gray-400'}>
+                              {delta > 0 ? '+' : ''}{delta}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {assignedPros.length === 0 ? (
+                            <span className="text-xs text-gray-300">— assegna prima un professionista all&apos;azienda</span>
+                          ) : (
+                            <select
+                              value={patientPro[p.id] || ''}
+                              onChange={e => assignPatientPro(p.id, e.target.value)}
+                              disabled={patientProBusy === p.id}
+                              className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                            >
+                              <option value="">— non assegnato</option>
+                              {assignedPros.map(pro => (
+                                <option key={pro.id} value={pro.id}>{pro.name}</option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                        <td className="px-2 py-2.5 text-center">
+                          <button onClick={() => deletePatient(p)} className="p-1 text-gray-300 hover:text-red-500" title="Elimina dipendente">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Capacità trattamenti (anno) — L1 contratto + buffer 20% ── */}
+        {capacity && capacity.budget > 0 && (() => {
+          const pct = Math.min(100, Math.round(capacity.committed / capacity.budget * 100));
+          const barColor = capacity.intakeSaturated ? '#dc2626' : pct >= 80 ? '#ca8a04' : '#16a34a';
+          return (
+            <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5">
+              <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">🎯 Capacità trattamenti (anno)</div>
+                {capacity.intakeSaturated ? (
+                  <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">ESAURITA — self-trigger bloccati</span>
+                ) : pct >= 80 ? (
+                  <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{pct}% impegnata</span>
+                ) : (
+                  <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{capacity.remaining} percorsi disponibili</span>
+                )}
+              </div>
+              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-2">
+                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: barColor }} />
+              </div>
+              <div className="text-xs text-gray-500">
+                <strong className="text-gray-700">{capacity.used}</strong> cicli avviati · <strong className="text-gray-700">{capacity.pending}</strong> in coda · budget <strong className="text-gray-700">{capacity.budget}</strong> percorsi
+                <span className="text-gray-400"> = {capacity.contracted} L1 {capacity.source === 'contratto' ? 'a contratto' : 'da assessment'} + buffer {Math.round(capacity.buffer_pct * 100)}%</span>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <label className="text-xs text-gray-400">L1 a contratto:</label>
+                <input type="number" min="0" value={contractedInput}
+                  onChange={e => setContractedInput(e.target.value)}
+                  placeholder={`auto (${(patientsNrs || []).filter(p => p.level === 'level1').length})`}
+                  className="w-24 px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <button onClick={saveContractedL1} disabled={savingContracted}
+                  className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+                  {savingContracted ? '…' : 'Salva'}
+                </button>
+                <span className="text-xs text-gray-300">vuoto = usa gli L1 reali dell&apos;assessment</span>
+              </div>
+            </div>
+          );
+        })()}
+
+
+        {/* ── Professionisti assegnati (elenco a scomparsa) ───────────── */}
+        <div className="mb-5">
+          <button
+            onClick={() => setShowProList(v => !v)}
+            className="w-full flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50"
+          >
+            <span className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Professionisti</span>
+            <span className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">{assignedCount > 0 ? `${assignedCount} assegnat${assignedCount === 1 ? 'o' : 'i'}` : 'nessuno assegnato'}</span>
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${showProList ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </span>
+          </button>
+          {showProList && (
+            (!allProfessionals || allProfessionals.length === 0) ? (
+              <div className="mt-2 bg-gray-50 rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-400">
+                Nessun professionista creato. Creane uno dal menu <Link href="/dashboard/professionals" className="text-blue-500 hover:underline">Professionisti</Link>.
+              </div>
+            ) : (
+              <div className="mt-2 space-y-2">
+                {allProfessionals.map(pro => {
+                  const active = !!assignedActive[pro.id];
+                  return (
+                    <div key={pro.id} className={`bg-white rounded-xl border px-4 py-2.5 flex items-center justify-between gap-3 ${active ? 'border-green-200' : 'border-gray-200'}`}>
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium text-gray-800">{pro.name}</span>
+                        <span className="text-xs text-gray-400 ml-2">{pro.email}</span>
+                        {pro.active === false && <span className="text-xs text-red-400 ml-2">(account disattivato)</span>}
+                      </div>
+                      <button
+                        onClick={() => togglePro(pro)}
+                        disabled={assignBusy === pro.id}
+                        role="switch"
+                        aria-checked={active}
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${active ? 'bg-green-500' : 'bg-gray-300'}`}
+                        title={active ? 'Assegnato — clicca per togliere' : 'Non assegnato — clicca per assegnare'}
+                      >
+                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${active ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          )}
+        </div>
+
+        {/* ── Monitoraggio T3 / T6 / T12 ──────────────────────────────── */}
+        <div className="mt-6 bg-white rounded-2xl border border-gray-200 p-5">
+          <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">📡 Monitoraggio T3 / T6 / T12</h2>
+          <div className="text-xs text-gray-400 mt-0.5 mb-4">
+            T3/T6: mini-check ancorati al 1° ciclo del paziente — invio email automatico ogni mattina (richiede dominio email verificato).
+            T12: re-assessment annuale con PGIC di tutta la popolazione. Qui i link personali per l&apos;invio manuale (HR/WhatsApp).
+          </div>
+          <div className="grid sm:grid-cols-3 gap-3">
+            {[
+              { fase: 't3', label: 'Mini-check T3 (3 mesi)', done: monit.doneT3, due: monit.dueT3, color: 'blue' },
+              { fase: 't6', label: 'Mini-check T6 (6 mesi)', done: monit.doneT6, due: monit.dueT6, color: 'purple' },
+              { fase: 't12', label: 'Re-assessment T12 + PGIC', done: monit.doneT12, due: monit.dueT12, color: 'amber' },
+            ].map(({ fase, label, done, due, color }) => {
+              const colorCls = { blue: 'text-blue-700 border-blue-200 bg-blue-50', purple: 'text-purple-700 border-purple-200 bg-purple-50', amber: 'text-amber-700 border-amber-200 bg-amber-50' }[color];
+              return (
+                <div key={fase} className="border border-gray-100 rounded-xl p-3">
+                  <div className={`text-xs font-bold px-2 py-1 rounded-lg border inline-block ${colorCls}`}>{label}</div>
+                  <div className="text-xs text-gray-500 mt-2 mb-2">
+                    <span className="font-semibold text-green-700">{done} compilati</span> · <span className={due.length > 0 ? 'font-semibold text-amber-700' : ''}>{due.length} da invitare</span>
+                  </div>
+                  {due.length === 0 ? (
+                    <div className="text-xs text-gray-300">{done > 0 ? 'Tutti invitati o completati ✓' : fase === 't12' ? 'Nessun dipendente pronto' : 'Nessun ciclo arrivato a scadenza'}</div>
+                  ) : (
+                    <div className="space-y-1 max-h-44 overflow-y-auto">
+                      {due.map(p => (
+                        <div key={p.id} className="flex items-center justify-between gap-2 text-xs bg-gray-50 rounded-lg px-2 py-1.5">
+                          <span className="truncate text-gray-700">{p.first_name} {p.last_name}{p.days != null ? <span className="text-gray-400"> · {p.days}gg</span> : ''}</span>
+                          <button onClick={() => copyMonitorLink(p, fase)}
+                            className={`shrink-0 font-medium px-2 py-0.5 rounded border ${copiedMonitor === p.id + fase ? 'border-green-300 text-green-700 bg-green-50' : 'border-gray-200 text-gray-500 bg-white hover:bg-gray-50'}`}>
+                            {copiedMonitor === p.id + fase ? '✓' : '🔗 Link'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Sezione AI Reports ─────────────────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">🤖 Report AI</h2>
+              <div className="text-xs text-gray-400 mt-0.5">Generati con Claude Sonnet — richiedono 15-30 secondi</div>
+            </div>
+          </div>
+          {/* Il Report di Attivazione vive nel report dati dell'assessment (📊 Report,
+              sezione "Commento clinico AI") — qui solo i checkpoint successivi. */}
+          <div className="grid sm:grid-cols-3 gap-3 mb-4">
+            {[
+              { type: 't3', label: '📊 Report T3 (3 mesi)', desc: 'KPI intermedi + trend NRS', color: 'blue' },
+              { type: 't6', label: '📈 Report T6 (6 mesi)', desc: 'Review intermedia + KPI', color: 'purple' },
+              { type: 't12', label: '🏆 Report Annuale (12 mesi)', desc: '3 KPI esito + prevalenza + OT23', color: 'amber' },
+            ].map(({ type, label, desc, color }) => {
+              const colorCls = {
+                green: 'bg-green-600 hover:bg-green-700 disabled:bg-green-300',
+                blue: 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300',
+                purple: 'bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300',
+                amber: 'bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300',
+              }[color];
+              return (
+                <button key={type} onClick={() => generateReport(type)} disabled={generatingReport !== null}
+                  className={`${colorCls} text-white rounded-xl p-4 text-left transition-colors disabled:cursor-not-allowed`}>
+                  <div className="font-semibold text-sm mb-1">{label}</div>
+                  <div className="text-xs opacity-80">{desc}</div>
+                  {generatingReport === type && (
+                    <div className="mt-2 text-xs opacity-90 animate-pulse">⏳ Generazione in corso...</div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {generatedReports.length > 0 && (
+            <div className="border-t border-gray-100 pt-3">
+              <div className="text-xs text-gray-400 mb-2">Report generati di recente</div>
+              {generatedReports.slice(0, 5).map(r => (
+                <button key={r.id} onClick={() => openSavedReport(r)}
+                  className="w-full flex items-center justify-between py-1.5 px-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded transition-colors">
+                  <span>{r.report_type === 'activation' ? '📋 Attivazione' : r.report_type === 'checkpoint_t12' ? '🏆 Annuale' : `📊 ${r.report_type?.replace('checkpoint_', '').toUpperCase()}`}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-gray-400">{new Date(r.created_at).toLocaleDateString('it-IT')}</span>
+                    <span className="text-blue-600 font-medium">Apri →</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Referral B2C ────────────────────────────────────────────── */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">🔗 Referral B2C</h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => generateCode('P')}
+                disabled={!!generatingCode || referralCodes.some(c => (c.type || 'P') === 'P')}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50"
+                title={referralCodes.some(c => (c.type || 'P') === 'P') ? 'Codice Dipendenti già presente' : 'Crea codice Dipendenti'}
+              >
+                {generatingCode === 'P' ? '…' : '+ Dipendenti'}
+              </button>
+              <button
+                onClick={() => generateCode('F')}
+                disabled={!!generatingCode || referralCodes.some(c => c.type === 'F')}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 disabled:opacity-50"
+                title={referralCodes.some(c => c.type === 'F') ? 'Codice Famigliari già presente' : 'Crea codice Famigliari'}
+              >
+                {generatingCode === 'F' ? '…' : '+ Famigliari'}
+              </button>
+              <Link href="/dashboard/referrals" className="text-xs text-orange-600 hover:underline">Tutti →</Link>
+            </div>
+          </div>
+          {referralCodes.length === 0 ? (
+            <div className="bg-orange-50 rounded-xl border border-orange-200 px-4 py-3 text-sm text-orange-600">
+              Nessun codice ancora generato. Crea un codice con i pulsanti “+ Dipendenti” / “+ Famigliari” quando vuoi attivare il referral B2C per questa azienda.
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide border-b border-gray-100">
+                  <tr>
+                    <th className="px-4 py-2.5 text-left">Codice</th>
+                    <th className="px-3 py-2.5 text-center">Utilizzi</th>
+                    <th className="px-3 py-2.5 text-center">Stato</th>
+                    <th className="px-3 py-2.5 text-center">Azioni</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {referralCodes.map(rc => {
+                    const uses = rc.referral_uses || [];
+                    return (
+                      <tr key={rc.id} className={`hover:bg-gray-50 ${!rc.is_active ? 'opacity-50' : ''}`}>
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-semibold text-blue-700 text-xs">{rc.code}</span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded font-bold ${(rc.type||'P') === 'F' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>
+                              {(rc.type||'P') === 'F' ? '👨‍👩‍👧 Famigliari' : '👤 Dipendenti'}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-400 mt-0.5">{new Date(rc.created_at).toLocaleDateString('it-IT')}</div>
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          {uses.length > 0 ? (
+                            <span className="text-xs">
+                              <span className="bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">{uses.filter(u => u.status === 'redeemed').length} redenti</span>
+                              <span className="text-gray-400 ml-1">/ {uses.length} rich.</span>
+                            </span>
+                          ) : (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${rc.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {rc.is_active ? 'Attivo' : 'Stoppato'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => copyReferralLink(rc.code)}
+                              className="text-xs text-gray-400 hover:text-blue-600 transition-colors"
+                              title="Copia link"
+                            >
+                              {copiedReferral === rc.code ? '✅' : '🔗'}
+                            </button>
+                            <button
+                              onClick={() => toggleReferral(rc)}
+                              className={`text-xs font-medium transition-colors ${rc.is_active ? 'text-yellow-600 hover:text-yellow-800' : 'text-green-600 hover:text-green-800'}`}
+                              title={rc.is_active ? 'Stoppa link' : 'Riattiva link'}
+                            >
+                              {rc.is_active ? '⏸' : '▶'}
+                            </button>
+                            <button
+                              onClick={() => deleteReferral(rc)}
+                              className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                              title="Elimina"
+                            >
+                              🗑
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {(() => {
+            const leads = referralCodes
+              .flatMap(c => (c.referral_uses || []).map(u => ({ ...u, codeType: c.type || 'P' })))
+              .sort((a, b) => new Date(b.used_at || 0) - new Date(a.used_at || 0));
+            if (leads.length === 0) return null;
+            return (
+              <div className="mt-3 bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                <div className="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">Lead recenti</div>
+                <div className="divide-y divide-gray-50">
+                  {leads.slice(0, 30).map(l => (
+                    <div key={l.id} className="px-4 py-2.5 text-sm flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="font-medium text-gray-800">{l.patient_name || '—'}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ml-2 ${l.codeType === 'F' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'}`}>{l.codeType === 'F' ? 'Fam.' : 'Dip.'}</span>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {l.patient_phone ? `📞 ${l.patient_phone}` : ''}{l.patient_email ? ` · ✉️ ${l.patient_email}` : ''}{l.preferred_when ? ` · 🕐 ${l.preferred_when}` : ''}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {l.voucher_code && <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">{l.voucher_code}</span>}
+                        {l.status === 'redeemed'
+                          ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">redento{l.amount != null ? ` · €${l.amount}` : ''}</span>
+                          : <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">richiesto</span>}
+                        {l.confirm_response === 'done' && l.status !== 'redeemed' && (
+                          <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full" title="Paziente conferma la visita ma il pro non ha redento">⚠ conf. paziente</span>
+                        )}
+                        {l.confirm_response === 'done' && l.status === 'redeemed' && (
+                          <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full">✓ conf. paziente</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
       </main>

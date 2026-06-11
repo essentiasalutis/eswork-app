@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getPatientsWithEmailByClient, getDocumentsByClient, getProfessionals, getMonitoringByClient } from '../../lib/store';
+import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getPatientsWithEmailByClient, getDocumentsByClient, getProfessionals, getMonitoringByClient, getTreatmentCapacity } from '../../lib/store';
 import { TYPE_LABELS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
 import { CONFIG } from '../../lib/config';
@@ -99,7 +99,7 @@ function NrsBar({ value, max = 10 }) {
   );
 }
 
-export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist, generatedReports: initialReports, allProfessionals, monitoring }) {
+export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist, generatedReports: initialReports, allProfessionals, monitoring, capacity: initialCapacity }) {
   const router = useRouter();
   const [client, setClient] = useState(initialClient);
   const [assessments, setAssessments] = useState(initial);
@@ -186,6 +186,11 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [copiedMonitor, setCopiedMonitor] = useState(null); // patient_id+fase copiato
   const [showNrsTable, setShowNrsTable] = useState(false);  // tabella NRS a scomparsa
   const [showWaitlistTable, setShowWaitlistTable] = useState(false); // lista d'attesa a scomparsa
+  const [capacity, setCapacity] = useState(initialCapacity);
+  const [contractedInput, setContractedInput] = useState(
+    initialCapacity?.source === 'contratto' ? String(initialCapacity.contracted) : ''
+  );
+  const [savingContracted, setSavingContracted] = useState(false);
 
   const tier = client.tier || getTierFromEmployees(client.employees);
 
@@ -419,6 +424,37 @@ ${FIRMA}`;
   // della scheda colloquio (tier/tariffe/IVA caricati server-side da first_meetings).
   function openRealQuote(a) {
     router.push(`/dashboard/offer?assessmentId=${a.id}&clientId=${client.id}&n=${client.employees}`);
+  }
+
+  // Salva gli L1 a contratto e ricalcola la capacità in locale
+  async function saveContractedL1() {
+    const v = contractedInput === '' ? null : Math.max(0, parseInt(contractedInput) || 0);
+    setSavingContracted(true);
+    const res = await fetch(`/api/clients/${client.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contracted_l1: v }),
+    });
+    if (res.ok && capacity) {
+      const fallback = (patientsNrs || []).filter(p => p.level === 'level1').length;
+      const contracted = v != null && v > 0 ? v : fallback;
+      const budget = Math.ceil(contracted * (1 + (capacity.buffer_pct || 0.2)));
+      const committed = capacity.used + capacity.pending;
+      setCapacity({
+        ...capacity,
+        contracted,
+        source: v != null && v > 0 ? 'contratto' : 'assessment',
+        budget,
+        committed,
+        remaining: Math.max(0, budget - committed),
+        intakeSaturated: budget > 0 && committed >= budget,
+        deliverySaturated: budget > 0 && capacity.used >= budget,
+      });
+    } else if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      alert(d.error || 'Errore salvataggio (hai eseguito la migration v30?)');
+    }
+    setSavingContracted(false);
   }
 
   // ── Monitoraggio T3/T6/T12 (v4) ──────────────────────────────────────────────
@@ -746,6 +782,45 @@ ${FIRMA}`;
                 </div>
               ))}
             </div>
+
+            {/* Capacità contrattuale trattamenti (L1 contratto + buffer 20%) */}
+            {capacity && capacity.budget > 0 && (() => {
+              const pct = Math.min(100, Math.round(capacity.committed / capacity.budget * 100));
+              const barColor = capacity.intakeSaturated ? '#dc2626' : pct >= 80 ? '#ca8a04' : '#16a34a';
+              return (
+                <div className="bg-white rounded-xl border border-gray-200 p-4 mb-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">🎯 Capacità trattamenti (anno)</div>
+                    {capacity.intakeSaturated ? (
+                      <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">ESAURITA — self-trigger bloccati</span>
+                    ) : pct >= 80 ? (
+                      <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{pct}% impegnata</span>
+                    ) : (
+                      <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{capacity.remaining} percorsi disponibili</span>
+                    )}
+                  </div>
+                  <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-2">
+                    <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: barColor }} />
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    <strong className="text-gray-700">{capacity.used}</strong> cicli avviati · <strong className="text-gray-700">{capacity.pending}</strong> in coda · budget <strong className="text-gray-700">{capacity.budget}</strong> percorsi
+                    <span className="text-gray-400"> = {capacity.contracted} L1 {capacity.source === 'contratto' ? 'a contratto' : 'da assessment'} + buffer {Math.round(capacity.buffer_pct * 100)}%</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <label className="text-xs text-gray-400">L1 a contratto:</label>
+                    <input type="number" min="0" value={contractedInput}
+                      onChange={e => setContractedInput(e.target.value)}
+                      placeholder={`auto (${(patientsNrs || []).filter(p => p.level === 'level1').length})`}
+                      className="w-24 px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
+                    <button onClick={saveContractedL1} disabled={savingContracted}
+                      className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+                      {savingContracted ? '…' : 'Salva'}
+                    </button>
+                    <span className="text-xs text-gray-300">vuoto = usa gli L1 reali dell&apos;assessment</span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Tabella NRS a scomparsa (cruscotto operativo: si apre solo se serve) */}
             <button
@@ -1320,5 +1395,10 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     monitoring = await getMonitoringByClient(clientId);
   } catch (_) {}
 
-  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist, generatedReports, allProfessionals, monitoring } };
+  let capacity = null;
+  try {
+    capacity = await getTreatmentCapacity(clientId);
+  } catch (_) {}
+
+  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist, generatedReports, allProfessionals, monitoring, capacity } };
 });

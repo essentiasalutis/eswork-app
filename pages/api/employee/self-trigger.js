@@ -6,6 +6,7 @@
 import {
   getPatientByCareToken,
   getSelfTriggerBudget,
+  getTreatmentCapacity,
   createSelfTrigger,
   addToWaitlist,
   getClientById,
@@ -25,12 +26,23 @@ export default async function handler(req, res) {
   const patient = await getPatientByCareToken(token).catch(() => null);
   if (!patient) return res.status(404).json({ error: 'Link non valido' });
 
-  // Budget: massimo 2 attivazioni l'anno
+  // Budget personale: massimo 2 attivazioni l'anno
   const budget = await getSelfTriggerBudget(patient.id);
   if (budget.remaining <= 0) {
     return res.status(429).json({
       error: 'Hai esaurito le 2 auto-segnalazioni disponibili quest\'anno. Per necessità urgenti scrivi a info@essentiasalutis.it',
       remaining: 0,
+    });
+  }
+
+  // Capacità contrattuale azienda: cicli avviati + candidati in coda non possono
+  // superare i percorsi pagati (L1 contratto + buffer 20%). Tutela automatica:
+  // niente nuovi ingressi oltre quanto contrattualizzato.
+  const capacity = await getTreatmentCapacity(patient.client_id).catch(() => null);
+  if (capacity?.intakeSaturated) {
+    return res.status(429).json({
+      error: 'Il programma della tua azienda ha raggiunto la capacità annuale dei percorsi di trattamento. La tua segnalazione non può essere presa in carico al momento: riprova più avanti oppure scrivi a info@essentiasalutis.it.',
+      capacity_reached: true,
     });
   }
 

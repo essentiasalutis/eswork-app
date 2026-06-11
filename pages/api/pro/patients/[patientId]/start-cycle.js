@@ -7,6 +7,7 @@ import {
   proCanAccessPatientClinical,
   getClientById,
   getPreValidationByPatient,
+  getTreatmentCapacity,
 } from '../../../../../lib/store';
 
 function tierOf(client) {
@@ -63,6 +64,16 @@ export default requireProAuth(async function handler(req, res) {
 
   // Ciclo di TRATTAMENTO — solo L1
   if (patient.level !== 'level1') return res.status(400).json({ error: 'Solo pazienti L1 possono avere cicli di trattamento' });
+
+  // CAPACITÀ CONTRATTUALE: i cicli di trattamento non possono superare i percorsi
+  // pagati (L1 contratto + buffer 20%). Tutela automatica contro l'over-delivery.
+  const capacity = await getTreatmentCapacity(patient.client_id).catch(() => null);
+  if (capacity?.deliverySaturated) {
+    return res.status(409).json({
+      error: `Capacità contrattuale esaurita: ${capacity.used}/${capacity.budget} percorsi di trattamento già avviati (L1 a contratto ${capacity.contracted} + buffer ${Math.round(capacity.buffer_pct * 100)}%). Per proseguire serve un'estensione del contratto — contatta l'amministrazione ES Work.`,
+      capacity_reached: true,
+    });
+  }
 
   const closedTreatment = cycles.filter(c => c.status === 'closed' && (c.cycle_type || 'treatment') === 'treatment');
   if (closedTreatment.length >= 2) return res.status(400).json({ error: 'Massimo 2 cicli per anno raggiunti' });

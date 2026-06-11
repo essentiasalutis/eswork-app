@@ -82,10 +82,10 @@ export default async function handler(req, res) {
 
       // 5. Se vuole essere contattato E risulta L1 → Waitlist
       if (wants_to_be_contacted && computed_level === 'level1') {
+        // NB: la tabella waitlist non ha assessment_id (il collegamento è via patient)
         await addToWaitlist({
           patient_id: patient.id,
           client_id: client.id,
-          assessment_id: assessment?.id || null,
           score: 100,
           source: 'self_declaration',
           status: 'pending',

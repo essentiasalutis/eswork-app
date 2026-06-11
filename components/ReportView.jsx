@@ -1,9 +1,62 @@
+import { useState } from 'react';
 import {
   aggregateNMQ,
   trafficLight, TL_COLOR, TL_BG, TL_BORDER,
   TYPE_LABELS, generateSummaryText,
 } from '../lib/scoring';
 import { CONFIG } from '../lib/config';
+
+// ─── Commento clinico AI (parte discorsiva integrata nel report dati) ──────────
+// Un solo report di attivazione: cruscotti/dati + commento discorsivo AI.
+// Mostra l'ultimo commento salvato in archivio; "Genera/Aggiorna" chiama
+// l'endpoint activation (che archivia anche in generated_reports).
+
+function renderMd(text) {
+  return (text || '').split('\n').map((line, i) => {
+    if (line.trim() === '---') return <hr key={i} className="my-3 border-gray-100" />;
+    if (line.startsWith('# ')) return <h3 key={i} className="text-base font-bold text-gray-900 mt-4 mb-1">{line.slice(2)}</h3>;
+    if (line.startsWith('## ')) return <h3 key={i} className="text-base font-bold text-gray-900 mt-4 mb-1">{line.slice(3)}</h3>;
+    if (line.startsWith('### ')) return <h4 key={i} className="text-sm font-bold text-gray-800 mt-3 mb-1">{line.slice(4)}</h4>;
+    if (line.startsWith('- ')) return <li key={i} className="text-sm text-gray-700 ml-4">{line.slice(2).replace(/\*\*/g, '')}</li>;
+    if (line.match(/^\d+\. /)) return <li key={i} className="text-sm text-gray-700 ml-4">{line.replace(/^\d+\. /, '').replace(/\*\*/g, '')}</li>;
+    if (line.startsWith('|')) return null; // le tabelle KPI sono già nei cruscotti del report
+    if (line.trim() === '') return <div key={i} className="h-1.5" />;
+    return <p key={i} className="text-sm text-gray-700 leading-relaxed">{line.replace(/\*\*/g, '')}</p>;
+  });
+}
+
+function AiCommentSection({ clientId, initialText }) {
+  const [text, setText] = useState(initialText || null);
+  const [busy, setBusy] = useState(false);
+
+  async function generate() {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/generate-activation-report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const d = await res.json().catch(() => null);
+      if (d?.report) setText(d.report);
+      else alert(d?.error || 'Errore nella generazione del commento.');
+    } catch { alert('Errore di rete.'); }
+    setBusy(false);
+  }
+
+  return (
+    <div className="mt-6 bg-white rounded-2xl border border-gray-200 p-5">
+      <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+        <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Commento clinico e raccomandazioni ✨ AI</div>
+        <button onClick={generate} disabled={busy}
+          className="no-print text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-100 disabled:opacity-50">
+          {busy ? '⏳ Generazione (15-30s)…' : text ? '↻ Aggiorna commento' : '✨ Genera commento AI'}
+        </button>
+      </div>
+      {text ? (
+        <div>{renderMd(text)}</div>
+      ) : (
+        <p className="text-sm text-gray-400 no-print">Nessun commento ancora generato. Clicca &quot;Genera commento AI&quot; per aggiungere la parte discorsiva (executive summary, analisi e raccomandazioni) a questo report.</p>
+      )}
+    </div>
+  );
+}
 
 // ─── Semaphore ────────────────────────────────────────────────────────────────
 
@@ -258,7 +311,7 @@ function ReportFooter() {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function ReportView({ assessment, client, baseline, onOpenCalculator }) {
+export default function ReportView({ assessment, client, baseline, onOpenCalculator, aiInitialText }) {
   const responseList = assessment.responseList || [];
   const n = responseList.length;
 
@@ -518,6 +571,11 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
             </div>
           </div>
         </>
+      )}
+
+      {/* Commento discorsivo AI — integrato nel report dati (un solo report) */}
+      {assessment.type === 'initial' && client?.id && (
+        <AiCommentSection clientId={client.id} initialText={aiInitialText} />
       )}
 
       {/* Genera preventivo button */}

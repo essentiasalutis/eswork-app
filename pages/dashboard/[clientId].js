@@ -486,6 +486,7 @@ ${FIRMA}`;
           client={client}
           baseline={getBaseline(reportAssessment)}
           onOpenCalculator={reportAssessment.type === 'initial' ? () => openRealQuote(reportAssessment) : null}
+          aiInitialText={generatedReports.find(r => r.report_type === 'activation')?.content_text || null}
         />
       </div>
     );
@@ -1012,9 +1013,10 @@ ${FIRMA}`;
               <div className="text-xs text-gray-400 mt-0.5">Generati con Claude Sonnet — richiedono 15-30 secondi</div>
             </div>
           </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+          {/* Il Report di Attivazione vive nel report dati dell'assessment (📊 Report,
+              sezione "Commento clinico AI") — qui solo i checkpoint successivi. */}
+          <div className="grid sm:grid-cols-3 gap-3 mb-4">
             {[
-              { type: 'activation', label: '📋 Report Attivazione', desc: 'Mappa clinica + piano operativo', color: 'green' },
               { type: 't3', label: '📊 Report T3 (3 mesi)', desc: 'KPI intermedi + trend NRS', color: 'blue' },
               { type: 't6', label: '📈 Report T6 (6 mesi)', desc: 'Review intermedia + KPI', color: 'purple' },
               { type: 't12', label: '🏆 Report Annuale (12 mesi)', desc: '3 KPI esito + prevalenza + OT23', color: 'amber' },

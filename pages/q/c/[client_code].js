@@ -381,11 +381,21 @@ function NMQPhase({ answers, setAnswer, step, onNext, onBack, onSubmit, isLast, 
 
 // ─── Schermata completamento ──────────────────────────────────────────────────
 
-function CompletionScreen({ level, wantsContact, tier }) {
+function CompletionScreen({ level, wantsContact, tier, careToken }) {
   const isL1 = level === 'level1';
   const isL2 = level === 'level2';
   // Plus/Enterprise: i Livello 2 ricevono prevenzione attiva (4 sessioni/anno)
   const tierSupportsL2Prevention = tier === 'plus' || tier === 'enterprise';
+  const [copiedLink, setCopiedLink] = useState(false);
+  const personalUrl = careToken && typeof window !== 'undefined'
+    ? `${window.location.origin}/employee/${careToken}` : null;
+
+  function copyPersonal() {
+    if (!personalUrl) return;
+    navigator.clipboard.writeText(personalUrl).catch(() => {});
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  }
 
   if (wantsContact) {
     return (
@@ -426,6 +436,27 @@ function CompletionScreen({ level, wantsContact, tier }) {
           </>
         )}
 
+        {/* Area personale: da qui il dipendente segnala disturbi (self-trigger),
+            fa i mini-check e il re-assessment. Va salvata ORA: è l'unico momento
+            in cui il link gli viene mostrato. */}
+        {personalUrl && (
+          <div className="mt-6 bg-green-50 border-2 border-green-300 rounded-2xl p-4 text-left w-full max-w-sm">
+            <div className="text-sm font-bold text-green-800 mb-1">📌 La tua area personale ES Work</div>
+            <p className="text-xs text-green-700 leading-relaxed mb-3">
+              <strong>Salva questo link</strong> (aggiungilo ai preferiti o invialo a te stesso):
+              da qui potrai <strong>segnalare un disturbo</strong> per essere ricontattato dall&apos;osteopata e completare i check periodici.
+            </p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 text-xs text-gray-600 font-mono bg-white border border-green-200 rounded-lg px-2 py-2 truncate">{personalUrl}</div>
+              <button onClick={copyPersonal}
+                className={`shrink-0 text-xs font-semibold px-3 py-2 rounded-lg border ${copiedLink ? 'border-green-400 text-green-700 bg-green-100' : 'border-green-300 text-green-700 bg-white'}`}>
+                {copiedLink ? '✓ Copiato' : 'Copia'}
+              </button>
+            </div>
+            <a href={personalUrl} className="block text-center mt-3 text-sm font-semibold text-green-700 underline">Apri ora la tua area personale →</a>
+          </div>
+        )}
+
         <div className="mt-6 bg-white rounded-2xl border border-gray-200 p-4 text-sm text-gray-500 text-left w-full max-w-sm">
           <p>🔒 I tuoi dati sono al sicuro con Essentia Salutis, trattati nel rispetto del segreto professionale. Puoi richiedere modifica o cancellazione in qualsiasi momento scrivendo a info@essentiasalutis.it</p>
         </div>
@@ -463,6 +494,7 @@ export default function SelfDeclarePage({ client, error: serverError }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [level, setLevel] = useState(null);
+  const [careToken, setCareToken] = useState(null);
 
   const STORAGE_KEY = client ? `eswork_q_${client.id}` : null;
 
@@ -503,6 +535,7 @@ export default function SelfDeclarePage({ client, error: serverError }) {
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setLevel(data.level || 'level3');
+        setCareToken(data.care_token || null);
         if (STORAGE_KEY) { try { localStorage.removeItem(STORAGE_KEY); } catch {} }
         setPhase(PHASES.DONE);
       } else {
@@ -576,7 +609,7 @@ export default function SelfDeclarePage({ client, error: serverError }) {
       )}
 
       {phase === PHASES.DONE && (
-        <CompletionScreen level={level} wantsContact={wantsContact} tier={client.tier} />
+        <CompletionScreen level={level} wantsContact={wantsContact} tier={client.tier} careToken={careToken} />
       )}
     </>
   );

@@ -96,6 +96,8 @@ export default async function handler(req, res) {
         ok: true,
         level: computed_level,
         patient_id: patient.id,
+        // Link area personale (self-trigger, mini-check, re-assessment)
+        care_token: wants_to_be_contacted ? patient.care_token : null,
       });
     } catch (e) {
       console.error('self-declare POST error:', e.message);

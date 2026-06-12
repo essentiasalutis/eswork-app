@@ -680,7 +680,7 @@ ${FIRMA}`;
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-6">
+      <main className="max-w-5xl mx-auto px-6 py-6 space-y-6">
         {/* ── Gestione Dipendenti & Campagna Assessment ──────────── */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
           <div className="flex items-center justify-between">
@@ -835,7 +835,7 @@ ${FIRMA}`;
 
         {/* ── Lista d'attesa L1 (a scomparsa) ─────────────────────────── */}
         {waitlist && waitlist.length > 0 && (
-          <div className="mb-5">
+          <div>
             <button
               onClick={() => setShowWaitlistTable(v => !v)}
               className="w-full flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 mb-2"
@@ -883,7 +883,7 @@ ${FIRMA}`;
 
         {/* ── Pazienti / NRS (solo coord., niente note cliniche) ──────── */}
         {patientsNrs && patientsNrs.length > 0 && (
-          <div className="mb-5">
+          <div>
             {/* Cruscotto sintetico stratificazione */}
             <div className="grid grid-cols-4 gap-3 mb-3">
               {[
@@ -991,7 +991,7 @@ ${FIRMA}`;
           const pct = Math.min(100, Math.round(capacity.committed / capacity.budget * 100));
           const barColor = capacity.intakeSaturated ? '#dc2626' : pct >= 80 ? '#ca8a04' : '#16a34a';
           return (
-            <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5">
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
               <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">🎯 Capacità trattamenti (anno)</div>
                 {capacity.intakeSaturated ? (
@@ -1027,7 +1027,7 @@ ${FIRMA}`;
 
 
         {/* ── Professionisti assegnati (elenco a scomparsa) ───────────── */}
-        <div className="mb-5">
+        <div>
           <button
             onClick={() => setShowProList(v => !v)}
             className="w-full flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50"
@@ -1075,7 +1075,7 @@ ${FIRMA}`;
         </div>
 
         {/* ── Monitoraggio T3 / T6 / T12 ──────────────────────────────── */}
-        <div className="mt-6 bg-white rounded-2xl border border-gray-200 p-5">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5">
           <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">📡 Monitoraggio T3 / T6 / T12</h2>
           <div className="text-xs text-gray-400 mt-0.5 mb-4">
             T3/T6: mini-check ancorati al 1° ciclo del paziente — invio email automatico ogni mattina (richiede dominio email verificato).
@@ -1116,7 +1116,7 @@ ${FIRMA}`;
         </div>
 
         {/* ── Sezione AI Reports ─────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 mt-6">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">🤖 Report AI</h2>
@@ -1167,7 +1167,7 @@ ${FIRMA}`;
         </div>
 
         {/* ── Referral B2C ────────────────────────────────────────────── */}
-        <div className="mt-6">
+        <div>
           <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
             <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">🔗 Referral B2C</h2>
             <div className="flex items-center gap-2">

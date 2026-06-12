@@ -9,12 +9,16 @@ export default requireAuth(async function handler(req, res) {
   if (req.method !== 'DELETE') return res.status(405).end();
 
   const { patientId } = req.query;
+  if (!patientId) return res.status(400).json({ error: 'patientId mancante' });
 
   try {
+    // Idempotente: NON blocchiamo se la riga paziente è già sparita (es. eliminata
+    // lato professionista). In quel caso ripuliamo comunque eventuali figli orfani
+    // e rispondiamo ok, così la voce sparisce dalla lista dell'amministratore.
     const patient = await getPatientById(patientId);
-    if (!patient) return res.status(404).json({ error: 'Paziente non trovato' });
 
-    // Figli espliciti (alcune FK non sono ON DELETE CASCADE)
+    // Figli per patient_id. Quasi tutte le FK sono ON DELETE CASCADE, ma li
+    // eliminiamo esplicitamente per coprire anche eventuali orfani e le FK non-cascade.
     const childTables = [
       'sessions',
       'treatment_cycles',
@@ -24,8 +28,10 @@ export default requireAuth(async function handler(req, res) {
       'waitlist',
       'restratification_alerts',
       'acute_events',
+      'checkpoints',
       'patient_documents',
       'reassessments_t12',
+      'email_log',
     ];
     for (const table of childTables) {
       // tollerante: la tabella potrebbe non esistere o non avere righe
@@ -35,7 +41,8 @@ export default requireAuth(async function handler(req, res) {
     const { error } = await supabase.from('patients').delete().eq('id', patientId);
     if (error) throw error;
 
-    return res.json({ ok: true });
+    // ok=true sia che il paziente esistesse, sia che fosse già stato rimosso
+    return res.json({ ok: true, existed: !!patient });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }

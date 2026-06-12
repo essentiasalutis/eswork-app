@@ -30,7 +30,8 @@ export default requireAuth(async function handler(req, res) {
   const l1 = patients.filter(p => p.level === 'level1').length;
   const l2 = patients.filter(p => p.level === 'level2').length;
   const l3 = patients.filter(p => p.level === 'level3').length;
-  const completed = sessions.filter(s => s.status === 'completed').length;
+  // sessione "completata" = chiusa (la tabella sessions usa closed_at, non status)
+  const completed = sessions.filter(s => s.closed_at).length;
   const planned = sessions.length;
 
   const sessionsWithNrs = sessions.filter(s => s.nrs_pre != null && s.nrs_post != null);

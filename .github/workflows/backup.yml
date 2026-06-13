@@ -26,18 +26,19 @@ jobs:
       - name: Install dependencies
         run: npm install @supabase/supabase-js ws
 
-      - name: Run backup
+      - name: Run backup (cifrato AES-256-GCM)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
         run: node scripts/backup.js
 
-      - name: Commit backup to 'backups' branch (no Vercel deploy)
+      - name: Commit backup cifrato to 'backups' branch (no Vercel deploy)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           DATE=$(date +%Y-%m-%d)
-          SRC=$(ls backups/eswork-backup-*.json | head -1)
+          SRC=$(ls backups/eswork-backup-*.json.enc | head -1)
           # Committa su un branch dedicato 'backups' (isolato da main → nessun deploy
           # di produzione; il branch è escluso anche dai preview via vercel.json).
           git fetch origin backups || true
@@ -49,12 +50,14 @@ jobs:
             git -C /tmp/bkp rm -rf . >/dev/null 2>&1 || true
           fi
           mkdir -p /tmp/bkp/backups
-          cp "$SRC" "/tmp/bkp/backups/eswork-backup-$DATE.json"
+          cp "$SRC" "/tmp/bkp/backups/eswork-backup-$DATE.json.enc"
+          # Rimuovi eventuali vecchi backup IN CHIARO già presenti sul branch (bonifica)
+          rm -f /tmp/bkp/backups/eswork-backup-*.json
           cd /tmp/bkp
-          # Mantieni solo gli ultimi 8 backup sul branch
-          ls -1t backups/eswork-backup-*.json | tail -n +9 | xargs -r rm -f
+          # Mantieni solo gli ultimi 8 backup cifrati sul branch
+          ls -1t backups/eswork-backup-*.json.enc | tail -n +9 | xargs -r rm -f
           git add -f backups/
-          git commit -m "Backup automatico $DATE" || { echo "Nessuna modifica"; exit 0; }
+          git commit -m "Backup automatico cifrato $DATE" || { echo "Nessuna modifica"; exit 0; }
           git push origin backups
 
       - name: Notify on failure

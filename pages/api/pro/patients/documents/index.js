@@ -1,17 +1,26 @@
 import { requireProAuth } from '../../../../../lib/pro-auth';
-import { getPatientDocuments, upsertPatientDocument } from '../../../../../lib/store';
-import { hashIp } from '../../../../../lib/crypto-utils';
-import { hashContent } from '../../../../../lib/crypto-utils';
+import {
+  getPatientById,
+  getPatientDocuments,
+  upsertPatientDocument,
+  proCanAccessPatientClinical,
+} from '../../../../../lib/store';
+import { hashIp, hashContent } from '../../../../../lib/crypto-utils';
 import { getClientIp } from '../../../../../lib/rate-limit';
 
 // GET  /api/pro/patients/documents?patientId=xxx
 // POST /api/pro/patients/documents — firma o compila documento
-export default async function handler(req, res) {
-  const proSession = await requireProAuth(req, res);
-  if (!proSession) return;
-
+// Livello B (cartella clinica): SOLO l'osteopata assegnato al paziente.
+export default requireProAuth(async function handler(req, res) {
+  const proId = req.proSession.proId;
   const { patientId } = req.query;
   if (!patientId) return res.status(400).json({ error: 'patientId richiesto' });
+
+  const patient = await getPatientById(patientId);
+  if (!patient) return res.status(404).json({ error: 'Paziente non trovato' });
+  if (!(await proCanAccessPatientClinical(proId, patient))) {
+    return res.status(403).json({ error: 'Accesso negato: documenti clinici riservati all\'osteopata assegnato.' });
+  }
 
   if (req.method === 'GET') {
     try {
@@ -32,7 +41,7 @@ export default async function handler(req, res) {
       const isAnamnesi = type === 'anamnesi';
 
       const fields = {
-        professional_id: proSession.proId,
+        professional_id: proId,
         status: isAnamnesi ? 'completed' : 'signed',
         signed_at: now,
         ip_hash: hashIp(ip),
@@ -52,4 +61,4 @@ export default async function handler(req, res) {
   }
 
   res.status(405).end();
-}
+});

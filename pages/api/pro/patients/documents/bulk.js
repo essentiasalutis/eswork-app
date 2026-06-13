@@ -1,20 +1,26 @@
 import { requireProAuth } from '../../../../../lib/pro-auth';
-import { upsertPatientDocument } from '../../../../../lib/store';
+import { upsertPatientDocument, getPatientById, proCanAccessPatientClinical } from '../../../../../lib/store';
 import { hashIp, hashContent } from '../../../../../lib/crypto-utils';
 import { getClientIp } from '../../../../../lib/rate-limit';
 
 // POST /api/pro/patients/documents/bulk?patientId=xxx
 // Salva consenso + privacy + anamnesi in un'unica operazione con firma cumulativa.
 // Registra: timestamp, hash contenuto documenti, ip anonimizzato, user-agent.
+// Livello B (cartella clinica): SOLO l'osteopata assegnato al paziente.
 
-export default async function handler(req, res) {
-  const proSession = await requireProAuth(req, res);
-  if (!proSession) return;
+export default requireProAuth(async function handler(req, res) {
+  const proId = req.proSession.proId;
 
   if (req.method !== 'POST') return res.status(405).end();
 
   const { patientId } = req.query;
   if (!patientId) return res.status(400).json({ error: 'patientId richiesto' });
+
+  const patient = await getPatientById(patientId);
+  if (!patient) return res.status(404).json({ error: 'Paziente non trovato' });
+  if (!(await proCanAccessPatientClinical(proId, patient))) {
+    return res.status(403).json({ error: 'Accesso negato: documenti clinici riservati all\'osteopata assegnato.' });
+  }
 
   try {
     const {
@@ -33,7 +39,7 @@ export default async function handler(req, res) {
     const ip    = getClientIp(req);
     const now   = new Date().toISOString();
     const base  = {
-      professional_id: proSession.proId,
+      professional_id: proId,
       signed_at:       now,
       ip_hash:         hashIp(ip),
       user_agent:      req.headers['user-agent']?.slice(0, 200) || null,
@@ -67,4 +73,4 @@ export default async function handler(req, res) {
     console.error('[bulk-docs] error:', e.message);
     return res.status(500).json({ error: e.message });
   }
-}
+});

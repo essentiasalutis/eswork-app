@@ -1,7 +1,7 @@
 import { requireProAuth } from '../../../../../lib/pro-auth';
 import {
   getPatientById,
-  getAssignmentsByProfessional,
+  proCanAccessPatientClinical,
   createRestratAlert,
 } from '../../../../../lib/store';
 
@@ -14,9 +14,8 @@ export default requireProAuth(async function handler(req, res) {
   const patient = await getPatientById(patientId);
   if (!patient) return res.status(404).json({ error: 'Paziente non trovato' });
 
-  const assignments = await getAssignmentsByProfessional(proId);
-  const allowed = assignments.some(a => a.client_id === patient.client_id);
-  if (!allowed) return res.status(403).json({ error: 'Accesso negato' });
+  // Azione clinica sulla cartella: SOLO l'osteopata assegnato.
+  if (!(await proCanAccessPatientClinical(proId, patient))) return res.status(403).json({ error: 'Accesso negato' });
 
   const { session_id, notes } = req.body;
 

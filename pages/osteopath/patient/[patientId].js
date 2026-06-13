@@ -8,6 +8,7 @@ import {
   getPreValidationByPatient,
   getReassessmentT12ByPatient,
   getMiniChecksByPatient,
+  proCanAccessPatientClinical,
 } from '../../../lib/store';
 
 const LEVEL_LABELS = { level1: 'Livello 1', level2: 'Livello 2', level3: 'Livello 3' };
@@ -270,9 +271,13 @@ export default function OsteopathPatientView({ patient, sessions, cycles, preVal
 
 export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   const { patientId } = ctx.params;
+  const proId = ctx.req.proSession.proId;
 
   const patient = await getPatientById(patientId).catch(() => null);
   if (!patient) return { notFound: true };
+
+  // Cartella clinica (Livello B): SOLO l'osteopata assegnato al paziente.
+  if (!(await proCanAccessPatientClinical(proId, patient))) return { notFound: true };
 
   const [sessions, cycles, preValidation, reassessmentT12, miniChecks] = await Promise.all([
     getSessionsByPatient(patientId).catch(() => []),

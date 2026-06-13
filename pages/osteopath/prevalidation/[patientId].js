@@ -3,7 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireProAuthSsr } from '../../../lib/pro-auth';
-import { getPatientById } from '../../../lib/store';
+import { getPatientById, proCanAccessClient } from '../../../lib/store';
 
 const PAIN_ZONES = [
   'Collo', 'Spalle', 'Braccia/gomiti', 'Polsi/mani',
@@ -207,7 +207,11 @@ export default function PrevalidationForm({ patient }) {
 
 export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   const { patientId } = ctx.params;
+  const proId = ctx.req.proSession.proId;
   const patient = await getPatientById(patientId).catch(() => null);
   if (!patient) return { notFound: true };
+  // Livello A: la pre-validazione è accessibile solo agli osteopati assegnati
+  // all'AZIENDA del candidato (vedono contatto+priorità, non la cartella clinica).
+  if (!(await proCanAccessClient(proId, patient.client_id))) return { notFound: true };
   return { props: { patient } };
 });

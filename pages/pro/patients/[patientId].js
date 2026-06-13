@@ -6,7 +6,7 @@ import { requireProAuthSsr } from '../../../lib/pro-auth';
 import {
   getPatientById,
   getSessionsByPatient,
-  getAssignmentsByProfessional,
+  proCanAccessPatientClinical,
   getClientById,
   getPatientDocuments,
   getCyclesByPatient,
@@ -1127,9 +1127,9 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   const patient = await getPatientById(patientId);
   if (!patient) return { notFound: true };
 
-  const assignments = await getAssignmentsByProfessional(proId);
-  const allowed = assignments.some(a => a.client_id === patient.client_id);
-  if (!allowed) return { notFound: true };
+  // Cartella clinica (Livello B): SOLO l'osteopata assegnato. Un candidato non
+  // ancora preso in carico (assigned_professional_id null) non ha cartella visibile.
+  if (!(await proCanAccessPatientClinical(proId, patient))) return { notFound: true };
 
   const [sessions, client, documents] = await Promise.all([
     getSessionsByPatient(patientId),

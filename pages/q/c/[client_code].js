@@ -1,12 +1,11 @@
 /**
  * /q/c/[client_code] — Auto-dichiarazione dipendente
  *
- * Flusso GDPR-compliant:
- *   Fase 0  — Welcome screen (2 scelte: con dati / anonima)
- *   Fase 1b — Spiegazione modalità anonima
- *   Fase 2  — Consensi GDPR (solo modalità identificata)
- *   Fase 3  — Raccolta dati contatto (solo modalità identificata)
- *   Fase 4  — NMQ (9 zone)
+ * Flusso GDPR-compliant (percorso unico, sempre identificato):
+ *   Fase 0  — Welcome screen
+ *   Fase 1  — Consensi GDPR (privacy + dati di salute art. 9), con prova persistita
+ *   Fase 2  — Raccolta dati contatto (obbligatori)
+ *   Fase 3  — NMQ (9 zone)
  *   Fine    — Schermata completamento
  */
 
@@ -324,8 +323,8 @@ function NMQPhase({ answers, setAnswer, step, onNext, onBack, onSubmit, isLast, 
         <div className="max-w-lg mx-auto">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-bold text-gray-900">ES <span className="text-green-600">Work</span></div>
-            <div className={`text-xs px-2 py-1 rounded-full ${wantsContact ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-              {wantsContact ? 'Con i tuoi dati' : 'Anonimo'}
+            <div className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">
+              Riservato
             </div>
           </div>
           <NMQProgress step={step} total={BODY_ZONES.length} />
@@ -397,8 +396,7 @@ function CompletionScreen({ level, wantsContact, tier, careToken }) {
     setTimeout(() => setCopiedLink(false), 2000);
   }
 
-  if (wantsContact) {
-    return (
+  return (
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col items-center justify-center px-6 text-center">
         <ESLogo size={72} />
         <div className="mt-4 mb-1 text-lg font-bold text-gray-900">ES Work</div>
@@ -462,17 +460,6 @@ function CompletionScreen({ level, wantsContact, tier, careToken }) {
         </div>
       </div>
     );
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex flex-col items-center justify-center px-6 text-center">
-      <ESLogo size={72} />
-      <div className="mt-4 mb-1 text-lg font-bold text-gray-900">ES Work</div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-3 mt-4">Grazie per il contributo!</h2>
-      <p className="text-gray-600 mb-2">Le tue risposte sono state registrate e contribuiranno all'analisi aggregata del benessere aziendale.</p>
-      <p className="text-sm text-gray-400 mt-4">Contributo registrato in forma anonima per le statistiche aggregate della popolazione, senza alcun dato identificativo.</p>
-    </div>
-  );
 }
 
 // ─── Pagina principale ────────────────────────────────────────────────────────

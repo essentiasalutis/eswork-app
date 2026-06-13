@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/compliance', label: 'Compliance', icon: '✅', color: 'teal' },
   { href: '/dashboard/access-logs', label: 'Registro accessi', icon: '🔒', color: 'slate' },
   { href: '/dashboard/data-requests', label: 'Richieste GDPR', icon: '🔐', color: 'violet' },
+  { href: '/dashboard/retention', label: 'Conservazione dati', icon: '🗄️', color: 'amber' },
   { href: '/dashboard/restratifications', label: 'Ri-stratificazioni', icon: '🔄', color: 'rose' },
   { href: '/dashboard/acute-events', label: 'Eventi acuti (storico)', icon: '🗄️', color: 'red', badge: true },
   { href: '/dashboard/finance', label: 'Finance', icon: '💶', color: 'emerald' },

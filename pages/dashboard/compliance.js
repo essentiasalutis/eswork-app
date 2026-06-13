@@ -153,7 +153,7 @@ export default function CompliancePage({ data: initialData }) {
 
         {/* Note normative */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-800">
-          <strong>📋 Nota sulla conservazione:</strong> I documenti firmati vengono conservati per 10 anni dall'ultima seduta del paziente, in conformità agli obblighi normativi sulle cartelle cliniche (D.Lgs 196/2003, GDPR, normativa sanitaria). La cancellazione automatica avviene alla scadenza del periodo.
+          <strong>📋 Nota sulla conservazione:</strong> I documenti firmati vengono conservati per almeno 10 anni dall'ultima seduta del paziente, in conformità agli obblighi normativi sulle cartelle cliniche (D.Lgs 196/2003, GDPR, normativa sanitaria). Alla scadenza del termine i dati vengono cancellati su procedura del titolare del trattamento (cancellazione assistita e validata). Lo stato è consultabile nella sezione &quot;Conservazione dati&quot;.
         </div>
 
       </main>

@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/professionals', label: 'Professionisti', icon: '👨‍⚕️', color: 'indigo' },
   { href: '/dashboard/referrals', label: 'Referral B2C', icon: '🔗', color: 'orange' },
   { href: '/dashboard/compliance', label: 'Compliance', icon: '✅', color: 'teal' },
+  { href: '/dashboard/access-logs', label: 'Registro accessi', icon: '🔒', color: 'slate' },
   { href: '/dashboard/restratifications', label: 'Ri-stratificazioni', icon: '🔄', color: 'rose' },
   { href: '/dashboard/acute-events', label: 'Eventi acuti (storico)', icon: '🗄️', color: 'red', badge: true },
   { href: '/dashboard/finance', label: 'Finance', icon: '💶', color: 'emerald' },

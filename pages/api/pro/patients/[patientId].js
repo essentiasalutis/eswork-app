@@ -21,7 +21,7 @@ export default requireProAuth(async function handler(req, res) {
   if (req.method === 'GET') {
     // Livello B — accesso alla cartella clinica di dettaglio: tracciato
     const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
-    await logAccess(proId, 'view_patient', ip, `Cartella paziente ${patientId}`).catch(() => {});
+    await logAccess({ professional_id: proId, action: 'view_patient', patient_id: patientId, ip, user_agent: req.headers['user-agent'], details: 'Apertura cartella clinica' }).catch(() => {});
     return res.json(patient);
   }
 

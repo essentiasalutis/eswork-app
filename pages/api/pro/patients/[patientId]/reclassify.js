@@ -73,7 +73,7 @@ export default requireProAuth(async function handler(req, res) {
   }
 
   const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
-  await logAccess(proId, 'reclassify', ip, `Paziente ${patientId} → ${level}${reason ? ' · ' + reason : ''}`).catch(() => {});
+  await logAccess({ professional_id: proId, action: 'reclassify', patient_id: patientId, ip, user_agent: req.headers['user-agent'], details: `Riclassificazione → ${level}${reason ? ' · ' + reason : ''}` }).catch(() => {});
 
   return res.json({ ok: true, patient: updated, cancelledCycle, queued_for_prevalidation: queuedForPrevalidation });
 });

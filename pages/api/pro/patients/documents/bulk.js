@@ -1,5 +1,5 @@
 import { requireProAuth } from '../../../../../lib/pro-auth';
-import { upsertPatientDocument, getPatientById, proCanAccessPatientClinical } from '../../../../../lib/store';
+import { upsertPatientDocument, getPatientById, proCanAccessPatientClinical, logAccess } from '../../../../../lib/store';
 import { hashIp, hashContent } from '../../../../../lib/crypto-utils';
 import { getClientIp } from '../../../../../lib/rate-limit';
 
@@ -65,6 +65,8 @@ export default requireProAuth(async function handler(req, res) {
         content_hash: hashContent(JSON.stringify(form_data)),
       }),
     ]);
+
+    await logAccess({ professional_id: proId, action: 'sign_documents', patient_id: patientId, ip, user_agent: req.headers['user-agent'], details: 'Firma cumulativa: consenso + privacy + anamnesi' }).catch(() => {});
 
     console.log(`[bulk-docs] patient=${patientId} signed at ${now} — consent=${docConsent.id} privacy=${docPrivacy.id} anamnesi=${docAnamnesi.id}`);
     return res.json([docConsent, docPrivacy, docAnamnesi]);

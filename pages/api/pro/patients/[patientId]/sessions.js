@@ -70,7 +70,7 @@ export default requireProAuth(async function handler(req, res) {
       let pendingPgic = false;
       if (close) {
         const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
-        await logAccess(proId, 'close_session', ip, `Sessione ${session.id} chiusa`);
+        await logAccess({ professional_id: proId, action: 'close_session', patient_id: patientId, ip, user_agent: req.headers['user-agent'], details: `Sessione ${session.id} chiusa` });
 
         // Aggiorna sessions_completed del ciclo; alla seduta finale → in attesa di PGIC
         if (activeCycle) {
@@ -118,10 +118,10 @@ export default requireProAuth(async function handler(req, res) {
       if (close && !session.closed_at) {
         // Chiusura di una visita aperta
         fields.closed_at = new Date().toISOString();
-        await logAccess(proId, 'close_session', ip, `Sessione ${sessionId} chiusa`);
+        await logAccess({ professional_id: proId, action: 'close_session', patient_id: patientId, ip, user_agent: req.headers['user-agent'], details: `Sessione ${sessionId} chiusa` });
       } else {
         // Modifica di una seduta esistente (anche già chiusa) — tracciata per integrità
-        await logAccess(proId, 'edit_session', ip, `Seduta ${sessionId} modificata`);
+        await logAccess({ professional_id: proId, action: 'edit_session', patient_id: patientId, ip, user_agent: req.headers['user-agent'], details: `Seduta ${sessionId} modificata` });
       }
 
       const updated = await updateSession(sessionId, fields);

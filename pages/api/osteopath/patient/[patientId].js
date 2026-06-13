@@ -24,7 +24,7 @@ export default requireProAuth(async function handler(req, res) {
     return res.status(403).json({ error: 'Accesso negato' });
   }
   const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
-  await logAccess(proId, 'view_patient', ip, `Cartella paziente ${patientId}`).catch(() => {});
+  await logAccess({ professional_id: proId, action: 'view_patient', patient_id: patientId, ip, user_agent: req.headers['user-agent'], details: 'Apertura cartella clinica' }).catch(() => {});
 
   const [sessions, cycles, preValidation, reassessmentT12, miniChecks] = await Promise.all([
     getSessionsByPatient(patientId).catch(() => []),

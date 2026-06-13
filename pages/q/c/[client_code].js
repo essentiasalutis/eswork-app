@@ -211,7 +211,7 @@ function ConsentScreen({ onContinue }) {
         </div>
 
         <button
-          onClick={onContinue}
+          onClick={() => onContinue(INFORMATIVA_QUESTIONARIO.version)}
           disabled={!canContinue}
           className="w-full py-4 rounded-2xl bg-green-600 text-white font-semibold text-base disabled:opacity-40 disabled:cursor-not-allowed"
         >
@@ -495,6 +495,7 @@ export default function SelfDeclarePage({ client, error: serverError }) {
   const [submitError, setSubmitError] = useState(null);
   const [level, setLevel] = useState(null);
   const [careToken, setCareToken] = useState(null);
+  const [consentVersion, setConsentVersion] = useState(null);
 
   const STORAGE_KEY = client ? `eswork_q_${client.id}` : null;
 
@@ -524,6 +525,10 @@ export default function SelfDeclarePage({ client, error: serverError }) {
         location: contactData?.location || null,
         wants_to_be_contacted: wantsContact,
         answers,
+        // Prova del consenso (l'utente ha spuntato entrambe le caselle per arrivare qui)
+        consent_privacy: true,
+        consent_health: true,
+        informativa_version: consentVersion,
       };
 
       const res = await fetch(`/api/self-declare/${client.share_code}`, {
@@ -574,7 +579,7 @@ export default function SelfDeclarePage({ client, error: serverError }) {
       )}
 
       {phase === PHASES.CONSENT && (
-        <ConsentScreen onContinue={() => setPhase(PHASES.CONTACT)} />
+        <ConsentScreen onContinue={(version) => { setConsentVersion(version); setPhase(PHASES.CONTACT); }} />
       )}
 
       {phase === PHASES.CONTACT && (

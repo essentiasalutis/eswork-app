@@ -5,6 +5,7 @@ import {
   getPatientDocuments,
   getSessionsByPatient,
   getClientById,
+  getConsentByPatient,
 } from '../../../../lib/store';
 import { CONSENSO_TRATTAMENTO, INFORMATIVA_PRIVACY_ESTESA } from '../../../../lib/legal-texts';
 
@@ -13,7 +14,7 @@ const NMQ_LABELS_IT = {
   '6-12m': '6–12 mesi', '>12m': 'Più di 12 mesi',
 };
 
-export default function PatientExport({ patient, client, documents, sessions, exportedAt }) {
+export default function PatientExport({ patient, client, documents, sessions, assessmentConsent, exportedAt }) {
 
   const getDoc = type => documents.find(d => d.type === type);
   const consent = getDoc('consent_treatment');
@@ -214,6 +215,22 @@ export default function PatientExport({ patient, client, documents, sessions, ex
           </table>
         )}
 
+        {/* ── CONSENSO PRE-QUESTIONARIO (prova GDPR) ── */}
+        <h2>Consenso pre-questionario (assessment)</h2>
+        {assessmentConsent ? (
+          <table>
+            <tbody>
+              <tr><td><strong>Consenso dati personali</strong></td><td>✓ prestato il {new Date(assessmentConsent.consent_privacy_at).toLocaleString('it-IT')}</td></tr>
+              <tr><td><strong>Consenso dati di salute (art. 9 GDPR)</strong></td><td>✓ prestato il {new Date(assessmentConsent.consent_health_at).toLocaleString('it-IT')}</td></tr>
+              <tr><td><strong>Versione informativa accettata</strong></td><td>{assessmentConsent.informativa_version || '—'}</td></tr>
+              <tr><td><strong>Registrato il</strong></td><td>{assessmentConsent.created_at ? new Date(assessmentConsent.created_at).toLocaleString('it-IT') : '—'}</td></tr>
+              <tr><td><strong>Impronta tecnica</strong></td><td>IP (hash): {assessmentConsent.ip_hash || '—'} · User-agent: {assessmentConsent.user_agent || '—'}</td></tr>
+            </tbody>
+          </table>
+        ) : (
+          <p style={{ color: '#64748b' }}>Nessun consenso pre-questionario registrato per questo paziente.</p>
+        )}
+
         {/* ── WATERMARK ── */}
         <div className="watermark">
           Documento generato da ES Work — Essentia Salutis · info@essentiasalutis.it · Via Salbertrand 9, Torino<br />
@@ -230,10 +247,11 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
   const patient = await getPatientById(patientId);
   if (!patient) return { notFound: true };
 
-  const [documents, sessions, client] = await Promise.all([
+  const [documents, sessions, client, assessmentConsent] = await Promise.all([
     getPatientDocuments(patientId),
     getSessionsByPatient(patientId),
     getClientById(patient.client_id),
+    getConsentByPatient(patientId).catch(() => null),
   ]);
 
   return {
@@ -242,6 +260,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       client,
       documents: JSON.parse(JSON.stringify(documents)), // serializza Date
       sessions: JSON.parse(JSON.stringify(sessions)),
+      assessmentConsent: assessmentConsent ? JSON.parse(JSON.stringify(assessmentConsent)) : null,
       exportedAt: new Date().toISOString(),
     },
   };

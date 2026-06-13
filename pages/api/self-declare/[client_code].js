@@ -6,11 +6,14 @@ import {
   createSelfDeclaredPatient,
   getActiveAssessmentByClient,
   insertResponse,
+  insertAssessmentConsent,
   updatePatient,
   addToWaitlist,
   generateId,
 } from '../../../lib/store';
 import { computeLevel } from '../../../lib/scoring';
+import { hashIp } from '../../../lib/crypto-utils';
+import { getClientIp } from '../../../lib/rate-limit';
 
 export default async function handler(req, res) {
   const { client_code } = req.query;
@@ -33,7 +36,16 @@ export default async function handler(req, res) {
       location,
       wants_to_be_contacted,
       answers,
+      consent_privacy,
+      consent_health,
+      informativa_version,
     } = req.body || {};
+
+    // GATE CONSENSO: nessun dato (anche di salute, art.9) viene trattato senza
+    // entrambi i consensi espliciti. Difesa lato server, non solo gate UI.
+    if (consent_privacy !== true || consent_health !== true) {
+      return res.status(400).json({ error: 'Consensi obbligatori mancanti: privacy e dati di salute.' });
+    }
 
     try {
       // 1. Crea il record paziente
@@ -79,6 +91,19 @@ export default async function handler(req, res) {
           submitted_at: now,
         }).catch(e => console.error('insertResponse error:', e.message));
       }
+
+      // 4-bis. PROVA DEL CONSENSO (persistita e riconducibile): chi (patient_id),
+      //        a cosa (privacy + salute art.9), quale versione dell'informativa,
+      //        quando (timestamp), con quale impronta tecnica (ip_hash, user_agent).
+      await insertAssessmentConsent({
+        assessment_id: assessment?.id || null,
+        patient_id: patient.id,
+        consent_privacy_at: now,
+        consent_health_at: now,
+        informativa_version: informativa_version || null,
+        ip_hash: hashIp(getClientIp(req)),
+        user_agent: (req.headers['user-agent'] || '').slice(0, 200) || null,
+      }).catch(e => console.error('insertAssessmentConsent error:', e.message));
 
       // 5. Se vuole essere contattato E risulta L1 → Waitlist
       if (wants_to_be_contacted && computed_level === 'level1') {

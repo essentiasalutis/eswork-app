@@ -292,6 +292,116 @@ function OptedOutScreen({ patient }) {
   );
 }
 
+// ─── Diritti GDPR (area personale) ───────────────────────────────────────────
+
+function RightsSection({ token, patient }) {
+  const [openForm, setOpenForm] = useState(null); // 'rectification' | 'erasure' | 'withdrawal' | null
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(null); // messaggio di conferma
+  const withdrawn = !!patient.consent_withdrawn_at;
+
+  async function submit(type) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/employee/${token}/data-request`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, note }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setDone(type === 'consent_withdrawal'
+          ? 'Consenso revocato. I trattamenti non obbligatori sono stati interrotti.'
+          : 'Richiesta inviata. Il titolare la prenderà in carico e ti risponderà.');
+        setOpenForm(null); setNote('');
+      } else { alert(d.error || 'Errore'); }
+    } catch { alert('Errore di rete'); }
+    setBusy(false);
+  }
+
+  const btn = (bg, color, border) => ({
+    width: '100%', textAlign: 'left', padding: '12px 14px', borderRadius: 12,
+    border: `1px solid ${border}`, background: bg, color, fontSize: 14, fontWeight: 600,
+    cursor: 'pointer', marginBottom: 8,
+  });
+
+  return (
+    <div style={{ padding: '8px 16px 4px' }}>
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 2 }}>🔐 I tuoi diritti sui dati (GDPR)</div>
+        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12, lineHeight: 1.5 }}>
+          Puoi esercitare i tuoi diritti direttamente da qui. Le richieste sono registrate e gestite dal titolare (Essentia Salutis).
+        </div>
+
+        {done && (
+          <div style={{ background: '#dcfce7', border: '1px solid #86efac', color: '#166534', borderRadius: 10, padding: '10px 12px', fontSize: 13, marginBottom: 10 }}>
+            ✅ {done}
+          </div>
+        )}
+
+        <a href={`/api/employee/${token}/export`} style={{ ...btn('#eff6ff', '#1d4ed8', '#bfdbfe'), display: 'block', textDecoration: 'none' }}>
+          📥 Scarica una copia dei miei dati
+        </a>
+
+        <button onClick={() => { setOpenForm(openForm === 'rectification' ? null : 'rectification'); setNote(''); }} style={btn('#f8fafc', '#0f172a', '#e2e8f0')}>
+          ✏️ Richiedi una rettifica dei miei dati
+        </button>
+        {openForm === 'rectification' && (
+          <RequestForm note={note} setNote={setNote} busy={busy} placeholder="Indica cosa è inesatto e come va corretto…" onSend={() => submit('rectification')} />
+        )}
+
+        <button onClick={() => { setOpenForm(openForm === 'erasure' ? null : 'erasure'); setNote(''); }} style={btn('#f8fafc', '#0f172a', '#e2e8f0')}>
+          🗑️ Richiedi la cancellazione dei miei dati
+        </button>
+        {openForm === 'erasure' && (
+          <div>
+            <div style={{ fontSize: 12, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '8px 10px', margin: '0 0 8px', lineHeight: 1.5 }}>
+              Nota: la documentazione clinica è conservata per l'obbligo legale di documentazione sanitaria (10 anni) e viene cancellata dal titolare alla scadenza. Gli altri dati possono essere cancellati su tua richiesta.
+            </div>
+            <RequestForm note={note} setNote={setNote} busy={busy} placeholder="Motivo della richiesta (facoltativo)…" onSend={() => submit('erasure')} />
+          </div>
+        )}
+
+        {withdrawn ? (
+          <div style={{ ...btn('#f1f5f9', '#64748b', '#e2e8f0'), cursor: 'default' }}>
+            🚫 Consenso revocato il {new Date(patient.consent_withdrawn_at).toLocaleDateString('it-IT')}
+          </div>
+        ) : (
+          <>
+            <button onClick={() => setOpenForm(openForm === 'withdrawal' ? null : 'withdrawal')} style={btn('#fef2f2', '#b91c1c', '#fecaca')}>
+              🚫 Revoca il consenso al trattamento
+            </button>
+            {openForm === 'withdrawal' && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: 12, marginBottom: 8 }}>
+                <div style={{ fontSize: 12, color: '#7f1d1d', lineHeight: 1.5, marginBottom: 10 }}>
+                  La revoca interrompe i trattamenti non obbligatori (promemoria, inviti, nuove campagne). La documentazione clinica già raccolta resta conservata per l'obbligo legale e poi viene cancellata dal titolare. Confermi?
+                </div>
+                <button onClick={() => submit('consent_withdrawal')} disabled={busy} style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', background: '#dc2626', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>
+                  {busy ? 'Invio…' : 'Conferma revoca del consenso'}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RequestForm({ note, setNote, busy, placeholder, onSend }) {
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <textarea
+        value={note} onChange={e => setNote(e.target.value)} placeholder={placeholder} rows={3}
+        style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #e2e8f0', borderRadius: 10, padding: 10, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', marginBottom: 8 }}
+      />
+      <button onClick={onSend} disabled={busy} style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', background: '#0f172a', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>
+        {busy ? 'Invio…' : 'Invia richiesta'}
+      </button>
+    </div>
+  );
+}
+
 // ─── Main page ─────────────────────────────────────────────────────────────────
 export default function EmployeeDashboard() {
   const router = useRouter();
@@ -359,6 +469,9 @@ export default function EmployeeDashboard() {
                     ? <DashboardL2 patient={patient} miniChecks={miniChecks} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} />
                     : <DashboardL3 patient={patient} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} />
               }
+
+              {/* Diritti GDPR */}
+              <RightsSection token={token} patient={patient} />
 
               {/* Footer */}
               <div style={{ padding: '20px 16px', textAlign: 'center', fontSize: 11, color: '#94a3b8', borderTop: '1px solid #e2e8f0', marginTop: 8 }}>

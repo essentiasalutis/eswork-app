@@ -25,6 +25,8 @@ export default async function handler(req, res) {
       const patients = await getPatientsForMinicheckInvite(checkpoint);
       for (const patient of patients) {
         try {
+          // Consenso revocato → niente inviti automatici
+          if (patient.consent_withdrawn_at) continue;
           const client = patient.clients || await getClientById(patient.client_id).catch(() => null);
           const companyName = client?.name || 'la tua azienda';
           const minicheckLink = `${BASE_URL}/employee/minicheck?token=${patient.care_token}&type=${checkpoint}`;

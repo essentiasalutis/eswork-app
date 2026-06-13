@@ -30,6 +30,8 @@ export default async function handler(req, res) {
       const patients = await getPatientsNeedingReminder(daysAgo);
       for (const patient of patients) {
         try {
+          // Consenso revocato → niente trattamenti non obbligatori (promemoria)
+          if (patient.consent_withdrawn_at) continue;
           const clientId = patient.client_id;
           const client = await getClientById(clientId).catch(() => null);
           const assessment = await getActiveAssessmentByClient(clientId).catch(() => null);

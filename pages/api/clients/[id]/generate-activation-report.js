@@ -12,8 +12,21 @@ import {
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { calculatePricing } from '../../../../lib/calculator';
 import { CONFIG } from '../../../../lib/config';
+import { kAnonPartition, tooSmall, K_ANON } from '../../../../lib/kanon';
 
 export const config = { maxDuration: 60 };
+
+// Stratificazione L1/L2/L3 con soppressione k-anon (gruppi < k → "n.d.").
+function stratLines(l1, l2, l3, total) {
+  if (tooSmall(total)) {
+    return `- Popolazione totale < ${K_ANON}: distribuzione per livello NON pubblicabile (tutela anonimato, k-anonymity)`;
+  }
+  const P = Object.fromEntries(kAnonPartition([
+    { key: 'l1', count: l1 }, { key: 'l2', count: l2 }, { key: 'l3', count: l3 },
+  ], total).map(c => [c.key, c]));
+  const cell = c => c.suppressed ? `n.d. (gruppo < ${K_ANON}, soppresso per anonimato)` : `${c.count} (${c.pct}%)`;
+  return `- Livello 1 (trattamento): ${cell(P.l1)}\n- Livello 2 (monitoraggio): ${cell(P.l2)}\n- Livello 3 (prevenzione): ${cell(P.l3)}`;
+}
 
 export default requireAuth(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -54,9 +67,9 @@ Dipendenti totali: ${client.employees || 'n.d.'}
 Tier: ${tierLabel}
 
 STRATIFICAZIONE (${totalPatients} assessment completati):
-- Livello 1 (trattamento): ${l1Count} (${totalPatients > 0 ? Math.round(l1Count/totalPatients*100) : 0}%)
-- Livello 2 (monitoraggio): ${l2Count} (${totalPatients > 0 ? Math.round(l2Count/totalPatients*100) : 0}%)
-- Livello 3 (prevenzione): ${l3Count} (${totalPatients > 0 ? Math.round(l3Count/totalPatients*100) : 0}%)
+${stratLines(l1Count, l2Count, l3Count, totalPatients)}
+
+NOTA PRIVACY: dove un gruppo è "n.d." è stato soppresso per anonimato (k-anonymity, < ${K_ANON}). NON dedurre, stimare o ricostruire i valori soppressi.
 
 SESSIONI EROGATE: ${sessions.length}
 NRS medio pre-sessione: ${avgNrsPre.toFixed(1)}/10
@@ -121,24 +134,33 @@ Tono: professionale, clinico, orientato ai dati. In italiano. Non più di 800 pa
 });
 
 function generateFallbackReport(client, l1, l2, l3, total, sessioni, settore, quoteBlock) {
-  const pctL1 = total > 0 ? Math.round(l1/total*100) : 0;
+  const small = tooSmall(total);
+  const P = small ? null : Object.fromEntries(kAnonPartition([
+    { key: 'l1', count: l1 }, { key: 'l2', count: l2 }, { key: 'l3', count: l3 },
+  ], total).map(c => [c.key, c]));
+  const dip = c => c.suppressed ? `n.d. (gruppo < ${K_ANON})` : `${c.count} dipendenti (${c.pct}%)`;
+  const pctL1txt = small || P.l1.suppressed ? 'non pubblicata per anonimato' : `${P.l1.pct}%`;
+  const riskTxt = small || P.l1.suppressed ? 'non determinabile in forma anonima' : (P.l1.pct > 20 ? 'elevato' : P.l1.pct > 10 ? 'moderato' : 'contenuto');
+  const mappa = small
+    ? `La popolazione valutata è inferiore alla soglia minima di aggregazione (${K_ANON}): la distribuzione per livello non viene pubblicata a tutela dell'anonimato dei dipendenti (k-anonymity).`
+    : `- **Livello 1 (Trattamento attivo):** ${dip(P.l1)} — dolore con impatto funzionale, richiedono protocollo individuale
+- **Livello 2 (Monitoraggio):** ${dip(P.l2)} — sintomatologia presente, seguiti con mini-check periodici
+- **Livello 3 (Prevenzione):** ${dip(P.l3)} — nessuna sintomatologia rilevante, inclusi nella formazione collettiva`;
   return `## Executive Summary
 
 Il programma ES Work per **${client.name}** (${settore}, ${client.employees || 'n.d.'} dipendenti) ha completato la fase di assessment iniziale con ${total} dipendenti valutati.
 
-La distribuzione clinica evidenzia ${pctL1}% di dipendenti in Livello 1 (trattamento attivo), indicando un profilo di rischio ${pctL1 > 20 ? 'elevato' : pctL1 > 10 ? 'moderato' : 'contenuto'} per la popolazione aziendale. Sono state erogate ${sessioni} sessioni osteopatiche ad oggi.
+La distribuzione clinica evidenzia una quota in Livello 1 (trattamento attivo) pari a ${pctL1txt}, profilo di rischio ${riskTxt}. Sono state erogate ${sessioni} sessioni osteopatiche ad oggi.
 
 Il programma è operativamente attivo e i risultati preliminari confermano la pertinenza dell'intervento.
 
 ## Mappa Clinica della Popolazione
 
-- **Livello 1 (Trattamento attivo):** ${l1} dipendenti — dolore con impatto funzionale, richiedono protocollo individuale
-- **Livello 2 (Monitoraggio):** ${l2} dipendenti — sintomatologia presente, seguiti con mini-check periodici
-- **Livello 3 (Prevenzione):** ${l3} dipendenti — nessuna sintomatologia rilevante, inclusi nella formazione collettiva
+${mappa}
 
 ## Piano Operativo Proposto
 
-Il piano prevede la presa in carico dei ${l1} pazienti L1 distribuiti in turni di avvio mensili, con sportello osteopatico in sede. La formazione collettiva copre l'intera popolazione aziendale con moduli su ergonomia e postura.
+Il piano prevede la presa in carico dei pazienti L1 distribuiti in turni di avvio mensili, con sportello osteopatico in sede. La formazione collettiva copre l'intera popolazione aziendale con moduli su ergonomia e postura.
 ${quoteBlock ? `
 ## Proposta economica collegata
 ${quoteBlock.replace('PROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):', 'Investimento calcolato con le condizioni concordate al colloquio e la stratificazione reale:')}` : ''}

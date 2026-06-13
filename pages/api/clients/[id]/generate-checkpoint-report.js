@@ -10,6 +10,7 @@ import {
   insertDocument,
 } from '../../../../lib/store';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
+import { kAnonPartition, maskCount, tooSmall, K_ANON } from '../../../../lib/kanon';
 
 export const config = { maxDuration: 60 };
 
@@ -30,6 +31,15 @@ export default requireAuth(async function handler(req, res) {
   const l1 = patients.filter(p => p.level === 'level1').length;
   const l2 = patients.filter(p => p.level === 'level2').length;
   const l3 = patients.filter(p => p.level === 'level3').length;
+
+  // k-anonymity sulla stratificazione L1/L2/L3 (con soppressione secondaria).
+  // l1d/l2d/l3d = stringhe da PUBBLICARE; l1/l2/l3 restano per i calcoli interni.
+  const stratTotal = l1 + l2 + l3;
+  const stratP = tooSmall(stratTotal) ? null
+    : Object.fromEntries(kAnonPartition([{ key: 'l1', count: l1 }, { key: 'l2', count: l2 }, { key: 'l3', count: l3 }], stratTotal).map(c => [c.key, c]));
+  const ld = k => (!stratP || stratP[k].suppressed) ? `n.d.` : String(stratP[k].count);
+  const l1d = ld('l1'), l2d = ld('l2'), l3d = ld('l3');
+
   // sessione "completata" = chiusa (la tabella sessions usa closed_at, non status)
   const completed = sessions.filter(s => s.closed_at).length;
   const planned = sessions.length;
@@ -48,12 +58,18 @@ export default requireAuth(async function handler(req, res) {
     const allChecks = await getMiniChecksByClient(id).catch(() => []);
     const phase = allChecks.filter(c => c.check_type === checkpoint);
     const nrsVals = phase.map(c => c.nrs_current).filter(v => v != null);
+    // k-anon: se i mini-check compilati sono < k, l'intero spaccato è soppresso.
+    const smallGroup = tooSmall(phase.length);
+    const wc = phase.filter(c => c.wants_contact).length;
+    const nc = phase.filter(c => c.triage_outcome === 'needs_contact').length;
     mc = {
       count: phase.length,
-      avgNrs: nrsVals.length ? (nrsVals.reduce((a, b) => a + b, 0) / nrsVals.length).toFixed(1) : 'n.d.',
-      limitationsPct: phase.length ? Math.round(phase.filter(c => c.has_limitations).length / phase.length * 100) : null,
-      wantsContact: phase.filter(c => c.wants_contact).length,
-      needsContact: phase.filter(c => c.triage_outcome === 'needs_contact').length,
+      smallGroup,
+      avgNrs: smallGroup || !nrsVals.length ? 'n.d.' : (nrsVals.reduce((a, b) => a + b, 0) / nrsVals.length).toFixed(1),
+      limitationsPct: smallGroup || !phase.length ? null : Math.round(phase.filter(c => c.has_limitations).length / phase.length * 100),
+      // conteggi singoli mascherati se < k (riservato)
+      wantsContact: maskCount(wc) == null ? 'n.d.' : wc,
+      needsContact: maskCount(nc) == null ? 'n.d.' : nc,
     };
   }
 
@@ -71,16 +87,27 @@ export default requireAuth(async function handler(req, res) {
     const baselineTreat = l1; // L1 all'intake (necessitano trattamento)
     const t12Treat = r1;      // L1 al re-assessment
     const prevalenceDelta = baselineTreat > 0 ? Math.round((baselineTreat - t12Treat) / baselineTreat * 100) : null;
-    t12 = { count: reass.length, r1, r2, r3, avgPgic, improvedPct, baselineTreat, t12Treat, prevalenceDelta };
+    // k-anon sulla distribuzione T12 (r1/r2/r3) + mascheramento dei conteggi piccoli.
+    const small = tooSmall(reass.length);
+    const RP = small ? null
+      : Object.fromEntries(kAnonPartition([{ key: 'r1', count: r1 }, { key: 'r2', count: r2 }, { key: 'r3', count: r3 }], reass.length).map(c => [c.key, c]));
+    const rd = k => (!RP || RP[k].suppressed) ? 'n.d.' : String(RP[k].count);
+    const baselineTreatD = maskCount(baselineTreat) == null ? 'n.d.' : String(baselineTreat);
+    const t12TreatD = (!RP || RP.r1.suppressed) ? 'n.d.' : String(t12Treat);
+    const prevalenceShown = !small && maskCount(baselineTreat) != null && RP && !RP.r1.suppressed;
+    t12 = {
+      count: reass.length, r1, r2, r3, avgPgic, improvedPct, baselineTreat, t12Treat, prevalenceDelta,
+      r1d: rd('r1'), r2d: rd('r2'), r3d: rd('r3'), baselineTreatD, t12TreatD, prevalenceShown, small,
+    };
   }
 
   const prompt = isAnnual ? `Sei un consulente clinico ES Work. Genera il REPORT ANNUALE (12 mesi) per ${client.name}, da consegnare alla direzione e utilizzabile per il bilancio di sostenibilità.
 
-DATI ANNO 1:
-- Popolazione all'intake: L1 ${l1}, L2 ${l2}, L3 ${l3}
+DATI ANNO 1 (i valori "n.d." sono soppressi per anonimato/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
+- Popolazione all'intake: L1 ${l1d}, L2 ${l2d}, L3 ${l3d}
 - Sessioni completate/pianificate: ${completed}/${planned}
 - Re-assessment a 12 mesi completati: ${t12.count}
-- Distribuzione livelli a T12: L1 ${t12.r1}, L2 ${t12.r2}, L3 ${t12.r3}
+- Distribuzione livelli a T12: L1 ${t12.r1d}, L2 ${t12.r2d}, L3 ${t12.r3d}
 - Settore: ${client.sector === 1 ? 'Manifattura' : 'Servizi'}
 
 STRUTTURA (markdown, ## per titoli):
@@ -92,7 +119,7 @@ STRUTTURA (markdown, ## per titoli):
 Presenta in tabella i tre indicatori v4:
 1. **Riduzione del dolore** — riduzione media NRS per sessione: ${avgDelta} punti.
 2. **Miglioramento percepito (PGIC)** — PGIC medio ${t12.avgPgic}/5${t12.improvedPct != null ? `, ${t12.improvedPct}% dei dipendenti rivalutati riporta un miglioramento (PGIC 4-5)` : ''}.
-3. **Variazione della prevalenza** — dipendenti che necessitano trattamento (L1): da ${t12.baselineTreat} all'intake a ${t12.t12Treat} a 12 mesi${t12.prevalenceDelta != null ? ` (${t12.prevalenceDelta >= 0 ? '−' : '+'}${Math.abs(t12.prevalenceDelta)}%)` : ''}.
+3. **Variazione della prevalenza** — dipendenti che necessitano trattamento (L1): da ${t12.baselineTreatD} all'intake a ${t12.t12TreatD} a 12 mesi${t12.prevalenceShown && t12.prevalenceDelta != null ? ` (${t12.prevalenceDelta >= 0 ? '−' : '+'}${Math.abs(t12.prevalenceDelta)}%)` : ''}.
 
 ## Confronto prima/dopo
 (commento al cambiamento della distribuzione L1/L2/L3 intake → T12)
@@ -106,19 +133,19 @@ Presenta in tabella i tre indicatori v4:
 ${t12.count === 0 ? 'NOTA: nessun re-assessment a 12 mesi ancora registrato — segnala che i KPI di esito saranno disponibili al completamento dei re-assessment.' : ''}
 Tono: clinico, orientato ai risultati e alla direzione. Italiano. Max 650 parole.` : `Sei un consulente clinico ES Work. Genera un Report Intermedio professionale a ${checkLabel} per il cliente ${client.name}.
 
-DATI CLINICI:
-- Pazienti L1 (trattamento): ${l1}
-- Pazienti L2 (monitoraggio): ${l2}
-- Pazienti L3 (prevenzione): ${l3}
+DATI CLINICI (i valori "n.d." sono soppressi per anonimato/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
+- Pazienti L1 (trattamento): ${l1d}
+- Pazienti L2 (monitoraggio): ${l2d}
+- Pazienti L3 (prevenzione): ${l3d}
 - Sessioni completate/pianificate: ${completed}/${planned}
 - Riduzione media NRS per sessione: ${avgDelta} punti
 - Settore: ${client.sector === 1 ? 'Manifattura' : 'Servizi'}
 
 MINI-CHECK ${checkpoint.toUpperCase()} (questionari compilati dai dipendenti a ${checkLabel}):
-- Compilati: ${mc.count}
+${mc.smallGroup ? `- Spaccato mini-check non pubblicabile: meno di ${K_ANON} compilati (tutela anonimato).` : `- Compilati: ${mc.count}
 - NRS medio dichiarato: ${mc.avgNrs}
 ${mc.limitationsPct != null ? `- Con limitazioni funzionali: ${mc.limitationsPct}%` : ''}
-- Richiedono contatto: ${mc.wantsContact} (triage: ${mc.needsContact} da ricontattare)
+- Richiedono contatto: ${mc.wantsContact} (triage: ${mc.needsContact} da ricontattare)`}
 ${mc.count === 0 ? 'NOTA: nessun mini-check ancora compilato — segnala che i KPI di percezione arriveranno coi questionari.' : ''}
 
 STRUTTURA REPORT (markdown, ## per titoli):
@@ -170,6 +197,13 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
 });
 
 function generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc) {
+  // k-anon sulla stratificazione intake L1/L2/L3 (soppressione secondaria inclusa)
+  const stratTotal = l1 + l2 + l3;
+  const SP = tooSmall(stratTotal) ? null
+    : Object.fromEntries(kAnonPartition([{ key: 'l1', count: l1 }, { key: 'l2', count: l2 }, { key: 'l3', count: l3 }], stratTotal).map(c => [c.key, c]));
+  const ld = k => (!SP || SP[k].suppressed) ? 'n.d.' : String(SP[k].count);
+  const l1d = ld('l1'), l2d = ld('l2'), l3d = ld('l3');
+
   if (checkpoint === 't12' && t12) {
     return `## Report Annuale — ${client.name}
 
@@ -181,11 +215,13 @@ Sintesi dei risultati del programma ES Work al termine dell'Anno 1${t12.count ==
 |-----|--------|
 | Riduzione del dolore (NRS media/seduta) | ${avgDelta} punti |
 | Miglioramento percepito (PGIC medio) | ${t12.avgPgic}/5${t12.improvedPct != null ? ` · ${t12.improvedPct}% migliorati` : ''} |
-| Dipendenti che necessitano trattamento (L1) | ${t12.baselineTreat} → ${t12.t12Treat}${t12.prevalenceDelta != null ? ` (${t12.prevalenceDelta >= 0 ? '−' : '+'}${Math.abs(t12.prevalenceDelta)}%)` : ''} |
+| Dipendenti che necessitano trattamento (L1) | ${t12.baselineTreatD} → ${t12.t12TreatD}${t12.prevalenceShown && t12.prevalenceDelta != null ? ` (${t12.prevalenceDelta >= 0 ? '−' : '+'}${Math.abs(t12.prevalenceDelta)}%)` : ''} |
 
 ## Confronto prima/dopo
 
-Distribuzione livelli all'intake: L1 ${l1}, L2 ${l2}, L3 ${l3}. A 12 mesi (su ${t12.count} re-assessment): L1 ${t12.r1}, L2 ${t12.r2}, L3 ${t12.r3}.
+Distribuzione livelli all'intake: L1 ${l1d}, L2 ${l2d}, L3 ${l3d}. A 12 mesi (su ${t12.count} re-assessment): L1 ${t12.r1d}, L2 ${t12.r2d}, L3 ${t12.r3d}.
+
+I valori "n.d." sono soppressi per tutela dell'anonimato (k-anonymity, gruppo < ${K_ANON}).
 
 ## Documentazione INAIL OT23
 
@@ -204,7 +240,7 @@ Il programma ES Work per **${client.name}** ha raggiunto il checkpoint a ${check
 
 - ${completed} sessioni completate su ${planned} pianificate (${planned > 0 ? Math.round(completed/planned*100) : 0}% completamento)
 - Riduzione media NRS: **${avgDelta} punti** per sessione
-- ${l1} pazienti in protocollo L1 attivo, ${l2} in monitoraggio L2
+- ${l1d} pazienti in protocollo L1 attivo, ${l2d} in monitoraggio L2
 
 ## KPI Clinici
 
@@ -212,12 +248,12 @@ Il programma ES Work per **${client.name}** ha raggiunto il checkpoint a ${check
 |-----------|--------|
 | Sessioni completate | ${completed} / ${planned} |
 | Riduzione NRS media (sedute) | ${avgDelta} punti |
-| Mini-check ${checkpoint.toUpperCase()} compilati | ${mc ? mc.count : 0} |
+| Mini-check ${checkpoint.toUpperCase()} compilati | ${mc ? (mc.smallGroup ? 'n.d.' : mc.count) : 0} |
 | NRS medio dichiarato (mini-check) | ${mc ? mc.avgNrs : 'n.d.'} |
 | Con limitazioni funzionali | ${mc && mc.limitationsPct != null ? mc.limitationsPct + '%' : 'n.d.'} |
 | Richiedono contatto | ${mc ? mc.needsContact : 0} |
-| Pazienti L1 attivi | ${l1} |
-| Pazienti L2 monitorati | ${l2} |
+| Pazienti L1 attivi | ${l1d} |
+| Pazienti L2 monitorati | ${l2d} |
 
 ## Trend e Analisi
 

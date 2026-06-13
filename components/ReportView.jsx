@@ -5,6 +5,7 @@ import {
   TYPE_LABELS, generateSummaryText,
 } from '../lib/scoring';
 import { CONFIG } from '../lib/config';
+import { kAnonPartition, maskCount, tooSmall, K_ANON, SUPPRESSED } from '../lib/kanon';
 
 // ─── Commento clinico AI (parte discorsiva integrata nel report dati) ──────────
 // Un solo report di attivazione: cruscotti/dati + commento discorsivo AI.
@@ -186,45 +187,40 @@ function LegendBox({ children }) {
 
 // ─── Livelli box ─────────────────────────────────────────────────────────────
 
+const LEVEL_META = {
+  l1: { label: 'Trattamento — Anno 1', subtitle: 'Problemi che impattano le attività', bg: '#FFEBEE', border: '#E74C3C', color: '#E74C3C' },
+  l2: { label: 'Prevenzione — Anno 2', subtitle: 'Segnali da monitorare', bg: '#FFF8E1', border: '#F39C12', color: '#F39C12' },
+  l3: { label: 'Solo formazione', subtitle: 'Postura ed ergonomia per tutti', bg: '#E8F5E9', border: '#16a34a', color: '#16a34a' },
+};
+
 function LevelBoxes({ nmq }) {
-  const levels = [
-    {
-      count: nmq.level1.count, pct: nmq.level1.pct,
-      label: 'Trattamento — Anno 1',
-      subtitle: 'Problemi che impattano le attività',
-      bg: '#FFEBEE', border: '#E74C3C', color: '#E74C3C',
-    },
-    {
-      count: nmq.level2.count, pct: nmq.level2.pct,
-      label: 'Prevenzione — Anno 2',
-      subtitle: 'Segnali da monitorare',
-      bg: '#FFF8E1', border: '#F39C12', color: '#F39C12',
-    },
-    {
-      count: nmq.level3.count, pct: nmq.level3.pct,
-      label: 'Solo formazione',
-      subtitle: 'Postura ed ergonomia per tutti',
-      bg: '#E8F5E9', border: '#16a34a', color: '#16a34a',
-    },
-  ];
+  const part = kAnonPartition([
+    { key: 'l1', count: nmq.level1.count },
+    { key: 'l2', count: nmq.level2.count },
+    { key: 'l3', count: nmq.level3.count },
+  ], nmq.n);
+  const prevShown = maskCount(nmq.prevalence.count) != null;
   return (
     <div className="mb-2">
       <div className="grid grid-cols-3 gap-2 mb-2">
-        {levels.map((l, i) => (
-          <div
-            key={i}
-            className="rounded-2xl p-3 text-center print-page"
-            style={{ background: l.bg, border: `1.5px solid ${l.border}`, printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
-          >
-            <div className="text-2xl font-bold" style={{ color: l.color }}>{l.count}</div>
-            <div className="text-xs text-gray-600 mt-0.5">dip. ({l.pct}%)</div>
-            <div className="text-xs font-semibold mt-2 leading-tight" style={{ color: l.color }}>{l.label}</div>
-            <div className="text-xs text-gray-400 mt-1 leading-tight hidden sm:block">{l.subtitle}</div>
-          </div>
-        ))}
+        {part.map((l) => {
+          const m = LEVEL_META[l.key];
+          return (
+            <div
+              key={l.key}
+              className="rounded-2xl p-3 text-center print-page"
+              style={{ background: m.bg, border: `1.5px solid ${m.border}`, printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
+            >
+              <div className="text-2xl font-bold" style={{ color: m.color }}>{l.suppressed ? SUPPRESSED : l.count}</div>
+              <div className="text-xs text-gray-600 mt-0.5">{l.suppressed ? `gruppo < ${K_ANON}` : `dip. (${l.pct}%)`}</div>
+              <div className="text-xs font-semibold mt-2 leading-tight" style={{ color: m.color }}>{m.label}</div>
+              <div className="text-xs text-gray-400 mt-1 leading-tight hidden sm:block">{m.subtitle}</div>
+            </div>
+          );
+        })}
       </div>
       <div className="text-xs text-gray-400 text-center mb-2">
-        Prevalenza generica: <strong>{nmq.prevalence.pct}%</strong> ha riportato almeno un fastidio negli ultimi 12 mesi (dato informativo)
+        Prevalenza generica: <strong>{prevShown ? `${nmq.prevalence.pct}%` : SUPPRESSED}</strong> ha riportato almeno un fastidio negli ultimi 12 mesi (dato informativo)
       </div>
     </div>
   );
@@ -323,11 +319,40 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
     );
   }
 
+  // k-anonymity: con meno di k risposte nessun aggregato è pubblicabile in modo
+  // anonimo verso l'azienda — sopprimiamo l'intero report.
+  if (tooSmall(n)) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+        <div className="text-4xl mb-3">🔒</div>
+        <div className="text-lg font-semibold text-gray-800 mb-1">Report aggregato non disponibile</div>
+        <p className="text-sm text-gray-500 max-w-md mx-auto">
+          Le risposte raccolte sono meno di {K_ANON}. Per tutelare l&apos;anonimato dei dipendenti
+          (k-anonymity), i risultati aziendali vengono mostrati solo con almeno {K_ANON} risposte.
+        </p>
+      </div>
+    );
+  }
+
   const nmq = aggregateNMQ(responseList);
 
+  // Partizione livelli con soppressione k-anon (riusata da cruscotto e sintesi)
+  const levelPart = kAnonPartition([
+    { key: 'l1', count: nmq.level1.count },
+    { key: 'l2', count: nmq.level2.count },
+    { key: 'l3', count: nmq.level3.count },
+  ], n);
+  const L = Object.fromEntries(levelPart.map(c => [c.key, c]));
+  const anyLevelSuppressed = levelPart.some(c => c.suppressed);
+
   const baseResp = baseline?.responseList || [];
-  const baseNmq = baseResp.length > 0 ? aggregateNMQ(baseResp) : null;
+  const baseNmq = baseResp.length > 0 && !tooSmall(baseResp.length) ? aggregateNMQ(baseResp) : null;
   const hasBaseline = !!baseNmq;
+  const baseLevelSuppressed = baseNmq
+    ? kAnonPartition([{ key: 'l1', count: baseNmq.level1.count }, { key: 'l2', count: baseNmq.level2.count }, { key: 'l3', count: baseNmq.level3.count }], baseNmq.n).some(c => c.suppressed)
+    : false;
+  // Confronti per livello mostrabili solo se nessun livello è soppresso (né attuale né baseline)
+  const showLevelComparison = hasBaseline && !anyLevelSuppressed && !baseLevelSuppressed;
 
   return (
     <div className="max-w-2xl mx-auto px-4 pb-6" id="report-root">
@@ -389,22 +414,26 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
           <span className="text-xs text-gray-400 italic">Analisi generata da ES Work AI — sistema di intelligenza artificiale per la prevenzione e cura dell'apparato muscolo-scheletrico</span>
         </div>
         <p className="text-sm text-gray-700 leading-relaxed">
-          {generateSummaryText(nmq)}
+          {anyLevelSuppressed
+            ? `Su ${n} risposte raccolte, la distribuzione di dettaglio per livello non è mostrata: uno o più gruppi contano meno di ${K_ANON} persone e vengono soppressi a tutela dell'anonimato (k-anonymity).`
+            : generateSummaryText(nmq)}
         </p>
       </div>
 
       {/* KPI Dashboard */}
       <SectionTitle>Cruscotto sintetico</SectionTitle>
       <div className="grid gap-3 mb-2 grid-cols-3">
-        <Semaphore type="nmq" score={nmq.level1.pct} value={`${nmq.level1.pct}%`} label="Livello 1" subtitle="Trattamento" />
+        {L.l1.suppressed
+          ? <div className="rounded-2xl p-3 text-center bg-gray-50 border border-gray-200"><div className="text-xs text-gray-600 mb-0.5">Livello 1</div><div className="text-xl font-bold text-gray-400">{SUPPRESSED}</div><div className="text-xs text-gray-400 mt-0.5">Trattamento</div></div>
+          : <Semaphore type="nmq" score={L.l1.pct} value={`${L.l1.pct}%`} label="Livello 1" subtitle="Trattamento" />}
         <div className="rounded-2xl p-3 text-center bg-yellow-50 border border-yellow-100">
           <div className="text-xs text-gray-600 mb-0.5">Livello 2</div>
-          <div className="text-xl font-bold text-yellow-600">{nmq.level2.pct}%</div>
+          <div className="text-xl font-bold text-yellow-600">{L.l2.suppressed ? SUPPRESSED : `${L.l2.pct}%`}</div>
           <div className="text-xs text-gray-400 mt-0.5">Monitoraggio</div>
         </div>
         <div className="rounded-2xl p-3 text-center bg-green-50 border border-green-100">
           <div className="text-xs text-gray-600 mb-0.5">Livello 3</div>
-          <div className="text-xl font-bold text-green-600">{nmq.level3.pct}%</div>
+          <div className="text-xl font-bold text-green-600">{L.l3.suppressed ? SUPPRESSED : `${L.l3.pct}%`}</div>
           <div className="text-xs text-gray-400 mt-0.5">Formazione</div>
         </div>
       </div>
@@ -428,30 +457,50 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
       <SectionTitle>Disturbi muscolo-scheletrici per zona — 12 mesi</SectionTitle>
       <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3 print-page">
         {nmq.zones.map((z, i) => (
-          <HBar key={i} label={z.zone} value={z.pct12} />
+          maskCount(z.count12) == null ? (
+            <div key={i} className="flex items-center gap-2 mb-1.5">
+              <div className="w-36 text-xs text-gray-600 text-right flex-shrink-0 truncate">{z.zone}</div>
+              <div className="flex-1 text-xs text-gray-400 italic">{SUPPRESSED} (gruppo &lt; {K_ANON})</div>
+            </div>
+          ) : (
+            <HBar key={i} label={z.zone} value={z.pct12} />
+          )
         ))}
         <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-100">
-          Prevalenza: <strong>{nmq.prevalence.count}</strong> dip. ({nmq.prevalence.pct}%) con almeno 1 disturbo negli ultimi 12 mesi
+          {maskCount(nmq.prevalence.count) == null
+            ? <>Prevalenza: <strong>{SUPPRESSED}</strong> (gruppo &lt; {K_ANON})</>
+            : <>Prevalenza: <strong>{nmq.prevalence.count}</strong> dip. ({nmq.prevalence.pct}%) con almeno 1 disturbo negli ultimi 12 mesi</>}
         </div>
       </div>
 
-      {/* Suddivisione per ruolo dentro la sezione NMQ */}
-      {(nmq.byRole.production.n > 0 && nmq.byRole.office.n > 0) && (
+      {/* Suddivisione per ruolo — mostrata solo se ENTRAMBI i gruppi ≥ k (altrimenti
+          il totale noto rivelerebbe il gruppo soppresso per differenza). */}
+      {(nmq.byRole.production.n >= K_ANON && nmq.byRole.office.n >= K_ANON) && (
         <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3 print-page">
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Suddivisione per tipologia di lavoro</div>
           <div className="grid grid-cols-2 gap-4">
             {[
               { label: '🏭 In produzione', data: nmq.byRole.production },
               { label: '💻 In ufficio', data: nmq.byRole.office },
-            ].map(({ label, data }) => (
+            ].map(({ label, data }) => {
+              const rolePart = kAnonPartition([
+                { key: 'l1', count: data.level1.count },
+                { key: 'l2', count: data.level2.count },
+                { key: 'l3', count: data.level3.count },
+              ], data.n);
+              const RL = Object.fromEntries(rolePart.map(c => [c.key, c]));
+              return (
               <div key={label}>
                 <div className="text-xs font-semibold text-gray-600 mb-2">
                   {label} <span className="font-normal text-gray-400">({data.n} risp.)</span>
                 </div>
-                {data.n < 5 ? (
-                  <div className="text-xs text-gray-400 italic">Dati insufficienti (&lt;5 risposte)</div>
-                ) : (
-                  data.zones.slice(0, 7).map((z, i) => (
+                {data.zones.slice(0, 7).map((z, i) => (
+                  maskCount(z.count12) == null ? (
+                    <div key={i} className="flex items-center gap-1.5 mb-1">
+                      <div className="w-20 text-xs text-gray-500 truncate text-right flex-shrink-0">{z.zone}</div>
+                      <div className="flex-1 text-xs text-gray-400 italic">{SUPPRESSED}</div>
+                    </div>
+                  ) : (
                     <div key={i} className="flex items-center gap-1.5 mb-1">
                       <div className="w-20 text-xs text-gray-500 truncate text-right flex-shrink-0">{z.zone}</div>
                       <div className="flex-1 h-3 bg-gray-100 rounded overflow-hidden">
@@ -466,18 +515,17 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
                       </div>
                       <div className="text-xs text-gray-500 w-8 flex-shrink-0">{z.pct12}%</div>
                     </div>
-                  ))
-                )}
-                {data.n >= 5 && (
-                  <div className="mt-2 pt-2 border-t border-gray-100 text-xs">
-                    <span className="text-red-600 font-semibold">L1: {data.level1.count}</span>
-                    <span className="text-gray-400 ml-1">({data.level1.pct}%)</span>
-                    <span className="text-yellow-600 font-semibold ml-2">L2: {data.level2.count}</span>
-                    <span className="text-gray-400 ml-1">({data.level2.pct}%)</span>
-                  </div>
-                )}
+                  )
+                ))}
+                <div className="mt-2 pt-2 border-t border-gray-100 text-xs">
+                  <span className="text-red-600 font-semibold">L1: {RL.l1.suppressed ? SUPPRESSED : RL.l1.count}</span>
+                  {!RL.l1.suppressed && <span className="text-gray-400 ml-1">({RL.l1.pct}%)</span>}
+                  <span className="text-yellow-600 font-semibold ml-2">L2: {RL.l2.suppressed ? SUPPRESSED : RL.l2.count}</span>
+                  {!RL.l2.suppressed && <span className="text-gray-400 ml-1">({RL.l2.pct}%)</span>}
+                </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -501,14 +549,15 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
           <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3 print-page">
             {nmq.zones.slice(0, 6).map((z, i) => {
               const bz = baseNmq.zones.find(b => b.zone === z.zone);
-              return bz ? <CompareBar key={i} label={z.zone} before={bz.pct12} after={z.pct12} /> : null;
+              if (!bz || maskCount(z.count12) == null || maskCount(bz.count12) == null) return null;
+              return <CompareBar key={i} label={z.zone} before={bz.pct12} after={z.pct12} />;
             })}
           </div>
         </>
       )}
 
       {/* Baseline comparison summary */}
-      {hasBaseline && (
+      {showLevelComparison && (
         <>
           <SectionTitle>Variazioni rispetto alla baseline</SectionTitle>
           <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-3 print-page">
@@ -531,7 +580,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
       )}
 
       {/* Mod 2: Matrice migrazione livelli (solo per final con baseline) */}
-      {assessment.type === 'final' && hasBaseline && baseNmq && (
+      {assessment.type === 'final' && showLevelComparison && (
         <>
           <SectionTitle>Migrazione tra livelli — Baseline vs Finale</SectionTitle>
           <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3 print-page">

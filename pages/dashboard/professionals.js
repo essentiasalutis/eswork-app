@@ -238,10 +238,12 @@ info@essentiasalutis.it`;
               style={{ borderColor: pro.active ? '#e5e7eb' : '#fecaca' }}>
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-gray-900">{pro.name}</span>
                     {!pro.active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">disattivato</span>}
                     {pro.must_reset_password && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">reset pw</span>}
+                    {pro.rcSuspended && <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full" title="Polizza RC scaduta o mancante (Art. 7.2)">⛔ RC non valida · non assegnare</span>}
+                    {pro.rcStatus === 'expiring' && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full" title="Polizza RC in scadenza ≤30gg">⏳ RC in scadenza</span>}
                   </div>
                   <div className="text-sm text-gray-500 mt-0.5">{pro.email}{pro.phone ? ` · ${pro.phone}` : ''}</div>
                 </div>
@@ -346,10 +348,14 @@ info@essentiasalutis.it`;
 }
 
 export const getServerSideProps = requireAuthSsr(async () => {
-  const { getProfessionals, getClients } = require('../../lib/store');
-  const [professionals, clients] = await Promise.all([
+  const { getProfessionals, getClients, getProComplianceOverview } = require('../../lib/store');
+  const [professionals, clients, overview] = await Promise.all([
     getProfessionals(),
     getClients(),
+    getProComplianceOverview().catch(() => []),
   ]);
-  return { props: { professionals, clients } };
+  // Stato RC per professionista (Art. 7.2): segnale visivo "non assegnare" se sospeso.
+  const rcByPro = Object.fromEntries((overview || []).map(o => [o.professional.id, { rcStatus: o.rcStatus, rcSuspended: o.rcSuspended }]));
+  const withRc = (professionals || []).map(p => ({ ...p, ...(rcByPro[p.id] || { rcStatus: 'missing', rcSuspended: true }) }));
+  return { props: { professionals: withRc, clients } };
 });

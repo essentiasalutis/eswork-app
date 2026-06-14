@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { requireProAuthSsr } from '../../lib/pro-auth';
 import { getProDocuments } from '../../lib/store';
+import { rcStatusFrom } from '../../lib/compliance';
 
 const SLOTS = [
   { type: 'identity', label: "Documento d'identità", required: true },
@@ -15,7 +16,59 @@ const ACCEPT = '.pdf,.jpg,.jpeg,.png';
 const MAX = 10 * 1024 * 1024;
 const fmt = d => d ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
-export default function ProDocumentsPage({ proName, documents: initial }) {
+function RcBanner({ rc }) {
+  if (!rc) return null;
+  const date = rc.expiry ? new Date(rc.expiry).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' }) : null;
+  const inDays = rc.days === 0 ? 'scade oggi' : rc.days === 1 ? 'scade tra 1 giorno' : `scade tra ${rc.days} giorni`;
+
+  if (rc.status === 'expired') {
+    return (
+      <div className="mb-4 rounded-2xl border-2 border-red-300 bg-red-50 px-4 py-3">
+        <div className="text-sm font-bold text-red-800">⛔ Polizza RC scaduta{date ? ` il ${date}` : ''}</div>
+        <p className="text-sm text-red-700 mt-1 leading-relaxed">
+          Ai sensi del contratto, in assenza di copertura assicurativa valida l&apos;operatività è sospesa: regolarizza la posizione prima di prendere in carico nuovi pazienti.
+        </p>
+      </div>
+    );
+  }
+  if (rc.status === 'missing') {
+    return (
+      <div className="mb-4 rounded-2xl border-2 border-red-300 bg-red-50 px-4 py-3">
+        <div className="text-sm font-bold text-red-800">⛔ Polizza RC professionale non presente</div>
+        <p className="text-sm text-red-700 mt-1 leading-relaxed">
+          Ai sensi del contratto, in assenza di copertura assicurativa valida l&apos;operatività è sospesa: carica la polizza RC prima di prendere in carico nuovi pazienti.
+        </p>
+      </div>
+    );
+  }
+  if (rc.status === 'expiring') {
+    return (
+      <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3">
+        <div className="text-sm font-semibold text-amber-800">⏳ La tua polizza RC {inDays}{date ? ` (${date})` : ''}</div>
+        <p className="text-sm text-amber-700 mt-1 leading-relaxed">
+          La copertura è ancora valida: provvedi al rinnovo per non interrompere l&apos;operatività.
+        </p>
+      </div>
+    );
+  }
+  if (rc.status === 'no_expiry') {
+    return (
+      <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
+        ℹ️ Imposta qui sotto la <strong>data di scadenza</strong> della tua polizza RC, così se ne può monitorare la validità.
+      </div>
+    );
+  }
+  if (rc.status === 'valid') {
+    return (
+      <div className="mb-4 rounded-2xl border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-700">
+        ✅ Polizza RC valida{date ? ` fino al ${date}` : ''}.
+      </div>
+    );
+  }
+  return null;
+}
+
+export default function ProDocumentsPage({ proName, documents: initial, rc }) {
   const [docs, setDocs] = useState(initial || []);
   const [busy, setBusy] = useState(null);   // doc_type in corso
   const [err, setErr] = useState('');
@@ -81,6 +134,9 @@ export default function ProDocumentsPage({ proName, documents: initial }) {
         <main className="max-w-3xl mx-auto px-5 py-6">
           <h1 className="text-lg font-bold text-gray-900">📁 Documenti e conformità</h1>
           <p className="text-sm text-gray-500 mt-1 mb-4">Carica e tieni aggiornati i documenti previsti dal contratto di collaborazione. Sono riservati: visibili solo a te e al titolare.</p>
+
+          <RcBanner rc={rc} />
+
           {err && <div className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{err}</div>}
 
           <div className="space-y-3">
@@ -161,5 +217,8 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   }
   let documents = [];
   try { documents = await getProDocuments(proId); } catch (_) {}
-  return { props: { proName, documents: JSON.parse(JSON.stringify(documents)) } };
+  const rcDoc = documents.find(d => d.doc_type === 'rc_policy') || null;
+  const { status, days } = rcStatusFrom(rcDoc);
+  const rc = { status, days, expiry: rcDoc?.expiry_date || null };
+  return { props: { proName, documents: JSON.parse(JSON.stringify(documents)), rc } };
 });

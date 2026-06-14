@@ -139,6 +139,19 @@ export default function ProDashboard({ proName, clients, leads }) {
           </svg>
         </Link>
 
+        {/* Documenti e conformità */}
+        <Link href="/pro/documents"
+          className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-2xl p-3 mb-5 hover:bg-slate-100 transition-colors">
+          <div className="w-8 h-8 bg-slate-600 rounded-lg flex items-center justify-center text-white text-sm">📁</div>
+          <div className="flex-1">
+            <div className="font-semibold text-slate-800 text-sm">Documenti e conformità</div>
+            <div className="text-xs text-slate-500">Identità, albo, polizza RC, contratto</div>
+          </div>
+          <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+
         <RedeemVoucher />
 
         <LeadsList leads={leads} />

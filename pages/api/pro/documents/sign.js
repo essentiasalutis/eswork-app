@@ -2,8 +2,8 @@
 // profilo (isolamento per proprietà). Il file va dritto allo Storage privato.
 import { requireProAuth } from '../../../../lib/pro-auth';
 import { createUploadUrl } from '../../../../lib/storage';
+import { DOC_TYPES as TYPES } from '../../../../lib/pro-docs';
 
-const TYPES = ['identity', 'albo', 'rc_policy', 'rc_receipt', 'contract'];
 const MIME_EXT = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png' };
 
 export default requireProAuth(async function handler(req, res) {

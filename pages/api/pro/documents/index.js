@@ -4,8 +4,7 @@ import { requireProAuth } from '../../../../lib/pro-auth';
 import { getProDocuments, upsertProDocument, logProDocAccess } from '../../../../lib/store';
 import { removeFile } from '../../../../lib/storage';
 import { getClientIp } from '../../../../lib/rate-limit';
-
-const TYPES = ['identity', 'albo', 'rc_policy', 'rc_receipt', 'contract'];
+import { DOC_TYPES as TYPES } from '../../../../lib/pro-docs';
 
 export default requireProAuth(async function handler(req, res) {
   const proId = req.proSession.proId;

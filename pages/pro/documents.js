@@ -4,14 +4,8 @@ import Link from 'next/link';
 import { requireProAuthSsr } from '../../lib/pro-auth';
 import { getProDocuments } from '../../lib/store';
 import { rcStatusFrom } from '../../lib/compliance';
+import { SLOTS, QUALIFICATION_TYPES } from '../../lib/pro-docs';
 
-const SLOTS = [
-  { type: 'identity', label: "Documento d'identità", required: true },
-  { type: 'albo', label: 'Iscrizione albo / elenco', required: true },
-  { type: 'rc_policy', label: 'Polizza RC professionale', required: true, expiry: true },
-  { type: 'rc_receipt', label: 'Quietanza RC', required: false },
-  { type: 'contract', label: 'Contratto di collaborazione firmato', required: true },
-];
 const ACCEPT = '.pdf,.jpg,.jpeg,.png';
 const MAX = 10 * 1024 * 1024;
 const fmt = d => d ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -26,7 +20,7 @@ function RcBanner({ rc }) {
       <div className="mb-4 rounded-2xl border-2 border-red-300 bg-red-50 px-4 py-3">
         <div className="text-sm font-bold text-red-800">⛔ Polizza RC scaduta{date ? ` il ${date}` : ''}</div>
         <p className="text-sm text-red-700 mt-1 leading-relaxed">
-          Ai sensi del contratto, in assenza di copertura assicurativa valida l&apos;operatività è sospesa: regolarizza la posizione prima di prendere in carico nuovi pazienti.
+          Ai sensi dell&apos;Art. 7.4 del contratto, in assenza di copertura assicurativa valida l&apos;operatività è sospesa: regolarizza la posizione prima di prendere in carico nuovi pazienti.
         </p>
       </div>
     );
@@ -36,7 +30,7 @@ function RcBanner({ rc }) {
       <div className="mb-4 rounded-2xl border-2 border-red-300 bg-red-50 px-4 py-3">
         <div className="text-sm font-bold text-red-800">⛔ Polizza RC professionale non presente</div>
         <p className="text-sm text-red-700 mt-1 leading-relaxed">
-          Ai sensi del contratto, in assenza di copertura assicurativa valida l&apos;operatività è sospesa: carica la polizza RC prima di prendere in carico nuovi pazienti.
+          Ai sensi dell&apos;Art. 7.4 del contratto, in assenza di copertura assicurativa valida l&apos;operatività è sospesa: carica la polizza RC prima di prendere in carico nuovi pazienti.
         </p>
       </div>
     );
@@ -73,6 +67,16 @@ export default function ProDocumentsPage({ proName, documents: initial, rc }) {
   const [busy, setBusy] = useState(null);   // doc_type in corso
   const [err, setErr] = useState('');
   const byType = Object.fromEntries(docs.map(d => [d.doc_type, d]));
+  const qualificationOk = QUALIFICATION_TYPES.some(t => byType[t]);
+
+  // Raggruppa gli slot consecutivi dello stesso gruppo (es. "qualification":
+  // titolo di formazione + albo, di cui ne basta almeno uno per la conformità).
+  const blocks = [];
+  for (const slot of SLOTS) {
+    const last = blocks[blocks.length - 1];
+    if (slot.group && last && last.group === slot.group) { last.slots.push(slot); continue; }
+    blocks.push({ group: slot.group || null, slots: [slot] });
+  }
 
   async function uploadFor(doc_type, file, expiry) {
     setErr('');
@@ -140,8 +144,29 @@ export default function ProDocumentsPage({ proName, documents: initial, rc }) {
           {err && <div className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{err}</div>}
 
           <div className="space-y-3">
-            {SLOTS.map(slot => (
-              <DocRow key={slot.type} slot={slot} doc={byType[slot.type]} busy={busy === slot.type}
+            {blocks.map((b, i) => b.group === 'qualification' ? (
+              <div key={`g-${i}`} className="bg-white rounded-2xl border border-gray-200 p-4">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${qualificationOk ? 'bg-green-500' : 'bg-gray-300'}`} />
+                    <span className="text-sm font-semibold text-gray-800">Qualifica professionale</span>
+                  </div>
+                  {qualificationOk
+                    ? <span className="text-xs font-semibold text-green-700">✓ requisito soddisfatto</span>
+                    : <span className="text-xs text-amber-600">· obbligatorio: carica almeno uno</span>}
+                </div>
+                <p className="text-xs text-gray-500 mt-1 mb-3">
+                  Titolo di formazione in osteopatia <strong>oppure</strong> iscrizione all&apos;albo professionale: per la conformità ne basta uno.
+                </p>
+                <div className="space-y-2">
+                  {b.slots.map(slot => (
+                    <DocRow key={slot.type} slot={slot} doc={byType[slot.type]} busy={busy === slot.type} nested
+                      onUpload={uploadFor} onDownload={download} onRemove={remove} onSaveExpiry={saveExpiry} />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <DocRow key={b.slots[0].type} slot={b.slots[0]} doc={byType[b.slots[0].type]} busy={busy === b.slots[0].type}
                 onUpload={uploadFor} onDownload={download} onRemove={remove} onSaveExpiry={saveExpiry} />
             ))}
           </div>
@@ -155,13 +180,13 @@ export default function ProDocumentsPage({ proName, documents: initial, rc }) {
   );
 }
 
-function DocRow({ slot, doc, busy, onUpload, onDownload, onRemove, onSaveExpiry }) {
+function DocRow({ slot, doc, busy, onUpload, onDownload, onRemove, onSaveExpiry, nested }) {
   const inputRef = useRef(null);
   const [expiry, setExpiry] = useState(doc?.expiry_date || '');
   const present = !!doc;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-4">
+    <div className={nested ? 'rounded-xl border border-gray-200 bg-gray-50/60 p-3' : 'bg-white rounded-2xl border border-gray-200 p-4'}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <div className="flex items-center gap-2">

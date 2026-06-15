@@ -6,7 +6,7 @@ import {
   aggregateNMQ,
   trafficLight, TL_COLOR, TL_BG, TL_BORDER, TYPE_LABELS, generateSummaryText, BODY_ZONES,
 } from '../../lib/scoring';
-import { calculatePricing, computeForchetta, calculateROI, fmt } from '../../lib/calculator';
+import { calculatePricing, computeForchetta, realL1L2FromAssessment, calculateROI, fmt } from '../../lib/calculator';
 import { CONFIG } from '../../lib/config';
 
 // ─── Firma standard ───────────────────────────────────────────────────────────
@@ -722,10 +722,8 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     ]);
 
     const nmq = aggregateNMQ(responses);
-
-    const totalN = n ? parseInt(n) : (client?.employees || responses.length);
-    const l1v = l1 !== undefined ? parseInt(l1) : nmq.level1.count;
-    const l2v = l2 !== undefined ? parseInt(l2) : nmq.level2.count;
+    const responders = responses.length;
+    const totalN = n ? parseInt(n) : (client?.employees || responders);
 
     // ── Parametri salvati dalla scheda colloquio ─────────────────────────────
     // Il preventivo post-assessment usa le STESSE condizioni concordate al
@@ -733,6 +731,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     // Priorità: override in query > parametri scheda > default di config.
     let schedaDefaults = null;
     let forchetta = null; // stima colloquio min/med/max (vista admin, non nel PDF)
+    let l2Mult = CONFIG.l2_multiplier_default;
     try {
       const fm = await getFirstMeeting(assessment.client_id);
       const fmd = fm?.data;
@@ -754,11 +753,17 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         // Forchetta del colloquio (SORGENTE UNICA computeForchetta) per il confronto
         // dentro/fuori — vista admin, non nel PDF cliente.
         const sectorKey = fmd.step1?.sector || (client?.sector === 1 ? 'manufacturing' : 'services');
-        const l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
+        l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
         const fch = computeForchetta({ n: fmN, sector: sectorKey, l2Mult, ...schedaDefaults });
         if (fch.min.price_y1 != null) forchetta = { min: fch.min.price_y1, avg: fch.avg.price_y1, max: fch.max.price_y1 };
       }
     } catch (_) {}
+
+    // "Prezzo reale" OMOGENEO con la forbice: prevalenza L1 osservata × forza
+    // lavoro, L2 derivato (L1 × moltiplicatore). Override manuale via query l1/l2.
+    const auto = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: totalN, l2Mult });
+    const l1v = l1 !== undefined ? parseInt(l1) : auto.l1;
+    const l2v = l2 !== undefined ? parseInt(l2) : auto.l2;
 
     const effective = custom || schedaDefaults;
     const calc = effective

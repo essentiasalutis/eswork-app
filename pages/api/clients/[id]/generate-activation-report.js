@@ -10,7 +10,8 @@ import {
   insertDocument,
 } from '../../../../lib/store';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
-import { calculatePricing, computeForchetta } from '../../../../lib/calculator';
+import { calculatePricing, computeForchetta, realL1L2FromAssessment } from '../../../../lib/calculator';
+import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
 import { kAnonPartition, tooSmall, K_ANON } from '../../../../lib/kanon';
 
@@ -53,7 +54,9 @@ export default requireAuth(async function handler(req, res) {
 
   // Rapporto col preventivo: condizioni della scheda colloquio + numeri REALI
   // della stratificazione (prezzo cliente; mai margini/costi nel report).
-  const { block: quoteBlock, compliance: quoteCompliance } = await buildQuoteBlock(id, client, totalPatients, l1Count, l2Count);
+  // Array PIATTO di answers (stessa forma che usa offer.js via getResponsesByAssessment).
+  const answers = Object.values((responses && responses.responses) || {}).flat();
+  const { block: quoteBlock, compliance: quoteCompliance } = await buildQuoteBlock(id, client, answers);
 
   // NRS data da sessioni
   const sessionsWithNrs = sessions.filter(s => s.nrs_pre != null || s.nrs_post != null);
@@ -182,7 +185,7 @@ ${quoteBlock.replace('PROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + s
 
 // Blocco "proposta economica" per il report: condizioni della scheda colloquio
 // applicate alla stratificazione REALE (solo prezzo cliente, mai margini).
-async function buildQuoteBlock(client_id, client, totalPatients, l1Count, l2Count) {
+async function buildQuoteBlock(client_id, client, answers) {
   try {
     const fm = await getFirstMeeting(client_id);
     const fmd = fm?.data;
@@ -190,19 +193,26 @@ async function buildQuoteBlock(client_id, client, totalPatients, l1Count, l2Coun
     const s2 = fmd.step2 || {};
     const sp = fmd.params || {};
     const cap = Math.max(1, parseInt(s2.capienza) || CONFIG.classroom_capacity_default);
-    const nEmp = parseInt(client.employees) || totalPatients;
+    const responders = (answers || []).length;
+    const nEmp = parseInt(client.employees) || responders;
     const sedi = Array.isArray(s2.sedi) ? s2.sedi : [];
     const groups = s2.training_mode === 'accorpa'
       ? Math.max(1, Math.ceil(nEmp / cap))
       : (sedi.reduce((a, e) => a + Math.ceil((parseInt(e.employees) || 0) / cap), 0) || Math.max(1, Math.ceil(nEmp / cap)));
     const conditions = { tier: s2.tier || undefined, groups, rates: sp.rates || undefined, vatExempt: sp.vat_exempt };
-    const calc = calculatePricing({ n: nEmp, l1: l1Count, l2: l2Count, ...conditions });
+    const sectorKey = fmd.step1?.sector || (client.sector === 1 ? 'manufacturing' : 'services');
+    const l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
+
+    // Reale OMOGENEO con la forbice (STESSA definizione del banner offer.js):
+    // prevalenza L1 OSSERVATA dall'assessment × forza lavoro, L2 derivato
+    // (L1 × moltiplicatore). Una sola definizione di "prezzo reale".
+    const nmq = aggregateNMQ(answers || []);
+    const real = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: nEmp, l2Mult });
+    const calc = calculatePricing({ n: nEmp, l1: real.l1, l2: real.l2, ...conditions });
     if (!calc) return { block: '', compliance: null };
 
     // Forbice del colloquio (SORGENTE UNICA) per il confronto dentro/fuori — dato
     // interno (solo admin): prova del rispetto del range concordato nella Lettera.
-    const sectorKey = fmd.step1?.sector || (client.sector === 1 ? 'manufacturing' : 'services');
-    const l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
     const fch = computeForchetta({ n: nEmp, sector: sectorKey, l2Mult, ...conditions });
     const min = fch.min.price_y1, avg = fch.avg.price_y1, max = fch.max.price_y1;
     const realPrice = calc.price_y1;

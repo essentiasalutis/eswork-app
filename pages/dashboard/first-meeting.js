@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireAuthSsr } from '../../lib/auth';
-import { calculatePricing, calculateROI, getTier, tierIncludesL2Prevention, fmt } from '../../lib/calculator';
+import { calculatePricing, computeForchetta, calculateROI, getTier, tierIncludesL2Prevention, fmt } from '../../lib/calculator';
 import { CONFIG } from '../../lib/config';
 import NavMenu from '../../components/NavMenu';
 
@@ -98,16 +98,12 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
     return sedi.reduce((a, e) => a + Math.ceil((parseInt(e.employees) || 0) / cap), 0) || 1;
   }, [sedi, capienza, trainingMode, n]);
   const prev = CONFIG.l1_prevalence[sector] || [0.08, 0.13, 0.19];
-  const scen = useMemo(() => {
-    const mk = p => { const l1 = Math.round(n * p); return { l1, l2: Math.round(l1 * l2Mult) }; };
-    return { min: mk(prev[0]), avg: mk(prev[1]), max: mk(prev[2]) };
-  }, [n, prev, l2Mult]);
-  const priceFor = sc => (n > 0 ? calculatePricing({ n, l1: sc.l1, l2: sc.l2, tier, groups, rates, vatExempt }) : null);
-  const calcMin = useMemo(() => priceFor(scen.min), [scen, tier, groups, rates, vatExempt, n]);
-  const calcAvg = useMemo(() => priceFor(scen.avg), [scen, tier, groups, rates, vatExempt, n]);
-  const calcMax = useMemo(() => priceFor(scen.max), [scen, tier, groups, rates, vatExempt, n]);
+  // Forbice unica (stessa funzione usata da pagina Stima / PDF / flag STEP 2).
+  const forchetta = useMemo(() => computeForchetta({ n, sector, tier, groups, rates, vatExempt, l2Mult }), [n, sector, tier, groups, rates, vatExempt, l2Mult]);
+  const scen = forchetta;                 // {min, avg, max}, ognuno {pct, l1, l2, ...calcolo}
+  const calcMin = forchetta.min, calcAvg = forchetta.avg, calcMax = forchetta.max;
   const calc = scenario === 'min' ? calcMin : scenario === 'max' ? calcMax : calcAvg;
-  const sel = scenario === 'min' ? scen.min : scenario === 'max' ? scen.max : scen.avg;
+  const sel = calc;                       // sel.l1 / sel.l2 invariati
   const roi = useMemo(() => calc ? calculateROI(calc.price_y1, parseInt(absenceDays) || 0) : null, [calc, absenceDays]);
 
   function buildData() {

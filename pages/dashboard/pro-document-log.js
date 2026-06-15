@@ -15,6 +15,7 @@ const ACTION_COLOR = {
 };
 const DOC_LABEL = {
   identity: 'Documento identità',
+  qualification_diploma: 'Titolo di formazione',
   albo: 'Iscrizione albo',
   rc_policy: 'Polizza RC',
   rc_receipt: 'Quietanza RC',

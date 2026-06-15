@@ -3,15 +3,18 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
 import { getProComplianceOverview } from '../../lib/store';
+import { SHOW_RC_RECEIPT } from '../../lib/pro-docs';
 
-const DOC_COLS = [
-  { type: 'identity', label: 'Identità' },
-  { type: 'albo', label: 'Albo' },
-  { type: 'rc_policy', label: 'Polizza RC' },
-  { type: 'rc_receipt', label: 'Quietanza' },
-  { type: 'contract', label: 'Contratto' },
+// Colonne documento della vista admin. La "Qualifica" collassa i due sotto-slot
+// (titolo di formazione + albo) in un'unica colonna: ✓ se almeno uno è presente,
+// ma con due chip che mostrano QUALE è stato fornito (titolo / albo / entrambi).
+const COLS = [
+  { key: 'identity', label: 'Identità', type: 'identity', required: true },
+  { key: 'qualification', label: 'Qualifica', qualification: true, required: true },
+  { key: 'rc_policy', label: 'Polizza RC', type: 'rc_policy', required: true },
+  ...(SHOW_RC_RECEIPT ? [{ key: 'rc_receipt', label: 'Quietanza', type: 'rc_receipt', required: false }] : []),
+  { key: 'contract', label: 'Contratto', type: 'contract', required: true },
 ];
-const REQUIRED = new Set(['identity', 'albo', 'rc_policy', 'contract']);
 const RC = {
   expired:   { txt: 'Scaduta',          cls: 'bg-red-100 text-red-700' },
   missing:   { txt: 'Mancante',         cls: 'bg-red-100 text-red-700' },   // niente copertura → sospensione
@@ -75,7 +78,7 @@ export default function ProCompliancePage({ overview: initial }) {
               <thead>
                 <tr className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                   <th className="px-4 py-3">Professionista</th>
-                  {DOC_COLS.map(c => <th key={c.type} className="px-3 py-3 text-center">{c.label}</th>)}
+                  {COLS.map(c => <th key={c.key} className="px-3 py-3 text-center">{c.label}</th>)}
                   <th className="px-4 py-3">Stato RC</th>
                 </tr>
               </thead>
@@ -93,19 +96,28 @@ export default function ProCompliancePage({ overview: initial }) {
                         </div>
                         <div className="text-xs text-gray-400">{row.professional.email}{!row.professional.active && ' · disattivato'}</div>
                       </td>
-                      {DOC_COLS.map(c => {
-                        const d = row.docs[c.type];
-                        return (
-                          <td key={c.type} className="px-3 py-3 text-center">
-                            {d ? (
-                              <button onClick={() => download(d.id)} title={`${d.file_name || 'documento'} · ${fmt(d.uploaded_at)}`}
-                                className="text-green-600 hover:text-green-800 font-bold">✓</button>
-                            ) : (
-                              <span className={REQUIRED.has(c.type) ? 'text-red-400' : 'text-gray-300'}>—</span>
-                            )}
-                          </td>
-                        );
-                      })}
+                      {COLS.map(c => c.qualification ? (
+                        <td key={c.key} className="px-3 py-3 text-center">
+                          <div className="flex flex-col items-center gap-1">
+                            {row.qualificationOk
+                              ? <span className="text-green-600 font-bold" title="Almeno una qualifica presente">✓</span>
+                              : <span className="text-red-400" title="Nessuna qualifica caricata">—</span>}
+                            <div className="flex items-center gap-1">
+                              <QualChip label="Titolo" doc={row.docs.qualification_diploma} onDownload={download} />
+                              <QualChip label="Albo" doc={row.docs.albo} onDownload={download} />
+                            </div>
+                          </div>
+                        </td>
+                      ) : (
+                        <td key={c.key} className="px-3 py-3 text-center">
+                          {row.docs[c.type] ? (
+                            <button onClick={() => download(row.docs[c.type].id)} title={`${row.docs[c.type].file_name || 'documento'} · ${fmt(row.docs[c.type].uploaded_at)}`}
+                              className="text-green-600 hover:text-green-800 font-bold">✓</button>
+                          ) : (
+                            <span className={c.required ? 'text-red-400' : 'text-gray-300'}>—</span>
+                          )}
+                        </td>
+                      ))}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${rc.cls}`}>{rc.txt}</span>
@@ -119,18 +131,28 @@ export default function ProCompliancePage({ overview: initial }) {
                   );
                 })}
                 {rows.length === 0 && (
-                  <tr><td colSpan={DOC_COLS.length + 2} className="px-4 py-8 text-center text-gray-400">Nessun professionista.</td></tr>
+                  <tr><td colSpan={COLS.length + 2} className="px-4 py-8 text-center text-gray-400">Nessun professionista.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
           <p className="text-xs text-gray-400 mt-4">
-            ✓ = documento presente (clicca per scaricarlo, accesso registrato). La scadenza della polizza RC è modificabile qui dal titolare. I documenti del professionista sono un trattamento distinto (art. 6.1.b) e non si mescolano coi dati clinici dei pazienti.
+            ✓ = documento presente (clicca per scaricarlo, accesso registrato). Nella colonna <strong>Qualifica</strong> i chip «Titolo»/«Albo» indicano quale qualifica è stata fornita: ne basta una per la conformità (utile per sapere chi è già iscritto all&apos;albo). La scadenza della polizza RC è modificabile qui dal titolare. I documenti del professionista sono un trattamento distinto (art. 6.1.b) e non si mescolano coi dati clinici dei pazienti.
           </p>
         </main>
       </div>
     </>
   );
+}
+
+// Chip di una singola qualifica nella colonna collassata: verde e cliccabile se
+// presente (scarica), grigio tenue se assente. Mostra all'admin QUALE è stata data.
+function QualChip({ label, doc, onDownload }) {
+  if (doc) return (
+    <button onClick={() => onDownload(doc.id)} title={`${doc.file_name || 'documento'} · ${fmt(doc.uploaded_at)}`}
+      className="text-[10px] font-semibold text-green-700 bg-green-100 px-1.5 py-0.5 rounded hover:bg-green-200">{label}</button>
+  );
+  return <span className="text-[10px] text-gray-300 px-1.5 py-0.5" title="Non fornito">{label}</span>;
 }
 
 export const getServerSideProps = requireAuthSsr(async () => {

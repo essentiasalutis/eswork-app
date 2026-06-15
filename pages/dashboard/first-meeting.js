@@ -157,18 +157,19 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
   function toggleArr(arr, set, v) { set(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]); }
   function setSede(i, k, v) { setSedi(prev => prev.map((s, j) => j === i ? { ...s, [k]: k === 'employees' ? (v === '' ? '' : Math.max(0, parseInt(v) || 0)) : v } : s)); }
 
-  async function goToOffer() {
+  async function goToStima() {
     const id = await ensureClient();
     await save({ silent: true });
-    // Passa TUTTI i parametri custom così il PDF mostra ESATTAMENTE gli stessi numeri della scheda
+    // Passa gli input: la Stima ricalcola la FORBICE (3 scenari) con computeForchetta
+    // a partire da settore + condizioni → stessi numeri della scheda colloquio.
     const params = new URLSearchParams({
-      clientId: id || '', n: String(n), l1: String(sel.l1), l2: String(sel.l2),
-      tier, groups: String(groups), vat: vatExempt ? '1' : '0',
+      clientId: id || '', name: nome || '', contact: refNome || '',
+      sector, n: String(n), tier, groups: String(groups), vat: vatExempt ? '1' : '0', l2mult: String(l2Mult),
       rs: String(rates.sportello_sell), rsc: String(rates.sportello_cost),
       rps: String(rates.prevalidation_sell), rpc: String(rates.prevalidation_cost),
       rts: String(rates.training_sell), rtc: String(rates.training_cost),
     });
-    router.push(`/dashboard/offer?${params}`);
+    router.push(`/dashboard/stima?${params}`);
   }
   async function goStep(next) { if (next > step) await save({ silent: true }); setStep(next); window.scrollTo({ top: 0 }); }
 
@@ -371,7 +372,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
                 <div className="flex gap-3">
                   <button onClick={() => goStep(3)} className="py-3.5 px-5 rounded-2xl border border-gray-300 text-gray-600 font-semibold">←</button>
                   <button onClick={() => save()} disabled={busy} className="py-3.5 px-5 rounded-2xl border border-gray-300 text-gray-700 font-semibold disabled:opacity-50">{busy ? '…' : 'Salva scheda'}</button>
-                  <button onClick={goToOffer} className="flex-1 py-3.5 rounded-2xl bg-green-600 text-white font-bold">Genera offerta PDF →</button>
+                  <button onClick={goToStima} className="flex-1 py-3.5 rounded-2xl bg-green-600 text-white font-bold">Genera Stima →</button>
                 </div>
               </>
             )}

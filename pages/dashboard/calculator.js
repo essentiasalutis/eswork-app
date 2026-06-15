@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
 import { getClientById } from '../../lib/store';
-import { calculatePricing, calculateROI, getTier, tierIncludesL2Prevention, fmt } from '../../lib/calculator';
+import { calculatePricing, computeForchetta, calculateROI, getTier, tierIncludesL2Prevention, fmt } from '../../lib/calculator';
 import { CONFIG } from '../../lib/config';
 import NavMenu from '../../components/NavMenu';
 
@@ -60,19 +60,12 @@ export default function CalculatorPage({ client, prefill }) {
   }, [sedi, capacity, trainingMode, n]);
 
   const prev = CONFIG.l1_prevalence[sector] || [0.08, 0.13, 0.19];
-  const scen = useMemo(() => {
-    const mk = p => { const l1 = Math.round(n * p); return { l1, l2: Math.round(l1 * l2Mult) }; };
-    return { min: mk(prev[0]), avg: mk(prev[1]), max: mk(prev[2]) };
-  }, [n, prev, l2Mult]);
-
-  function priceFor(s) {
-    return n > 0 ? calculatePricing({ n, l1: s.l1, l2: s.l2, tier, groups, rates, vatExempt }) : null;
-  }
-  const calcMin = useMemo(() => priceFor(scen.min), [scen, tier, groups, rates, vatExempt, n]);
-  const calcAvg = useMemo(() => priceFor(scen.avg), [scen, tier, groups, rates, vatExempt, n]);
-  const calcMax = useMemo(() => priceFor(scen.max), [scen, tier, groups, rates, vatExempt, n]);
+  // Forbice unica (stessa funzione di colloquio / pagina Stima / PDF).
+  const forchetta = useMemo(() => computeForchetta({ n, sector, tier, groups, rates, vatExempt, l2Mult }), [n, sector, tier, groups, rates, vatExempt, l2Mult]);
+  const scen = forchetta;
+  const calcMin = forchetta.min, calcAvg = forchetta.avg, calcMax = forchetta.max;
   const calc = scenario === 'min' ? calcMin : scenario === 'max' ? calcMax : calcAvg;
-  const sel = scenario === 'min' ? scen.min : scenario === 'max' ? scen.max : scen.avg;
+  const sel = calc;
 
   const roi = useMemo(() => calc ? calculateROI(calc.price_y1, parseInt(absenceDays) || 0) : null, [calc, absenceDays]);
 
@@ -85,13 +78,27 @@ export default function CalculatorPage({ client, prefill }) {
   function addSede() { setSedi(s => [...s, 0]); }
   function removeSede(i) { setSedi(s => s.length > 1 ? s.filter((_, j) => j !== i) : s); }
 
+  const hasAssessment = !!prefill?.assessmentId;
   function goToOffer() {
+    // Con assessment → Report di Attivazione (offer.js, STEP 2, dati reali).
+    if (hasAssessment) {
+      const params = new URLSearchParams({
+        assessmentId: prefill.assessmentId,
+        n: String(n), l1: String(sel.l1), l2: String(sel.l2),
+        ...(client ? { clientId: client.id } : {}),
+      });
+      router.push(`/dashboard/offer?${params}`);
+      return;
+    }
+    // Senza assessment → STIMA con forbice (STEP 1).
     const params = new URLSearchParams({
-      assessmentId: prefill?.assessmentId || '',
-      n: String(n), l1: String(sel.l1), l2: String(sel.l2),
-      ...(client ? { clientId: client.id } : {}),
+      ...(client ? { clientId: client.id, name: client.name || '' } : {}),
+      sector, n: String(n), tier, groups: String(groups), vat: vatExempt ? '1' : '0', l2mult: String(l2Mult),
+      rs: String(rates.sportello_sell), rsc: String(rates.sportello_cost),
+      rps: String(rates.prevalidation_sell), rpc: String(rates.prevalidation_cost),
+      rts: String(rates.training_sell), rtc: String(rates.training_cost),
     });
-    router.push(`/dashboard/offer?${params}`);
+    router.push(`/dashboard/stima?${params}`);
   }
 
   const inputCls = 'w-full px-4 py-3 rounded-xl border border-gray-200 text-base focus:outline-none focus:ring-2 focus:ring-green-500 bg-white';
@@ -126,7 +133,7 @@ export default function CalculatorPage({ client, prefill }) {
           </div>
           {calc && (
             <button onClick={goToOffer} className="bg-green-600 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-green-700">
-              Genera offerta →
+              {hasAssessment ? 'Genera offerta →' : 'Genera Stima →'}
             </button>
           )}
           <NavMenu />
@@ -323,7 +330,7 @@ export default function CalculatorPage({ client, prefill }) {
             )}
 
             <button onClick={goToOffer} className="w-full py-4 rounded-2xl bg-green-600 text-white font-bold text-base hover:bg-green-700 transition-colors">
-              Genera offerta grafica →
+              {hasAssessment ? 'Genera offerta grafica →' : 'Genera Stima →'}
             </button>
           </>
         )}

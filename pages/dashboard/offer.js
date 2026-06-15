@@ -6,7 +6,7 @@ import {
   aggregateNMQ,
   trafficLight, TL_COLOR, TL_BG, TL_BORDER, TYPE_LABELS, generateSummaryText, BODY_ZONES,
 } from '../../lib/scoring';
-import { calculatePricing, calculateROI, fmt } from '../../lib/calculator';
+import { calculatePricing, computeForchetta, calculateROI, fmt } from '../../lib/calculator';
 import { CONFIG } from '../../lib/config';
 
 // ─── Firma standard ───────────────────────────────────────────────────────────
@@ -751,16 +751,12 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
           rates: sp.rates || undefined,
           vatExempt: sp.vat_exempt,
         };
-        // Forchetta del colloquio: scenari di prevalenza min/med/max con gli stessi parametri
+        // Forchetta del colloquio (SORGENTE UNICA computeForchetta) per il confronto
+        // dentro/fuori — vista admin, non nel PDF cliente.
         const sectorKey = fmd.step1?.sector || (client?.sector === 1 ? 'manufacturing' : 'services');
-        const prevs = CONFIG.l1_prevalence[sectorKey] || CONFIG.l1_prevalence.mix;
         const l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
-        const prices = prevs.map(p => {
-          const fl1 = Math.round(fmN * p);
-          const c = calculatePricing({ n: fmN, l1: fl1, l2: Math.round(fl1 * l2Mult), ...schedaDefaults });
-          return c ? c.price_y1 : null;
-        });
-        if (prices.every(p => p != null)) forchetta = { min: prices[0], avg: prices[1], max: prices[2] };
+        const fch = computeForchetta({ n: fmN, sector: sectorKey, l2Mult, ...schedaDefaults });
+        if (fch.min.price_y1 != null) forchetta = { min: fch.min.price_y1, avg: fch.avg.price_y1, max: fch.max.price_y1 };
       }
     } catch (_) {}
 

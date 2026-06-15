@@ -10,7 +10,7 @@ import {
   insertDocument,
 } from '../../../../lib/store';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
-import { calculatePricing } from '../../../../lib/calculator';
+import { calculatePricing, computeForchetta } from '../../../../lib/calculator';
 import { CONFIG } from '../../../../lib/config';
 import { kAnonPartition, tooSmall, K_ANON } from '../../../../lib/kanon';
 
@@ -53,7 +53,7 @@ export default requireAuth(async function handler(req, res) {
 
   // Rapporto col preventivo: condizioni della scheda colloquio + numeri REALI
   // della stratificazione (prezzo cliente; mai margini/costi nel report).
-  const quoteBlock = await buildQuoteBlock(id, client, totalPatients, l1Count, l2Count);
+  const { block: quoteBlock, compliance: quoteCompliance } = await buildQuoteBlock(id, client, totalPatients, l1Count, l2Count);
 
   // NRS data da sessioni
   const sessionsWithNrs = sessions.filter(s => s.nrs_pre != null || s.nrs_post != null);
@@ -84,7 +84,7 @@ ${quoteBlock}
   if (!process.env.ANTHROPIC_API_KEY) {
     const fallback = generateFallbackReport(client, l1Count, l2Count, l3Count, totalPatients, sessions.length, sectorLabel, quoteBlock);
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
-    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl }).catch(() => null);
+    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', pdf_url: pdfUrl, report_id: rec?.id });
   }
 
@@ -123,12 +123,12 @@ Tono: professionale, clinico, orientato ai dati. In italiano. Non più di 800 pa
 
     const report = message.content[0]?.text || '';
     const pdfUrl = await tryGeneratePdf(client, 'activation', report, id).catch(() => null);
-    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', pdf_url: pdfUrl }).catch(() => null);
+    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report, source: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
     const fallback = generateFallbackReport(client, l1Count, l2Count, l3Count, totalPatients, sessions.length, sectorLabel, quoteBlock);
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
-    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl }).catch(() => null);
+    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
   }
 });
@@ -186,7 +186,7 @@ async function buildQuoteBlock(client_id, client, totalPatients, l1Count, l2Coun
   try {
     const fm = await getFirstMeeting(client_id);
     const fmd = fm?.data;
-    if (!fmd) return '';
+    if (!fmd) return { block: '', compliance: null };
     const s2 = fmd.step2 || {};
     const sp = fmd.params || {};
     const cap = Math.max(1, parseInt(s2.capienza) || CONFIG.classroom_capacity_default);
@@ -195,12 +195,28 @@ async function buildQuoteBlock(client_id, client, totalPatients, l1Count, l2Coun
     const groups = s2.training_mode === 'accorpa'
       ? Math.max(1, Math.ceil(nEmp / cap))
       : (sedi.reduce((a, e) => a + Math.ceil((parseInt(e.employees) || 0) / cap), 0) || Math.max(1, Math.ceil(nEmp / cap)));
-    const calc = calculatePricing({ n: nEmp, l1: l1Count, l2: l2Count, tier: s2.tier || undefined, groups, rates: sp.rates || undefined, vatExempt: sp.vat_exempt });
-    if (!calc) return '';
+    const conditions = { tier: s2.tier || undefined, groups, rates: sp.rates || undefined, vatExempt: sp.vat_exempt };
+    const calc = calculatePricing({ n: nEmp, l1: l1Count, l2: l2Count, ...conditions });
+    if (!calc) return { block: '', compliance: null };
+
+    // Forbice del colloquio (SORGENTE UNICA) per il confronto dentro/fuori — dato
+    // interno (solo admin): prova del rispetto del range concordato nella Lettera.
+    const sectorKey = fmd.step1?.sector || (client.sector === 1 ? 'manufacturing' : 'services');
+    const l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
+    const fch = computeForchetta({ n: nEmp, sector: sectorKey, l2Mult, ...conditions });
+    const min = fch.min.price_y1, avg = fch.avg.price_y1, max = fch.max.price_y1;
+    const realPrice = calc.price_y1;
+    const inRange = (min != null && max != null) ? (realPrice >= min && realPrice <= max) : null;
+    const compliance = { in_range: inRange, min, avg, max, real_price: realPrice };
+
     const eur = v => v.toLocaleString('it-IT', { useGrouping: 'always' });
-    return `\nPROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):\n- Programma Anno 1: €${eur(calc.price_y1)} (${calc.days_osteo_y1} giornate sportello, ${calc.training_sessions_y1} sessioni formative)\n- Stima Anno 2+: €${eur(calc.price_y2)}`;
+    // Testo CLIENTE: prezzo + framing positivo "in linea con la stima" se rientra.
+    // MAI il flag grezzo dentro/fuori (resta dato interno persistito).
+    const inLinea = inRange ? ', in linea con la stima presentata al colloquio' : '';
+    const block = `\nPROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):\n- Programma Anno 1: €${eur(realPrice)}${inLinea} (${calc.days_osteo_y1} giornate sportello, ${calc.training_sessions_y1} sessioni formative)\n- Stima Anno 2+: €${eur(calc.price_y2)}`;
+    return { block, compliance };
   } catch {
-    return '';
+    return { block: '', compliance: null };
   }
 }
 

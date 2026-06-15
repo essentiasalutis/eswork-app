@@ -1151,6 +1151,12 @@ ${FIRMA}`;
                   className="w-full flex items-center justify-between py-1.5 px-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded transition-colors">
                   <span>{r.report_type === 'activation' ? '📋 Attivazione' : r.report_type === 'checkpoint_t12' ? '🏆 Annuale' : `📊 ${r.report_type?.replace('checkpoint_', '').toUpperCase()}`}</span>
                   <span className="flex items-center gap-2">
+                    {r.report_type === 'activation' && r.quote_compliance && r.quote_compliance.in_range != null && (
+                      <span title={`Forbice colloquio €${Math.round(r.quote_compliance.min || 0).toLocaleString('it-IT')}–€${Math.round(r.quote_compliance.max || 0).toLocaleString('it-IT')} · prezzo definitivo €${Math.round(r.quote_compliance.real_price || 0).toLocaleString('it-IT')} (uso interno)`}
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.quote_compliance.in_range ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {r.quote_compliance.in_range ? '✓ in forbice' : '⚠ fuori'}
+                      </span>
+                    )}
                     <span className="text-gray-400">{new Date(r.created_at).toLocaleDateString('it-IT')}</span>
                     <span className="text-blue-600 font-medium">Apri →</span>
                   </span>

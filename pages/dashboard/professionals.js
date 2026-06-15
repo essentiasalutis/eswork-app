@@ -242,7 +242,7 @@ info@essentiasalutis.it`;
                     <span className="font-semibold text-gray-900">{pro.name}</span>
                     {!pro.active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">disattivato</span>}
                     {pro.must_reset_password && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">reset pw</span>}
-                    {pro.rcSuspended && <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full" title="Polizza RC scaduta o mancante (Art. 7.2)">⛔ RC non valida · non assegnare</span>}
+                    {pro.rcSuspended && <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full" title="Polizza RC scaduta o mancante (Art. 7.4)">⛔ RC non valida · non assegnare</span>}
                     {pro.rcStatus === 'expiring' && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full" title="Polizza RC in scadenza ≤30gg">⏳ RC in scadenza</span>}
                   </div>
                   <div className="text-sm text-gray-500 mt-0.5">{pro.email}{pro.phone ? ` · ${pro.phone}` : ''}</div>
@@ -354,7 +354,7 @@ export const getServerSideProps = requireAuthSsr(async () => {
     getClients(),
     getProComplianceOverview().catch(() => []),
   ]);
-  // Stato RC per professionista (Art. 7.2): segnale visivo "non assegnare" se sospeso.
+  // Stato RC per professionista (Art. 7.4): segnale visivo "non assegnare" se sospeso.
   const rcByPro = Object.fromEntries((overview || []).map(o => [o.professional.id, { rcStatus: o.rcStatus, rcSuspended: o.rcSuspended }]));
   const withRc = (professionals || []).map(p => ({ ...p, ...(rcByPro[p.id] || { rcStatus: 'missing', rcSuspended: true }) }));
   return { props: { professionals: withRc, clients } };

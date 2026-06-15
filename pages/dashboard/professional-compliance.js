@@ -61,7 +61,7 @@ export default function ProCompliancePage({ overview: initial }) {
         <main className="max-w-6xl mx-auto px-6 py-6">
           {suspended > 0 && (
             <div className="mb-3 text-sm bg-red-50 border border-red-200 text-red-800 rounded-2xl px-4 py-3">
-              ⛔ <strong>{suspended}</strong> professionist{suspended === 1 ? 'a' : 'i'} con polizza RC <strong>scaduta o mancante</strong>: in assenza di copertura valida l&apos;operatività è sospesa (Art. 7.2). <strong>Si raccomanda di non assegnare nuovi pazienti</strong> finché la posizione non è regolarizzata.
+              ⛔ <strong>{suspended}</strong> professionist{suspended === 1 ? 'a' : 'i'} con polizza RC <strong>scaduta o mancante</strong>: in assenza di copertura valida l&apos;operatività è sospesa (Art. 7.4). <strong>Si raccomanda di non assegnare nuovi pazienti</strong> finché la posizione non è regolarizzata.
             </div>
           )}
           {expiring > 0 && (

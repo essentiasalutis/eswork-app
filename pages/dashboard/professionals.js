@@ -10,7 +10,8 @@ export default function ProfessionalsPage({ professionals: initial, clients }) {
   const [form, setForm] = useState({ name: '', email: '', password: DEFAULT_PASSWORD, phone: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [assignModal, setAssignModal] = useState(null); // { proId, proName, assignments }
+  const [assignModal, setAssignModal] = useState(null); // { proId, proName, assignments, blocked, reasons }
+  const [blockNotice, setBlockNotice] = useState(null); // { proName, reasons } — pop-up "non assegnabile"
   const [newPassword, setNewPassword] = useState({ proId: null, value: '' });
   const [justCreated, setJustCreated] = useState(null); // { name, email, password } — mostrato dopo creazione
 
@@ -109,22 +110,34 @@ info@essentiasalutis.it`;
   async function openAssignModal(pro) {
     const res = await fetch(`/api/professionals/${pro.id}/assignments`);
     const assignments = res.ok ? await res.json() : [];
-    setAssignModal({ proId: pro.id, proName: pro.name, assignments });
+    setAssignModal({ proId: pro.id, proName: pro.name, assignments, blocked: !!pro.assignBlocked, reasons: pro.assignReasons || [] });
   }
 
   async function toggleAssignment(clientId, currentActive) {
     if (!assignModal) return;
+    const activating = !currentActive;
+    // Gate conformità: si può ASSEGNARE solo un pro conforme. La disattivazione
+    // di un'assegnazione esistente è sempre permessa.
+    if (activating && assignModal.blocked) {
+      setBlockNotice({ proName: assignModal.proName, reasons: assignModal.reasons });
+      return;
+    }
     const res = await fetch(`/api/professionals/${assignModal.proId}/assignments`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId, active: !currentActive }),
+      body: JSON.stringify({ client_id: clientId, active: activating }),
     });
+    // Difesa: anche se la UI fosse disallineata, il server rifiuta (409) un pro non conforme.
+    if (res.status === 409) {
+      const j = await res.json().catch(() => ({}));
+      setBlockNotice({ proName: assignModal.proName, reasons: j.reasons || assignModal.reasons });
+      return;
+    }
     if (res.ok) {
-      const updated = await res.json();
       setAssignModal(prev => {
         const exists = prev.assignments.find(a => a.client_id === clientId);
         if (exists) {
-          return { ...prev, assignments: prev.assignments.map(a => a.client_id === clientId ? { ...a, active: !currentActive } : a) };
+          return { ...prev, assignments: prev.assignments.map(a => a.client_id === clientId ? { ...a, active: activating } : a) };
         } else {
           return { ...prev, assignments: [...prev.assignments, { client_id: clientId, active: true }] };
         }
@@ -242,7 +255,7 @@ info@essentiasalutis.it`;
                     <span className="font-semibold text-gray-900">{pro.name}</span>
                     {!pro.active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">disattivato</span>}
                     {pro.must_reset_password && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">reset pw</span>}
-                    {pro.rcSuspended && <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full" title="Polizza RC scaduta o mancante (Art. 7.4)">⛔ RC non valida · non assegnare</span>}
+                    {pro.assignBlocked && <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full" title={`Non assegnabile a nuove aziende — manca: ${(pro.assignReasons || []).join(', ')}`}>⛔ Non assegnabile</span>}
                     {pro.rcStatus === 'expiring' && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full" title="Polizza RC in scadenza ≤30gg">⏳ RC in scadenza</span>}
                   </div>
                   <div className="text-sm text-gray-500 mt-0.5">{pro.email}{pro.phone ? ` · ${pro.phone}` : ''}</div>
@@ -320,10 +333,17 @@ info@essentiasalutis.it`;
               <button onClick={() => setAssignModal(null)} className="text-gray-400 text-xl">✕</button>
             </div>
             <p className="text-xs text-gray-500">Attiva o disattiva l&apos;accesso del professionista a ogni azienda.</p>
+            {assignModal.blocked && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-700 leading-relaxed">
+                ⛔ <strong>Non assegnabile a nuove aziende.</strong> Manca: {assignModal.reasons.join(', ')}. Completa i documenti in{' '}
+                <Link href="/dashboard/professional-compliance" className="underline font-semibold">Conformità professionisti</Link>. Le assegnazioni già attive restano e puoi disattivarle.
+              </div>
+            )}
             <div className="space-y-2">
               {clients.map(c => {
                 const a = assignModal.assignments.find(x => x.client_id === c.id);
                 const active = a?.active || false;
+                const lockNew = assignModal.blocked && !active; // assegnare è bloccato; disattivare no
                 return (
                   <div key={c.id} className="flex items-center justify-between py-2 border-b border-gray-100">
                     <div>
@@ -332,14 +352,32 @@ info@essentiasalutis.it`;
                     </div>
                     <button
                       onClick={() => toggleAssignment(c.id, active)}
-                      className={`text-xs px-3 py-1.5 rounded-xl font-semibold ${active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}
+                      className={`text-xs px-3 py-1.5 rounded-xl font-semibold ${active ? 'bg-green-100 text-green-700' : lockNew ? 'bg-red-50 text-red-400 cursor-help' : 'bg-gray-100 text-gray-400'}`}
                     >
-                      {active ? 'Assegnata ✓' : 'Non assegnata'}
+                      {active ? 'Assegnata ✓' : lockNew ? '🔒 Non assegnabile' : 'Non assegnata'}
                     </button>
                   </div>
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pop-up: professionista non assegnabile (documentazione incompleta) */}
+      {blockNotice && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5 space-y-3 text-center">
+            <div className="text-4xl">⛔</div>
+            <h3 className="font-bold text-gray-900">Non assegnabile</h3>
+            <p className="text-sm text-gray-600">
+              <strong>{blockNotice.proName}</strong> non può essere assegnato a un&apos;azienda: la documentazione di conformità è incompleta.
+            </p>
+            <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-700">
+              Manca: <strong>{(blockNotice.reasons || []).join(', ') || 'documentazione'}</strong>
+            </div>
+            <p className="text-xs text-gray-400">Completa i documenti in “Conformità professionisti”, poi riprova.</p>
+            <button onClick={() => setBlockNotice(null)} className="w-full text-sm font-semibold bg-gray-800 text-white rounded-xl py-2.5 hover:bg-gray-700">Ho capito</button>
           </div>
         </div>
       )}

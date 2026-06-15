@@ -354,8 +354,14 @@ export const getServerSideProps = requireAuthSsr(async () => {
     getClients(),
     getProComplianceOverview().catch(() => []),
   ]);
-  // Stato RC per professionista (Art. 7.4): segnale visivo "non assegnare" se sospeso.
-  const rcByPro = Object.fromEntries((overview || []).map(o => [o.professional.id, { rcStatus: o.rcStatus, rcSuspended: o.rcSuspended }]));
-  const withRc = (professionals || []).map(p => ({ ...p, ...(rcByPro[p.id] || { rcStatus: 'missing', rcSuspended: true }) }));
+  // Stato RC + idoneità assegnazione per professionista. assignBlocked/assignReasons
+  // guidano il gate: un pro non conforme non è assegnabile a nuove aziende.
+  const cmpByPro = Object.fromEntries((overview || []).map(o => [o.professional.id, {
+    rcStatus: o.rcStatus, rcSuspended: o.rcSuspended, assignBlocked: o.assignBlocked, assignReasons: o.assignReasons || [],
+  }]));
+  const withRc = (professionals || []).map(p => ({
+    ...p,
+    ...(cmpByPro[p.id] || { rcStatus: 'missing', rcSuspended: true, assignBlocked: true, assignReasons: ['Documentazione non caricata'] }),
+  }));
   return { props: { professionals: withRc, clients } };
 });

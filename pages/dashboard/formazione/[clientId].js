@@ -148,6 +148,7 @@ export default function FormazionePage({ clientId }) {
             <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
               <h2 className="font-bold text-gray-900">👥 Anagrafica ({dipendenti.length})</h2>
               <div className="flex gap-2">
+                <a href={`/api/org/${clientId}/export`} className="text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-xl hover:bg-gray-200">⬇ Esporta CSV</a>
                 <button onClick={() => call('POST', `/api/org/${clientId}/seed`, {}, 'seed')} disabled={busy === 'seed'} className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl disabled:opacity-50">Importa nomi dall'assessment</button>
               </div>
             </div>

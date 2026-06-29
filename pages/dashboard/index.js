@@ -3,10 +3,11 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { getSessionToken, verifyToken } from '../../lib/auth';
 import { getClients, getAssessmentCounts, getAllAcuteEvents } from '../../lib/store';
+import { getDashboardFormazione } from '../../lib/org';
 import NavMenu from '../../components/NavMenu';
 import { TYPE_COLORS, TYPE_LABELS } from '../../lib/scoring';
 
-export default function Dashboard({ clients: initialClients, assessmentCounts, pendingAcuteCount }) {
+export default function Dashboard({ clients: initialClients, assessmentCounts, pendingAcuteCount, formazioneAlerts = [] }) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
 
@@ -39,6 +40,27 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-6">
+        {formazioneAlerts.length > 0 && (
+          <div className="mb-5 bg-white rounded-2xl border border-gray-200 p-4">
+            <h2 className="font-semibold text-gray-700 text-sm mb-2">📚 Formazione — nuovi ingressi da recuperare</h2>
+            <div className="space-y-1.5">
+              {formazioneAlerts.map(a => (
+                <Link key={a.client_id} href={`/dashboard/formazione/${a.client_id}`}
+                  className="flex items-center justify-between py-1.5 px-1 text-sm text-gray-600 hover:bg-gray-50 rounded gap-2 flex-wrap">
+                  <span className="font-medium text-gray-800">{a.name}</span>
+                  <span className="flex items-center gap-2 text-xs flex-wrap">
+                    <span className="text-gray-500">{a.nInAttesa} in attesa</span>
+                    {a.active
+                      ? <span className="font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">⏰ {a.motivo === 'soglia' ? 'soglia raggiunta' : 'scaduto (6 mesi)'}</span>
+                      : <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">scade tra {a.giorniAllaScadenza}gg</span>}
+                    {a.prossimaCampagna && <span className="text-gray-400">campagna: {new Date(a.prossimaCampagna).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })}</span>}
+                    <span className="text-blue-600 font-medium">Apri →</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-lg font-semibold text-gray-800">Aziende clienti</h1>
           <button
@@ -116,5 +138,8 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     pendingAcuteCount = 0;
   }
 
-  return { props: { clients, assessmentCounts, pendingAcuteCount } };
+  let formazioneAlerts = [];
+  try { formazioneAlerts = await getDashboardFormazione(new Date().toISOString().slice(0, 10)); } catch (_) {}
+
+  return { props: { clients, assessmentCounts, pendingAcuteCount, formazioneAlerts } };
 });

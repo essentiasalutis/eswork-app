@@ -669,6 +669,12 @@ ${FIRMA}`;
             >
               Colloquio
             </Link>
+            <Link
+              href={`/dashboard/formazione/${client.id}`}
+              className="text-sm text-green-700 border border-green-200 bg-green-50 px-3 py-2 rounded-xl whitespace-nowrap"
+            >
+              📚 Formazione
+            </Link>
             <NavMenu />
           </div>
         </div>

@@ -1,0 +1,1467 @@
+{
+  "note": "Baseline pricing v1 PRE-refactor (branch pricing-v2 da main 0b2e37b). Confronto: campo computed identico al centesimo dopo il versionamento.",
+  "clients": {
+    "c_1779114097507_4rjfa": {
+      "label": "industrie_lisa",
+      "computed": {
+        "inputs": {
+          "nEmp": 70,
+          "responders": 0,
+          "l1Responders": 0,
+          "sectorKey": "services",
+          "l2Mult": 2,
+          "conditions": {
+            "tier": "core",
+            "groups": 3,
+            "rates": {
+              "training_cost": 100,
+              "training_sell": 250,
+              "sportello_cost": 60,
+              "sportello_sell": 120,
+              "prevalidation_cost": 15,
+              "prevalidation_sell": 30
+            },
+            "vatExempt": true
+          }
+        },
+        "real": {
+          "l1": 0,
+          "l2": 0,
+          "obsPrev": 0
+        },
+        "calc": {
+          "n": 70,
+          "l1": 0,
+          "l2": 0,
+          "tier": "core",
+          "groups": 3,
+          "rates": {
+            "training_cost": 100,
+            "training_sell": 250,
+            "sportello_cost": 60,
+            "sportello_sell": 120,
+            "prevalidation_cost": 15,
+            "prevalidation_sell": 30
+          },
+          "y1": {
+            "items": [
+              {
+                "label": "Sportello trattamento L1",
+                "detail": "0 L1 × 4 sedute × 30′",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              {
+                "label": "Pre-validazioni",
+                "detail": "0 × 15′",
+                "count": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              {
+                "label": "Prevenzione attiva L2",
+                "detail": "non prevista (tier Core)",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              {
+                "label": "Formazione collettiva",
+                "detail": "3 gruppi × 2 moduli",
+                "sessions": 6,
+                "sell": 1500,
+                "cost": 600
+              }
+            ],
+            "sportello": {
+              "label": "Sportello trattamento L1",
+              "detail": "0 L1 × 4 sedute × 30′",
+              "hours": 0,
+              "sell": 0,
+              "cost": 0
+            },
+            "prevalidations": {
+              "label": "Pre-validazioni",
+              "detail": "0 × 15′",
+              "count": 0,
+              "sell": 0,
+              "cost": 0
+            },
+            "prevention": {
+              "label": "Prevenzione attiva L2",
+              "detail": "non prevista (tier Core)",
+              "hours": 0,
+              "sell": 0,
+              "cost": 0
+            },
+            "training": {
+              "label": "Formazione collettiva",
+              "detail": "3 gruppi × 2 moduli",
+              "sessions": 6,
+              "sell": 1500,
+              "cost": 600
+            },
+            "groups": 3,
+            "modules": 2,
+            "trainingSessions": 6,
+            "subtotal_sell": 1500,
+            "subtotal_cost": 600,
+            "buffer_pct": 0.2,
+            "buffer_sell": 300,
+            "buffer_cost": 120,
+            "total_sell": 1800,
+            "total_cost": 720,
+            "margin": 1080,
+            "vat": 0,
+            "total_with_vat": 1800,
+            "sportello_hours_total": 0
+          },
+          "y2": {
+            "items": [
+              {
+                "label": "Sportello trattamento L1",
+                "detail": "0 L1 × 4 sedute × 30′",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              {
+                "label": "Pre-validazioni",
+                "detail": "0 × 15′",
+                "count": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              {
+                "label": "Prevenzione attiva L2",
+                "detail": "non prevista (tier Core)",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              {
+                "label": "Formazione collettiva",
+                "detail": "3 gruppi × 1 modulo",
+                "sessions": 3,
+                "sell": 750,
+                "cost": 300
+              }
+            ],
+            "sportello": {
+              "label": "Sportello trattamento L1",
+              "detail": "0 L1 × 4 sedute × 30′",
+              "hours": 0,
+              "sell": 0,
+              "cost": 0
+            },
+            "prevalidations": {
+              "label": "Pre-validazioni",
+              "detail": "0 × 15′",
+              "count": 0,
+              "sell": 0,
+              "cost": 0
+            },
+            "prevention": {
+              "label": "Prevenzione attiva L2",
+              "detail": "non prevista (tier Core)",
+              "hours": 0,
+              "sell": 0,
+              "cost": 0
+            },
+            "training": {
+              "label": "Formazione collettiva",
+              "detail": "3 gruppi × 1 modulo",
+              "sessions": 3,
+              "sell": 750,
+              "cost": 300
+            },
+            "groups": 3,
+            "modules": 1,
+            "trainingSessions": 3,
+            "subtotal_sell": 750,
+            "subtotal_cost": 300,
+            "buffer_pct": 0.2,
+            "buffer_sell": 150,
+            "buffer_cost": 60,
+            "total_sell": 900,
+            "total_cost": 360,
+            "margin": 540,
+            "vat": 0,
+            "total_with_vat": 900,
+            "sportello_hours_total": 0
+          },
+          "price_y1": 1800,
+          "price_y2": 900,
+          "price_monthly_y1": 150,
+          "price_per_employee_y1": 26,
+          "pop_y2": 0,
+          "days_osteo_y1": 0,
+          "training_sessions_y1": 6,
+          "hours_treated": 4,
+          "hours_untreated": 2
+        },
+        "forchetta": {
+          "min": {
+            "pct": 0.07,
+            "l1": 5,
+            "l2": 10,
+            "n": 70,
+            "tier": "core",
+            "groups": 3,
+            "rates": {
+              "training_cost": 100,
+              "training_sell": 250,
+              "sportello_cost": 60,
+              "sportello_sell": 120,
+              "prevalidation_cost": 15,
+              "prevalidation_sell": 30
+            },
+            "y1": {
+              "items": [
+                {
+                  "label": "Sportello trattamento L1",
+                  "detail": "5 L1 × 4 sedute × 30′",
+                  "hours": 10,
+                  "sell": 1200,
+                  "cost": 600
+                },
+                {
+                  "label": "Pre-validazioni",
+                  "detail": "5 × 15′",
+                  "count": 5,
+                  "sell": 150,
+                  "cost": 75
+                },
+                {
+                  "label": "Prevenzione attiva L2",
+                  "detail": "non prevista (tier Core)",
+                  "hours": 0,
+                  "sell": 0,
+                  "cost": 0
+                },
+                {
+                  "label": "Formazione collettiva",
+                  "detail": "3 gruppi × 2 moduli",
+                  "sessions": 6,
+                  "sell": 1500,
+                  "cost": 600
+                }
+              ],
+              "sportello": {
+                "label": "Sportello trattamento L1",
+                "detail": "5 L1 × 4 sedute × 30′",
+                "hours": 10,
+                "sell": 1200,
+                "cost": 600
+              },
+              "prevalidations": {
+                "label": "Pre-validazioni",
+                "detail": "5 × 15′",
+                "count": 5,
+                "sell": 150,
+                "cost": 75
+              },
+              "prevention": {
+                "label": "Prevenzione attiva L2",
+                "detail": "non prevista (tier Core)",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              "training": {
+                "label": "Formazione collettiva",
+                "detail": "3 gruppi × 2 moduli",
+                "sessions": 6,
+                "sell": 1500,
+                "cost": 600
+              },
+              "groups": 3,
+              "modules": 2,
+              "trainingSessions": 6,
+              "subtotal_sell": 2850,
+              "subtotal_cost": 1275,
+              "buffer_pct": 0.2,
+              "buffer_sell": 570,
+              "buffer_cost": 255,
+              "total_sell": 3420,
+              "total_cost": 1530,
+              "margin": 1890,
+              "vat": 0,
+              "total_with_vat": 3420,
+              "sportello_hours_total": 10
+            },
+            "y2": {
+              "items": [
+                {
+                  "label": "Sportello trattamento L1",
+                  "detail": "5 L1 × 4 sedute × 30′",
+                  "hours": 10,
+                  "sell": 1200,
+                  "cost": 600
+                },
+                {
+                  "label": "Pre-validazioni",
+                  "detail": "5 × 15′",
+                  "count": 5,
+                  "sell": 150,
+                  "cost": 75
+                },
+                {
+                  "label": "Prevenzione attiva L2",
+                  "detail": "non prevista (tier Core)",
+                  "hours": 0,
+                  "sell": 0,
+                  "cost": 0
+                },
+                {
+                  "label": "Formazione collettiva",
+                  "detail": "3 gruppi × 1 modulo",
+                  "sessions": 3,
+                  "sell": 750,
+                  "cost": 300
+                }
+              ],
+              "sportello": {
+                "label": "Sportello trattamento L1",
+                "detail": "5 L1 × 4 sedute × 30′",
+                "hours": 10,
+                "sell": 1200,
+                "cost": 600
+              },
+              "prevalidations": {
+                "label": "Pre-validazioni",
+                "detail": "5 × 15′",
+                "count": 5,
+                "sell": 150,
+                "cost": 75
+              },
+              "prevention": {
+                "label": "Prevenzione attiva L2",
+                "detail": "non prevista (tier Core)",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              "training": {
+                "label": "Formazione collettiva",
+                "detail": "3 gruppi × 1 modulo",
+                "sessions": 3,
+                "sell": 750,
+                "cost": 300
+              },
+              "groups": 3,
+              "modules": 1,
+              "trainingSessions": 3,
+              "subtotal_sell": 2100,
+              "subtotal_cost": 975,
+              "buffer_pct": 0.2,
+              "buffer_sell": 420,
+              "buffer_cost": 195,
+              "total_sell": 2520,
+              "total_cost": 1170,
+              "margin": 1350,
+              "vat": 0,
+              "total_with_vat": 2520,
+              "sportello_hours_total": 10
+            },
+            "price_y1": 3420,
+            "price_y2": 2520,
+            "price_monthly_y1": 285,
+            "price_per_employee_y1": 49,
+            "pop_y2": 15,
+            "days_osteo_y1": 2,
+            "training_sessions_y1": 6,
+            "hours_treated": 4,
+            "hours_untreated": 2
+          },
+          "avg": {
+            "pct": 0.12,
+            "l1": 8,
+            "l2": 16,
+            "n": 70,
+            "tier": "core",
+            "groups": 3,
+            "rates": {
+              "training_cost": 100,
+              "training_sell": 250,
+              "sportello_cost": 60,
+              "sportello_sell": 120,
+              "prevalidation_cost": 15,
+              "prevalidation_sell": 30
+            },
+            "y1": {
+              "items": [
+                {
+                  "label": "Sportello trattamento L1",
+                  "detail": "8 L1 × 4 sedute × 30′",
+                  "hours": 16,
+                  "sell": 1920,
+                  "cost": 960
+                },
+                {
+                  "label": "Pre-validazioni",
+                  "detail": "8 × 15′",
+                  "count": 8,
+                  "sell": 240,
+                  "cost": 120
+                },
+                {
+                  "label": "Prevenzione attiva L2",
+                  "detail": "non prevista (tier Core)",
+                  "hours": 0,
+                  "sell": 0,
+                  "cost": 0
+                },
+                {
+                  "label": "Formazione collettiva",
+                  "detail": "3 gruppi × 2 moduli",
+                  "sessions": 6,
+                  "sell": 1500,
+                  "cost": 600
+                }
+              ],
+              "sportello": {
+                "label": "Sportello trattamento L1",
+                "detail": "8 L1 × 4 sedute × 30′",
+                "hours": 16,
+                "sell": 1920,
+                "cost": 960
+              },
+              "prevalidations": {
+                "label": "Pre-validazioni",
+                "detail": "8 × 15′",
+                "count": 8,
+                "sell": 240,
+                "cost": 120
+              },
+              "prevention": {
+                "label": "Prevenzione attiva L2",
+                "detail": "non prevista (tier Core)",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              "training": {
+                "label": "Formazione collettiva",
+                "detail": "3 gruppi × 2 moduli",
+                "sessions": 6,
+                "sell": 1500,
+                "cost": 600
+              },
+              "groups": 3,
+              "modules": 2,
+              "trainingSessions": 6,
+              "subtotal_sell": 3660,
+              "subtotal_cost": 1680,
+              "buffer_pct": 0.2,
+              "buffer_sell": 732,
+              "buffer_cost": 336,
+              "total_sell": 4392,
+              "total_cost": 2016,
+              "margin": 2376,
+              "vat": 0,
+              "total_with_vat": 4392,
+              "sportello_hours_total": 16
+            },
+            "y2": {
+              "items": [
+                {
+                  "label": "Sportello trattamento L1",
+                  "detail": "8 L1 × 4 sedute × 30′",
+                  "hours": 16,
+                  "sell": 1920,
+                  "cost": 960
+                },
+                {
+                  "label": "Pre-validazioni",
+                  "detail": "8 × 15′",
+                  "count": 8,
+                  "sell": 240,
+                  "cost": 120
+                },
+                {
+                  "label": "Prevenzione attiva L2",
+                  "detail": "non prevista (tier Core)",
+                  "hours": 0,
+                  "sell": 0,
+                  "cost": 0
+                },
+                {
+                  "label": "Formazione collettiva",
+                  "detail": "3 gruppi × 1 modulo",
+                  "sessions": 3,
+                  "sell": 750,
+                  "cost": 300
+                }
+              ],
+              "sportello": {
+                "label": "Sportello trattamento L1",
+                "detail": "8 L1 × 4 sedute × 30′",
+                "hours": 16,
+                "sell": 1920,
+                "cost": 960
+              },
+              "prevalidations": {
+                "label": "Pre-validazioni",
+                "detail": "8 × 15′",
+                "count": 8,
+                "sell": 240,
+                "cost": 120
+              },
+              "prevention": {
+                "label": "Prevenzione attiva L2",
+                "detail": "non prevista (tier Core)",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              "training": {
+                "label": "Formazione collettiva",
+                "detail": "3 gruppi × 1 modulo",
+                "sessions": 3,
+                "sell": 750,
+                "cost": 300
+              },
+              "groups": 3,
+              "modules": 1,
+              "trainingSessions": 3,
+              "subtotal_sell": 2910,
+              "subtotal_cost": 1380,
+              "buffer_pct": 0.2,
+              "buffer_sell": 582,
+              "buffer_cost": 276,
+              "total_sell": 3492,
+              "total_cost": 1656,
+              "margin": 1836,
+              "vat": 0,
+              "total_with_vat": 3492,
+              "sportello_hours_total": 16
+            },
+            "price_y1": 4392,
+            "price_y2": 3492,
+            "price_monthly_y1": 366,
+            "price_per_employee_y1": 63,
+            "pop_y2": 24,
+            "days_osteo_y1": 3,
+            "training_sessions_y1": 6,
+            "hours_treated": 4,
+            "hours_untreated": 2
+          },
+          "max": {
+            "pct": 0.18,
+            "l1": 13,
+            "l2": 26,
+            "n": 70,
+            "tier": "core",
+            "groups": 3,
+            "rates": {
+              "training_cost": 100,
+              "training_sell": 250,
+              "sportello_cost": 60,
+              "sportello_sell": 120,
+              "prevalidation_cost": 15,
+              "prevalidation_sell": 30
+            },
+            "y1": {
+              "items": [
+                {
+                  "label": "Sportello trattamento L1",
+                  "detail": "13 L1 × 4 sedute × 30′",
+                  "hours": 26,
+                  "sell": 3120,
+                  "cost": 1560
+                },
+                {
+                  "label": "Pre-validazioni",
+                  "detail": "13 × 15′",
+                  "count": 13,
+                  "sell": 390,
+                  "cost": 195
+                },
+                {
+                  "label": "Prevenzione attiva L2",
+                  "detail": "non prevista (tier Core)",
+                  "hours": 0,
+                  "sell": 0,
+                  "cost": 0
+                },
+                {
+                  "label": "Formazione collettiva",
+                  "detail": "3 gruppi × 2 moduli",
+                  "sessions": 6,
+                  "sell": 1500,
+                  "cost": 600
+                }
+              ],
+              "sportello": {
+                "label": "Sportello trattamento L1",
+                "detail": "13 L1 × 4 sedute × 30′",
+                "hours": 26,
+                "sell": 3120,
+                "cost": 1560
+              },
+              "prevalidations": {
+                "label": "Pre-validazioni",
+                "detail": "13 × 15′",
+                "count": 13,
+                "sell": 390,
+                "cost": 195
+              },
+              "prevention": {
+                "label": "Prevenzione attiva L2",
+                "detail": "non prevista (tier Core)",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              "training": {
+                "label": "Formazione collettiva",
+                "detail": "3 gruppi × 2 moduli",
+                "sessions": 6,
+                "sell": 1500,
+                "cost": 600
+              },
+              "groups": 3,
+              "modules": 2,
+              "trainingSessions": 6,
+              "subtotal_sell": 5010,
+              "subtotal_cost": 2355,
+              "buffer_pct": 0.2,
+              "buffer_sell": 1002,
+              "buffer_cost": 471,
+              "total_sell": 6012,
+              "total_cost": 2826,
+              "margin": 3186,
+              "vat": 0,
+              "total_with_vat": 6012,
+              "sportello_hours_total": 26
+            },
+            "y2": {
+              "items": [
+                {
+                  "label": "Sportello trattamento L1",
+                  "detail": "13 L1 × 4 sedute × 30′",
+                  "hours": 26,
+                  "sell": 3120,
+                  "cost": 1560
+                },
+                {
+                  "label": "Pre-validazioni",
+                  "detail": "13 × 15′",
+                  "count": 13,
+                  "sell": 390,
+                  "cost": 195
+                },
+                {
+                  "label": "Prevenzione attiva L2",
+                  "detail": "non prevista (tier Core)",
+                  "hours": 0,
+                  "sell": 0,
+                  "cost": 0
+                },
+                {
+                  "label": "Formazione collettiva",
+                  "detail": "3 gruppi × 1 modulo",
+                  "sessions": 3,
+                  "sell": 750,
+                  "cost": 300
+                }
+              ],
+              "sportello": {
+                "label": "Sportello trattamento L1",
+                "detail": "13 L1 × 4 sedute × 30′",
+                "hours": 26,
+                "sell": 3120,
+                "cost": 1560
+              },
+              "prevalidations": {
+                "label": "Pre-validazioni",
+                "detail": "13 × 15′",
+                "count": 13,
+                "sell": 390,
+                "cost": 195
+              },
+              "prevention": {
+                "label": "Prevenzione attiva L2",
+                "detail": "non prevista (tier Core)",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              "training": {
+                "label": "Formazione collettiva",
+                "detail": "3 gruppi × 1 modulo",
+                "sessions": 3,
+                "sell": 750,
+                "cost": 300
+              },
+              "groups": 3,
+              "modules": 1,
+              "trainingSessions": 3,
+              "subtotal_sell": 4260,
+              "subtotal_cost": 2055,
+              "buffer_pct": 0.2,
+              "buffer_sell": 852,
+              "buffer_cost": 411,
+              "total_sell": 5112,
+              "total_cost": 2466,
+              "margin": 2646,
+              "vat": 0,
+              "total_with_vat": 5112,
+              "sportello_hours_total": 26
+            },
+            "price_y1": 6012,
+            "price_y2": 5112,
+            "price_monthly_y1": 501,
+            "price_per_employee_y1": 86,
+            "pop_y2": 39,
+            "days_osteo_y1": 4,
+            "training_sessions_y1": 6,
+            "hours_treated": 4,
+            "hours_untreated": 2
+          }
+        },
+        "compliance": {
+          "in_range": false,
+          "min": 3420,
+          "avg": 4392,
+          "max": 6012,
+          "real_price": 1800
+        },
+        "block": "\nPROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):\n- Programma Anno 1: €1.800 (0 giornate sportello, 6 sessioni formative)\n- Stima Anno 2+: €900"
+      }
+    },
+    "c_1781186381663_ggsx6": {
+      "label": "core",
+      "computed": {
+        "inputs": {
+          "nEmp": 78,
+          "responders": 50,
+          "l1Responders": 6,
+          "sectorKey": "manufacturing",
+          "l2Mult": 2,
+          "conditions": {
+            "tier": "core",
+            "groups": 2,
+            "rates": {
+              "training_cost": 100,
+              "training_sell": 250,
+              "sportello_cost": 60,
+              "sportello_sell": 120,
+              "prevalidation_cost": 15,
+              "prevalidation_sell": 30
+            },
+            "vatExempt": true
+          }
+        },
+        "real": {
+          "l1": 9,
+          "l2": 18,
+          "obsPrev": 0.12
+        },
+        "calc": {
+          "n": 78,
+          "l1": 9,
+          "l2": 18,
+          "tier": "core",
+          "groups": 2,
+          "rates": {
+            "training_cost": 100,
+            "training_sell": 250,
+            "sportello_cost": 60,
+            "sportello_sell": 120,
+            "prevalidation_cost": 15,
+            "prevalidation_sell": 30
+          },
+          "y1": {
+            "items": [
+              {
+                "label": "Sportello trattamento L1",
+                "detail": "9 L1 × 4 sedute × 30′",
+                "hours": 18,
+                "sell": 2160,
+                "cost": 1080
+              },
+              {
+                "label": "Pre-validazioni",
+                "detail": "9 × 15′",
+                "count": 9,
+                "sell": 270,
+                "cost": 135
+              },
+              {
+                "label": "Prevenzione attiva L2",
+                "detail": "non prevista (tier Core)",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              {
+                "label": "Formazione collettiva",
+                "detail": "2 gruppi × 2 moduli",
+                "sessions": 4,
+                "sell": 1000,
+                "cost": 400
+              }
+            ],
+            "sportello": {
+              "label": "Sportello trattamento L1",
+              "detail": "9 L1 × 4 sedute × 30′",
+              "hours": 18,
+              "sell": 2160,
+              "cost": 1080
+            },
+            "prevalidations": {
+              "label": "Pre-validazioni",
+              "detail": "9 × 15′",
+              "count": 9,
+              "sell": 270,
+              "cost": 135
+            },
+            "prevention": {
+              "label": "Prevenzione attiva L2",
+              "detail": "non prevista (tier Core)",
+              "hours": 0,
+              "sell": 0,
+              "cost": 0
+            },
+            "training": {
+              "label": "Formazione collettiva",
+              "detail": "2 gruppi × 2 moduli",
+              "sessions": 4,
+              "sell": 1000,
+              "cost": 400
+            },
+            "groups": 2,
+            "modules": 2,
+            "trainingSessions": 4,
+            "subtotal_sell": 3430,
+            "subtotal_cost": 1615,
+            "buffer_pct": 0.2,
+            "buffer_sell": 686,
+            "buffer_cost": 323,
+            "total_sell": 4116,
+            "total_cost": 1938,
+            "margin": 2178,
+            "vat": 0,
+            "total_with_vat": 4116,
+            "sportello_hours_total": 18
+          },
+          "y2": {
+            "items": [
+              {
+                "label": "Sportello trattamento L1",
+                "detail": "9 L1 × 4 sedute × 30′",
+                "hours": 18,
+                "sell": 2160,
+                "cost": 1080
+              },
+              {
+                "label": "Pre-validazioni",
+                "detail": "9 × 15′",
+                "count": 9,
+                "sell": 270,
+                "cost": 135
+              },
+              {
+                "label": "Prevenzione attiva L2",
+                "detail": "non prevista (tier Core)",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              {
+                "label": "Formazione collettiva",
+                "detail": "2 gruppi × 1 modulo",
+                "sessions": 2,
+                "sell": 500,
+                "cost": 200
+              }
+            ],
+            "sportello": {
+              "label": "Sportello trattamento L1",
+              "detail": "9 L1 × 4 sedute × 30′",
+              "hours": 18,
+              "sell": 2160,
+              "cost": 1080
+            },
+            "prevalidations": {
+              "label": "Pre-validazioni",
+              "detail": "9 × 15′",
+              "count": 9,
+              "sell": 270,
+              "cost": 135
+            },
+            "prevention": {
+              "label": "Prevenzione attiva L2",
+              "detail": "non prevista (tier Core)",
+              "hours": 0,
+              "sell": 0,
+              "cost": 0
+            },
+            "training": {
+              "label": "Formazione collettiva",
+              "detail": "2 gruppi × 1 modulo",
+              "sessions": 2,
+              "sell": 500,
+              "cost": 200
+            },
+            "groups": 2,
+            "modules": 1,
+            "trainingSessions": 2,
+            "subtotal_sell": 2930,
+            "subtotal_cost": 1415,
+            "buffer_pct": 0.2,
+            "buffer_sell": 586,
+            "buffer_cost": 283,
+            "total_sell": 3516,
+            "total_cost": 1698,
+            "margin": 1818,
+            "vat": 0,
+            "total_with_vat": 3516,
+            "sportello_hours_total": 18
+          },
+          "price_y1": 4116,
+          "price_y2": 3516,
+          "price_monthly_y1": 343,
+          "price_per_employee_y1": 53,
+          "pop_y2": 27,
+          "days_osteo_y1": 3,
+          "training_sessions_y1": 4,
+          "hours_treated": 4,
+          "hours_untreated": 2
+        },
+        "forchetta": {
+          "min": {
+            "pct": 0.1,
+            "l1": 8,
+            "l2": 16,
+            "n": 78,
+            "tier": "core",
+            "groups": 2,
+            "rates": {
+              "training_cost": 100,
+              "training_sell": 250,
+              "sportello_cost": 60,
+              "sportello_sell": 120,
+              "prevalidation_cost": 15,
+              "prevalidation_sell": 30
+            },
+            "y1": {
+              "items": [
+                {
+                  "label": "Sportello trattamento L1",
+                  "detail": "8 L1 × 4 sedute × 30′",
+                  "hours": 16,
+                  "sell": 1920,
+                  "cost": 960
+                },
+                {
+                  "label": "Pre-validazioni",
+                  "detail": "8 × 15′",
+                  "count": 8,
+                  "sell": 240,
+                  "cost": 120
+                },
+                {
+                  "label": "Prevenzione attiva L2",
+                  "detail": "non prevista (tier Core)",
+                  "hours": 0,
+                  "sell": 0,
+                  "cost": 0
+                },
+                {
+                  "label": "Formazione collettiva",
+                  "detail": "2 gruppi × 2 moduli",
+                  "sessions": 4,
+                  "sell": 1000,
+                  "cost": 400
+                }
+              ],
+              "sportello": {
+                "label": "Sportello trattamento L1",
+                "detail": "8 L1 × 4 sedute × 30′",
+                "hours": 16,
+                "sell": 1920,
+                "cost": 960
+              },
+              "prevalidations": {
+                "label": "Pre-validazioni",
+                "detail": "8 × 15′",
+                "count": 8,
+                "sell": 240,
+                "cost": 120
+              },
+              "prevention": {
+                "label": "Prevenzione attiva L2",
+                "detail": "non prevista (tier Core)",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              "training": {
+                "label": "Formazione collettiva",
+                "detail": "2 gruppi × 2 moduli",
+                "sessions": 4,
+                "sell": 1000,
+                "cost": 400
+              },
+              "groups": 2,
+              "modules": 2,
+              "trainingSessions": 4,
+              "subtotal_sell": 3160,
+              "subtotal_cost": 1480,
+              "buffer_pct": 0.2,
+              "buffer_sell": 632,
+              "buffer_cost": 296,
+              "total_sell": 3792,
+              "total_cost": 1776,
+              "margin": 2016,
+              "vat": 0,
+              "total_with_vat": 3792,
+              "sportello_hours_total": 16
+            },
+            "y2": {
+              "items": [
+                {
+                  "label": "Sportello trattamento L1",
+                  "detail": "8 L1 × 4 sedute × 30′",
+                  "hours": 16,
+                  "sell": 1920,
+                  "cost": 960
+                },
+                {
+                  "label": "Pre-validazioni",
+                  "detail": "8 × 15′",
+                  "count": 8,
+                  "sell": 240,
+                  "cost": 120
+                },
+                {
+                  "label": "Prevenzione attiva L2",
+                  "detail": "non prevista (tier Core)",
+                  "hours": 0,
+                  "sell": 0,
+                  "cost": 0
+                },
+                {
+                  "label": "Formazione collettiva",
+                  "detail": "2 gruppi × 1 modulo",
+                  "sessions": 2,
+                  "sell": 500,
+                  "cost": 200
+                }
+              ],
+              "sportello": {
+                "label": "Sportello trattamento L1",
+                "detail": "8 L1 × 4 sedute × 30′",
+                "hours": 16,
+                "sell": 1920,
+                "cost": 960
+              },
+              "prevalidations": {
+                "label": "Pre-validazioni",
+                "detail": "8 × 15′",
+                "count": 8,
+                "sell": 240,
+                "cost": 120
+              },
+              "prevention": {
+                "label": "Prevenzione attiva L2",
+                "detail": "non prevista (tier Core)",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              "training": {
+                "label": "Formazione collettiva",
+                "detail": "2 gruppi × 1 modulo",
+                "sessions": 2,
+                "sell": 500,
+                "cost": 200
+              },
+              "groups": 2,
+              "modules": 1,
+              "trainingSessions": 2,
+              "subtotal_sell": 2660,
+              "subtotal_cost": 1280,
+              "buffer_pct": 0.2,
+              "buffer_sell": 532,
+              "buffer_cost": 256,
+              "total_sell": 3192,
+              "total_cost": 1536,
+              "margin": 1656,
+              "vat": 0,
+              "total_with_vat": 3192,
+              "sportello_hours_total": 16
+            },
+            "price_y1": 3792,
+            "price_y2": 3192,
+            "price_monthly_y1": 316,
+            "price_per_employee_y1": 49,
+            "pop_y2": 24,
+            "days_osteo_y1": 3,
+            "training_sessions_y1": 4,
+            "hours_treated": 4,
+            "hours_untreated": 2
+          },
+          "avg": {
+            "pct": 0.15,
+            "l1": 12,
+            "l2": 24,
+            "n": 78,
+            "tier": "core",
+            "groups": 2,
+            "rates": {
+              "training_cost": 100,
+              "training_sell": 250,
+              "sportello_cost": 60,
+              "sportello_sell": 120,
+              "prevalidation_cost": 15,
+              "prevalidation_sell": 30
+            },
+            "y1": {
+              "items": [
+                {
+                  "label": "Sportello trattamento L1",
+                  "detail": "12 L1 × 4 sedute × 30′",
+                  "hours": 24,
+                  "sell": 2880,
+                  "cost": 1440
+                },
+                {
+                  "label": "Pre-validazioni",
+                  "detail": "12 × 15′",
+                  "count": 12,
+                  "sell": 360,
+                  "cost": 180
+                },
+                {
+                  "label": "Prevenzione attiva L2",
+                  "detail": "non prevista (tier Core)",
+                  "hours": 0,
+                  "sell": 0,
+                  "cost": 0
+                },
+                {
+                  "label": "Formazione collettiva",
+                  "detail": "2 gruppi × 2 moduli",
+                  "sessions": 4,
+                  "sell": 1000,
+                  "cost": 400
+                }
+              ],
+              "sportello": {
+                "label": "Sportello trattamento L1",
+                "detail": "12 L1 × 4 sedute × 30′",
+                "hours": 24,
+                "sell": 2880,
+                "cost": 1440
+              },
+              "prevalidations": {
+                "label": "Pre-validazioni",
+                "detail": "12 × 15′",
+                "count": 12,
+                "sell": 360,
+                "cost": 180
+              },
+              "prevention": {
+                "label": "Prevenzione attiva L2",
+                "detail": "non prevista (tier Core)",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              "training": {
+                "label": "Formazione collettiva",
+                "detail": "2 gruppi × 2 moduli",
+                "sessions": 4,
+                "sell": 1000,
+                "cost": 400
+              },
+              "groups": 2,
+              "modules": 2,
+              "trainingSessions": 4,
+              "subtotal_sell": 4240,
+              "subtotal_cost": 2020,
+              "buffer_pct": 0.2,
+              "buffer_sell": 848,
+              "buffer_cost": 404,
+              "total_sell": 5088,
+              "total_cost": 2424,
+              "margin": 2664,
+              "vat": 0,
+              "total_with_vat": 5088,
+              "sportello_hours_total": 24
+            },
+            "y2": {
+              "items": [
+                {
+                  "label": "Sportello trattamento L1",
+                  "detail": "12 L1 × 4 sedute × 30′",
+                  "hours": 24,
+                  "sell": 2880,
+                  "cost": 1440
+                },
+                {
+                  "label": "Pre-validazioni",
+                  "detail": "12 × 15′",
+                  "count": 12,
+                  "sell": 360,
+                  "cost": 180
+                },
+                {
+                  "label": "Prevenzione attiva L2",
+                  "detail": "non prevista (tier Core)",
+                  "hours": 0,
+                  "sell": 0,
+                  "cost": 0
+                },
+                {
+                  "label": "Formazione collettiva",
+                  "detail": "2 gruppi × 1 modulo",
+                  "sessions": 2,
+                  "sell": 500,
+                  "cost": 200
+                }
+              ],
+              "sportello": {
+                "label": "Sportello trattamento L1",
+                "detail": "12 L1 × 4 sedute × 30′",
+                "hours": 24,
+                "sell": 2880,
+                "cost": 1440
+              },
+              "prevalidations": {
+                "label": "Pre-validazioni",
+                "detail": "12 × 15′",
+                "count": 12,
+                "sell": 360,
+                "cost": 180
+              },
+              "prevention": {
+                "label": "Prevenzione attiva L2",
+                "detail": "non prevista (tier Core)",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              "training": {
+                "label": "Formazione collettiva",
+                "detail": "2 gruppi × 1 modulo",
+                "sessions": 2,
+                "sell": 500,
+                "cost": 200
+              },
+              "groups": 2,
+              "modules": 1,
+              "trainingSessions": 2,
+              "subtotal_sell": 3740,
+              "subtotal_cost": 1820,
+              "buffer_pct": 0.2,
+              "buffer_sell": 748,
+              "buffer_cost": 364,
+              "total_sell": 4488,
+              "total_cost": 2184,
+              "margin": 2304,
+              "vat": 0,
+              "total_with_vat": 4488,
+              "sportello_hours_total": 24
+            },
+            "price_y1": 5088,
+            "price_y2": 4488,
+            "price_monthly_y1": 424,
+            "price_per_employee_y1": 65,
+            "pop_y2": 36,
+            "days_osteo_y1": 4,
+            "training_sessions_y1": 4,
+            "hours_treated": 4,
+            "hours_untreated": 2
+          },
+          "max": {
+            "pct": 0.2,
+            "l1": 16,
+            "l2": 32,
+            "n": 78,
+            "tier": "core",
+            "groups": 2,
+            "rates": {
+              "training_cost": 100,
+              "training_sell": 250,
+              "sportello_cost": 60,
+              "sportello_sell": 120,
+              "prevalidation_cost": 15,
+              "prevalidation_sell": 30
+            },
+            "y1": {
+              "items": [
+                {
+                  "label": "Sportello trattamento L1",
+                  "detail": "16 L1 × 4 sedute × 30′",
+                  "hours": 32,
+                  "sell": 3840,
+                  "cost": 1920
+                },
+                {
+                  "label": "Pre-validazioni",
+                  "detail": "16 × 15′",
+                  "count": 16,
+                  "sell": 480,
+                  "cost": 240
+                },
+                {
+                  "label": "Prevenzione attiva L2",
+                  "detail": "non prevista (tier Core)",
+                  "hours": 0,
+                  "sell": 0,
+                  "cost": 0
+                },
+                {
+                  "label": "Formazione collettiva",
+                  "detail": "2 gruppi × 2 moduli",
+                  "sessions": 4,
+                  "sell": 1000,
+                  "cost": 400
+                }
+              ],
+              "sportello": {
+                "label": "Sportello trattamento L1",
+                "detail": "16 L1 × 4 sedute × 30′",
+                "hours": 32,
+                "sell": 3840,
+                "cost": 1920
+              },
+              "prevalidations": {
+                "label": "Pre-validazioni",
+                "detail": "16 × 15′",
+                "count": 16,
+                "sell": 480,
+                "cost": 240
+              },
+              "prevention": {
+                "label": "Prevenzione attiva L2",
+                "detail": "non prevista (tier Core)",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              "training": {
+                "label": "Formazione collettiva",
+                "detail": "2 gruppi × 2 moduli",
+                "sessions": 4,
+                "sell": 1000,
+                "cost": 400
+              },
+              "groups": 2,
+              "modules": 2,
+              "trainingSessions": 4,
+              "subtotal_sell": 5320,
+              "subtotal_cost": 2560,
+              "buffer_pct": 0.2,
+              "buffer_sell": 1064,
+              "buffer_cost": 512,
+              "total_sell": 6384,
+              "total_cost": 3072,
+              "margin": 3312,
+              "vat": 0,
+              "total_with_vat": 6384,
+              "sportello_hours_total": 32
+            },
+            "y2": {
+              "items": [
+                {
+                  "label": "Sportello trattamento L1",
+                  "detail": "16 L1 × 4 sedute × 30′",
+                  "hours": 32,
+                  "sell": 3840,
+                  "cost": 1920
+                },
+                {
+                  "label": "Pre-validazioni",
+                  "detail": "16 × 15′",
+                  "count": 16,
+                  "sell": 480,
+                  "cost": 240
+                },
+                {
+                  "label": "Prevenzione attiva L2",
+                  "detail": "non prevista (tier Core)",
+                  "hours": 0,
+                  "sell": 0,
+                  "cost": 0
+                },
+                {
+                  "label": "Formazione collettiva",
+                  "detail": "2 gruppi × 1 modulo",
+                  "sessions": 2,
+                  "sell": 500,
+                  "cost": 200
+                }
+              ],
+              "sportello": {
+                "label": "Sportello trattamento L1",
+                "detail": "16 L1 × 4 sedute × 30′",
+                "hours": 32,
+                "sell": 3840,
+                "cost": 1920
+              },
+              "prevalidations": {
+                "label": "Pre-validazioni",
+                "detail": "16 × 15′",
+                "count": 16,
+                "sell": 480,
+                "cost": 240
+              },
+              "prevention": {
+                "label": "Prevenzione attiva L2",
+                "detail": "non prevista (tier Core)",
+                "hours": 0,
+                "sell": 0,
+                "cost": 0
+              },
+              "training": {
+                "label": "Formazione collettiva",
+                "detail": "2 gruppi × 1 modulo",
+                "sessions": 2,
+                "sell": 500,
+                "cost": 200
+              },
+              "groups": 2,
+              "modules": 1,
+              "trainingSessions": 2,
+              "subtotal_sell": 4820,
+              "subtotal_cost": 2360,
+              "buffer_pct": 0.2,
+              "buffer_sell": 964,
+              "buffer_cost": 472,
+              "total_sell": 5784,
+              "total_cost": 2832,
+              "margin": 2952,
+              "vat": 0,
+              "total_with_vat": 5784,
+              "sportello_hours_total": 32
+            },
+            "price_y1": 6384,
+            "price_y2": 5784,
+            "price_monthly_y1": 532,
+            "price_per_employee_y1": 82,
+            "pop_y2": 48,
+            "days_osteo_y1": 5,
+            "training_sessions_y1": 4,
+            "hours_treated": 4,
+            "hours_untreated": 2
+          }
+        },
+        "compliance": {
+          "in_range": true,
+          "min": 3792,
+          "avg": 5088,
+          "max": 6384,
+          "real_price": 4116
+        },
+        "block": "\nPROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):\n- Programma Anno 1: €4.116, in linea con la stima presentata al colloquio (3 giornate sportello, 4 sessioni formative)\n- Stima Anno 2+: €3.516"
+      }
+    }
+  }
+}

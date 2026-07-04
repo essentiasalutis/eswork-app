@@ -185,7 +185,8 @@ ${quoteBlock.replace('PROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + s
 
 // Blocco "proposta economica" per il report: condizioni della scheda colloquio
 // applicate alla stratificazione REALE (solo prezzo cliente, mai margini).
-async function buildQuoteBlock(client_id, client, answers) {
+// Esportata (solo lettura) anche per la baseline di regressione pricing v1/v2.
+export async function buildQuoteBlock(client_id, client, answers) {
   try {
     const fm = await getFirstMeeting(client_id);
     const fmd = fm?.data;

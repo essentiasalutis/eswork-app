@@ -39,10 +39,13 @@ export default requireAuth(async function handler(req, res) {
     const sectorKey = fmd?.step1?.sector || (client.sector === 1 ? 'manufacturing' : 'services');
     const l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
 
+    // Versione dal record cliente (fail-safe v1) — NON entra in computed.inputs:
+    // la shape confrontata con la baseline resta invariata.
+    const pricingVersion = client.pricing_version || 'v1';
     const nmq = aggregateNMQ(answers);
-    const real = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: nEmp, l2Mult });
-    const calc = calculatePricing({ n: nEmp, l1: real.l1, l2: real.l2, ...conditions });
-    const forchetta = computeForchetta({ n: nEmp, sector: sectorKey, l2Mult, ...conditions });
+    const real = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: nEmp, l2Mult, pricingVersion });
+    const calc = calculatePricing({ n: nEmp, l1: real.l1, l2: real.l2, pricingVersion, ...conditions });
+    const forchetta = computeForchetta({ n: nEmp, sector: sectorKey, l2Mult, pricingVersion, ...conditions });
     const { block, compliance } = await buildQuoteBlock(clientId, client, answers);
 
     return res.json({

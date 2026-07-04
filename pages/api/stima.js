@@ -8,6 +8,7 @@
 import { requireAuth } from '../../lib/auth';
 import { generateAndStorePdf, buildQuoteHtml } from '../../lib/pdf';
 import { computeForchetta } from '../../lib/calculator';
+import { getClientById } from '../../lib/store';
 
 export const config = { maxDuration: 60 };
 
@@ -23,10 +24,19 @@ export default requireAuth(async function handler(req, res) {
   const employees = parseInt(b.employees) || 0;
   const sector = b.sector || 'services';
 
+  // Versione listino SEMPRE risolta server-side dal record cliente (mai dal
+  // body/query). Prospect senza record → 'v2' (le nuove aziende nascono v2);
+  // cliente esistente senza colonna/valore → fail-safe 'v1'.
+  let pricingVersion = 'v2';
+  if (b.clientId) {
+    const client = await getClientById(b.clientId).catch(() => null);
+    pricingVersion = client?.pricing_version || 'v1';
+  }
+
   // Sorgente UNICA della forbice.
   const forchetta = computeForchetta({
     n: employees, sector, tier: b.tier, groups: b.groups,
-    rates: b.rates, vatExempt: b.vatExempt, l2Mult: b.l2Mult,
+    rates: b.rates, vatExempt: b.vatExempt, l2Mult: b.l2Mult, pricingVersion,
   });
 
   const html = buildQuoteHtml({

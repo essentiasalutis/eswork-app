@@ -692,9 +692,9 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       const totalN = n ? parseInt(n) : (client.employees || 0);
       const l1v = l1 != null ? parseInt(l1) : 0;
       const l2v = l2 != null ? parseInt(l2) : 0;
-      const calc = custom
-        ? calculatePricing({ n: totalN, l1: l1v, l2: l2v, ...custom })
-        : calculatePricing(totalN, l1v, l2v);
+      // Versione listino SEMPRE dal record cliente (mai da query); fail-safe v1.
+      const pricingVersion = client.pricing_version || 'v1';
+      const calc = calculatePricing({ n: totalN, l1: l1v, l2: l2v, pricingVersion, ...(custom || {}) });
       return {
         props: {
           client,
@@ -732,6 +732,8 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     let schedaDefaults = null;
     let forchetta = null; // stima colloquio min/med/max (vista admin, non nel PDF)
     let l2Mult = CONFIG.l2_multiplier_default;
+    // Versione listino SEMPRE dal record cliente (mai da query); fail-safe v1.
+    const pricingVersion = client?.pricing_version || 'v1';
     try {
       const fm = await getFirstMeeting(assessment.client_id);
       const fmd = fm?.data;
@@ -754,21 +756,19 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         // dentro/fuori — vista admin, non nel PDF cliente.
         const sectorKey = fmd.step1?.sector || (client?.sector === 1 ? 'manufacturing' : 'services');
         l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
-        const fch = computeForchetta({ n: fmN, sector: sectorKey, l2Mult, ...schedaDefaults });
+        const fch = computeForchetta({ n: fmN, sector: sectorKey, l2Mult, pricingVersion, ...schedaDefaults });
         if (fch.min.price_y1 != null) forchetta = { min: fch.min.price_y1, avg: fch.avg.price_y1, max: fch.max.price_y1 };
       }
     } catch (_) {}
 
     // "Prezzo reale" OMOGENEO con la forbice: prevalenza L1 osservata × forza
     // lavoro, L2 derivato (L1 × moltiplicatore). Override manuale via query l1/l2.
-    const auto = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: totalN, l2Mult });
+    const auto = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: totalN, l2Mult, pricingVersion });
     const l1v = l1 !== undefined ? parseInt(l1) : auto.l1;
     const l2v = l2 !== undefined ? parseInt(l2) : auto.l2;
 
     const effective = custom || schedaDefaults;
-    const calc = effective
-      ? calculatePricing({ n: totalN, l1: l1v, l2: l2v, ...effective })
-      : calculatePricing(totalN, l1v, l2v);
+    const calc = calculatePricing({ n: totalN, l1: l1v, l2: l2v, pricingVersion, ...(effective || {}) });
     const roi = null; // ROI only from calculator (requires absence days input)
 
     return {

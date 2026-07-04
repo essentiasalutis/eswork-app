@@ -200,7 +200,10 @@ export async function buildQuoteBlock(client_id, client, answers) {
     const groups = s2.training_mode === 'accorpa'
       ? Math.max(1, Math.ceil(nEmp / cap))
       : (sedi.reduce((a, e) => a + Math.ceil((parseInt(e.employees) || 0) / cap), 0) || Math.max(1, Math.ceil(nEmp / cap)));
-    const conditions = { tier: s2.tier || undefined, groups, rates: sp.rates || undefined, vatExempt: sp.vat_exempt };
+    // Versione listino dal record cliente (fail-safe v1): forbice e prezzo reale
+    // escono SEMPRE dalla stessa versione → mai confronti incrociati tra versioni.
+    const pricingVersion = client.pricing_version || 'v1';
+    const conditions = { pricingVersion, tier: s2.tier || undefined, groups, rates: sp.rates || undefined, vatExempt: sp.vat_exempt };
     const sectorKey = fmd.step1?.sector || (client.sector === 1 ? 'manufacturing' : 'services');
     const l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
 
@@ -208,7 +211,7 @@ export async function buildQuoteBlock(client_id, client, answers) {
     // prevalenza L1 OSSERVATA dall'assessment × forza lavoro, L2 derivato
     // (L1 × moltiplicatore). Una sola definizione di "prezzo reale".
     const nmq = aggregateNMQ(answers || []);
-    const real = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: nEmp, l2Mult });
+    const real = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: nEmp, l2Mult, pricingVersion });
     const calc = calculatePricing({ n: nEmp, l1: real.l1, l2: real.l2, ...conditions });
     if (!calc) return { block: '', compliance: null };
 

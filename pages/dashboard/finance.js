@@ -46,7 +46,9 @@ export default function FinancePage({ clients, patientCounts }) {
   const clientsWithFinance = clients.map(c => {
     const l1 = patientCounts[c.id]?.l1 || estimateL1(c.employees, c.sector);
     const l2 = patientCounts[c.id]?.l2 || Math.round(l1 * 2.2);
-    const calc = calculatePricing(parseInt(c.employees) || 0, l1, l2);
+    // Instradato per versione listino del cliente (fail-safe v1): stessi default
+    // della vecchia firma posizionale (tier/tariffe/gruppi da config).
+    const calc = calculatePricing({ n: parseInt(c.employees) || 0, l1, l2, pricingVersion: c.pricing_version || 'v1' });
     const isActive = c.pipeline_stage === 'active';
     const revenue = calc?.price_y1 || 0;
     const cost = calc?.total_cost_y1 || 0;

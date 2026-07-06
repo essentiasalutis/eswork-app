@@ -115,7 +115,8 @@ VINCOLI TASSATIVI SUL TESTO:
 - MAI "AI" o "intelligenza artificiale" nel nome della piattaforma (si chiama solo "Piattaforma digitale ES Work").
 - MAI i termini Core, Plus, Enterprise (nomi interni). Il prodotto si chiama "${nomeProdotto}".` : '';
   const istruzioniPacchetto = isPacchetto ? `
-ATTENZIONE — PRODOTTO "${nomeProdotto}" (12 mesi, non rinnovabile): include SOLO assessment completo, formazione (2 moduli) e consulenza ergonomico-posturale. NON include trattamenti individuali, percorsi clinici o prevenzione attiva: NON presentarli MAI come inclusi. Il report mostra la stratificazione emersa dall'assessment e in chiusura può indicare l'evoluzione verso il programma completo con questo testo (adattalo senza stravolgerlo): "${testoEvoluzione}"` : '';
+ATTENZIONE — PRODOTTO "${nomeProdotto}" (12 mesi, non rinnovabile): include SOLO assessment completo, formazione (2 moduli) e consulenza ergonomico-posturale. NON include trattamenti individuali, percorsi clinici o prevenzione attiva: NON presentarli MAI come inclusi.
+La Mappa Clinica è una FOTOGRAFIA NEUTRA dei dati del questionario: MAI formulazioni come "non trattati", "non presi in carico", "sintomatologia non gestita", "richiedono trattamento/protocollo" o simili riferite a persone; nessun tono di allarme sanitario, nessuna pressione commerciale. Il programma completo va presentato SOLO come evoluzione disponibile, usando questo testo (adattalo senza stravolgerlo): "${testoEvoluzione}"` : '';
 
   // Fallback se manca la chiave
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -186,16 +187,28 @@ function generateFallbackReport(client, l1, l2, l3, total, sessioni, settore, qu
   const riskTxt = small || P.l1.suppressed ? 'non determinabile in forma anonima' : (P.l1.pct > 20 ? 'elevato' : P.l1.pct > 10 ? 'moderato' : 'contenuto');
   const mappa = small
     ? `La popolazione valutata è inferiore alla soglia minima di aggregazione (${K_ANON}): la distribuzione per livello non viene pubblicata a tutela dell'anonimato dei dipendenti (k-anonymity).`
-    : `- **Livello 1 (Trattamento attivo):** ${dip(P.l1)} — dolore con impatto funzionale, richiedono protocollo individuale
+    : isPacchetto
+      // Pacchetto: FOTOGRAFIA NEUTRA del questionario — niente "richiedono
+      // protocollo", niente riferimenti a mini-check/prese in carico (non incluse).
+      ? `- **Livello 1:** ${dip(P.l1)} — dolore con impatto funzionale riportato nel questionario
+- **Livello 2:** ${dip(P.l2)} — sintomatologia presente, senza impatto funzionale rilevante
+- **Livello 3:** ${dip(P.l3)} — nessuna sintomatologia rilevante`
+      : `- **Livello 1 (Trattamento attivo):** ${dip(P.l1)} — dolore con impatto funzionale, richiedono protocollo individuale
 - **Livello 2 (Monitoraggio):** ${dip(P.l2)} — sintomatologia presente, seguiti con mini-check periodici
 - **Livello 3 (Prevenzione):** ${dip(P.l3)} — nessuna sintomatologia rilevante, inclusi nella formazione collettiva`;
   return `## Executive Summary
 
-Il programma ES Work per **${client.name}** (${settore}, ${client.employees || 'n.d.'} dipendenti) ha completato la fase di assessment iniziale con ${total} dipendenti valutati.
+${isPacchetto
+  ? `Il percorso ${nomeProdotto || 'd\'ingresso'} per **${client.name}** (${settore}, ${client.employees || 'n.d.'} dipendenti) ha completato l'assessment della popolazione con ${total} dipendenti valutati.
+
+La fotografia raccolta indica una quota in Livello 1 pari a ${pctL1txt}: il dettaglio per livello è riportato nella Mappa Clinica.
+
+Il percorso prosegue con le attività previste: formazione collettiva e consulenza ergonomico-posturale.`
+  : `Il programma ES Work per **${client.name}** (${settore}, ${client.employees || 'n.d.'} dipendenti) ha completato la fase di assessment iniziale con ${total} dipendenti valutati.
 
 La distribuzione clinica evidenzia una quota in Livello 1 (trattamento attivo) pari a ${pctL1txt}, profilo di rischio ${riskTxt}. Sono state erogate ${sessioni} sessioni osteopatiche ad oggi.
 
-Il programma è operativamente attivo e i risultati preliminari confermano la pertinenza dell'intervento.
+Il programma è operativamente attivo e i risultati preliminari confermano la pertinenza dell'intervento.`}
 
 ## Mappa Clinica della Popolazione
 

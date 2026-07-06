@@ -87,22 +87,24 @@ export default requireAuth(async function handler(req, res) {
   const avgNrsPre = sessionsWithNrs.filter(s => s.nrs_pre != null).reduce((a, s) => a + s.nrs_pre, 0) / (sessionsWithNrs.filter(s => s.nrs_pre != null).length || 1);
   const avgNrsPost = sessionsWithNrs.filter(s => s.nrs_post != null).reduce((a, s) => a + s.nrs_post, 0) / (sessionsWithNrs.filter(s => s.nrs_post != null).length || 1);
 
-  const dataBlock = `
-CLIENTE: ${client.name}
-Settore: ${sectorLabel}
-Dipendenti totali: ${client.employees || 'n.d.'}
-Tier: ${tierLabel}
-
-STRATIFICAZIONE (${totalPatients} assessment completati):
-${stratLines(l1Count, l2Count, l3Count, totalPatients)}
-
-NOTA PRIVACY: dove un gruppo è "n.d." è stato soppresso per anonimato (k-anonymity, < ${K_ANON}). NON dedurre, stimare o ricostruire i valori soppressi.
-
+  // Per il pacchetto NON passiamo sessioni/NRS/tier: sono 0/interni e inducono
+  // l'AI a citare trattamenti "non ancora erogati". Solo la fotografia neutra.
+  const clinicoBlock = isPacchetto ? '' : `
 SESSIONI EROGATE: ${sessions.length}
 NRS medio pre-sessione: ${avgNrsPre.toFixed(1)}/10
 NRS medio post-sessione: ${avgNrsPost.toFixed(1)}/10
 Riduzione media NRS: ${(avgNrsPre - avgNrsPost).toFixed(1)} punti
+`;
+  const dataBlock = `
+CLIENTE: ${client.name}
+Settore: ${sectorLabel}
+Dipendenti totali: ${client.employees || 'n.d.'}
+${isPacchetto ? '' : `Tier: ${tierLabel}`}
+STRATIFICAZIONE (${totalPatients} assessment completati):
+${stratLines(l1Count, l2Count, l3Count, totalPatients)}
 
+NOTA PRIVACY: dove un gruppo è "n.d." è stato soppresso per anonimato (k-anonymity, < ${K_ANON}). NON dedurre, stimare o ricostruire i valori soppressi.
+${clinicoBlock}
 PAZIENTI: ${totalPatients > 0 ? 'Assessment completati' : 'Nessun assessment ancora'}
 ${isPacchetto ? '' : quoteBlock}${serviziBlock}
 `.trim();
@@ -115,8 +117,18 @@ VINCOLI TASSATIVI SUL TESTO:
 - MAI "AI" o "intelligenza artificiale" nel nome della piattaforma (si chiama solo "Piattaforma digitale ES Work").
 - MAI i termini Core, Plus, Enterprise (nomi interni). Il prodotto si chiama "${nomeProdotto}".` : '';
   const istruzioniPacchetto = isPacchetto ? `
-ATTENZIONE — PRODOTTO "${nomeProdotto}" (12 mesi, non rinnovabile): include SOLO assessment completo, formazione (2 moduli) e consulenza ergonomico-posturale. NON include trattamenti individuali, percorsi clinici o prevenzione attiva: NON presentarli MAI come inclusi.
-La Mappa Clinica è una FOTOGRAFIA NEUTRA dei dati del questionario: MAI formulazioni come "non trattati", "non presi in carico", "sintomatologia non gestita", "richiedono trattamento/protocollo" o simili riferite a persone; nessun tono di allarme sanitario, nessuna pressione commerciale. Il programma completo va presentato SOLO come evoluzione disponibile, usando questo testo (adattalo senza stravolgerlo): "${testoEvoluzione}"` : '';
+════ PRODOTTO "${nomeProdotto}" — 12 mesi, non rinnovabile, AUTOCONCLUSIVO ════
+Include SOLO: assessment completo (già svolto), formazione (2 moduli), consulenza ergonomico-posturale.
+NON include: trattamenti individuali, percorsi clinici, prevenzione attiva, sportelli, follow-up, monitoraggio.
+
+DIVIETI ASSOLUTI — valgono su TUTTO il testo, incluse le PARAFRASI che aggirano la lettera del divieto ma ne violano lo spirito:
+1. PIATTAFORMA/ACCESSO: l'azienda NON accede alla Piattaforma e NON consulta dati su di essa — RICEVE i report. VIETATO "per consultazione aziendale", "l'azienda consulta/accede/monitora sulla piattaforma", "a disposizione dell'azienda per la consultazione" e ogni variante.
+2. EVOLUZIONE: il programma completo compare SOLO in una chiusura dedicata, con QUESTO testo (adattalo senza stravolgerlo): "${testoEvoluzione}". VIETATO collegarlo alle persone o alle descrizioni dei livelli: niente "beneficia di un approccio personalizzato", "qualora l'azienda decida di estendere", "potrebbe beneficiare di…" dentro le voci L1/L2/L3 o le raccomandazioni.
+3. RACCOMANDAZIONI: possono riguardare SOLO formazione, ergonomia e comportamenti organizzativi. VIETATO raccomandare follow-up periodici, monitoraggio sistematico, mini-check, controlli clinici periodici, prese in carico.
+4. TRATTAMENTI: si citano SOLO nell'esclusione dichiarata del Piano Operativo. VIETATO "non ancora erogate/erogati", "in attesa di trattamento", "prima fase" e ogni formulazione che li presenti come tappa attesa o futura.
+5. MAPPA CLINICA = fotografia NEUTRA del questionario: descrivi i livelli con i soli dati osservati (dolore riportato, impatto funzionale). MAI come bisogni clinici da soddisfare, MAI tono di allarme, MAI "non trattati", "non presi in carico", "sintomatologia non gestita", "richiedono trattamento/protocollo".
+6. NON inserire date nel testo: la data del report è nell'intestazione.
+PRINCIPIO GUIDA: la stratificazione è la fotografia dello stato della popolazione, NON un elenco di bisogni da colmare. Il pacchetto si esaurisce nelle sue tre attività.` : '';
 
   // Fallback se manca la chiave
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -154,13 +166,17 @@ ${serviziBlock ? `
 ## Cosa include il programma
 (elenca le voci con i rispettivi valori dichiarati, una per riga, SENZA totale)
 ` : ''}
-## Raccomandazioni Cliniche
-(3-5 raccomandazioni specifiche basate sui dati)
+## Raccomandazioni ${isPacchetto ? '' : 'Cliniche'}
+${isPacchetto
+  ? '(3-5 raccomandazioni SOLO su formazione, ergonomia e comportamenti organizzativi — vedi DIVIETI: niente monitoraggio/follow-up/trattamenti)'
+  : '(3-5 raccomandazioni specifiche basate sui dati)'}
 
 ## Prossimi Passi
-(5 step operativi con timeframe indicativo)
+${isPacchetto
+  ? '(SOLO gli step del pacchetto: restituzione dei risultati alla direzione, formazione collettiva, sopralluogo ergonomico e conferma delle postazioni, consulenza ergonomico-posturale; NIENTE monitoraggio, follow-up clinici o trattamenti)'
+  : '(5 step operativi con timeframe indicativo)'}
 ${vincoliV2}${istruzioniPacchetto}
-Tono: professionale, clinico, orientato ai dati. In italiano. Non più di 800 parole totali.`,
+Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole totali. NON inserire date nel testo: la data del report è gestita dall'intestazione.`,
       }],
     });
 

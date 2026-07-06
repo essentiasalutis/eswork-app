@@ -217,7 +217,7 @@ ${mappa}
 ## Piano Operativo Proposto
 
 ${isPacchetto
-  ? `Il percorso ${nomeProdotto || 'd\'ingresso'} (12 mesi) comprende l'assessment completo della popolazione — già svolto —, la formazione collettiva su ergonomia e postura e la consulenza ergonomico-posturale sulle postazioni di lavoro. Il percorso non comprende trattamenti individuali: la stratificazione qui presentata fotografa il bisogno emerso.`
+  ? `Il percorso ${nomeProdotto || 'd\'ingresso'} (12 mesi) comprende l'assessment completo della popolazione — già svolto —, la formazione collettiva su ergonomia e postura e la consulenza ergonomico-posturale sulle postazioni di lavoro. Il percorso non comprende trattamenti individuali: la stratificazione qui presentata fotografa lo stato della popolazione rilevato dal questionario.`
   : `Il piano prevede la presa in carico dei pazienti L1 distribuiti in turni di avvio mensili, con sportello osteopatico in sede. La formazione collettiva copre l'intera popolazione aziendale con moduli su ergonomia e postura.`}
 ${!isPacchetto && quoteBlock ? `
 ## Proposta economica collegata

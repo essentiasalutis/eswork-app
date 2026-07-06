@@ -58,8 +58,8 @@ INSERT INTO public.pricing_settings (version, key, value) VALUES
   ('v2','ergonomia_minuti_postazione','60'),   -- produzione: 60' × tariffa/h sportello, per postazione tipo
   ('v2','ergonomia_minimo_ore','4'),           -- minimo fatturabile: mezza giornata (sotto → avviso admin, nessun blocco)
   -- prodotto d'ingresso (pacchetto prevenzione)
-  ('v2','soglia_ingresso','80'),               -- pacchetto selezionabile SOLO se popolazione ≤ soglia (regola dura server)
-  ('v2','prezzo_assessment_pacchetto','0'),    -- ⚠ DA DEFINIRE (valore da Enrico): prezzo assessment nel pacchetto
+  ('v2','soglia_ingresso','80'),                    -- pacchetto selezionabile SOLO se popolazione ≤ soglia (regola dura server)
+  ('v2','assessment_prezzo_per_dipendente','15'),   -- pacchetto: €/dipendente DICHIARATO (fattore; costo = n × 15)
   -- naming cliente-facing parametrico (i nomi interni non compaiono mai nei documenti)
   ('v2','naming_cliente_programma_completo','Programma ES Work'),
   ('v2','naming_cliente_pacchetto_prevenzione','Pacchetto Prevenzione'),
@@ -70,6 +70,13 @@ INSERT INTO public.pricing_settings (version, key, value) VALUES
   ('v2','argomentario_buffer','Segnaposto (admin): cosa copre il buffer clinico, perché 20%, come argomentarlo.'),
   ('v2','argomentario_formazione','Segnaposto (admin): cosa è la formazione, perché ha questo valore, come argomentarla.'),
   ('v2','argomentario_assessment_pacchetto','Segnaposto (admin): cosa include l''assessment nel pacchetto, perché ha questo valore, come argomentarlo.')
+ON CONFLICT (version, key) DO NOTHING;
+
+-- Bonifica (per DB dove la v38 era già stata applicata con la chiave provvisoria):
+-- il prezzo assessment del pacchetto è un FATTORE per dipendente, non un flat.
+DELETE FROM public.pricing_settings WHERE version='v2' AND key='prezzo_assessment_pacchetto';
+INSERT INTO public.pricing_settings (version, key, value) VALUES
+  ('v2','assessment_prezzo_per_dipendente','15')
 ON CONFLICT (version, key) DO NOTHING;
 
 -- ── 3. Servizi & deliverable (valori dichiarati per configurazione) ─────────

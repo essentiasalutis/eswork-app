@@ -81,6 +81,7 @@ export default requireAuth(async function handler(req, res) {
     ? (v2Texts.naming_cliente_pacchetto_prevenzione || 'Pacchetto Prevenzione')
     : (v2Texts.naming_cliente_programma_completo || 'Programma ES Work');
   const testoEvoluzione = v2Texts.testo_evoluzione_pacchetto || '';
+  const dataOggi = new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
 
   // NRS data da sessioni
   const sessionsWithNrs = sessions.filter(s => s.nrs_pre != null || s.nrs_post != null);
@@ -119,7 +120,7 @@ VINCOLI TASSATIVI SUL TESTO:
   const istruzioniPacchetto = isPacchetto ? `
 ════ PRODOTTO "${nomeProdotto}" — 12 mesi, non rinnovabile, AUTOCONCLUSIVO ════
 Include SOLO: assessment completo (già svolto), formazione (2 moduli), consulenza ergonomico-posturale.
-NON include: trattamenti individuali, percorsi clinici, prevenzione attiva, sportelli, follow-up, monitoraggio.
+NON include: trattamenti individuali, percorsi clinici, prevenzione attiva, sportello osteopatico, follow-up, monitoraggio.
 
 DIVIETI ASSOLUTI — valgono su TUTTO il testo, incluse le PARAFRASI che aggirano la lettera del divieto ma ne violano lo spirito:
 1. PIATTAFORMA/ACCESSO: l'azienda NON accede alla Piattaforma e NON consulta dati su di essa — RICEVE i report. VIETATO "per consultazione aziendale", "l'azienda consulta/accede/monitora sulla piattaforma", "a disposizione dell'azienda per la consultazione" e ogni variante.
@@ -127,7 +128,6 @@ DIVIETI ASSOLUTI — valgono su TUTTO il testo, incluse le PARAFRASI che aggiran
 3. RACCOMANDAZIONI: possono riguardare SOLO formazione, ergonomia e comportamenti organizzativi. VIETATO raccomandare follow-up periodici, monitoraggio sistematico, mini-check, controlli clinici periodici, prese in carico.
 4. TRATTAMENTI: si citano SOLO nell'esclusione dichiarata del Piano Operativo. VIETATO "non ancora erogate/erogati", "in attesa di trattamento", "prima fase" e ogni formulazione che li presenti come tappa attesa o futura.
 5. MAPPA CLINICA = fotografia NEUTRA del questionario: descrivi i livelli con i soli dati osservati (dolore riportato, impatto funzionale). MAI come bisogni clinici da soddisfare, MAI tono di allarme, MAI "non trattati", "non presi in carico", "sintomatologia non gestita", "richiedono trattamento/protocollo".
-6. NON inserire date nel testo: la data del report è nell'intestazione.
 PRINCIPIO GUIDA: la stratificazione è la fotografia dello stato della popolazione, NON un elenco di bisogni da colmare. Il pacchetto si esaurisce nelle sue tre attività.` : '';
 
   // Fallback se manca la chiave
@@ -161,7 +161,7 @@ STRUTTURA DEL REPORT (usa markdown con ## per titoli):
 ## Piano Operativo Proposto
 ${isPacchetto
   ? `(SOLO le attività del pacchetto: assessment già svolto, formazione collettiva, consulenza ergonomico-posturale — NESSUN trattamento incluso)`
-  : `(turni di presa in carico, sportelli, formazione collettiva — adatto al tier ${tierLabel}; se presente la PROPOSTA ECONOMICA COLLEGATA, citane l'investimento Anno 1 in chiusura)`}
+  : `(turni di presa in carico, sportello osteopatico, formazione collettiva — adatto al tier ${tierLabel}; se presente la PROPOSTA ECONOMICA COLLEGATA, citane l'investimento Anno 1 in chiusura)`}
 ${serviziBlock ? `
 ## Cosa include il programma
 (elenca le voci con i rispettivi valori dichiarati, una per riga, SENZA totale)
@@ -176,7 +176,9 @@ ${isPacchetto
   ? '(SOLO gli step del pacchetto: restituzione dei risultati alla direzione, formazione collettiva, sopralluogo ergonomico e conferma delle postazioni, consulenza ergonomico-posturale; NIENTE monitoraggio, follow-up clinici o trattamenti)'
   : '(5 step operativi con timeframe indicativo)'}
 ${vincoliV2}${istruzioniPacchetto}
-Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole totali. NON inserire date nel testo: la data del report è gestita dall'intestazione.`,
+IDENTITÀ PROFESSIONALE (tassativa): il servizio è OSTEOPATICO. Usa sempre "osteopata", "trattamento osteopatico", "sportello osteopatico". VIETATO "fisioterapista", "fisioterapico", "riabilitativo/riabilitazione" e ogni termine fisioterapico riferito al nostro servizio.
+DATA: se includi un'intestazione con il riepilogo del cliente, riporta "Data: ${dataOggi}". Usa ESATTAMENTE questa data; non inventarne altre né citare altre date nel testo.
+Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole totali.`,
       }],
     });
 

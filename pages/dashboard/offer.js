@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { requireAuthSsr } from '../../lib/auth';
 import { getAssessmentById, getClientById, getResponsesByAssessment, getFirstMeeting } from '../../lib/store';
 import { getPricingSettingsV2 } from '../../lib/pricing/settings';
+import { getStimaSnapshot } from '../../lib/pricing/snapshot';
 import {
   aggregateNMQ,
   trafficLight, TL_COLOR, TL_BG, TL_BORDER, TYPE_LABELS, generateSummaryText, BODY_ZONES,
@@ -738,8 +739,10 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     const pricingVersion = client?.pricing_version || 'v1';
     const v2Params = pricingVersion === 'v2' ? (await getPricingSettingsV2()).params : null;
     let ergonomiaV2; // input colloquio (Blocco C li scrive in step2); default motore: tutta la popolazione ufficio
+    let snap = null;
     try {
       const fm = await getFirstMeeting(assessment.client_id);
+      snap = getStimaSnapshot(fm);
       const fmd = fm?.data;
       if (fmd) {
         const s2 = fmd.step2 || {};
@@ -768,14 +771,27 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       }
     } catch (_) {}
 
+    // Precedenza: SNAPSHOT (promessa congelata) → live. Se lo snapshot esiste, il
+    // banner confronta il prezzo reale (parametri snapshottati) contro la forbice
+    // PERSISTITA — coerente col flag quote_compliance del Report.
+    const usableSnap = snap && snap.forchetta;
+    const si = usableSnap ? (snap.inputs || {}) : null;
+    const nBasis = usableSnap ? (parseInt(si.n) || totalN) : totalN;
+    const l2MultBasis = usableSnap ? (si.l2Mult != null ? Number(si.l2Mult) : l2Mult) : l2Mult;
+    const v2ParamsBasis = usableSnap ? snap.v2Params : v2Params;
+    const ergBasis = usableSnap ? si.ergonomia : ergonomiaV2;
+    const condBasis = usableSnap
+      ? { tier: si.tier, groups: si.groups, rates: si.rates, vatExempt: si.vatExempt }
+      : (custom || schedaDefaults);
+    if (usableSnap) forchetta = { min: snap.forchetta.min?.price_y1, avg: snap.forchetta.avg?.price_y1, max: snap.forchetta.max?.price_y1 };
+
     // "Prezzo reale" OMOGENEO con la forbice: prevalenza L1 osservata × forza
-    // lavoro, L2 derivato (L1 × moltiplicatore). Override manuale via query l1/l2.
-    const auto = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: totalN, l2Mult, pricingVersion, v2Params });
+    // lavoro (snapshottata se presente), L2 derivato. Override manuale via query l1/l2.
+    const auto = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: nBasis, l2Mult: l2MultBasis, pricingVersion, v2Params: v2ParamsBasis });
     const l1v = l1 !== undefined ? parseInt(l1) : auto.l1;
     const l2v = l2 !== undefined ? parseInt(l2) : auto.l2;
 
-    const effective = custom || schedaDefaults;
-    const calc = calculatePricing({ n: totalN, l1: l1v, l2: l2v, pricingVersion, v2Params, ergonomia: ergonomiaV2, ...(effective || {}) });
+    const calc = calculatePricing({ n: nBasis, l1: l1v, l2: l2v, pricingVersion, v2Params: v2ParamsBasis, ergonomia: ergBasis, ...(condBasis || {}) });
     const roi = null; // ROI only from calculator (requires absence days input)
 
     return {

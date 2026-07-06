@@ -12,6 +12,7 @@ import {
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { calculatePricing, computeForchetta, realL1L2FromAssessment } from '../../../../lib/calculator';
 import { getPricingSettingsV2, getServiziDeliverable, getNotaValidazione } from '../../../../lib/pricing/settings';
+import { getStimaSnapshot, freezeStimaSnapshot } from '../../../../lib/pricing/snapshot';
 import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
 import { kAnonPartition, tooSmall, K_ANON } from '../../../../lib/kanon';
@@ -58,6 +59,10 @@ export default requireAuth(async function handler(req, res) {
   // Array PIATTO di answers (stessa forma che usa offer.js via getResponsesByAssessment).
   const answers = Object.values((responses && responses.responses) || {}).flat();
   const { block: quoteBlock, compliance: quoteCompliance } = await buildQuoteBlock(id, client, answers);
+  // La generazione del Report CHIUDE la catena Stima→Report → timbra frozen_at
+  // sullo snapshot (se esiste). Fatto qui, NON in buildQuoteBlock (usata anche
+  // dall'endpoint read-only di regressione).
+  await freezeStimaSnapshot(id).catch(() => {});
 
   // ── v2: tabella servizi ("Cosa include il programma") + testi parametrici ──
   // SOLO listino v2: per i clienti v1 il report resta ESATTAMENTE quello attuale.
@@ -283,46 +288,57 @@ export async function buildQuoteBlock(client_id, client, answers) {
   try {
     const fm = await getFirstMeeting(client_id);
     const fmd = fm?.data;
-    if (!fmd) return { block: '', compliance: null };
-    const s2 = fmd.step2 || {};
-    const sp = fmd.params || {};
-    const cap = Math.max(1, parseInt(s2.capienza) || CONFIG.classroom_capacity_default);
+    const snap = getStimaSnapshot(fm);
+    const usableSnap = snap && snap.forchetta;  // snapshot programma completo con forbice
+    if (!fmd && !usableSnap) return { block: '', compliance: null };
+    const s2 = fmd?.step2 || {};
+    const sp = fmd?.params || {};
     const responders = (answers || []).length;
-    const nEmp = parseInt(client.employees) || responders;
-    const sedi = Array.isArray(s2.sedi) ? s2.sedi : [];
-    const groups = s2.training_mode === 'accorpa'
-      ? Math.max(1, Math.ceil(nEmp / cap))
-      : (sedi.reduce((a, e) => a + Math.ceil((parseInt(e.employees) || 0) / cap), 0) || Math.max(1, Math.ceil(nEmp / cap)));
-    // Versione listino dal record cliente (fail-safe v1): forbice e prezzo reale
-    // escono SEMPRE dalla stessa versione → mai confronti incrociati tra versioni.
     const pricingVersion = client.pricing_version || 'v1';
-    const v2Params = pricingVersion === 'v2' ? (await getPricingSettingsV2()).params : null;
-    // Ergonomia: nel Report il conteggio postazioni è quello DEFINITIVO
-    // (input admin aggiornato post-sopralluogo, scritto in step2 dal colloquio).
-    const ergonomiaV2 = (s2.ergonomia_ufficio != null || s2.ergonomia_postazioni != null)
-      ? { nUfficio: parseInt(s2.ergonomia_ufficio) || 0, nPostazioni: parseInt(s2.ergonomia_postazioni) || 0 }
-      : undefined;
-    const conditions = { pricingVersion, v2Params, ergonomia: ergonomiaV2, tier: s2.tier || undefined, groups, rates: sp.rates || undefined, vatExempt: sp.vat_exempt };
-    const sectorKey = fmd.step1?.sector || (client.sector === 1 ? 'manufacturing' : 'services');
-    const l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
-
-    // Reale OMOGENEO con la forbice (STESSA definizione del banner offer.js):
-    // prevalenza L1 OSSERVATA dall'assessment × forza lavoro, L2 derivato
-    // (L1 × moltiplicatore). Una sola definizione di "prezzo reale".
     const nmq = aggregateNMQ(answers || []);
-    const real = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: nEmp, l2Mult, pricingVersion });
+
+    // ── Precedenza: SNAPSHOT (promessa congelata) → LIVE (colloquio + config) ──
+    // Prezzo reale coi parametri SNAPSHOTTATI, forbice = quella PERSISTITA.
+    let source, nEmp, l2Mult, conditions, min, avg, max;
+    if (usableSnap) {
+      source = 'snapshot';
+      const si = snap.inputs || {};
+      nEmp = parseInt(si.n) || (parseInt(client.employees) || responders);
+      l2Mult = si.l2Mult != null ? Number(si.l2Mult) : CONFIG.l2_multiplier_default;
+      conditions = { pricingVersion, v2Params: snap.v2Params, ergonomia: si.ergonomia, tier: si.tier, groups: si.groups, rates: si.rates, vatExempt: si.vatExempt };
+      min = snap.forchetta.min?.price_y1; avg = snap.forchetta.avg?.price_y1; max = snap.forchetta.max?.price_y1;
+    } else {
+      source = 'live';
+      const cap = Math.max(1, parseInt(s2.capienza) || CONFIG.classroom_capacity_default);
+      nEmp = parseInt(client.employees) || responders;
+      const sedi = Array.isArray(s2.sedi) ? s2.sedi : [];
+      const groups = s2.training_mode === 'accorpa'
+        ? Math.max(1, Math.ceil(nEmp / cap))
+        : (sedi.reduce((a, e) => a + Math.ceil((parseInt(e.employees) || 0) / cap), 0) || Math.max(1, Math.ceil(nEmp / cap)));
+      const v2Params = pricingVersion === 'v2' ? (await getPricingSettingsV2()).params : null;
+      const ergonomiaV2 = (s2.ergonomia_ufficio != null || s2.ergonomia_postazioni != null)
+        ? { nUfficio: parseInt(s2.ergonomia_ufficio) || 0, nPostazioni: parseInt(s2.ergonomia_postazioni) || 0 }
+        : undefined;
+      conditions = { pricingVersion, v2Params, ergonomia: ergonomiaV2, tier: s2.tier || undefined, groups, rates: sp.rates || undefined, vatExempt: sp.vat_exempt };
+      const sectorKey = fmd?.step1?.sector || (client.sector === 1 ? 'manufacturing' : 'services');
+      l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
+      const fch = computeForchetta({ n: nEmp, sector: sectorKey, l2Mult, ...conditions });
+      min = fch.min.price_y1; avg = fch.avg.price_y1; max = fch.max.price_y1;
+    }
+
+    // Reale OMOGENEO con la forbice: prevalenza L1 OSSERVATA × forza lavoro
+    // (snapshottata se presente), L2 derivato, coi parametri della stessa fonte.
+    const real = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: nEmp, l2Mult, pricingVersion, v2Params: conditions.v2Params });
     const calc = calculatePricing({ n: nEmp, l1: real.l1, l2: real.l2, ...conditions });
     if (!calc) return { block: '', compliance: null };
 
-    // Forbice del colloquio (SORGENTE UNICA) per il confronto dentro/fuori — dato
-    // interno (solo admin): prova del rispetto del range concordato nella Lettera.
-    const fch = computeForchetta({ n: nEmp, sector: sectorKey, l2Mult, ...conditions });
-    const min = fch.min.price_y1, avg = fch.avg.price_y1, max = fch.max.price_y1;
     const realPrice = calc.price_y1;
     const inRange = (min != null && max != null) ? (realPrice >= min && realPrice <= max) : null;
-    // pricing_version nel flag: prova che reale e forbice escono dalla STESSA
-    // versione del listino (mai confronti incrociati).
-    const compliance = { in_range: inRange, min, avg, max, real_price: realPrice, pricing_version: pricingVersion };
+    // source: 'snapshot' = confronto contro la forbice promessa; 'live' = ricalcolata
+    // (nessuna Stima emessa). pricing_version: mai confronti incrociati tra versioni.
+    const compliance = { in_range: inRange, min, avg, max, real_price: realPrice, pricing_version: pricingVersion, source };
+    // NB: nessun side-effect qui (buildQuoteBlock è usata anche dall'endpoint
+    // read-only di regressione). Il freeze avviene nel handler del Report.
 
     const eur = v => v.toLocaleString('it-IT', { useGrouping: 'always' });
     // Testo CLIENTE: prezzo + framing positivo "in linea con la stima" se rientra.

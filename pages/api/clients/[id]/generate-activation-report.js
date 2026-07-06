@@ -11,6 +11,7 @@ import {
 } from '../../../../lib/store';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { calculatePricing, computeForchetta, realL1L2FromAssessment } from '../../../../lib/calculator';
+import { getPricingSettingsV2 } from '../../../../lib/pricing/settings';
 import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
 import { kAnonPartition, tooSmall, K_ANON } from '../../../../lib/kanon';
@@ -203,7 +204,13 @@ export async function buildQuoteBlock(client_id, client, answers) {
     // Versione listino dal record cliente (fail-safe v1): forbice e prezzo reale
     // escono SEMPRE dalla stessa versione → mai confronti incrociati tra versioni.
     const pricingVersion = client.pricing_version || 'v1';
-    const conditions = { pricingVersion, tier: s2.tier || undefined, groups, rates: sp.rates || undefined, vatExempt: sp.vat_exempt };
+    const v2Params = pricingVersion === 'v2' ? (await getPricingSettingsV2()).params : null;
+    // Ergonomia: nel Report il conteggio postazioni è quello DEFINITIVO
+    // (input admin aggiornato post-sopralluogo, scritto in step2 dal colloquio).
+    const ergonomiaV2 = (s2.ergonomia_ufficio != null || s2.ergonomia_postazioni != null)
+      ? { nUfficio: parseInt(s2.ergonomia_ufficio) || 0, nPostazioni: parseInt(s2.ergonomia_postazioni) || 0 }
+      : undefined;
+    const conditions = { pricingVersion, v2Params, ergonomia: ergonomiaV2, tier: s2.tier || undefined, groups, rates: sp.rates || undefined, vatExempt: sp.vat_exempt };
     const sectorKey = fmd.step1?.sector || (client.sector === 1 ? 'manufacturing' : 'services');
     const l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
 
@@ -221,7 +228,9 @@ export async function buildQuoteBlock(client_id, client, answers) {
     const min = fch.min.price_y1, avg = fch.avg.price_y1, max = fch.max.price_y1;
     const realPrice = calc.price_y1;
     const inRange = (min != null && max != null) ? (realPrice >= min && realPrice <= max) : null;
-    const compliance = { in_range: inRange, min, avg, max, real_price: realPrice };
+    // pricing_version nel flag: prova che reale e forbice escono dalla STESSA
+    // versione del listino (mai confronti incrociati).
+    const compliance = { in_range: inRange, min, avg, max, real_price: realPrice, pricing_version: pricingVersion };
 
     const eur = v => v.toLocaleString('it-IT', { useGrouping: 'always' });
     // Testo CLIENTE: prezzo + framing positivo "in linea con la stima" se rientra.

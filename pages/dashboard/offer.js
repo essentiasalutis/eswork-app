@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { requireAuthSsr } from '../../lib/auth';
 import { getAssessmentById, getClientById, getResponsesByAssessment, getFirstMeeting } from '../../lib/store';
+import { getPricingSettingsV2 } from '../../lib/pricing/settings';
 import {
   aggregateNMQ,
   trafficLight, TL_COLOR, TL_BG, TL_BORDER, TYPE_LABELS, generateSummaryText, BODY_ZONES,
@@ -694,7 +695,8 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       const l2v = l2 != null ? parseInt(l2) : 0;
       // Versione listino SEMPRE dal record cliente (mai da query); fail-safe v1.
       const pricingVersion = client.pricing_version || 'v1';
-      const calc = calculatePricing({ n: totalN, l1: l1v, l2: l2v, pricingVersion, ...(custom || {}) });
+      const v2Params = pricingVersion === 'v2' ? (await getPricingSettingsV2()).params : null;
+      const calc = calculatePricing({ n: totalN, l1: l1v, l2: l2v, pricingVersion, v2Params, ...(custom || {}) });
       return {
         props: {
           client,
@@ -734,6 +736,8 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     let l2Mult = CONFIG.l2_multiplier_default;
     // Versione listino SEMPRE dal record cliente (mai da query); fail-safe v1.
     const pricingVersion = client?.pricing_version || 'v1';
+    const v2Params = pricingVersion === 'v2' ? (await getPricingSettingsV2()).params : null;
+    let ergonomiaV2; // input colloquio (Blocco C li scrive in step2); default motore: tutta la popolazione ufficio
     try {
       const fm = await getFirstMeeting(assessment.client_id);
       const fmd = fm?.data;
@@ -756,19 +760,22 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         // dentro/fuori — vista admin, non nel PDF cliente.
         const sectorKey = fmd.step1?.sector || (client?.sector === 1 ? 'manufacturing' : 'services');
         l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
-        const fch = computeForchetta({ n: fmN, sector: sectorKey, l2Mult, pricingVersion, ...schedaDefaults });
+        if (s2.ergonomia_ufficio != null || s2.ergonomia_postazioni != null) {
+          ergonomiaV2 = { nUfficio: parseInt(s2.ergonomia_ufficio) || 0, nPostazioni: parseInt(s2.ergonomia_postazioni) || 0 };
+        }
+        const fch = computeForchetta({ n: fmN, sector: sectorKey, l2Mult, pricingVersion, v2Params, ergonomia: ergonomiaV2, ...schedaDefaults });
         if (fch.min.price_y1 != null) forchetta = { min: fch.min.price_y1, avg: fch.avg.price_y1, max: fch.max.price_y1 };
       }
     } catch (_) {}
 
     // "Prezzo reale" OMOGENEO con la forbice: prevalenza L1 osservata × forza
     // lavoro, L2 derivato (L1 × moltiplicatore). Override manuale via query l1/l2.
-    const auto = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: totalN, l2Mult, pricingVersion });
+    const auto = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: totalN, l2Mult, pricingVersion, v2Params });
     const l1v = l1 !== undefined ? parseInt(l1) : auto.l1;
     const l2v = l2 !== undefined ? parseInt(l2) : auto.l2;
 
     const effective = custom || schedaDefaults;
-    const calc = calculatePricing({ n: totalN, l1: l1v, l2: l2v, pricingVersion, ...(effective || {}) });
+    const calc = calculatePricing({ n: totalN, l1: l1v, l2: l2v, pricingVersion, v2Params, ergonomia: ergonomiaV2, ...(effective || {}) });
     const roi = null; // ROI only from calculator (requires absence days input)
 
     return {

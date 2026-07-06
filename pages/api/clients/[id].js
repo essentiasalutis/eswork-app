@@ -1,5 +1,7 @@
 import { requireAuth } from '../../../lib/auth';
 import { getClientById, updateClient, deleteClientById } from '../../../lib/store';
+import { getPricingSettingsV2 } from '../../../lib/pricing/settings';
+import { validatePacchetto } from '../../../lib/pricing/v2';
 
 export default requireAuth(async function handler(req, res) {
   const { id } = req.query;
@@ -32,7 +34,38 @@ export default requireAuth(async function handler(req, res) {
 
   if (req.method === 'PATCH') {
     try {
-      const updated = await updateClient(id, req.body);
+      const body = { ...req.body };
+      // pricing_version NON è modificabile via API: si decide alla creazione
+      // (esistenti v1, nuove v2). Requisito #1: mai spostare un cliente di versione.
+      delete body.pricing_version;
+
+      // Prodotto d'ingresso: REGOLE DURE lato server (la UI può nascondere
+      // l'opzione, ma è qui che viene rifiutata).
+      if (body.tipo_prodotto != null && !['programma_completo', 'pacchetto_prevenzione'].includes(body.tipo_prodotto)) {
+        return res.status(422).json({ error: 'tipo_prodotto non valido' });
+      }
+      if (body.tipo_prodotto === 'pacchetto_prevenzione' && client.tipo_prodotto !== 'pacchetto_prevenzione') {
+        const { params } = await getPricingSettingsV2();
+        const check = validatePacchetto({
+          employees: body.employees != null ? body.employees : client.employees,
+          pricingVersion: client.pricing_version || 'v1',
+          v2Params: params,
+        });
+        if (!check.ok) return res.status(422).json({ error: check.motivo });
+        // Durata 12 mesi, NON rinnovabile: scadenza fissata all'attivazione.
+        body.stato_ingresso = 'attivo';
+        if (!body.data_scadenza_ingresso) {
+          const start = client.contract_start_date ? new Date(client.contract_start_date) : new Date();
+          start.setMonth(start.getMonth() + 12);
+          body.data_scadenza_ingresso = start.toISOString().slice(0, 10);
+        }
+      }
+      // Alla scadenza (o anticipato): upgrade a programma completo.
+      if (body.tipo_prodotto === 'programma_completo' && client.tipo_prodotto === 'pacchetto_prevenzione') {
+        body.stato_ingresso = 'upgradato';
+      }
+
+      const updated = await updateClient(id, body);
       return res.json(updated);
     } catch (e) {
       return res.status(500).json({ error: e.message });

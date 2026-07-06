@@ -115,5 +115,5 @@ GRANT ALL ON public.servizi_deliverable TO service_role;
 --   → tutte le esistenti 'v1'; nessuna NULL.
 -- SELECT tipo_prodotto, COUNT(*) FROM public.clients GROUP BY tipo_prodotto;
 --   → tutte 'programma_completo'.
--- SELECT COUNT(*) FROM public.pricing_settings;    → 19
+-- SELECT COUNT(*) FROM public.pricing_settings;    → 18
 -- SELECT COUNT(*) FROM public.servizi_deliverable; → 12

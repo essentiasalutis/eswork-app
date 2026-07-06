@@ -24,6 +24,7 @@ const PARAM_LABELS = {
 };
 
 const TEXT_LABELS = {
+  nota_validazione_report: 'Nota di validazione (in fondo a OGNI report: Attivazione + checkpoint)',
   naming_cliente_programma_completo: 'Nome cliente-facing: programma completo',
   naming_cliente_pacchetto_prevenzione: 'Nome cliente-facing: pacchetto prevenzione',
   testo_evoluzione_pacchetto: 'Report pacchetto: testo "evoluzione verso il programma completo"',

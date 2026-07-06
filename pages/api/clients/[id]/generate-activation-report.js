@@ -11,7 +11,7 @@ import {
 } from '../../../../lib/store';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { calculatePricing, computeForchetta, realL1L2FromAssessment } from '../../../../lib/calculator';
-import { getPricingSettingsV2, getServiziDeliverable } from '../../../../lib/pricing/settings';
+import { getPricingSettingsV2, getServiziDeliverable, getNotaValidazione } from '../../../../lib/pricing/settings';
 import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
 import { kAnonPartition, tooSmall, K_ANON } from '../../../../lib/kanon';
@@ -82,6 +82,9 @@ export default requireAuth(async function handler(req, res) {
     : (v2Texts.naming_cliente_programma_completo || 'Programma ES Work');
   const testoEvoluzione = v2Texts.testo_evoluzione_pacchetto || '';
   const dataOggi = new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+  // Nota di validazione deterministica in fondo a ogni report (mai generata dall'AI).
+  const notaValidazione = await getNotaValidazione();
+  const conNota = t => `${t}\n\n---\n\n*${notaValidazione}*`;
 
   // NRS data da sessioni
   const sessionsWithNrs = sessions.filter(s => s.nrs_pre != null || s.nrs_post != null);
@@ -132,7 +135,7 @@ PRINCIPIO GUIDA: la stratificazione è la fotografia dello stato della popolazio
 
   // Fallback se manca la chiave
   if (!process.env.ANTHROPIC_API_KEY) {
-    const fallback = generateFallbackReport(client, l1Count, l2Count, l3Count, totalPatients, sessions.length, sectorLabel, quoteBlock, { serviziBlock, isPacchetto, nomeProdotto, testoEvoluzione });
+    const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, totalPatients, sessions.length, sectorLabel, quoteBlock, { serviziBlock, isPacchetto, nomeProdotto, testoEvoluzione }));
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', pdf_url: pdfUrl, report_id: rec?.id });
@@ -182,12 +185,12 @@ Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole tota
       }],
     });
 
-    const report = message.content[0]?.text || '';
+    const report = conNota(message.content[0]?.text || '');
     const pdfUrl = await tryGeneratePdf(client, 'activation', report, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report, source: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
-    const fallback = generateFallbackReport(client, l1Count, l2Count, l3Count, totalPatients, sessions.length, sectorLabel, quoteBlock, { serviziBlock, isPacchetto, nomeProdotto, testoEvoluzione });
+    const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, totalPatients, sessions.length, sectorLabel, quoteBlock, { serviziBlock, isPacchetto, nomeProdotto, testoEvoluzione }));
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });

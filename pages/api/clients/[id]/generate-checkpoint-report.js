@@ -9,6 +9,7 @@ import {
   insertGeneratedReport,
   insertDocument,
 } from '../../../../lib/store';
+import { getNotaValidazione } from '../../../../lib/pricing/settings';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { kAnonPartition, maskCount, tooSmall, K_ANON } from '../../../../lib/kanon';
 
@@ -168,9 +169,12 @@ STRUTTURA REPORT (markdown, ## per titoli):
 Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
 
   const reportType = `checkpoint_${checkpoint}`;
+  // Nota di validazione deterministica in fondo al report (mai dall'AI).
+  const notaValidazione = await getNotaValidazione();
+  const conNota = t => `${t}\n\n---\n\n*${notaValidazione}*`;
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    const fallback = generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc);
+    const fallback = conNota(generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc));
     // PDF prima dell'insert: così pdf_url resta sul record e il report è riapribile col PDF
     const pdfUrl = await tryGeneratePdf(client, reportType, fallback, id, checkpoint).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system', pdf_url: pdfUrl }).catch(() => null);
@@ -184,12 +188,12 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
       max_tokens: 1500,
       messages: [{ role: 'user', content: prompt }],
     });
-    const report = message.content[0]?.text || '';
+    const report = conNota(message.content[0]?.text || '');
     const pdfUrl = await tryGeneratePdf(client, reportType, report, id, checkpoint).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: report, checkpoint, created_by: 'admin', pdf_url: pdfUrl }).catch(() => null);
     return res.json({ report, source: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
-    const fallback = generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc);
+    const fallback = conNota(generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc));
     const pdfUrl = await tryGeneratePdf(client, reportType, fallback, id, checkpoint).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system', pdf_url: pdfUrl }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });

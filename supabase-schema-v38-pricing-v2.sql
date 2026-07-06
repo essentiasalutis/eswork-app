@@ -60,6 +60,8 @@ INSERT INTO public.pricing_settings (version, key, value) VALUES
   -- prodotto d'ingresso (pacchetto prevenzione)
   ('v2','soglia_ingresso','80'),                    -- pacchetto selezionabile SOLO se popolazione ≤ soglia (regola dura server)
   ('v2','assessment_prezzo_per_dipendente','15'),   -- pacchetto: €/dipendente DICHIARATO (fattore; costo = n × 15)
+  -- nota di validazione in fondo a OGNI report (Attivazione + checkpoint), a schermo e nel PDF
+  ('v2','nota_validazione_report','Questo report è stato elaborato con il supporto di strumenti di intelligenza artificiale e validato da un professionista osteopata di Essentia Salutis, che ne assume la responsabilità clinica.'),
   -- naming cliente-facing parametrico (i nomi interni non compaiono mai nei documenti)
   ('v2','naming_cliente_programma_completo','Programma ES Work'),
   ('v2','naming_cliente_pacchetto_prevenzione','Pacchetto Prevenzione'),

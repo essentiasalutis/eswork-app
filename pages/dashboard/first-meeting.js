@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireAuthSsr } from '../../lib/auth';
 import { calculatePricing, computeForchetta, calculateROI, getTier, tierIncludesL2Prevention, fmt } from '../../lib/calculator';
+import { calculatePacchetto } from '../../lib/pricing/v2';
 import { CONFIG } from '../../lib/config';
 import NavMenu from '../../components/NavMenu';
 
@@ -35,10 +36,13 @@ function Toggle({ checked, onChange, label }) {
   );
 }
 
-export default function FirstMeetingScheda({ client: initialClient, meeting }) {
+export default function FirstMeetingScheda({ client: initialClient, meeting, v2Params }) {
   const router = useRouter();
   const d = meeting?.data || {};
   const s1 = d.step1 || {}, s2 = d.step2 || {}, s3 = d.step3 || {}, sp = d.params || {};
+  // Versione listino: dal record cliente (fail-safe v1); azienda nuova → v2.
+  const pricingVersion = initialClient ? (initialClient.pricing_version || 'v1') : 'v2';
+  const isV2 = pricingVersion === 'v2';
 
   const [clientId, setClientId] = useState(initialClient?.id || null);
   const [step, setStep] = useState(1);
@@ -88,6 +92,12 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
   const [showParams, setShowParams] = useState(false);
   const [scenario, setScenario] = useState('avg');
 
+  // v2: ergonomia (ufficio per persona, produzione per postazione tipo) + prodotto
+  const [ergUfficio, setErgUfficio] = useState(s2.ergonomia_ufficio ?? '');
+  const [ergPostazioni, setErgPostazioni] = useState(s2.ergonomia_postazioni ?? '');
+  const [tipoProdotto, setTipoProdotto] = useState(initialClient?.tipo_prodotto || 'programma_completo');
+  const [prodottoErr, setProdottoErr] = useState('');
+
   // ─── Derivati calcolatore ───────────────────────────────────────────────────
   const n = useMemo(() => sedi.reduce((a, e) => a + (parseInt(e.employees) || 0), 0), [sedi]);
   const suggestedTier = useMemo(() => getTier(n, { fatturato: fatturatoNum(fatturato), hrMaturity }), [n, fatturato, hrMaturity]);
@@ -98,8 +108,24 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
     return sedi.reduce((a, e) => a + Math.ceil((parseInt(e.employees) || 0) / cap), 0) || 1;
   }, [sedi, capienza, trainingMode, n]);
   const prev = CONFIG.l1_prevalence[sector] || [0.08, 0.13, 0.19];
-  // Forbice unica (stessa funzione usata da pagina Stima / PDF / flag STEP 2).
-  const forchetta = useMemo(() => computeForchetta({ n, sector, tier, groups, rates, vatExempt, l2Mult }), [n, sector, tier, groups, rates, vatExempt, l2Mult]);
+  // Forbice unica (stessa funzione usata da pagina Stima / PDF / flag STEP 2),
+  // instradata per versione listino (v2: parametri admin + ergonomia).
+  const forchetta = useMemo(() => {
+    const ergonomia = isV2 && (ergUfficio !== '' || ergPostazioni !== '')
+      ? { nUfficio: parseInt(ergUfficio) || 0, nPostazioni: parseInt(ergPostazioni) || 0 }
+      : undefined;
+    return computeForchetta({ n, sector, tier, groups, rates, vatExempt, l2Mult, pricingVersion, v2Params, ergonomia });
+  }, [n, sector, tier, groups, rates, vatExempt, l2Mult, pricingVersion, v2Params, ergUfficio, ergPostazioni, isV2]);
+  // Pacchetto prevenzione (v2, sotto soglia): prezzo dal motore, regole dure lato server.
+  const sogliaIngresso = (v2Params && v2Params.soglia_ingresso) || 80;
+  const pacchettoDisponibile = isV2 && n > 0 && n <= sogliaIngresso;
+  const pacchetto = useMemo(() => {
+    if (!isV2 || tipoProdotto !== 'pacchetto_prevenzione') return null;
+    const ergonomia = (ergUfficio !== '' || ergPostazioni !== '')
+      ? { nUfficio: parseInt(ergUfficio) || 0, nPostazioni: parseInt(ergPostazioni) || 0 }
+      : undefined;
+    return calculatePacchetto({ n, groups, rates, vatExempt, v2Params, ergonomia });
+  }, [isV2, tipoProdotto, n, groups, rates, vatExempt, v2Params, ergUfficio, ergPostazioni]);
   const scen = forchetta;                 // {min, avg, max}, ognuno {pct, l1, l2, ...calcolo}
   const calcMin = forchetta.min, calcAvg = forchetta.avg, calcMax = forchetta.max;
   const calc = scenario === 'min' ? calcMin : scenario === 'max' ? calcMax : calcAvg;
@@ -109,7 +135,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
   function buildData() {
     return {
       step1: { nome, ref_nome: refNome, ref_ruolo: refRuolo, ref_email: refEmail, ref_tel: refTel, work_desc: workDesc, sector, disturbi, disturbi_altro: disturbiAltro, prev_fatta: prevFatta, prev_note: prevNote, assenteismo, absence_days: absenceDays, note: note1 },
-      step2: { sedi, capienza, training_mode: trainingMode, fatturato, hr_maturity: hrMaturity, tier_override: tierOverride, tier },
+      step2: { sedi, capienza, training_mode: trainingMode, fatturato, hr_maturity: hrMaturity, tier_override: tierOverride, tier, ergonomia_ufficio: ergUfficio === '' ? null : parseInt(ergUfficio) || 0, ergonomia_postazioni: ergPostazioni === '' ? null : parseInt(ergPostazioni) || 0 },
       step3: { spazio, spazio_note: spazioNote, fasce, mc, mc_nome: mcNome, mc_contatti: mcContatti, esg, refop_nome: refOpNome, refop_ruolo: refOpRuolo, refop_contatti: refOpContatti },
       params: { rates, l2_mult: l2Mult, vat_exempt: vatExempt },
     };
@@ -152,7 +178,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
     const t = setTimeout(() => save({ silent: true }), 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nome, refNome, refRuolo, refEmail, refTel, workDesc, sector, disturbi, disturbiAltro, prevFatta, prevNote, assenteismo, absenceDays, note1, sedi, capienza, trainingMode, fatturato, hrMaturity, tierOverride, spazio, spazioNote, fasce, mc, mcNome, mcContatti, esg, refOpNome, refOpRuolo, refOpContatti, rates, l2Mult, vatExempt]);
+  }, [nome, refNome, refRuolo, refEmail, refTel, workDesc, sector, disturbi, disturbiAltro, prevFatta, prevNote, assenteismo, absenceDays, note1, sedi, capienza, trainingMode, fatturato, hrMaturity, tierOverride, spazio, spazioNote, fasce, mc, mcNome, mcContatti, esg, refOpNome, refOpRuolo, refOpContatti, rates, l2Mult, vatExempt, ergUfficio, ergPostazioni]);
 
   function toggleArr(arr, set, v) { set(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]); }
   function setSede(i, k, v) { setSedi(prev => prev.map((s, j) => j === i ? { ...s, [k]: k === 'employees' ? (v === '' ? '' : Math.max(0, parseInt(v) || 0)) : v } : s)); }
@@ -169,7 +195,30 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
       rps: String(rates.prevalidation_sell), rpc: String(rates.prevalidation_cost),
       rts: String(rates.training_sell), rtc: String(rates.training_cost),
     });
+    // v2: input ergonomia + prodotto (la versione resta risolta SERVER-side dal clientId)
+    if (isV2) {
+      if (ergUfficio !== '') params.set('ergu', String(parseInt(ergUfficio) || 0));
+      if (ergPostazioni !== '') params.set('ergp', String(parseInt(ergPostazioni) || 0));
+      if (tipoProdotto === 'pacchetto_prevenzione') params.set('prodotto', 'pacchetto_prevenzione');
+    }
     router.push(`/dashboard/stima?${params}`);
+  }
+
+  // Scelta prodotto (binaria, al colloquio): persistita su clients con REGOLE
+  // DURE lato server (soglia + versione). La UI nasconde l'opzione sopra soglia,
+  // ma è l'API a fare fede.
+  async function scegliProdotto(nuovo) {
+    setProdottoErr('');
+    const id = await ensureClient();
+    if (!id) { setProdottoErr('Salva prima i dati azienda (nome)'); return; }
+    const prevVal = tipoProdotto;
+    setTipoProdotto(nuovo);
+    const r = await fetch(`/api/clients/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipo_prodotto: nuovo, employees: n || undefined }) });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      setTipoProdotto(prevVal);
+      setProdottoErr(j.error || 'Scelta non consentita');
+    }
   }
   async function goStep(next) { if (next > step) await save({ silent: true }); setStep(next); window.scrollTo({ top: 0 }); }
 
@@ -249,6 +298,24 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
               <Field label="Capienza aula/sala"><input type="number" value={capienza} onChange={e => setCapienza(e.target.value)} className={inputCls} /></Field>
               <Field label="Formazione"><div className="flex gap-1">{seg('per_sede', trainingMode, setTrainingMode, 'Per sede')}{seg('accorpa', trainingMode, setTrainingMode, 'Accorpa')}</div></Field>
             </div>
+            {isV2 && (
+              <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
+                <div className="text-sm font-semibold text-gray-700">🪑 Consulenza ergonomico-posturale</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Dipendenti ufficio" hint={`vuoto = tutti (${n}) · ${v2Params?.ergonomia_minuti_persona ?? 10}′ a persona`}>
+                    <input type="number" min="0" value={ergUfficio} onChange={e => setErgUfficio(e.target.value)} placeholder={String(n)} className={inputCls} />
+                  </Field>
+                  <Field label="Postazioni tipo (produzione)" hint={`stima — conteggio definitivo al sopralluogo · ${v2Params?.ergonomia_minuti_postazione ?? 60}′ a postazione`}>
+                    <input type="number" min="0" value={ergPostazioni} onChange={e => setErgPostazioni(e.target.value)} placeholder="0" className={inputCls} />
+                  </Field>
+                </div>
+                {forchetta?.avg?.y1?.ergonomia_sotto_minimo && (
+                  <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                    ⚠ Ergonomia sotto il minimo fatturabile ({v2Params?.ergonomia_minimo_ore ?? 4}h): accorpare ad altra attività in sede. (Solo avviso, non blocca.)
+                  </div>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Fatturato" hint="Dirime i borderline del tier"><div className="flex gap-1">{FATTURATO.map(([v, l]) => seg(v, fatturato, setFatturato, l))}</div></Field>
               <Field label="Maturità HR"><div className="flex gap-1">{HR.map(([v, l]) => seg(v, hrMaturity, setHrMaturity, l))}</div></Field>
@@ -299,6 +366,37 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
               <div className="text-center text-gray-400 py-8 text-sm">Inserisci i dipendenti nello Step 2 per calcolare il preventivo.</div>
             ) : (
               <>
+                {/* v2: scelta prodotto (binaria, al colloquio). L'opzione pacchetto
+                    compare SOLO sotto soglia; il rifiuto vero è comunque lato server. */}
+                {isV2 && pacchettoDisponibile && (
+                  <div className="bg-white rounded-2xl border border-gray-200 p-4">
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Prodotto</div>
+                    <div className="flex gap-2">
+                      {seg('programma_completo', tipoProdotto, scegliProdotto, 'Programma completo')}
+                      {seg('pacchetto_prevenzione', tipoProdotto, scegliProdotto, `Pacchetto prevenzione (≤${sogliaIngresso} dip)`)}
+                    </div>
+                    {prodottoErr && <div className="text-xs text-red-600 mt-2">{prodottoErr}</div>}
+                  </div>
+                )}
+                {isV2 && tipoProdotto === 'pacchetto_prevenzione' && pacchetto ? (
+                  <>
+                    <div className="bg-blue-600 rounded-2xl p-5 text-white">
+                      <div className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-1">Pacchetto prevenzione — 12 mesi, non rinnovabile</div>
+                      <div className="text-4xl font-bold mb-1">{fmt(pacchetto.price)}</div>
+                      <div className="text-sm opacity-90">Formazione {fmt(pacchetto.training.sell)} · Ergonomia {fmt(pacchetto.ergonomia.sell)} · Assessment {fmt(pacchetto.assessment.sell)}</div>
+                      <div className="text-xs opacity-80 mt-1">Include assessment completo (consensi identici al programma), formazione 2 moduli, ergonomia. ESCLUDE cicli L1, prevenzione L2 e buffer clinico.</div>
+                    </div>
+                    {pacchetto.ergonomia_sotto_minimo && (
+                      <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">⚠ Ergonomia sotto il minimo fatturabile: accorpare ad altra attività in sede (solo avviso).</div>
+                    )}
+                    <div className="flex gap-3">
+                      <button onClick={() => goStep(3)} className="py-3.5 px-5 rounded-2xl border border-gray-300 text-gray-600 font-semibold">←</button>
+                      <button onClick={() => save()} disabled={busy} className="py-3.5 px-5 rounded-2xl border border-gray-300 text-gray-700 font-semibold disabled:opacity-50">{busy ? '…' : 'Salva scheda'}</button>
+                      <button onClick={goToStima} className="flex-1 py-3.5 rounded-2xl bg-blue-600 text-white font-bold">Genera Stima pacchetto →</button>
+                    </div>
+                  </>
+                ) : (
+                <>
                 <div>
                   <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Scenario di prevalenza — Anno 1</div>
                   <div className="flex gap-2">{[['min', 'Min', scen.min, calcMin], ['avg', 'Medio', scen.avg, calcAvg], ['max', 'Max', scen.max, calcMax]].map(([k, lbl, sc, cc]) => cc && (
@@ -374,6 +472,8 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
                   <button onClick={() => save()} disabled={busy} className="py-3.5 px-5 rounded-2xl border border-gray-300 text-gray-700 font-semibold disabled:opacity-50">{busy ? '…' : 'Salva scheda'}</button>
                   <button onClick={goToStima} className="flex-1 py-3.5 rounded-2xl bg-green-600 text-white font-bold">Genera Stima →</button>
                 </div>
+                </>
+                )}
               </>
             )}
           </div>
@@ -385,9 +485,12 @@ export default function FirstMeetingScheda({ client: initialClient, meeting }) {
 
 export const getServerSideProps = requireAuthSsr(async (ctx) => {
   const { getClientById, getFirstMeeting } = require('../../lib/store');
+  const { getPricingSettingsV2 } = require('../../lib/pricing/settings');
   const { clientId } = ctx.query;
-  if (!clientId) return { props: { client: null, meeting: null } };
+  // Parametri v2 sempre in props: un'azienda nuova (senza record) nasce v2.
+  const { params: v2Params } = await getPricingSettingsV2();
+  if (!clientId) return { props: { client: null, meeting: null, v2Params } };
   const [client, meeting] = await Promise.all([getClientById(clientId), getFirstMeeting(clientId)]);
   if (!client) return { notFound: true };
-  return { props: { client, meeting: meeting || null } };
+  return { props: { client, meeting: meeting || null, v2Params } };
 });

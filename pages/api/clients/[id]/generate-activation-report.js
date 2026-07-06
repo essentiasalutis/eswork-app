@@ -11,7 +11,7 @@ import {
 } from '../../../../lib/store';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { calculatePricing, computeForchetta, realL1L2FromAssessment } from '../../../../lib/calculator';
-import { getPricingSettingsV2 } from '../../../../lib/pricing/settings';
+import { getPricingSettingsV2, getServiziDeliverable } from '../../../../lib/pricing/settings';
 import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
 import { kAnonPartition, tooSmall, K_ANON } from '../../../../lib/kanon';
@@ -59,6 +59,29 @@ export default requireAuth(async function handler(req, res) {
   const answers = Object.values((responses && responses.responses) || {}).flat();
   const { block: quoteBlock, compliance: quoteCompliance } = await buildQuoteBlock(id, client, answers);
 
+  // ── v2: tabella servizi ("Cosa include il programma") + testi parametrici ──
+  // SOLO listino v2: per i clienti v1 il report resta ESATTAMENTE quello attuale.
+  const isV2 = (client.pricing_version || 'v1') === 'v2';
+  const isPacchetto = isV2 && client.tipo_prodotto === 'pacchetto_prevenzione';
+  let serviziBlock = '';
+  let v2Texts = {};
+  if (isV2) {
+    try {
+      const [{ texts }, servizi] = await Promise.all([
+        getPricingSettingsV2(),
+        getServiziDeliverable({ soloAttivi: true, configurazione: tier }),
+      ]);
+      v2Texts = texts || {};
+      if (!isPacchetto && servizi.length) {
+        serviziBlock = `\nCOSA INCLUDE IL PROGRAMMA (valori dichiarati per singola voce — NON sommarli, NON presentare MAI un totale, MAI "in omaggio"/"gratuito"):\n${servizi.map(s => `- ${s.voce}: €${Math.round(s.valore_dichiarato).toLocaleString('it-IT')}`).join('\n')}`;
+      }
+    } catch (_) {}
+  }
+  const nomeProdotto = isPacchetto
+    ? (v2Texts.naming_cliente_pacchetto_prevenzione || 'Pacchetto Prevenzione')
+    : (v2Texts.naming_cliente_programma_completo || 'Programma ES Work');
+  const testoEvoluzione = v2Texts.testo_evoluzione_pacchetto || '';
+
   // NRS data da sessioni
   const sessionsWithNrs = sessions.filter(s => s.nrs_pre != null || s.nrs_post != null);
   const avgNrsPre = sessionsWithNrs.filter(s => s.nrs_pre != null).reduce((a, s) => a + s.nrs_pre, 0) / (sessionsWithNrs.filter(s => s.nrs_pre != null).length || 1);
@@ -81,12 +104,22 @@ NRS medio post-sessione: ${avgNrsPost.toFixed(1)}/10
 Riduzione media NRS: ${(avgNrsPre - avgNrsPost).toFixed(1)} punti
 
 PAZIENTI: ${totalPatients > 0 ? 'Assessment completati' : 'Nessun assessment ancora'}
-${quoteBlock}
+${isPacchetto ? '' : quoteBlock}${serviziBlock}
 `.trim();
+
+  // Vincoli di wording per i documenti v2 (mai violarli nel testo generato).
+  const vincoliV2 = isV2 ? `
+VINCOLI TASSATIVI SUL TESTO:
+- MAI presentare la somma dei valori delle voci ("Cosa include il programma") né affiancarla all'investimento.
+- MAI espressioni come "in omaggio", "compreso gratuitamente", "gratis".
+- MAI "AI" o "intelligenza artificiale" nel nome della piattaforma (si chiama solo "Piattaforma digitale ES Work").
+- MAI i termini Core, Plus, Enterprise (nomi interni). Il prodotto si chiama "${nomeProdotto}".` : '';
+  const istruzioniPacchetto = isPacchetto ? `
+ATTENZIONE — PRODOTTO "${nomeProdotto}" (12 mesi, non rinnovabile): include SOLO assessment completo, formazione (2 moduli) e consulenza ergonomico-posturale. NON include trattamenti individuali, percorsi clinici o prevenzione attiva: NON presentarli MAI come inclusi. Il report mostra la stratificazione emersa dall'assessment e in chiusura può indicare l'evoluzione verso il programma completo con questo testo (adattalo senza stravolgerlo): "${testoEvoluzione}"` : '';
 
   // Fallback se manca la chiave
   if (!process.env.ANTHROPIC_API_KEY) {
-    const fallback = generateFallbackReport(client, l1Count, l2Count, l3Count, totalPatients, sessions.length, sectorLabel, quoteBlock);
+    const fallback = generateFallbackReport(client, l1Count, l2Count, l3Count, totalPatients, sessions.length, sectorLabel, quoteBlock, { serviziBlock, isPacchetto, nomeProdotto, testoEvoluzione });
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', pdf_url: pdfUrl, report_id: rec?.id });
@@ -113,14 +146,19 @@ STRUTTURA DEL REPORT (usa markdown con ## per titoli):
 (analisi della distribuzione L1/L2/L3, zone di rischio, caratteristiche del profilo clinico)
 
 ## Piano Operativo Proposto
-(turni di presa in carico, sportelli, formazione collettiva — adatto al tier ${tierLabel}; se presente la PROPOSTA ECONOMICA COLLEGATA, citane l'investimento Anno 1 in chiusura)
-
+${isPacchetto
+  ? `(SOLO le attività del pacchetto: assessment già svolto, formazione collettiva, consulenza ergonomico-posturale — NESSUN trattamento incluso)`
+  : `(turni di presa in carico, sportelli, formazione collettiva — adatto al tier ${tierLabel}; se presente la PROPOSTA ECONOMICA COLLEGATA, citane l'investimento Anno 1 in chiusura)`}
+${serviziBlock ? `
+## Cosa include il programma
+(elenca le voci con i rispettivi valori dichiarati, una per riga, SENZA totale)
+` : ''}
 ## Raccomandazioni Cliniche
 (3-5 raccomandazioni specifiche basate sui dati)
 
 ## Prossimi Passi
 (5 step operativi con timeframe indicativo)
-
+${vincoliV2}${istruzioniPacchetto}
 Tono: professionale, clinico, orientato ai dati. In italiano. Non più di 800 parole totali.`,
       }],
     });
@@ -130,14 +168,15 @@ Tono: professionale, clinico, orientato ai dati. In italiano. Non più di 800 pa
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report, source: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
-    const fallback = generateFallbackReport(client, l1Count, l2Count, l3Count, totalPatients, sessions.length, sectorLabel, quoteBlock);
+    const fallback = generateFallbackReport(client, l1Count, l2Count, l3Count, totalPatients, sessions.length, sectorLabel, quoteBlock, { serviziBlock, isPacchetto, nomeProdotto, testoEvoluzione });
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
   }
 });
 
-function generateFallbackReport(client, l1, l2, l3, total, sessioni, settore, quoteBlock) {
+function generateFallbackReport(client, l1, l2, l3, total, sessioni, settore, quoteBlock, v2 = {}) {
+  const { serviziBlock = '', isPacchetto = false, nomeProdotto = '', testoEvoluzione = '' } = v2;
   const small = tooSmall(total);
   const P = small ? null : Object.fromEntries(kAnonPartition([
     { key: 'l1', count: l1 }, { key: 'l2', count: l2 }, { key: 'l3', count: l3 },
@@ -164,11 +203,30 @@ ${mappa}
 
 ## Piano Operativo Proposto
 
-Il piano prevede la presa in carico dei pazienti L1 distribuiti in turni di avvio mensili, con sportello osteopatico in sede. La formazione collettiva copre l'intera popolazione aziendale con moduli su ergonomia e postura.
-${quoteBlock ? `
+${isPacchetto
+  ? `Il percorso ${nomeProdotto || 'd\'ingresso'} (12 mesi) comprende l'assessment completo della popolazione — già svolto —, la formazione collettiva su ergonomia e postura e la consulenza ergonomico-posturale sulle postazioni di lavoro. Il percorso non comprende trattamenti individuali: la stratificazione qui presentata fotografa il bisogno emerso.`
+  : `Il piano prevede la presa in carico dei pazienti L1 distribuiti in turni di avvio mensili, con sportello osteopatico in sede. La formazione collettiva copre l'intera popolazione aziendale con moduli su ergonomia e postura.`}
+${!isPacchetto && quoteBlock ? `
 ## Proposta economica collegata
-${quoteBlock.replace('PROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):', 'Investimento calcolato con le condizioni concordate al colloquio e la stratificazione reale:')}` : ''}
-## Raccomandazioni Cliniche
+${quoteBlock.replace('PROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):', 'Investimento calcolato con le condizioni concordate al colloquio e la stratificazione reale:')}` : ''}${serviziBlock ? `
+## Cosa include il programma
+${serviziBlock.split('\n').filter(l => l.startsWith('- ')).join('\n')}` : ''}${isPacchetto && testoEvoluzione && !testoEvoluzione.startsWith('Segnaposto') ? `
+## Evoluzione possibile
+${testoEvoluzione}` : ''}
+${isPacchetto ? `## Raccomandazioni
+
+1. Condividere con la direzione la fotografia emersa dall'assessment
+2. Formazione focalizzata sulle zone di rischio prevalenti
+3. Programmare il sopralluogo per confermare le postazioni di produzione
+4. Rivalutare a fine percorso l'evoluzione più adatta al bisogno emerso
+
+## Prossimi Passi
+
+1. **Settimana 1-2**: Restituzione dei risultati dell'assessment alla direzione
+2. **Mese 1**: Prima sessione formativa collettiva
+3. **Mese 1-2**: Sopralluogo ergonomico e conferma delle postazioni
+4. **Mese 2-3**: Completamento formazione e consulenza ergonomico-posturale
+5. **Mese 11**: Valutazione dell'evoluzione del percorso (prosecuzione o chiusura)` : `## Raccomandazioni Cliniche
 
 1. Priorità ai pazienti L1 con NRS > 6 e impatto funzionale documentato
 2. Monitoraggio trimestrale L2 tramite mini-check digitale
@@ -181,7 +239,7 @@ ${quoteBlock.replace('PROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + s
 2. **Mese 1**: Avvio sportello osteopatico — Turno 1
 3. **Mese 2-3**: Avvio turni 2 e 3, prima sessione formativa collettiva
 4. **Mese 3**: Mini-check T3 per pazienti L2
-5. **Mese 6**: Review intermedia con report dati aggregati`;
+5. **Mese 6**: Review intermedia con report dati aggregati`}`;
 }
 
 // Blocco "proposta economica" per il report: condizioni della scheda colloquio

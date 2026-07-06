@@ -6,7 +6,7 @@
 //   store=true → genera e salva il PDF (Vercel Blob) e ritorna { url, html }
 //   altrimenti → ritorna { html } per anteprima/stampa
 import { requireAuth } from '../../lib/auth';
-import { generateAndStorePdf, buildQuoteHtml } from '../../lib/pdf';
+import { generateAndStorePdf, buildQuoteHtml, buildPacchettoHtml } from '../../lib/pdf';
 import { computeForchetta } from '../../lib/calculator';
 import { getClientById } from '../../lib/store';
 import { getPricingSettingsV2 } from '../../lib/pricing/settings';
@@ -36,7 +36,8 @@ export default requireAuth(async function handler(req, res) {
   }
 
   // Parametri v2 (override admin dal DB) + input ergonomia dal colloquio.
-  const v2Params = pricingVersion === 'v2' ? (await getPricingSettingsV2()).params : null;
+  const settingsV2 = pricingVersion === 'v2' ? await getPricingSettingsV2() : null;
+  const v2Params = settingsV2 ? settingsV2.params : null;
   const ergonomia = pricingVersion === 'v2'
     ? { nUfficio: b.ergonomiaUfficio != null ? parseInt(b.ergonomiaUfficio) || 0 : undefined, nPostazioni: parseInt(b.ergonomiaPostazioni) || 0 }
     : undefined;
@@ -47,9 +48,21 @@ export default requireAuth(async function handler(req, res) {
     const check = validatePacchetto({ employees, pricingVersion, v2Params });
     if (!check.ok) return res.status(422).json({ ok: false, error: check.motivo });
     const pacchetto = calculatePacchetto({ n: employees, groups: b.groups, rates: b.rates, vatExempt: b.vatExempt, v2Params, ergonomia });
-    // Template documento dedicato nel Blocco C: qui il calcolo server (nessun
-    // riferimento a trattamenti come inclusi).
-    return res.json({ ok: true, pacchetto, html: null, message: 'Calcolo pacchetto pronto — template documento nel Blocco C' });
+    // Template DEDICATO: naming parametrico, nessun trattamento come incluso.
+    const pHtml = buildPacchettoHtml({
+      client: { name: b.name || '—', employees: employees || '—', contact_name: b.contact_name || null },
+      pacchetto,
+      naming: settingsV2?.texts?.naming_cliente_pacchetto_prevenzione,
+      sector_label: SECTOR_LABELS[sector] || '—',
+    });
+    if (!b.store) return res.json({ ok: true, pacchetto, html: pHtml });
+    if (!process.env.BLOB_READ_WRITE_TOKEN) return res.json({ ok: true, pacchetto, html: pHtml, url: null, message: 'Storage PDF non configurato — usa Stampa per salvare in PDF' });
+    try {
+      const { url } = await generateAndStorePdf(pHtml, `stima_pacchetto_${b.clientId || 'x'}_${Date.now()}.pdf`, 'quotes');
+      return res.json({ ok: true, pacchetto, url, html: pHtml });
+    } catch (e) {
+      return res.json({ ok: true, pacchetto, html: pHtml, url: null, error: `PDF non generato: ${e.message}` });
+    }
   }
 
   // Sorgente UNICA della forbice.
@@ -62,6 +75,8 @@ export default requireAuth(async function handler(req, res) {
     client: { name: b.name || '—', employees: employees || '—', contact_name: b.contact_name || null },
     forchetta,
     sector_label: SECTOR_LABELS[sector] || '—',
+    // Sezione componenti SOLO per v2 (v1 resta byte-identico)
+    v2Doc: pricingVersion === 'v2' ? { ergonomiaPostazioni: (ergonomia && ergonomia.nPostazioni) || 0 } : null,
   });
 
   // `forchetta` in risposta: solo admin (requireAuth) — serve alla UI colloquio

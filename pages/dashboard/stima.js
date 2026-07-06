@@ -36,6 +36,11 @@ export default function StimaPage() {
       vatExempt: q.vat === '1',
       l2Mult: q.l2mult != null ? Number(q.l2mult) : undefined,
       rates: ratesFromQuery(q),
+      // v2: input ergonomia + prodotto (la versione del listino resta risolta
+      // server-side dal clientId; questi sono solo input di calcolo)
+      ergonomiaUfficio: q.ergu != null ? Number(q.ergu) : undefined,
+      ergonomiaPostazioni: q.ergp != null ? Number(q.ergp) : undefined,
+      tipoProdotto: q.prodotto === 'pacchetto_prevenzione' ? 'pacchetto_prevenzione' : undefined,
       store,
     };
   }

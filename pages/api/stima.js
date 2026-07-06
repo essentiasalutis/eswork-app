@@ -123,14 +123,14 @@ export default requireAuth(async function handler(req, res) {
   if (!b.store) return res.json({ ok: true, html, forchetta: forchettaOut, snapshot });
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return res.json({ ok: true, html, url: null, snapshot, message: 'Storage PDF non configurato — usa Stampa per salvare in PDF' });
+    return res.json({ ok: true, html, url: null, forchetta: forchettaOut, snapshot, message: 'Storage PDF non configurato — usa Stampa per salvare in PDF' });
   }
   try {
     const filename = `stima_${b.clientId || 'x'}_${Date.now()}.pdf`;
     const { url } = await generateAndStorePdf(html, filename, 'quotes');
-    return res.json({ ok: true, url, html, snapshot });
+    return res.json({ ok: true, url, html, forchetta: forchettaOut, snapshot });
   } catch (e) {
     console.error('[stima]', e.message);
-    return res.json({ ok: true, html, url: null, snapshot, error: `PDF non generato: ${e.message}` });
+    return res.json({ ok: true, html, url: null, forchetta: forchettaOut, snapshot, error: `PDF non generato: ${e.message}` });
   }
 });

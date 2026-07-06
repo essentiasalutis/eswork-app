@@ -22,6 +22,7 @@ export default function StimaPage() {
   const [html, setHtml] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [snapMeta, setSnapMeta] = useState(null); // { exists, frozen, source, preview, at }
   const iframeRef = useRef(null);
 
   function buildBody(store) {
@@ -51,6 +52,7 @@ export default function StimaPage() {
       try {
         const r = await fetch('/api/stima', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildBody(false)) });
         const j = await r.json();
+        setSnapMeta(j.snapshot ?? null);
         if (j.html) setHtml(j.html); else setErr(j.error || 'Errore nella generazione');
       } catch { setErr('Errore di rete'); }
     })();
@@ -67,6 +69,8 @@ export default function StimaPage() {
     try {
       const r = await fetch('/api/stima', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildBody(true)) });
       const j = await r.json();
+      setSnapMeta(j.snapshot ?? snapMeta);
+      if (j.html) setHtml(j.html);
       if (j.url) window.open(j.url, '_blank');
       else setErr(j.message || j.error || 'PDF non disponibile — usa Stampa per salvare in PDF.');
     } catch { setErr('Errore di rete'); }
@@ -85,6 +89,17 @@ export default function StimaPage() {
               <button onClick={scaricaPdf} disabled={busy || !html} className="text-sm font-semibold text-white bg-green-600 px-4 py-2 rounded-xl hover:bg-green-700 disabled:opacity-50">{busy ? '…' : '⬇ Scarica PDF'}</button>
             </div>
           </div>
+          {snapMeta && (() => {
+            const s = snapMeta;
+            const fmt = s.at ? new Date(s.at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+            let text, cls, icon;
+            if (s.frozen) { icon = '🔒'; text = 'Forbice congelata — la catena Stima→Report è chiusa: non più modificabile.'; cls = 'bg-gray-100 text-gray-600 border-gray-200'; }
+            else if (s.preview && !s.exists) { icon = '⚠'; text = 'ANTEPRIMA — forbice non impegnata: genera il PDF per fissarla.'; cls = 'bg-amber-50 text-amber-900 border-amber-300 font-semibold'; }
+            else if (s.preview && s.exists) { icon = '⚠'; text = `ANTEPRIMA — genera il PDF per aggiornare la forbice impegnata${fmt ? ` (attuale: del ${fmt})` : ''}.`; cls = 'bg-amber-50 text-amber-800 border-amber-200'; }
+            else if (s.exists) { icon = '✓'; text = `Forbice impegnata${fmt ? ` — Stima del ${fmt}` : ''}: è la promessa fatta al prospect.`; cls = 'bg-green-50 text-green-700 border-green-200'; }
+            else return null;
+            return <div className="max-w-4xl mx-auto px-5 pb-2"><div className={`text-xs px-3 py-1.5 rounded-lg border ${cls}`}>{icon} {text}</div></div>;
+          })()}
           {err && <div className="max-w-4xl mx-auto px-5 pb-2 text-xs text-amber-700">{err}</div>}
         </header>
 

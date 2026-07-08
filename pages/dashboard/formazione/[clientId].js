@@ -26,6 +26,7 @@ export default function FormazionePage({ clientId }) {
   const [importTxt, setImportTxt] = useState('');
   const [erogaFor, setErogaFor] = useState(null); // sessione in erogazione
   const [presenti, setPresenti] = useState({});
+  const [invitoLinks, setInvitoLinks] = useState({}); // link /invito generati in-sessione (plaintext MAI persistito)
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/org/${clientId}`);
@@ -67,6 +68,30 @@ export default function FormazionePage({ clientId }) {
     const ids = Object.keys(presenti).filter(k => presenti[k]);
     await call('PUT', `/api/org/sessioni/${erogaFor.id}`, { azione: 'eroga', data_erogazione: new Date().toISOString().slice(0, 10), presenti: ids }, 'eroga');
     setErogaFor(null); setPresenti({});
+  }
+  // Invito clinico del neoassunto. Il token torna in chiaro UNA volta → lo tengo in
+  // invitoLinks (non è persistito). Su guardia 409 (già completato/consumato) chiedo
+  // conferma ESPLICITA per l'override (recupero-errore: nuova cartella scollegata).
+  async function genInvito(d, override = false) {
+    setBusy('inv_' + d.id); setErr('');
+    try {
+      const r = await fetch(`/api/org/${clientId}/invito`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dipendente_id: d.id, action: 'genera', override }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.status === 409 && !override) {
+        const msg = j.error === 'GIA_COMPLETATO' ? `${d.nome} ha già completato l'assessment.` : `${d.nome} ha già un invito consumato.`;
+        setBusy('');
+        if (confirm(`${msg}\n\nProcedere è un RECUPERO ECCEZIONALE: crea una NUOVA cartella clinica scollegata dalla precedente. Continuare?`)) return genInvito(d, true);
+        return;
+      }
+      if (!r.ok) { setErr(j.error || 'Errore'); setBusy(''); return; }
+      if (j.token) setInvitoLinks(m => ({ ...m, [d.id]: `${window.location.origin}/invito/${j.token}` }));
+      await load(); setBusy('');
+    } catch { setErr('Errore di rete'); setBusy(''); }
+  }
+  async function revInvito(d) {
+    if (!confirm(`Revocare l'invito di ${d.nome}? Il link smetterà di funzionare.`)) return;
+    await call('POST', `/api/org/${clientId}/invito`, { dipendente_id: d.id, action: 'revoca' }, 'inv_' + d.id);
+    setInvitoLinks(m => { const n = { ...m }; delete n[d.id]; return n; });
   }
 
   const box = 'bg-white rounded-2xl border border-gray-200 p-4';
@@ -182,7 +207,7 @@ export default function FormazionePage({ clientId }) {
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[640px]">
                 <thead><tr className="text-left text-xs uppercase tracking-wide text-gray-400 border-b border-gray-100">
-                  <th className="py-2">Nome</th><th>Matricola</th><th>Ingresso</th><th>Base</th><th>Origine</th><th></th>
+                  <th className="py-2">Nome</th><th>Matricola</th><th>Ingresso</th><th>Base</th><th>Origine</th><th>Invito</th><th></th>
                 </tr></thead>
                 <tbody>
                   {dipendenti.map(d => {
@@ -194,6 +219,17 @@ export default function FormazionePage({ clientId }) {
                         <td className="text-gray-500">{fmt(d.data_ingresso)}</td>
                         <td className={sb.cls}>{sb.label}{sb.data ? ` · ${fmt(sb.data)}` : ''}</td>
                         <td className="text-gray-400 text-xs">{d.inserito_da}</td>
+                        <td className="text-xs">
+                          {invitoLinks[d.id] ? (
+                            <span className="inline-flex items-center gap-1"><span className="text-green-700 font-semibold">link pronto</span><button onClick={() => navigator.clipboard.writeText(invitoLinks[d.id])} className="text-gray-700 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded">Copia</button></span>
+                          ) : d.stato_invito_assessment === 'completato' ? (
+                            <span className="text-green-700">✓ completato<button onClick={() => genInvito(d)} title="Re-invito (eccezionale)" className="ml-1 text-gray-400 underline">re-invito</button></span>
+                          ) : d.stato_invito_assessment === 'invitato' ? (
+                            <span className="text-amber-700 inline-flex items-center gap-1">invitato<button onClick={() => genInvito(d)} disabled={busy === 'inv_' + d.id} title="Rigenera (chiude il vecchio link)" className="text-gray-500">↻</button><button onClick={() => revInvito(d)} disabled={busy === 'inv_' + d.id} title="Revoca" className="text-red-500">✕</button></span>
+                          ) : d.attivo ? (
+                            <button onClick={() => genInvito(d)} disabled={busy === 'inv_' + d.id} className="text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded disabled:opacity-50">Genera invito</button>
+                          ) : <span className="text-gray-300">—</span>}
+                        </td>
                         <td className="text-right whitespace-nowrap">
                           {d.attivo && <>
                             <button onClick={() => call('PUT', `/api/org/${clientId}/dipendenti/${d.id}`, { straordinario: !d.straordinario }, d.id)} title="Straordinario" className="text-xs text-purple-600 px-1">⇅</button>
@@ -203,7 +239,7 @@ export default function FormazionePage({ clientId }) {
                       </tr>
                     );
                   })}
-                  {dipendenti.length === 0 && <tr><td colSpan={6} className="py-6 text-center text-gray-400">Nessun dipendente. Usa "Importa nomi dall'assessment" o aggiungi sopra.</td></tr>}
+                  {dipendenti.length === 0 && <tr><td colSpan={7} className="py-6 text-center text-gray-400">Nessun dipendente. Usa "Importa nomi dall'assessment" o aggiungi sopra.</td></tr>}
                 </tbody>
               </table>
             </div>

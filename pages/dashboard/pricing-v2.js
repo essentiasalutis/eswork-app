@@ -99,6 +99,24 @@ export default function PricingV2Page() {
             <p className="text-[11px] text-gray-400 mt-3">Solo fattori primitivi: i costi si calcolano (es. ergonomia ufficio = minuti/60 × tariffa oraria sportello del cliente; assessment pacchetto = n dipendenti × €/dipendente).</p>
           </div>
 
+          {/* Parametri formazione (org) — turnover/recupero */}
+          <div className={box}>
+            <h2 className="font-semibold text-gray-800 mb-3">Parametri formazione (turnover / recupero)</h2>
+            <div className="grid md:grid-cols-3 gap-3">
+              {[['listino_concentrata', 'Listino base concentrata (€/gruppo)'], ['listino_base_completa', 'Listino base completa (€/gruppo)'], ['finestra_recupero_mesi', 'Finestra recupero (mesi)']].map(([k, lbl]) => (
+                <label key={k} className="text-xs text-gray-500">{lbl}
+                  <input type="number" step="any" defaultValue={texts[k] ?? ''} className={`${inputCls} mt-1`}
+                    onBlur={e => { if ((texts[k] ?? '') !== e.target.value && e.target.value !== '') put({ tipo: 'setting', key: k, value: e.target.value }, 'parametro salvato'); }} />
+                </label>
+              ))}
+            </div>
+            <label className="block text-xs text-gray-500 mt-3">Soglie recupero per fascia (JSON: max=null = oltre)
+              <textarea rows={2} defaultValue={texts.soglia_recupero_fasce || ''} className={`${inputCls} mt-1 font-mono text-xs`}
+                onBlur={e => { if ((texts.soglia_recupero_fasce || '') !== e.target.value) put({ tipo: 'setting', key: 'soglia_recupero_fasce', value: e.target.value }, 'soglie salvate'); }} />
+            </label>
+            <p className="text-[11px] text-gray-400 mt-2">Globali, editabili qui. Override per-azienda opzionale sui listini (colonna cliente); capienza gruppo resta per-azienda. Precedenza: override cliente → questi → default.</p>
+          </div>
+
           {/* Servizi & deliverable */}
           <div className={box}>
             <h2 className="font-semibold text-gray-800 mb-1">Servizi &amp; deliverable — valori dichiarati (€/anno)</h2>

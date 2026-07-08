@@ -103,6 +103,27 @@ export default function FormazionePage({ clientId }) {
             <button onClick={() => call('PUT', `/api/org/${clientId}`, params, 'params')} disabled={busy === 'params'} className="mt-3 text-sm font-semibold text-white bg-green-600 px-4 py-2 rounded-xl hover:bg-green-700 disabled:opacity-50">Salva parametri</button>
           </details>
 
+          {/* Accesso HR (link pubblico sola-scrittura, revocabile) */}
+          <details className={box}>
+            <summary className="cursor-pointer text-sm font-semibold text-gray-700">🔗 Accesso HR — link "Aggiungi nuovo ingresso"</summary>
+            <p className="text-xs text-gray-500 mt-2">Link pubblico per l'HR dell'azienda: SOLA scrittura (aggiunge ingressi). Non legge nomi né stato formativo. Revocabile: se sospetti che il link sia in giro, rigeneralo o revocalo.</p>
+            {params.hr_ingressi_token ? (
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">● attivo</span>
+                  <code className="text-xs bg-gray-100 px-2 py-1 rounded flex-1 min-w-0 truncate">{`${typeof window !== 'undefined' ? window.location.origin : ''}/hr/${params.hr_ingressi_token}`}</code>
+                  <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/hr/${params.hr_ingressi_token}`); }} className="text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-200 px-3 py-1 rounded-lg">Copia</button>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => call('POST', `/api/org/${clientId}/hr-token`, { action: 'genera' }, 'hrgen')} disabled={busy === 'hrgen'} className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl">↻ Rigenera (chiude il vecchio)</button>
+                  <button onClick={() => { if (confirm('Revocare il link HR? Il vecchio link smetterà di funzionare.')) call('POST', `/api/org/${clientId}/hr-token`, { action: 'revoca' }, 'hrrev'); }} disabled={busy === 'hrrev'} className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-3 py-1.5 rounded-xl">Revoca</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => call('POST', `/api/org/${clientId}/hr-token`, { action: 'genera' }, 'hrgen')} disabled={busy === 'hrgen'} className="mt-3 text-sm font-semibold text-white bg-gray-800 px-4 py-2 rounded-xl disabled:opacity-50">Genera link HR</button>
+            )}
+          </details>
+
           {/* Coda recupero + trigger + proposta */}
           <div className={`${box} ${proposta.active ? 'border-green-300' : ''}`}>
             <div className="flex items-center justify-between flex-wrap gap-2">

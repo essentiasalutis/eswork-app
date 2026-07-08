@@ -103,7 +103,7 @@ export default function PricingV2Page() {
           <div className={box}>
             <h2 className="font-semibold text-gray-800 mb-3">Parametri formazione (turnover / recupero)</h2>
             <div className="grid md:grid-cols-3 gap-3">
-              {[['listino_concentrata', 'Listino base concentrata (€/gruppo)'], ['listino_base_completa', 'Listino base completa (€/gruppo)'], ['finestra_recupero_mesi', 'Finestra recupero (mesi)']].map(([k, lbl]) => (
+              {[['listino_concentrata', 'Listino base concentrata (€/gruppo)'], ['listino_base_completa', 'Listino base completa (€/gruppo)'], ['finestra_recupero_mesi', 'Finestra recupero (mesi)'], ['hr_ingressi_max_per_ora', 'Rate-limit HR (max ingressi/ora per azienda)']].map(([k, lbl]) => (
                 <label key={k} className="text-xs text-gray-500">{lbl}
                   <input type="number" step="any" defaultValue={texts[k] ?? ''} className={`${inputCls} mt-1`}
                     onBlur={e => { if ((texts[k] ?? '') !== e.target.value && e.target.value !== '') put({ tipo: 'setting', key: k, value: e.target.value }, 'parametro salvato'); }} />

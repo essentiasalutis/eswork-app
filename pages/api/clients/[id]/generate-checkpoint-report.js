@@ -19,6 +19,17 @@ import { kAnonPartition, maskCount, tooSmall, K_ANON } from '../../../../lib/kan
 
 export const config = { maxDuration: 60 };
 
+// Soglia HARD di rappresentatività della coorte T12 (quota rispetto alla T0): sotto
+// questa, il confronto anno-su-anno NON è un claim di risultato. FONTE UNICA della
+// LOGICA — usata sia dalla riga KPI (kpiDeltaLabel) sia dalla sezione andamento
+// (repOk): un ritocco qui muove entrambe insieme, non possono divergere.
+// NB: il valore appare anche come PROSA ("soglia del 70%") nel testo parametrico
+// report_t12_andamento_b_coorte_parziale (pricing_settings, editabile). NON è reso
+// un token {repPct} di proposito: introdurrebbe un placeholder che il codice già in
+// produzione non sostituisce, rompendo l'ordine sicuro "applica il testo, poi deploya
+// il codice". Se un giorno si cambia la soglia, aggiornare ANCHE quella stringa.
+const COHORT_REP_MIN = 0.70;
+
 export default requireAuth(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
@@ -101,10 +112,19 @@ export default requireAuth(async function handler(req, res) {
     // k-anon: prevalenza e distribuzioni mostrate SOLO se ENTRAMBE le coorti ≥ K.
     const prevalenceShown = t0.n >= K_ANON && t12s.n >= K_ANON;
     const prevalenceDeltaPts = prevalenceShown ? (t0.l1pct - t12s.l1pct) : null; // punti % di riduzione L1
+    // Rappresentatività della coorte T12 (soglia 70% hard, come nella sezione andamento):
+    // sotto soglia il delta anno-su-anno NON è un risultato → la riga KPI non lo spaccia
+    // come tale (marca "coorte parziale"), coerente con "L'andamento del programma".
+    const cohortRepresentative = t0.n > 0 && (t12s.n / t0.n) >= COHORT_REP_MIN;
+    const kpiDeltaLabel = !prevalenceShown ? ''
+      : (cohortRepresentative && prevalenceDeltaPts != null
+          ? ` (${prevalenceDeltaPts >= 0 ? '−' : '+'}${Math.abs(prevalenceDeltaPts)} punti)`
+          : ' (coorte parziale)');
     const nd = (s) => prevalenceShown ? s : 'n.d.';
     t12 = {
       count: reass.length, avgPgic, improvedPct,
       t0N: t0.n, t12N: t12s.n, prevalenceShown, prevalenceDeltaPts,
+      cohortRepresentative, kpiDeltaLabel,
       t0L1: nd(`${t0.l1pct}%`), t12L1: nd(`${t12s.l1pct}%`),
       t0Strat: nd(`L1 ${t0.l1pct}%, L2 ${t0.l2pct}%, L3 ${t0.l3pct}%`),
       t12Strat: nd(`L1 ${t12s.l1pct}%, L2 ${t12s.l2pct}%, L3 ${t12s.l3pct}%`),
@@ -136,7 +156,7 @@ STRUTTURA (markdown, ## per titoli):
 Presenta in tabella i tre indicatori v4:
 1. **Riduzione del dolore** — riduzione media NRS per sessione: ${avgDelta} punti.
 2. **Miglioramento percepito (PGIC)** — PGIC medio ${t12.avgPgic}/5${t12.improvedPct != null ? `, ${t12.improvedPct}% dei dipendenti rivalutati riporta un miglioramento (PGIC 4-5)` : ''}.
-3. **Variazione della prevalenza L1** — prevalenza L1 OSSERVATA (stessa strumentazione ai due capi): dal ${t12.t0L1} all'intake al ${t12.t12L1} a 12 mesi${t12.prevalenceShown && t12.prevalenceDeltaPts != null ? ` (${t12.prevalenceDeltaPts >= 0 ? '−' : '+'}${Math.abs(t12.prevalenceDeltaPts)} punti)` : ''}. NON confrontare conteggi grezzi (coorti T0/T12 di numerosità diversa: ${t12.t0N} vs ${t12.t12N}).
+3. **Variazione della prevalenza L1** — prevalenza L1 OSSERVATA (stessa strumentazione ai due capi): dal ${t12.t0L1} all'intake al ${t12.t12L1} a 12 mesi${t12.kpiDeltaLabel}. NON confrontare conteggi grezzi (coorti T0/T12 di numerosità diversa: ${t12.t0N} vs ${t12.t12N}).
 
 IMPORTANTE: riporta le percentuali di prevalenza ESATTAMENTE come indicate sopra (${t12.t0L1} all'intake, ${t12.t12L1} a 12 mesi); non ricalcolarle né arrotondarle diversamente. Il commento prima/dopo è già fornito nella sezione "L'andamento del programma" più sotto: NON duplicarlo.
 
@@ -240,7 +260,7 @@ function buildAndamentoSection(t12, client, T) {
   const shown = t12.prevalenceShown;
   const ratio = t0N > 0 ? t12N / t0N : 0;
   const ratioPct = Math.round(ratio * 100);
-  const repOk = ratio >= 0.70; // SOGLIA COORTE 70% HARD
+  const repOk = ratio >= COHORT_REP_MIN; // SOGLIA COORTE HARD (fonte unica: COHORT_REP_MIN)
   const deltaPts = t0L1pct - t12L1pct; // >0 = prevalenza L1 SCESA (miglioramento)
   const deltaAbs = Math.abs(deltaPts);
   const kMin = K_ANON;
@@ -316,7 +336,7 @@ Sintesi dei risultati del programma ES Work al termine dell'Anno 1${t12.count ==
 |-----|--------|
 | Riduzione del dolore (NRS media/seduta) | ${avgDelta} punti |
 | Miglioramento percepito (PGIC medio) | ${t12.avgPgic}/5${t12.improvedPct != null ? ` · ${t12.improvedPct}% migliorati` : ''} |
-| Prevalenza L1 osservata (intake → 12 mesi) | ${t12.t0L1} → ${t12.t12L1}${t12.prevalenceShown && t12.prevalenceDeltaPts != null ? ` (${t12.prevalenceDeltaPts >= 0 ? '−' : '+'}${Math.abs(t12.prevalenceDeltaPts)} punti)` : ''} |
+| Prevalenza L1 osservata (intake → 12 mesi) | ${t12.t0L1} → ${t12.t12L1}${t12.kpiDeltaLabel} |
 
 ## Documentazione INAIL OT23
 

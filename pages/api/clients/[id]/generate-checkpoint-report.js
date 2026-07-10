@@ -6,10 +6,13 @@ import {
   getSessionsForClient,
   getReassessmentsT12ByClient,
   getMiniChecksByClient,
+  getAssessmentsByClient,
+  getResponsesByAssessment,
   insertGeneratedReport,
   insertDocument,
 } from '../../../../lib/store';
 import { getNotaValidazione } from '../../../../lib/pricing/settings';
+import { stratificazioneOsservata } from '../../../../lib/scoring';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { kAnonPartition, maskCount, tooSmall, K_ANON } from '../../../../lib/kanon';
 
@@ -78,37 +81,42 @@ export default requireAuth(async function handler(req, res) {
   let t12 = null;
   if (isAnnual) {
     const reass = await getReassessmentsT12ByClient(id).catch(() => []);
-    const r1 = reass.filter(r => r.computed_level === 'level1').length;
-    const r2 = reass.filter(r => r.computed_level === 'level2').length;
-    const r3 = reass.filter(r => r.computed_level === 'level3').length;
     const pgicVals = reass.map(r => r.pgic).filter(v => v != null);
     const avgPgic = pgicVals.length ? (pgicVals.reduce((a, b) => a + b, 0) / pgicVals.length).toFixed(1) : 'n.d.';
     const improved = pgicVals.filter(v => v >= 4).length; // PGIC 4-5 = migliorato
     const improvedPct = pgicVals.length ? Math.round(improved / pgicVals.length * 100) : null;
-    const baselineTreat = l1; // L1 all'intake (necessitano trattamento)
-    const t12Treat = r1;      // L1 al re-assessment
-    const prevalenceDelta = baselineTreat > 0 ? Math.round((baselineTreat - t12Treat) / baselineTreat * 100) : null;
-    // k-anon sulla distribuzione T12 (r1/r2/r3) + mascheramento dei conteggi piccoli.
-    const small = tooSmall(reass.length);
-    const RP = small ? null
-      : Object.fromEntries(kAnonPartition([{ key: 'r1', count: r1 }, { key: 'r2', count: r2 }, { key: 'r3', count: r3 }], reass.length).map(c => [c.key, c]));
-    const rd = k => (!RP || RP[k].suppressed) ? 'n.d.' : String(RP[k].count);
-    const baselineTreatD = maskCount(baselineTreat) == null ? 'n.d.' : String(baselineTreat);
-    const t12TreatD = (!RP || RP.r1.suppressed) ? 'n.d.' : String(t12Treat);
-    const prevalenceShown = !small && maskCount(baselineTreat) != null && RP && !RP.r1.suppressed;
+
+    // FONTE OMOGENEA — aggregateNMQ ai DUE capi, MAI patients.level (che deriva col
+    // trattamento → falserebbe il baseline). T0 = risposte CONGELATE dell'assessment
+    // iniziale (il più vecchio del cliente); T12 = nmq_data CONGELATI dei re-assessment.
+    // Stessa funzione + stessa definizione di L1 ai due capi. Confronto su prevalenza (%).
+    const assessments = await getAssessmentsByClient(id).catch(() => []);
+    const t0Ass = assessments[assessments.length - 1]; // ordinati desc → il più vecchio = intake
+    const t0Answers = t0Ass ? await getResponsesByAssessment(t0Ass.id).catch(() => []) : [];
+    const t0 = stratificazioneOsservata(t0Answers);
+    const t12s = stratificazioneOsservata(reass.map(r => r.nmq_data).filter(Boolean));
+
+    // k-anon: prevalenza e distribuzioni mostrate SOLO se ENTRAMBE le coorti ≥ K.
+    const prevalenceShown = t0.n >= K_ANON && t12s.n >= K_ANON;
+    const prevalenceDeltaPts = prevalenceShown ? (t0.l1pct - t12s.l1pct) : null; // punti % di riduzione L1
+    const nd = (s) => prevalenceShown ? s : 'n.d.';
     t12 = {
-      count: reass.length, r1, r2, r3, avgPgic, improvedPct, baselineTreat, t12Treat, prevalenceDelta,
-      r1d: rd('r1'), r2d: rd('r2'), r3d: rd('r3'), baselineTreatD, t12TreatD, prevalenceShown, small,
+      count: reass.length, avgPgic, improvedPct,
+      t0N: t0.n, t12N: t12s.n, prevalenceShown, prevalenceDeltaPts,
+      t0L1: nd(`${t0.l1pct}%`), t12L1: nd(`${t12s.l1pct}%`),
+      t0Strat: nd(`L1 ${t0.l1pct}%, L2 ${t0.l2pct}%, L3 ${t0.l3pct}%`),
+      t12Strat: nd(`L1 ${t12s.l1pct}%, L2 ${t12s.l2pct}%, L3 ${t12s.l3pct}%`),
+      _t0: t0, _t12: t12s, // grezzi per il Blocco 2 (confronti A/B)
     };
   }
 
   const prompt = isAnnual ? `Sei un consulente clinico ES Work. Genera il REPORT ANNUALE (12 mesi) per ${client.name}, da consegnare alla direzione e utilizzabile per il bilancio di sostenibilità.
 
 DATI ANNO 1 (i valori "n.d." sono soppressi per anonimato/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
-- Popolazione all'intake: L1 ${l1d}, L2 ${l2d}, L3 ${l3d}
+- Prevalenza osservata all'intake (${t12.t0N} risposte T0): ${t12.t0Strat}
 - Sessioni completate/pianificate: ${completed}/${planned}
 - Re-assessment a 12 mesi completati: ${t12.count}
-- Distribuzione livelli a T12: L1 ${t12.r1d}, L2 ${t12.r2d}, L3 ${t12.r3d}
+- Prevalenza osservata a 12 mesi (${t12.t12N} re-assessment): ${t12.t12Strat}
 - Settore: ${client.sector === 1 ? 'Manifattura' : 'Servizi'}
 
 STRUTTURA (markdown, ## per titoli):
@@ -120,7 +128,7 @@ STRUTTURA (markdown, ## per titoli):
 Presenta in tabella i tre indicatori v4:
 1. **Riduzione del dolore** — riduzione media NRS per sessione: ${avgDelta} punti.
 2. **Miglioramento percepito (PGIC)** — PGIC medio ${t12.avgPgic}/5${t12.improvedPct != null ? `, ${t12.improvedPct}% dei dipendenti rivalutati riporta un miglioramento (PGIC 4-5)` : ''}.
-3. **Variazione della prevalenza** — dipendenti che necessitano trattamento (L1): da ${t12.baselineTreatD} all'intake a ${t12.t12TreatD} a 12 mesi${t12.prevalenceShown && t12.prevalenceDelta != null ? ` (${t12.prevalenceDelta >= 0 ? '−' : '+'}${Math.abs(t12.prevalenceDelta)}%)` : ''}.
+3. **Variazione della prevalenza L1** — prevalenza L1 OSSERVATA (stessa strumentazione ai due capi): dal ${t12.t0L1} all'intake al ${t12.t12L1} a 12 mesi${t12.prevalenceShown && t12.prevalenceDeltaPts != null ? ` (${t12.prevalenceDeltaPts >= 0 ? '−' : '+'}${Math.abs(t12.prevalenceDeltaPts)} punti)` : ''}. NON confrontare conteggi grezzi (coorti T0/T12 di numerosità diversa: ${t12.t0N} vs ${t12.t12N}).
 
 ## Confronto prima/dopo
 (commento al cambiamento della distribuzione L1/L2/L3 intake → T12)
@@ -219,11 +227,11 @@ Sintesi dei risultati del programma ES Work al termine dell'Anno 1${t12.count ==
 |-----|--------|
 | Riduzione del dolore (NRS media/seduta) | ${avgDelta} punti |
 | Miglioramento percepito (PGIC medio) | ${t12.avgPgic}/5${t12.improvedPct != null ? ` · ${t12.improvedPct}% migliorati` : ''} |
-| Dipendenti che necessitano trattamento (L1) | ${t12.baselineTreatD} → ${t12.t12TreatD}${t12.prevalenceShown && t12.prevalenceDelta != null ? ` (${t12.prevalenceDelta >= 0 ? '−' : '+'}${Math.abs(t12.prevalenceDelta)}%)` : ''} |
+| Prevalenza L1 osservata (intake → 12 mesi) | ${t12.t0L1} → ${t12.t12L1}${t12.prevalenceShown && t12.prevalenceDeltaPts != null ? ` (${t12.prevalenceDeltaPts >= 0 ? '−' : '+'}${Math.abs(t12.prevalenceDeltaPts)} punti)` : ''} |
 
 ## Confronto prima/dopo
 
-Distribuzione livelli all'intake: L1 ${l1d}, L2 ${l2d}, L3 ${l3d}. A 12 mesi (su ${t12.count} re-assessment): L1 ${t12.r1d}, L2 ${t12.r2d}, L3 ${t12.r3d}.
+Distribuzione osservata all'intake (${t12.t0N} risposte T0): ${t12.t0Strat}. A 12 mesi (${t12.t12N} re-assessment): ${t12.t12Strat}.
 
 I valori "n.d." sono soppressi per tutela dell'anonimato (k-anonymity, gruppo < ${K_ANON}).
 

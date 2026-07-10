@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
 import { getClients, getPatientsByClient } from '../../lib/store';
 import { calculatePricing, fmt } from '../../lib/calculator';
+import { tierFromEmployees } from '../../lib/pricing/tier';
 import NavMenu from '../../components/NavMenu';
 
 const STAGE_COLORS = {
@@ -24,10 +25,7 @@ const TIER_COLORS = { core: '#6b7280', plus: '#2563eb', enterprise: '#7c3aed' };
 const TIER_LABELS = { core: 'Core', plus: 'Plus', enterprise: 'Enterprise' };
 
 function getTier(employees) {
-  const n = parseInt(employees) || 0;
-  if (n <= 150) return 'core';
-  if (n <= 500) return 'plus';
-  return 'enterprise';
+  return tierFromEmployees(employees); // fonte unica: lib/pricing/tier.js
 }
 
 // Stima L1 da dipendenti (avg sector)

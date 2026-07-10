@@ -9,6 +9,7 @@ import {
   addToWaitlist,
 } from '../../../lib/store';
 import { computeLevel } from '../../../lib/scoring';
+import { tierFromEmployees } from '../../../lib/pricing/tier';
 
 export default async function handler(req, res) {
   const { share_code } = req.query;
@@ -52,8 +53,7 @@ export default async function handler(req, res) {
 
             // prevention_eligible: L2 da assessment solo nei tier Plus/Enterprise
             const respClient = await getClientById(patient.client_id).catch(() => null);
-            const rn = parseInt(respClient?.employees) || 0;
-            const rtier = respClient?.tier || (rn <= 150 ? 'core' : rn <= 500 ? 'plus' : 'enterprise');
+            const rtier = tierFromEmployees(respClient?.employees, respClient?.tier);
             const prevention_eligible = computed_level === 'level2' && (rtier === 'plus' || rtier === 'enterprise');
 
             await updatePatient(patient.id, {

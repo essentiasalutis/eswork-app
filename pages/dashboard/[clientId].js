@@ -7,12 +7,10 @@ import ReportView from '../../components/ReportView';
 import ReportDoc, { reportPrintHtml } from '../../components/ReportDoc';
 import { CONFIG } from '../../lib/config';
 import NavMenu from '../../components/NavMenu';
+import { tierFromEmployees } from '../../lib/pricing/tier';
 
 function getTierFromEmployees(employees) {
-  const n = parseInt(employees) || 0;
-  if (n <= 150) return 'core';
-  if (n <= 500) return 'plus';
-  return 'enterprise';
+  return tierFromEmployees(employees); // fonte unica: lib/pricing/tier.js
 }
 
 const TIER_LABELS = { core: 'Core', plus: 'Plus', enterprise: 'Enterprise' };

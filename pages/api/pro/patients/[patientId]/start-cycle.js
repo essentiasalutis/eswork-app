@@ -9,11 +9,10 @@ import {
   getPreValidationByPatient,
   getTreatmentCapacity,
 } from '../../../../../lib/store';
+import { tierFromEmployees } from '../../../../../lib/pricing/tier';
 
 function tierOf(client) {
-  if (client?.tier) return client.tier;
-  const n = parseInt(client?.employees) || 0;
-  return n <= 150 ? 'core' : n <= 500 ? 'plus' : 'enterprise';
+  return tierFromEmployees(client?.employees, client?.tier);
 }
 
 export default requireProAuth(async function handler(req, res) {

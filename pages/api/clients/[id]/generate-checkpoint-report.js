@@ -138,8 +138,7 @@ Presenta in tabella i tre indicatori v4:
 2. **Miglioramento percepito (PGIC)** — PGIC medio ${t12.avgPgic}/5${t12.improvedPct != null ? `, ${t12.improvedPct}% dei dipendenti rivalutati riporta un miglioramento (PGIC 4-5)` : ''}.
 3. **Variazione della prevalenza L1** — prevalenza L1 OSSERVATA (stessa strumentazione ai due capi): dal ${t12.t0L1} all'intake al ${t12.t12L1} a 12 mesi${t12.prevalenceShown && t12.prevalenceDeltaPts != null ? ` (${t12.prevalenceDeltaPts >= 0 ? '−' : '+'}${Math.abs(t12.prevalenceDeltaPts)} punti)` : ''}. NON confrontare conteggi grezzi (coorti T0/T12 di numerosità diversa: ${t12.t0N} vs ${t12.t12N}).
 
-## Confronto prima/dopo
-(commento al cambiamento della distribuzione L1/L2/L3 intake → T12)
+IMPORTANTE: riporta le percentuali di prevalenza ESATTAMENTE come indicate sopra (${t12.t0L1} all'intake, ${t12.t12L1} a 12 mesi); non ricalcolarle né arrotondarle diversamente. Il commento prima/dopo è già fornito nella sezione "L'andamento del programma" più sotto: NON duplicarlo.
 
 ## Documentazione INAIL OT23
 (elementi per la richiesta di riduzione del tasso: interventi erogati, dipendenti coinvolti, ore, monitoraggio continuo)
@@ -318,12 +317,6 @@ Sintesi dei risultati del programma ES Work al termine dell'Anno 1${t12.count ==
 | Riduzione del dolore (NRS media/seduta) | ${avgDelta} punti |
 | Miglioramento percepito (PGIC medio) | ${t12.avgPgic}/5${t12.improvedPct != null ? ` · ${t12.improvedPct}% migliorati` : ''} |
 | Prevalenza L1 osservata (intake → 12 mesi) | ${t12.t0L1} → ${t12.t12L1}${t12.prevalenceShown && t12.prevalenceDeltaPts != null ? ` (${t12.prevalenceDeltaPts >= 0 ? '−' : '+'}${Math.abs(t12.prevalenceDeltaPts)} punti)` : ''} |
-
-## Confronto prima/dopo
-
-Distribuzione osservata all'intake (${t12.t0N} risposte T0): ${t12.t0Strat}. A 12 mesi (${t12.t12N} re-assessment): ${t12.t12Strat}.
-
-I valori "n.d." sono soppressi per tutela dell'anonimato (k-anonymity, gruppo < ${K_ANON}).
 
 ## Documentazione INAIL OT23
 

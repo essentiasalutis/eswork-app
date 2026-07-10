@@ -19,9 +19,9 @@
 --  2. informativa_version non-null per contratto: RAISE (→ rollback) se mancante.
 --     Nessun default silenzioso. (L'endpoint la rifiuta già prima; questa è belt-and-braces.)
 --
---  Consenso PATIENT-LINKED: assessment_consents (patient_id, v31, assessment_id nullable)
---  + patients.informativa_version. Nessun aggancio org — il neoassunto entra nel modello
---  di consenso ESISTENTE, non ne crea uno nuovo. Ponte impossibile per costruzione.
+--  Consenso PATIENT-LINKED: SOLO su assessment_consents (patient_id + informativa_version,
+--  v31; assessment_id nullable). NB: patients NON ha informativa_version. Nessun aggancio org
+--  — il neoassunto entra nel modello di consenso ESISTENTE. Ponte impossibile per costruzione.
 --
 -- NB "risposte" (righe responses anonime) SALTATE di proposito: il KPI prevalenza NMQ del
 --    Report Annuale viene da patients.level + reassessments_t12, NON da responses. Il
@@ -96,17 +96,19 @@ BEGIN
   v_now        := now();
   v_care_token := replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '');
   v_pid        := 'pat_' || replace(gen_random_uuid()::text, '-', '');
+  -- NB: informativa_version NON è su patients (v31 l'ha aggiunta ad assessment_consents).
+  -- La prova di consenso (versione) vive SOLO su assessment_consents, patient-linked (3b).
   INSERT INTO public.patients
     (id, client_id, first_name, last_name, email, phone, location,
      level, level_status, computed_level, prevention_eligible,
      care_token, self_declared, wants_to_be_contacted,
-     informativa_version, assessment_completed_at, created_at, updated_at)
+     assessment_completed_at, created_at, updated_at)
   VALUES
     (v_pid, v_client_id, COALESCE(p_first_name, 'Anonimo'), COALESCE(p_last_name, ''),
      p_email, p_phone, p_location,
      v_level, v_status, p_computed_level, v_prev,
      v_care_token, true, COALESCE(p_wants_contacted, true),
-     p_informativa_version, v_now, v_now, v_now);
+     v_now, v_now, v_now);
 
   -- (3b) PROVA DI CONSENSO — stessa transazione (Guardia 1). Patient-linked (patient_id),
   --      assessment_id NULL (v31: "il consenso è legato al paziente"). Se questa INSERT

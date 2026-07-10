@@ -11,7 +11,8 @@ import {
   insertGeneratedReport,
   insertDocument,
 } from '../../../../lib/store';
-import { getNotaValidazione } from '../../../../lib/pricing/settings';
+import { getNotaValidazione, getAndamentoT12Texts } from '../../../../lib/pricing/settings';
+import { CONFIG_V1 } from '../../../../lib/pricing/v1';
 import { stratificazioneOsservata } from '../../../../lib/scoring';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { kAnonPartition, maskCount, tooSmall, K_ANON } from '../../../../lib/kanon';
@@ -79,6 +80,7 @@ export default requireAuth(async function handler(req, res) {
 
   // ── KPI del Report Annuale (T12): prevalenza baseline↔T12 + PGIC ──────────────
   let t12 = null;
+  let andamentoSection = ''; // sezione "L'andamento del programma" (verbatim, solo T12)
   if (isAnnual) {
     const reass = await getReassessmentsT12ByClient(id).catch(() => []);
     const pgicVals = reass.map(r => r.pgic).filter(v => v != null);
@@ -108,6 +110,12 @@ export default requireAuth(async function handler(req, res) {
       t12Strat: nd(`L1 ${t12s.l1pct}%, L2 ${t12s.l2pct}%, L3 ${t12s.l3pct}%`),
       _t0: t0, _t12: t12s, // grezzi per il Blocco 2 (confronti A/B)
     };
+
+    // Sezione deterministica "L'andamento del programma" (confronto A vs settore /
+    // B anno-su-anno, soglia coorte 70%, degrado k-anon). Testi parametrici da
+    // pricing_settings v2 (fail-safe su default nel codice). Inserita VERBATIM.
+    const andamentoTexts = await getAndamentoT12Texts();
+    andamentoSection = buildAndamentoSection(t12, client, andamentoTexts);
   }
 
   const prompt = isAnnual ? `Sei un consulente clinico ES Work. Genera il REPORT ANNUALE (12 mesi) per ${client.name}, da consegnare alla direzione e utilizzabile per il bilancio di sostenibilità.
@@ -180,9 +188,11 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
   // Nota di validazione deterministica in fondo al report (mai dall'AI).
   const notaValidazione = await getNotaValidazione();
   const conNota = t => `${t}\n\n---\n\n*${notaValidazione}*`;
+  // Inietta la sezione andamento (verbatim) PRIMA della nota; no-op se non annuale.
+  const finalize = t => conNota(injectAndamento(t, andamentoSection));
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    const fallback = conNota(generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc));
+    const fallback = finalize(generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc));
     // PDF prima dell'insert: così pdf_url resta sul record e il report è riapribile col PDF
     const pdfUrl = await tryGeneratePdf(client, reportType, fallback, id, checkpoint).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system', pdf_url: pdfUrl }).catch(() => null);
@@ -196,17 +206,97 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
       max_tokens: 1500,
       messages: [{ role: 'user', content: prompt }],
     });
-    const report = conNota(message.content[0]?.text || '');
+    const report = finalize(message.content[0]?.text || '');
     const pdfUrl = await tryGeneratePdf(client, reportType, report, id, checkpoint).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: report, checkpoint, created_by: 'admin', pdf_url: pdfUrl }).catch(() => null);
     return res.json({ report, source: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
-    const fallback = conNota(generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc));
+    const fallback = finalize(generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc));
     const pdfUrl = await tryGeneratePdf(client, reportType, fallback, id, checkpoint).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system', pdf_url: pdfUrl }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
   }
 });
+
+// ─── Sezione "L'andamento del programma" (Report Annuale T12) ─────────────────
+// Deterministica e VERBATIM: sceglie i template parametrici in base ai dati e li
+// riempie in JS (l'AI non riscrive nulla). Confronto A (prevalenza L1 osservata vs
+// MID atteso di settore) + Confronto B (anno-su-anno T0→T12). Regole dure:
+//  • soglia coorte 70%: se la coorte T12 copre < 70% della T0, B non è un claim di
+//    risultato (dato indicativo con caveat) e l'ancora di A ripiega su T0 (censimento
+//    pieno; la coorte T12 parziale è auto-selezionata);
+//  • degrado k-anon: se una delle due coorti < K, niente percentuali → messaggio che
+//    spiega il PERCHÉ (mai un buco/"n.d." secco); gli N delle coorti sempre mostrati;
+//  • letture oneste: se la prevalenza L1 sale, il testo lo dichiara; il frame-rinnovo
+//    appare solo con coorte rappresentativa E prevalenza a T12 sotto l'atteso (< stretto).
+function fillT(tpl, vars) {
+  return String(tpl == null ? '' : tpl).replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
+}
+
+function buildAndamentoSection(t12, client, T) {
+  if (!t12 || !t12._t0 || !t12._t12) return '';
+  const t0 = t12._t0, t12s = t12._t12;
+  const t0N = t0.n, t12N = t12s.n;
+  const t0L1pct = t0.l1pct, t12L1pct = t12s.l1pct;
+  const shown = t12.prevalenceShown;
+  const ratio = t0N > 0 ? t12N / t0N : 0;
+  const ratioPct = Math.round(ratio * 100);
+  const repOk = ratio >= 0.70; // SOGLIA COORTE 70% HARD
+  const deltaPts = t0L1pct - t12L1pct; // >0 = prevalenza L1 SCESA (miglioramento)
+  const deltaAbs = Math.abs(deltaPts);
+  const kMin = K_ANON;
+  const sectorKey = client.sector === 1 ? 'manufacturing' : 'services';
+  const midArr = (CONFIG_V1.l1_prevalence && CONFIG_V1.l1_prevalence[sectorKey]) || [0.08, 0.13, 0.19];
+  const midPct = Math.round(midArr[1] * 100); // MID atteso di settore (indice 1), NON high
+
+  const out = [T.report_t12_andamento_titolo,
+    fillT(T.report_t12_andamento_intro, { t0N, t12N, ratioPct })];
+
+  // RAMO 0 — degrado k-anon: nessun numero A/B disponibile.
+  if (!shown) {
+    out.push(fillT(T.report_t12_andamento_degrado_kanon, { t0N, t12N, kMin }));
+    out.push(T.report_t12_andamento_chiusura_neutra);
+    return out.join('\n\n');
+  }
+
+  // Confronto A — ancora a T12 se coorte rappresentativa, altrimenti a T0.
+  const aPoint = repOk ? 'a dodici mesi' : "all'intake";
+  const obsPct = repOk ? t12L1pct : t0L1pct;
+  const aVantaggio = obsPct < midPct; // "<" stretto: alla pari col settore niente vanto
+  const gapPts = midPct - obsPct;
+  const aTpl = aVantaggio
+    ? fillT(T.report_t12_andamento_a_vantaggio, { aPoint, obsPct, midPct, gapPts })
+    : fillT(T.report_t12_andamento_a_pari_sopra, { aPoint, obsPct, midPct });
+
+  if (repOk) {
+    // Coorte adeguata: B è il claim di risultato in evidenza, A è contesto.
+    let bTpl;
+    if (deltaPts > 0) bTpl = fillT(T.report_t12_andamento_b_riduzione, { ratioPct, t0L1pct, t12L1pct, deltaAbs });
+    else if (deltaPts === 0) bTpl = fillT(T.report_t12_andamento_b_stabile, { ratioPct, t0L1pct, t12L1pct });
+    else bTpl = fillT(T.report_t12_andamento_b_aumento, { ratioPct, t0L1pct, t12L1pct, deltaAbs });
+    out.push(bTpl, aTpl);
+    if (deltaPts >= 0 && t12L1pct < midPct) out.push(fillT(T.report_t12_andamento_chiusura_rinnovo, { t12L1pct, midPct }));
+    else if (deltaPts < 0) out.push(T.report_t12_andamento_chiusura_consolidamento);
+    else out.push(T.report_t12_andamento_chiusura_neutra);
+  } else {
+    // Coorte parziale (<70%): fallback ad A (headline), B solo indicativo, chiusura neutra.
+    const bTpl = fillT(T.report_t12_andamento_b_coorte_parziale, { ratioPct, t12N, t0N, t12L1pct, t0L1pct });
+    out.push(aTpl, bTpl, T.report_t12_andamento_chiusura_neutra);
+  }
+  return out.join('\n\n');
+}
+
+// Inserisce la sezione (verbatim) prima della prima ancora disponibile; se nessuna
+// è presente (l'AI ha deviato dalle intestazioni), la appende in fondo. No-op se vuota.
+function injectAndamento(report, section) {
+  if (!section) return report;
+  const anchors = ['## Documentazione INAIL OT23', '## Documentazione INAIL', '## Raccomandazioni'];
+  for (const a of anchors) {
+    const idx = report.indexOf(a);
+    if (idx !== -1) return `${report.slice(0, idx)}${section}\n\n${report.slice(idx)}`;
+  }
+  return `${report.trimEnd()}\n\n${section}`;
+}
 
 function generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc) {
   // k-anon sulla stratificazione intake L1/L2/L3 (soppressione secondaria inclusa)

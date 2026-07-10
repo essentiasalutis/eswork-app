@@ -35,6 +35,24 @@ const TEXT_LABELS = {
   argomentario_assessment_pacchetto: 'Argomentario — Assessment (pacchetto)',
 };
 
+// Testi del Report Annuale (T12) — sezione "L'andamento del programma".
+// A differenza degli argomentari (solo interni), QUESTI compaiono nel report generato.
+// I {token} sono sostituiti coi numeri; default nel codice (lib/pricing/settings.js).
+const ANDAMENTO_T12_LABELS = {
+  report_t12_andamento_titolo: 'Titolo sezione',
+  report_t12_andamento_intro: 'Intro (numerosità coorti T0/T12, {t0N} {t12N} {ratioPct})',
+  report_t12_andamento_a_vantaggio: 'Confronto A — sotto l\'atteso di settore / vantaggio ({aPoint} {obsPct} {midPct} {gapPts})',
+  report_t12_andamento_a_pari_sopra: 'Confronto A — in linea o sopra l\'atteso ({aPoint} {obsPct} {midPct})',
+  report_t12_andamento_b_riduzione: 'Confronto B — prevalenza L1 in riduzione ({ratioPct} {t0L1pct} {t12L1pct} {deltaAbs})',
+  report_t12_andamento_b_stabile: 'Confronto B — prevalenza L1 stabile ({ratioPct} {t0L1pct} {t12L1pct})',
+  report_t12_andamento_b_aumento: 'Confronto B — prevalenza L1 in aumento, lettura onesta ({ratioPct} {t0L1pct} {t12L1pct} {deltaAbs})',
+  report_t12_andamento_b_coorte_parziale: 'Confronto B — coorte parziale <70%, dato indicativo ({ratioPct} {t12N} {t0N} {t12L1pct} {t0L1pct})',
+  report_t12_andamento_degrado_kanon: 'Degrado k-anon — numerosità sotto soglia ({t0N} {t12N} {kMin})',
+  report_t12_andamento_chiusura_rinnovo: 'Chiusura — frame rinnovo / mantenimento del vantaggio ({t12L1pct} {midPct})',
+  report_t12_andamento_chiusura_consolidamento: 'Chiusura — consolidamento (prevalenza in aumento)',
+  report_t12_andamento_chiusura_neutra: 'Chiusura — neutra / consolidare',
+};
+
 const CONFIGS = ['core', 'plus', 'enterprise'];
 
 export default function PricingV2Page() {
@@ -164,6 +182,20 @@ export default function PricingV2Page() {
               {Object.keys(TEXT_LABELS).map(k => (
                 <label key={k} className="block text-xs text-gray-500">{TEXT_LABELS[k]}
                   <textarea rows={k.startsWith('naming') ? 1 : 2} defaultValue={texts[k] || ''} className={`${inputCls} mt-1`}
+                    onBlur={e => { if ((texts[k] || '') !== e.target.value) put({ tipo: 'setting', key: k, value: e.target.value }, 'testo salvato'); }} />
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Testi del Report Annuale (T12) — sezione "L'andamento del programma" */}
+          <div className={box}>
+            <h2 className="font-semibold text-gray-800 mb-1">Report Annuale (T12) — sezione «L&apos;andamento del programma»</h2>
+            <p className="text-xs text-gray-500 mb-3">Questi testi <strong>compaiono nel report generato</strong> (a differenza degli argomentari, solo interni). I <code>{'{token}'}</code> sono sostituiti automaticamente con i numeri. Il template usato dipende dai dati (confronto vs settore, andamento anno-su-anno, soglia coorte, anonimato): non tutti compaiono in ogni report.</p>
+            <div className="space-y-3">
+              {Object.keys(ANDAMENTO_T12_LABELS).map(k => (
+                <label key={k} className="block text-xs text-gray-500">{ANDAMENTO_T12_LABELS[k]}
+                  <textarea rows={k.endsWith('titolo') ? 1 : 3} defaultValue={texts[k] || ''} className={`${inputCls} mt-1`}
                     onBlur={e => { if ((texts[k] || '') !== e.target.value) put({ tipo: 'setting', key: k, value: e.target.value }, 'testo salvato'); }} />
                 </label>
               ))}

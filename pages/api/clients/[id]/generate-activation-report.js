@@ -12,7 +12,7 @@ import {
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { calculatePricing, computeForchetta, realL1L2FromAssessment } from '../../../../lib/calculator';
 import { getPricingSettingsV2, getServiziDeliverable, getNotaValidazione } from '../../../../lib/pricing/settings';
-import { getStimaSnapshot, freezeStimaSnapshot } from '../../../../lib/pricing/snapshot';
+import { getForchettaSnapshot, freezeStimaSnapshot } from '../../../../lib/pricing/snapshot';
 import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
 import { kAnonPartition, tooSmall, K_ANON } from '../../../../lib/kanon';
@@ -331,7 +331,7 @@ export async function buildQuoteBlock(client_id, client, answers) {
   try {
     const fm = await getFirstMeeting(client_id);
     const fmd = fm?.data;
-    const snap = getStimaSnapshot(fm);
+    const snap = getForchettaSnapshot(fm);      // risolve anche la forbice conservata
     const usableSnap = snap && snap.forchetta;  // snapshot programma completo con forbice
     if (!fmd && !usableSnap) return { block: '', compliance: null };
     const s2 = fmd?.step2 || {};

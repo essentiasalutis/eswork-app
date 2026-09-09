@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { requireAuthSsr } from '../../lib/auth';
 import { getAssessmentById, getClientById, getResponsesByAssessment, getFirstMeeting } from '../../lib/store';
 import { getPricingSettingsV2 } from '../../lib/pricing/settings';
-import { getStimaSnapshot } from '../../lib/pricing/snapshot';
+import { getForchettaSnapshot } from '../../lib/pricing/snapshot';
 import {
   aggregateNMQ,
   trafficLight, TL_COLOR, TL_BG, TL_BORDER, TYPE_LABELS, generateSummaryText, BODY_ZONES,
@@ -742,7 +742,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     let snap = null;
     try {
       const fm = await getFirstMeeting(assessment.client_id);
-      snap = getStimaSnapshot(fm);
+      snap = getForchettaSnapshot(fm);
       const fmd = fm?.data;
       if (fmd) {
         const s2 = fmd.step2 || {};

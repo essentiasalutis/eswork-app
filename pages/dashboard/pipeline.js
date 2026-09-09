@@ -47,6 +47,7 @@ function ClientCard({ client, onMove }) {
       <div className="flex items-start justify-between gap-2 mb-2">
         <Link href={`/dashboard/${client.id}`} className="font-semibold text-gray-900 text-sm leading-tight hover:text-green-700 flex-1 min-w-0 truncate">
           {client.name}
+          {client.is_demo && <span className="ml-1.5 text-[9px] font-bold px-1 py-0.5 rounded bg-gray-200 text-gray-500 align-middle">DEMO</span>}
         </Link>
         <span className="text-xs text-gray-400 whitespace-nowrap">{client.employees} dip.</span>
       </div>
@@ -128,12 +129,16 @@ export default function PipelinePage({ clients: initialClients }) {
     ? clients
     : clients.filter(c => c.source === filterSource);
 
-  // Statistiche
+  // Statistiche — SOLO clienti reali (clients.is_demo, v49). Le aziende demo
+  // restano visibili nelle colonne con badge, ma non vanno contate: un "Firmati: 1"
+  // che in realtà è una demo è esattamente il numero che porta fuori strada.
+  const realOnly = clients.filter(c => !c.is_demo);
+  const demoCount = clients.length - realOnly.length;
   const stats = {
-    total: clients.length,
-    signed: clients.filter(c => c.pipeline_stage === 'signed').length,
-    active: clients.filter(c => !['signed', 'lost'].includes(c.pipeline_stage)).length,
-    lost: clients.filter(c => c.pipeline_stage === 'lost').length,
+    total: realOnly.length,
+    signed: realOnly.filter(c => c.pipeline_stage === 'signed').length,
+    active: realOnly.filter(c => !['signed', 'lost'].includes(c.pipeline_stage)).length,
+    lost: realOnly.filter(c => c.pipeline_stage === 'lost').length,
   };
 
   // Sorgenti presenti
@@ -185,6 +190,7 @@ export default function PipelinePage({ clients: initialClients }) {
           <span className="text-yellow-700">In lavorazione: <strong>{stats.active}</strong></span>
           <span className="text-green-700">Firmati: <strong>{stats.signed}</strong></span>
           <span className="text-red-600">Persi: <strong>{stats.lost}</strong></span>
+          {demoCount > 0 && <span className="text-gray-400">(+{demoCount} demo, non conteggiate)</span>}
         </div>
       </div>
 

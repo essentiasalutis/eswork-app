@@ -71,8 +71,11 @@ export default requireAuth(async function handler(req, res) {
   const stratTotal = daRisposte ? nmqStrat.n : totalPatients;
 
   const sectorLabel = client.sector === 1 ? 'Manifattura/Produzione' : 'Servizi/Uffici';
-  const tier = client.tier || 'core';
-  const tierLabel = tier === 'core' ? 'Core' : tier === 'plus' ? 'Plus' : 'Enterprise';
+  const tier = client.tier || 'core'; // serve per selezionare i servizi deliverable
+  // NB: il tier (Core/Plus/Enterprise) è un nome INTERNO e non viene passato all'AI:
+  // fornirglielo e poi vietarne l'uso è una trappola — nel primo giro di test è uscito
+  // "il modello Core" nel report destinato al cliente. Il dimensionamento del piano si
+  // deduce dalla popolazione, che l'AI riceve già.
 
   // Rapporto col preventivo: condizioni della scheda colloquio + numeri REALI
   // della stratificazione (prezzo cliente; mai margini/costi nel report).
@@ -126,7 +129,6 @@ Riduzione media NRS: ${(avgNrsPre - avgNrsPost).toFixed(1)} punti
 CLIENTE: ${client.name}
 Settore: ${sectorLabel}
 Dipendenti totali: ${client.employees || 'n.d.'}
-${isPacchetto ? '' : `Tier: ${tierLabel}`}
 STRATIFICAZIONE (${stratTotal} questionari compilati):
 ${stratLines(l1Count, l2Count, l3Count, stratTotal)}
 
@@ -136,7 +138,7 @@ DEFINIZIONE DEI LIVELLI (tassativa — NON invertirla, NON reinterpretarla):
 - Livello 3 = nessun dolore in atto. Formazione collettiva su postura ed ergonomia.
 NON esiste una scala "rischio basso/medio/alto": non usarla e non invertire l'ordine. Se citi una priorità, la priorità clinica è il Livello 1.
 
-NOTA PRIVACY: dove un gruppo è "n.d." è stato soppresso per anonimato (k-anonymity, < ${K_ANON}). NON dedurre, stimare o ricostruire i valori soppressi.
+NOTA PRIVACY: dove un gruppo è "n.d." è stato soppresso per anonimato (k-anonymity). NON dedurre, stimare o ricostruire i valori soppressi. ATTENZIONE: un gruppo può risultare soppresso ANCHE se conta ${K_ANON} persone o più — è la soppressione secondaria, che impedisce di ricavarlo per differenza dagli altri. Quindi NON affermare che i gruppi soppressi siano "inferiori a ${K_ANON}": di' solo che non sono pubblicabili per tutela dell'anonimato.
 ${clinicoBlock}
 ASSESSMENT: ${stratTotal > 0 ? `${stratTotal} questionari raccolti` : 'nessun questionario ancora raccolto'}
 ${isPacchetto ? '' : quoteBlock}${serviziBlock}
@@ -148,7 +150,7 @@ VINCOLI TASSATIVI SUL TESTO:
 - MAI presentare la somma dei valori delle voci ("Cosa include il programma") né affiancarla all'investimento.
 - MAI espressioni come "in omaggio", "compreso gratuitamente", "gratis".
 - MAI "AI" o "intelligenza artificiale" nel nome della piattaforma (si chiama solo "Piattaforma digitale ES Work").
-- MAI i termini Core, Plus, Enterprise (nomi interni). Il prodotto si chiama "${nomeProdotto}".` : '';
+- MAI i termini Core, Plus, Enterprise, "tier", "modello Core/Plus/Enterprise": sono nomi INTERNI, non ti vengono forniti e non vanno inventati. Il prodotto si chiama SOLO "${nomeProdotto}".` : '';
   const istruzioniPacchetto = isPacchetto ? `
 ════ PRODOTTO "${nomeProdotto}" — 12 mesi, non rinnovabile, AUTOCONCLUSIVO ════
 Include SOLO: assessment completo (già svolto), formazione (2 moduli), consulenza ergonomico-posturale.
@@ -193,7 +195,7 @@ STRUTTURA DEL REPORT (usa markdown con ## per titoli):
 ## Piano Operativo Proposto
 ${isPacchetto
   ? `(SOLO le attività del pacchetto: assessment già svolto, formazione collettiva, consulenza ergonomico-posturale — NESSUN trattamento incluso)`
-  : `(turni di presa in carico, sportello osteopatico, formazione collettiva — adatto al tier ${tierLabel}; se presente la PROPOSTA ECONOMICA COLLEGATA, citane l'investimento Anno 1 in chiusura)`}
+  : `(turni di presa in carico, sportello osteopatico, formazione collettiva, dimensionati sulla popolazione indicata; se presente la PROPOSTA ECONOMICA COLLEGATA, citane l'investimento Anno 1 in chiusura)`}
 ${serviziBlock ? `
 ## Cosa include il programma
 (elenca le voci con i rispettivi valori dichiarati, una per riga, SENZA totale)

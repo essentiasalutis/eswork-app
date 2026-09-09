@@ -91,13 +91,15 @@ export default requireAuth(async function handler(req, res) {
   const isPacchetto = isV2 && client.tipo_prodotto === 'pacchetto_prevenzione';
   let serviziBlock = '';
   let v2Texts = {};
+  let v2Params = {};
   if (isV2) {
     try {
-      const [{ texts }, servizi] = await Promise.all([
+      const [{ texts, params }, servizi] = await Promise.all([
         getPricingSettingsV2(),
         getServiziDeliverable({ soloAttivi: true, configurazione: tier }),
       ]);
       v2Texts = texts || {};
+      v2Params = params || {};
       if (!isPacchetto && servizi.length) {
         serviziBlock = `\nCOSA INCLUDE IL PROGRAMMA (valori dichiarati per singola voce — NON sommarli, NON presentare MAI un totale, MAI "in omaggio"/"gratuito"):\n${servizi.map(s => `- ${s.voce}: €${Math.round(s.valore_dichiarato).toLocaleString('it-IT')}`).join('\n')}`;
       }
@@ -143,6 +145,21 @@ ${clinicoBlock}
 ASSESSMENT: ${stratTotal > 0 ? `${stratTotal} questionari raccolti` : 'nessun questionario ancora raccolto'}
 ${isPacchetto ? '' : quoteBlock}${serviziBlock}
 `.trim();
+
+  // PARAMETRI OPERATIVI REALI. Senza questi l'AI riempie i vuoti da sola: nel primo
+  // giro ha scritto "6-8 sedute per giornata" (la giornata ne vale 14) e "frequenza
+  // quindicinale", cioè impegni di erogazione inventati dentro il documento che
+  // fissa il prezzo. Stessa logica della definizione tassativa dei livelli.
+  const pOp = { ...{ sessions_per_l1: 4, session_duration_min: 30, prevention_sessions_per_l2: 4 }, ...(v2Params || {}) };
+  const parametriOperativi = (!isV2 || isPacchetto) ? '' : `
+PARAMETRI OPERATIVI REALI (usa ESATTAMENTE questi, non altri):
+- Seduta osteopatica individuale: ${pOp.session_duration_min} minuti
+- Ciclo per persona in Livello 1: ${pOp.sessions_per_l1} sedute
+- Prevenzione attiva per persona in Livello 2: ${pOp.prevention_sessions_per_l2} sessioni
+- Una giornata di sportello in sede vale ${CONFIG.hours_per_day} ore di erogazione
+VIETATO inventare dettagli di erogazione che non trovi qui sopra: quante sedute stanno in una giornata, la cadenza degli accessi (settimanale, quindicinale, mensile), durate, calendari, orari. Se un dato non ti è stato fornito, NON scriverlo: il report fissa il prezzo, ogni numero che scrivi diventa un impegno.
+VIETATO attribuire alla Piattaforma digitale ES Work funzioni che non ti sono state elencate (alert automatici, contenuti educativi personalizzati, questionari periodici, notifiche, tracciamento in tempo reale): è lo strumento con cui il programma viene gestito e i report prodotti, nient'altro.
+VIETATO raccomandare al cliente attività che sono GIÀ comprese nell'investimento (in particolare la valutazione ergonomica delle postazioni, se compare nella PROPOSTA ECONOMICA COLLEGATA): sono incluse, non sono cose "da valutare".`;
 
   // Vincoli di wording per i documenti v2 (mai violarli nel testo generato).
   const vincoliV2 = isV2 ? `
@@ -209,7 +226,7 @@ ${isPacchetto
 ${isPacchetto
   ? '(SOLO gli step del pacchetto: restituzione dei risultati alla direzione, formazione collettiva, sopralluogo ergonomico e conferma delle postazioni, consulenza ergonomico-posturale; NIENTE monitoraggio, follow-up clinici o trattamenti)'
   : '(5 step operativi con timeframe indicativo)'}
-${vincoliV2}${istruzioniPacchetto}
+${parametriOperativi}${vincoliV2}${istruzioniPacchetto}
 IDENTITÀ PROFESSIONALE (tassativa): il servizio è OSTEOPATICO. Usa sempre "osteopata", "trattamento osteopatico", "sportello osteopatico". VIETATO "fisioterapista", "fisioterapico", "riabilitativo/riabilitazione" e ogni termine fisioterapico riferito al nostro servizio.
 DATA: se includi un'intestazione con il riepilogo del cliente, riporta "Data: ${dataOggi}". Usa ESATTAMENTE questa data; non inventarne altre né citare altre date nel testo.
 Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole totali.`,
@@ -370,7 +387,30 @@ export async function buildQuoteBlock(client_id, client, answers) {
     // Testo CLIENTE: prezzo + framing positivo "in linea con la stima" se rientra.
     // MAI il flag grezzo dentro/fuori (resta dato interno persistito).
     const inLinea = inRange ? ', in linea con la stima presentata al colloquio' : '';
-    const block = `\nPROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):\n- Programma Anno 1: €${eur(realPrice)}${inLinea} (${calc.days_osteo_y1} giornate sportello, ${calc.training_sessions_y1} sessioni formative)\n- Stima Anno 2+: €${eur(calc.price_y2)}`;
+
+    // PONTE rispondenti -> popolazione. Il prezzo NON si dimensiona sui soli
+    // rispondenti: la prevalenza osservata viene riportata sull'intera forza
+    // lavoro (stessa regola della forbice, vedi realL1L2FromAssessment). Senza
+    // questa riga il documento dice "5 in Livello 1" e fattura per 8: numeri
+    // entrambi giusti, ma il passaggio non era spiegato da nessuna parte.
+    const obsPct = responders > 0 ? Math.round((nmq.level1.count / responders) * 100) : null;
+    const rigaDimensionamento = (pricingVersion === 'v2' && obsPct != null && nEmp > responders)
+      ? `\n- Dimensionamento: la quota in Livello 1 osservata sui ${responders} questionari (${obsPct}%) è riportata sull'intera popolazione di ${nEmp} dipendenti (${real.l1} persone attese), così il programma copre anche chi non ha compilato il questionario`
+      : '';
+
+    // ERGONOMIA: e' una voce PAGATA (fino a qui invisibile nel documento). Senza
+    // questa riga il cliente paga la valutazione delle postazioni e nel report
+    // non se ne parla — e l'AI e' arrivata a raccomandarla come cosa da valutare.
+    const ergo = calc.y1 && calc.y1.ergonomia;
+    // Stessi default del motore v2 (nUfficio assente = tutta la popolazione).
+    const nUff = conditions.ergonomia && conditions.ergonomia.nUfficio != null ? conditions.ergonomia.nUfficio : nEmp;
+    const nPost = (conditions.ergonomia && conditions.ergonomia.nPostazioni) || 0;
+    const pezzi = [nUff ? `${nUff} postazioni d'ufficio` : null, nPost ? `${nPost} postazioni tipo di produzione` : null].filter(Boolean);
+    const rigaErgonomia = (ergo && ergo.sell > 0 && pezzi.length)
+      ? `\n- Include la valutazione ergonomica delle postazioni di lavoro (${pezzi.join(' + ')}): è già compresa nell'investimento, non è un'attività da acquistare a parte`
+      : '';
+
+    const block = `\nPROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):\n- Programma Anno 1: €${eur(realPrice)}${inLinea} (${calc.days_osteo_y1} giornate sportello, ${calc.training_sessions_y1} sessioni formative)\n- Stima Anno 2+: €${eur(calc.price_y2)}${rigaDimensionamento}${rigaErgonomia}`;
     return { block, compliance };
   } catch {
     return { block: '', compliance: null };

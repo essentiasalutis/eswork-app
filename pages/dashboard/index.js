@@ -85,7 +85,10 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
                 <div className="bg-white rounded-2xl border border-gray-200 p-4 active:bg-gray-50 transition-colors">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-gray-900 text-base truncate">{c.name}</div>
+                      <div className="font-semibold text-gray-900 text-base truncate">
+                        {c.name}
+                        {c.is_demo && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-500 align-middle">DEMO</span>}
+                      </div>
                       <div className="text-sm text-gray-500 mt-0.5">
                         {c.employees} dipendenti · {c.sector === 1 ? 'Manifattura' : 'Ufficio/IT'}
                       </div>

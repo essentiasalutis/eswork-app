@@ -1,5 +1,5 @@
 import { requireAuth } from '../../../lib/auth';
-import { getClients, insertClient, generateId } from '../../../lib/store';
+import { getClients, insertClient, generateId, generateShareCode } from '../../../lib/store';
 
 export default requireAuth(async function handler(req, res) {
   if (req.method === 'GET') {
@@ -26,7 +26,7 @@ export default requireAuth(async function handler(req, res) {
         notes: notes?.trim() || null,
         source: source || 'passaparola',
         pipeline_stage: 'contacted',
-        assessment_share_code: Math.random().toString(36).substring(2, 8),
+        assessment_share_code: generateShareCode(), // codice pubblico → crypto, mai Math.random
         created_at: new Date().toISOString(),
       });
       return res.status(201).json(client);

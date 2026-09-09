@@ -35,8 +35,15 @@ function estimateL1(employees, sector) {
 }
 
 export default function FinancePage({ clients, patientCounts }) {
-  const activeClients = clients.filter(c => c.pipeline_stage === 'active' || c.pipeline_stage === 'signed');
-  const prospectClients = clients.filter(c => !['active', 'closed'].includes(c.pipeline_stage));
+  // Le aziende DEMO (clients.is_demo, v49) restano VISIBILI in tabella con badge,
+  // ma non entrano in NESSUN aggregato economico: ARR, pipeline, forecast, margini
+  // e revenue per tier devono riflettere solo clienti reali. Senza questo filtro il
+  // primo cliente vero sarebbe sommato ai 500 pazienti della demo.
+  const realClients = clients.filter(c => !c.is_demo);
+  const demoCount = clients.length - realClients.length;
+
+  const activeClients = realClients.filter(c => c.pipeline_stage === 'active' || c.pipeline_stage === 'signed');
+  const prospectClients = realClients.filter(c => !['active', 'closed'].includes(c.pipeline_stage));
 
   // KPI
   let totalARR = 0;
@@ -51,7 +58,7 @@ export default function FinancePage({ clients, patientCounts }) {
     const revenue = calc?.price_y1 || 0;
     const cost = calc?.total_cost_y1 || 0;
     const margin = cost > 0 ? Math.round((1 - cost / revenue) * 100) : 0;
-    if (isActive) { totalARR += revenue; totalCost += cost; }
+    if (isActive && !c.is_demo) { totalARR += revenue; totalCost += cost; }
     return { ...c, calc, revenue, cost, margin, l1, l2 };
   });
 
@@ -64,13 +71,13 @@ export default function FinancePage({ clients, patientCounts }) {
 
   // Revenue per tier
   const byTier = { core: 0, plus: 0, enterprise: 0 };
-  clientsWithFinance.filter(c => c.pipeline_stage === 'active').forEach(c => {
+  clientsWithFinance.filter(c => c.pipeline_stage === 'active' && !c.is_demo).forEach(c => {
     const t = getTier(c.employees);
     byTier[t] += c.revenue;
   });
 
   // Forecast 6 mesi (signed → attivi entro 6 mesi)
-  const signedClients = clients.filter(c => c.pipeline_stage === 'signed');
+  const signedClients = realClients.filter(c => c.pipeline_stage === 'signed');
   const forecast6m = signedClients.reduce((sum, c) => {
     const cf = clientsWithFinance.find(x => x.id === c.id);
     return sum + (cf?.revenue || 0) * 0.5; // stima 50% del valore Y1 nei primi 6 mesi
@@ -155,6 +162,7 @@ export default function FinancePage({ clients, patientCounts }) {
                       <tr key={c.id} className="border-t border-gray-50 hover:bg-gray-50">
                         <td className="px-4 py-3">
                           <Link href={`/dashboard/${c.id}`} className="font-semibold text-gray-900 hover:text-blue-600">{c.name}</Link>
+                          {c.is_demo && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-500 align-middle">DEMO</span>}
                         </td>
                         <td className="px-4 py-3 text-gray-600">{c.employees || '—'}</td>
                         <td className="px-4 py-3">
@@ -185,7 +193,7 @@ export default function FinancePage({ clients, patientCounts }) {
 
           {/* Note */}
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-700">
-            <strong>Note:</strong> I valori revenue e L1/L2 sono stime basate sul calcolatore quando i dati reali non sono disponibili. I clienti "signed" sono inclusi nel forecast ma non nell&apos;ARR corrente. Margini calcolati senza costi fissi aziendali.
+            <strong>Note:</strong> {demoCount > 0 && <>Le {demoCount} aziende marcate <strong>DEMO</strong> sono elencate ma <strong>escluse</strong> da ARR, pipeline, forecast, margini e revenue per tier. </>}I valori revenue e L1/L2 sono stime basate sul calcolatore quando i dati reali non sono disponibili. I clienti "signed" sono inclusi nel forecast ma non nell&apos;ARR corrente. Margini calcolati senza costi fissi aziendali.
           </div>
         </main>
       </div>

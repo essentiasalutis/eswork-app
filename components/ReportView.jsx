@@ -473,34 +473,47 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         </div>
       </div>
 
-      {/* Suddivisione per ruolo — mostrata solo se ENTRAMBI i gruppi ≥ k (altrimenti
-          il totale noto rivelerebbe il gruppo soppresso per differenza). */}
-      {(nmq.byRole.production.n >= K_ANON && nmq.byRole.office.n >= K_ANON) && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3 print-page">
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Suddivisione per tipologia di lavoro</div>
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { label: '🏭 In produzione', data: nmq.byRole.production },
-              { label: '💻 In ufficio', data: nmq.byRole.office },
-            ].map(({ label, data }) => {
-              const rolePart = kAnonPartition([
-                { key: 'l1', count: data.level1.count },
-                { key: 'l2', count: data.level2.count },
-                { key: 'l3', count: data.level3.count },
-              ], data.n);
-              const RL = Object.fromEntries(rolePart.map(c => [c.key, c]));
-              return (
-              <div key={label}>
-                <div className="text-xs font-semibold text-gray-600 mb-2">
-                  {label} <span className="font-normal text-gray-400">({data.n} risp.)</span>
-                </div>
-                {data.zones.slice(0, 7).map((z, i) => (
-                  maskCount(z.count12) == null ? (
-                    <div key={i} className="flex items-center gap-1.5 mb-1">
-                      <div className="w-20 text-xs text-gray-500 truncate text-right flex-shrink-0">{z.zone}</div>
-                      <div className="flex-1 text-xs text-gray-400 italic">{SUPPRESSED}</div>
-                    </div>
-                  ) : (
+      {/* Suddivisione per ruolo. Due livelli di tutela:
+          1) il blocco esce solo se ENTRAMBI i gruppi ≥ k (altrimenti il totale noto
+             rivelerebbe il gruppo soppresso per differenza);
+          2) DENTRO ogni gruppo, zone e livelli possono comunque finire sotto soglia:
+             in quel caso non si stampa una griglia di "n.d." e "0%" — che si legge
+             come un report rotto — ma si dice esplicitamente perché il dato manca. */}
+      {(nmq.byRole.production.n >= K_ANON && nmq.byRole.office.n >= K_ANON) && (() => {
+        const gruppi = [
+          { label: '🏭 In produzione', data: nmq.byRole.production },
+          { label: '💻 In ufficio', data: nmq.byRole.office },
+        ].map(g => {
+          const zones = g.data.zones.filter(z => maskCount(z.count12) != null && z.pct12 > 0).slice(0, 5);
+          const RL = Object.fromEntries(kAnonPartition([
+            { key: 'l1', count: g.data.level1.count },
+            { key: 'l2', count: g.data.level2.count },
+            { key: 'l3', count: g.data.level3.count },
+          ], g.data.n).map(c => [c.key, c]));
+          return { ...g, zones, RL, livelliVisibili: !RL.l1.suppressed || !RL.l2.suppressed };
+        });
+        const nullaDaMostrare = gruppi.every(g => g.zones.length === 0 && !g.livelliVisibili);
+
+        if (nullaDaMostrare) return (
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3">
+            <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Suddivisione per tipologia di lavoro</div>
+            <p className="text-xs text-gray-500">
+              Il dettaglio per tipologia di lavoro non è pubblicabile: i sottogruppi sono sotto la soglia minima
+              di {K_ANON} persone prevista per la tutela dell&apos;anonimato. I dati complessivi riportati sopra restano validi.
+            </p>
+          </div>
+        );
+
+        return (
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3 print-page">
+            <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Suddivisione per tipologia di lavoro</div>
+            <div className="grid grid-cols-2 gap-4">
+              {gruppi.map(({ label, data, zones, RL, livelliVisibili }) => (
+                <div key={label}>
+                  <div className="text-xs font-semibold text-gray-600 mb-2">
+                    {label} <span className="font-normal text-gray-400">({data.n} risp.)</span>
+                  </div>
+                  {zones.length > 0 ? zones.map((z, i) => (
                     <div key={i} className="flex items-center gap-1.5 mb-1">
                       <div className="w-20 text-xs text-gray-500 truncate text-right flex-shrink-0">{z.zone}</div>
                       <div className="flex-1 h-3 bg-gray-100 rounded overflow-hidden">
@@ -509,26 +522,31 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
                           style={{
                             width: `${z.pct12}%`,
                             background: z.pct12 > 50 ? '#dc2626' : z.pct12 > 30 ? '#ca8a04' : '#16a34a',
-                            minWidth: z.pct12 > 0 ? 16 : 0,
+                            minWidth: 16,
                           }}
                         />
                       </div>
                       <div className="text-xs text-gray-500 w-8 flex-shrink-0">{z.pct12}%</div>
                     </div>
-                  )
-                ))}
-                <div className="mt-2 pt-2 border-t border-gray-100 text-xs">
-                  <span className="text-red-600 font-semibold">L1: {RL.l1.suppressed ? SUPPRESSED : RL.l1.count}</span>
-                  {!RL.l1.suppressed && <span className="text-gray-400 ml-1">({RL.l1.pct}%)</span>}
-                  <span className="text-yellow-600 font-semibold ml-2">L2: {RL.l2.suppressed ? SUPPRESSED : RL.l2.count}</span>
-                  {!RL.l2.suppressed && <span className="text-gray-400 ml-1">({RL.l2.pct}%)</span>}
+                  )) : (
+                    <div className="text-xs text-gray-400 italic">Nessuna zona con valori pubblicabili: i conteggi per zona di questo gruppo sono sotto la soglia di anonimato.</div>
+                  )}
+                  <div className="mt-2 pt-2 border-t border-gray-100 text-xs">
+                    {livelliVisibili ? (
+                      <>
+                        {!RL.l1.suppressed && <><span className="text-red-600 font-semibold">L1: {RL.l1.count}</span><span className="text-gray-400 ml-1">({RL.l1.pct}%)</span></>}
+                        {!RL.l2.suppressed && <><span className="text-yellow-600 font-semibold ml-2">L2: {RL.l2.count}</span><span className="text-gray-400 ml-1">({RL.l2.pct}%)</span></>}
+                      </>
+                    ) : (
+                      <span className="text-gray-400 italic">Distribuzione per livello non pubblicabile a questo dettaglio (tutela anonimato).</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 3 livelli */}
       <SectionTitle>Stratificazione popolazione — 3 livelli</SectionTitle>

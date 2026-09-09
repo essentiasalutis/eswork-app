@@ -45,10 +45,30 @@ export default requireAuth(async function handler(req, res) {
   ]);
 
   const totalPatients = patients.length;
-  const l1Count = patients.filter(p => p.level === 'level1').length;
-  const l2Count = patients.filter(p => p.level === 'level2').length;
-  const l3Count = patients.filter(p => p.level === 'level3').length;
+  const patL1 = patients.filter(p => p.level === 'level1').length;
+  const patL2 = patients.filter(p => p.level === 'level2').length;
+  const patL3 = patients.filter(p => p.level === 'level3').length;
   const optedOut = patients.filter(p => p.level_status === 'opted_out').length;
+
+  // Array PIATTO delle risposte dell'assessment (stessa forma usata da offer.js).
+  const answers = Object.values((responses && responses.responses) || {}).flat();
+
+  // FONTE della fotografia clinica = le RISPOSTE dell'assessment, non patients.level.
+  // Due ragioni, entrambe verificate sul campo:
+  //  1. Al momento del Report di Attivazione i pazienti NON esistono ancora: nascono
+  //     all'attivazione clinica, cioè DOPO il contratto. Leggendo patients il report
+  //     diceva "nessun assessment completato" anche con 45 questionari raccolti — e
+  //     nello stesso documento il prezzo era calcolato correttamente dalle risposte.
+  //  2. patients.level DERIVA col trattamento, mentre l'Attivazione è la fotografia
+  //     del punto di partenza (stessa ragione per cui il baseline T12 usa le risposte
+  //     congelate: vedi stratificazioneOsservata in lib/scoring).
+  // Fallback su patients solo se non ci sono risposte (cliente già attivo senza assessment).
+  const nmqStrat = aggregateNMQ(answers || []);
+  const daRisposte = nmqStrat.n > 0;
+  const l1Count = daRisposte ? nmqStrat.level1.count : patL1;
+  const l2Count = daRisposte ? nmqStrat.level2.count : patL2;
+  const l3Count = daRisposte ? nmqStrat.level3.count : patL3;
+  const stratTotal = daRisposte ? nmqStrat.n : totalPatients;
 
   const sectorLabel = client.sector === 1 ? 'Manifattura/Produzione' : 'Servizi/Uffici';
   const tier = client.tier || 'core';
@@ -56,8 +76,6 @@ export default requireAuth(async function handler(req, res) {
 
   // Rapporto col preventivo: condizioni della scheda colloquio + numeri REALI
   // della stratificazione (prezzo cliente; mai margini/costi nel report).
-  // Array PIATTO di answers (stessa forma che usa offer.js via getResponsesByAssessment).
-  const answers = Object.values((responses && responses.responses) || {}).flat();
   const { block: quoteBlock, compliance: quoteCompliance } = await buildQuoteBlock(id, client, answers);
   // La generazione del Report CHIUDE la catena Stima→Report → timbra frozen_at
   // sullo snapshot (se esiste). Fatto qui, NON in buildQuoteBlock (usata anche
@@ -109,12 +127,18 @@ CLIENTE: ${client.name}
 Settore: ${sectorLabel}
 Dipendenti totali: ${client.employees || 'n.d.'}
 ${isPacchetto ? '' : `Tier: ${tierLabel}`}
-STRATIFICAZIONE (${totalPatients} assessment completati):
-${stratLines(l1Count, l2Count, l3Count, totalPatients)}
+STRATIFICAZIONE (${stratTotal} questionari compilati):
+${stratLines(l1Count, l2Count, l3Count, stratTotal)}
+
+DEFINIZIONE DEI LIVELLI (tassativa — NON invertirla, NON reinterpretarla):
+- Livello 1 = dolore in atto CON impatto funzionale. È il gruppo più critico, quello che necessita trattamento osteopatico individuale.
+- Livello 2 = dolore in atto SENZA impatto funzionale. Monitoraggio e prevenzione.
+- Livello 3 = nessun dolore in atto. Formazione collettiva su postura ed ergonomia.
+NON esiste una scala "rischio basso/medio/alto": non usarla e non invertire l'ordine. Se citi una priorità, la priorità clinica è il Livello 1.
 
 NOTA PRIVACY: dove un gruppo è "n.d." è stato soppresso per anonimato (k-anonymity, < ${K_ANON}). NON dedurre, stimare o ricostruire i valori soppressi.
 ${clinicoBlock}
-PAZIENTI: ${totalPatients > 0 ? 'Assessment completati' : 'Nessun assessment ancora'}
+ASSESSMENT: ${stratTotal > 0 ? `${stratTotal} questionari raccolti` : 'nessun questionario ancora raccolto'}
 ${isPacchetto ? '' : quoteBlock}${serviziBlock}
 `.trim();
 
@@ -140,7 +164,7 @@ PRINCIPIO GUIDA: la stratificazione è la fotografia dello stato della popolazio
 
   // Fallback se manca la chiave
   if (!process.env.ANTHROPIC_API_KEY) {
-    const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, totalPatients, sessions.length, sectorLabel, quoteBlock, { serviziBlock, isPacchetto, nomeProdotto, testoEvoluzione }));
+    const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { serviziBlock, isPacchetto, nomeProdotto, testoEvoluzione }));
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', pdf_url: pdfUrl, report_id: rec?.id });
@@ -195,7 +219,7 @@ Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole tota
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report, source: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
-    const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, totalPatients, sessions.length, sectorLabel, quoteBlock, { serviziBlock, isPacchetto, nomeProdotto, testoEvoluzione }));
+    const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { serviziBlock, isPacchetto, nomeProdotto, testoEvoluzione }));
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });

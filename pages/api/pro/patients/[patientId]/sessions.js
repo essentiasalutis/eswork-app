@@ -11,6 +11,7 @@ import {
   updateTreatmentCycle,
 } from '../../../../../lib/store';
 import { sendCyclePgicLink } from '../../../../../lib/notify';
+import { parseNrs, validaNrsChiusura } from '../../../../../lib/nrs';
 
 export default requireProAuth(async function handler(req, res) {
   const { patientId } = req.query;
@@ -33,8 +34,16 @@ export default requireProAuth(async function handler(req, res) {
     try {
       const sessions = await getSessionsByPatient(patientId);
       const nextNumber = sessions.filter(s => s.closed_at).length + 1;
-      const { nrs_pre, treatment_notes, next_session_notes, close } = req.body;
+      const { nrs_pre, nrs_post, treatment_notes, next_session_notes, close } = req.body;
       const now = new Date().toISOString();
+
+      // Una seduta chiusa senza entrambi gli NRS non entra nel KPI "Riduzione
+      // del dolore" dei report di checkpoint: il dato si perde nel momento in
+      // cui si potrebbe ancora raccogliere. Blocco qui, non solo nella UI.
+      if (close) {
+        const errNrs = validaNrsChiusura({ nrs_pre, nrs_post });
+        if (errNrs) return res.status(400).json({ error: errNrs });
+      }
 
       // Recupera ciclo attivo (se esiste)
       let activeCycle = null;
@@ -59,8 +68,8 @@ export default requireProAuth(async function handler(req, res) {
         client_id: patient.client_id,
         date: now,
         session_number: nextNumber,
-        nrs_pre: nrs_pre !== undefined ? parseInt(nrs_pre) : null,
-        nrs_post: null,
+        nrs_pre: parseNrs(nrs_pre),
+        nrs_post: parseNrs(nrs_post),
         treatment_notes: treatment_notes?.trim() || null,
         next_session_notes: next_session_notes?.trim() || null,
         closed_at: close ? now : null,
@@ -107,9 +116,20 @@ export default requireProAuth(async function handler(req, res) {
       const session = sessions.find(s => s.id === sessionId);
       if (!session) return res.status(404).json({ error: 'Sessione non trovata' });
 
+      // Chiusura di una visita aperta: valgono gli stessi due NRS del POST.
+      // La MODIFICA di una seduta già chiusa resta libera — le sedute storiche
+      // senza NRS devono restare correggibili, non bloccate.
+      if (close && !session.closed_at) {
+        const errNrs = validaNrsChiusura({
+          nrs_pre: nrs_pre !== undefined ? nrs_pre : session.nrs_pre,
+          nrs_post: nrs_post !== undefined ? nrs_post : session.nrs_post,
+        });
+        if (errNrs) return res.status(400).json({ error: errNrs });
+      }
+
       const fields = {};
-      if (nrs_pre !== undefined) fields.nrs_pre = nrs_pre === null || nrs_pre === '' ? null : parseInt(nrs_pre);
-      if (nrs_post !== undefined) fields.nrs_post = nrs_post === null || nrs_post === '' ? null : parseInt(nrs_post);
+      if (nrs_pre !== undefined) fields.nrs_pre = parseNrs(nrs_pre);
+      if (nrs_post !== undefined) fields.nrs_post = parseNrs(nrs_post);
       if (treatment_notes !== undefined) fields.treatment_notes = treatment_notes?.trim() || null;
       if (next_session_notes !== undefined) fields.next_session_notes = next_session_notes?.trim() || null;
 

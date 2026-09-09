@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireProAuthSsr } from '../../../lib/pro-auth';
 import { getSessionById } from '../../../lib/store';
+import { validaNrsChiusura } from '../../../lib/nrs';
 
 export default function SessionForm({ session }) {
   const router = useRouter();
@@ -24,6 +25,10 @@ export default function SessionForm({ session }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (present === null) { setError('Indica se il paziente era presente'); return; }
+    if (present !== false) {
+      const errNrs = validaNrsChiusura({ nrs_pre: nrsPre, nrs_post: nrsPost });
+      if (errNrs) { setError(errNrs); return; }
+    }
     if (cycleOutcome && pgic == null) { setError('Per chiudere il ciclo registra il PGIC del paziente'); return; }
     setSaving(true);
     setError('');

@@ -8,6 +8,7 @@ import {
   getPatientById,
   proCanAccessPatientClinical,
 } from '../../../../lib/store';
+import { validaNrsChiusura } from '../../../../lib/nrs';
 
 // Livello B — la sessione fa parte della cartella clinica: solo l'osteopata
 // assegnato al paziente può leggerla/modificarla.
@@ -38,6 +39,13 @@ export default requireProAuth(async function handler(req, res) {
     const session = await getSessionById(sessionId).catch(() => null);
     if (!session) return res.status(404).json({ error: 'Sessione non trovata' });
     if (!(await guardSession(proId, session, res))) return;
+
+    // Paziente presente = seduta erogata: senza i due NRS non entra nel KPI di
+    // efficacia. Su un no-show gli NRS non hanno senso e non si chiedono.
+    if (patient_present !== false) {
+      const errNrs = validaNrsChiusura({ nrs_pre, nrs_post });
+      if (errNrs) return res.status(400).json({ error: errNrs });
+    }
 
     const patientId = session.patient_id || session.patients?.id;
     const pgicVal = pgic != null ? parseInt(pgic, 10) : null;

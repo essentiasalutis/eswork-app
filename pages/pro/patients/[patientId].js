@@ -12,6 +12,7 @@ import {
   getCyclesByPatient,
 } from '../../../lib/store';
 import PatientDocuments from '../../../components/PatientDocuments';
+import { validaNrsChiusura } from '../../../lib/nrs';
 
 // ─── NRS Slider ───────────────────────────────────────────────────────────────
 
@@ -467,23 +468,34 @@ function AnamnesisBlock({ patient: initial, onUpdated }) {
 
 function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved }) {
   const isFirst = sessionNumber === 1;
+  // Prima seduta: l'NRS di inizio arriva dall'anamnesi — ma SOLO se c'è davvero.
+  // Se l'anamnesi non è stata compilata, la fase 'pre' va fatta comunque: senza
+  // NRS di inizio la seduta non entrerebbe nel KPI di efficacia.
+  const nrsDaAnamnesi = Number.isInteger(anamnesiNrs) ? anamnesiNrs : null;
+  const saltaPre = isFirst && nrsDaAnamnesi !== null;
   const [nrs, setNrs] = useState(0);
   const [nrsTouched, setNrsTouched] = useState(false);
+  const [nrsPost, setNrsPost] = useState(0);
+  const [nrsPostTouched, setNrsPostTouched] = useState(false);
   const [treatmentNotes, setTreatmentNotes] = useState('');
   const [nextNotes, setNextNotes] = useState('');
-  // Prima seduta: salta la fase NRS (già raccolto in anamnesi), vai diretto al trattamento
-  const [phase, setPhase] = useState(isFirst ? 'post' : 'pre');
+  const [phase, setPhase] = useState(saltaPre ? 'post' : 'pre');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const nrsPreValore = saltaPre ? nrsDaAnamnesi : (nrsTouched ? nrs : null);
+
   async function closeSession() {
     if (!treatmentNotes.trim()) return setError('Inserisci le note del trattamento prima di chiudere');
+    const errNrs = validaNrsChiusura({ nrs_pre: nrsPreValore, nrs_post: nrsPostTouched ? nrsPost : null });
+    if (errNrs) return setError(errNrs);
     setSaving(true);
     const res = await fetch(`/api/pro/patients/${patientId}/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        nrs_pre: isFirst ? (anamnesiNrs ?? null) : (nrsTouched ? nrs : null),
+        nrs_pre: nrsPreValore,
+        nrs_post: nrsPostTouched ? nrsPost : null,
         treatment_notes: treatmentNotes,
         next_session_notes: nextNotes,
         close: true,
@@ -531,12 +543,12 @@ function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved 
         <>
           <div className="bg-gray-50 rounded-xl px-3 py-2 text-sm text-gray-600 flex items-center justify-between">
             <span>
-              {isFirst && anamnesiNrs !== undefined
-                ? <>NRS registrato in anamnesi: <strong>{anamnesiNrs}/10</strong></>
-                : <>NRS registrato: <strong>{nrs}/10</strong></>
+              {saltaPre
+                ? <>NRS registrato in anamnesi: <strong>{nrsDaAnamnesi}/10</strong></>
+                : <>NRS inizio seduta: <strong>{nrs}/10</strong></>
               }
             </span>
-            {!isFirst && (
+            {!saltaPre && (
               <button
                 onClick={() => setPhase('pre')}
                 className="text-xs text-blue-600 font-semibold hover:underline ml-3"
@@ -557,10 +569,19 @@ function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved 
               placeholder="Esercizi domiciliari, aree da rivalutare, priorità..."
               className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
           </div>
+          <div className="border-t border-gray-100 pt-4">
+            <NrsSlider value={nrsPost} onChange={setNrsPost} label="NRS fine seduta *"
+              touched={nrsPostTouched} onTouch={() => setNrsPostTouched(true)} />
+            {nrsPostTouched && nrsPreValore !== null && (
+              <div className={`mt-2 text-center text-sm font-semibold ${nrsPost < nrsPreValore ? 'text-green-600' : nrsPost > nrsPreValore ? 'text-red-600' : 'text-gray-500'}`}>
+                {nrsPost < nrsPreValore ? `↓ ${nrsPreValore - nrsPost} punti` : nrsPost > nrsPreValore ? `↑ ${nrsPost - nrsPreValore} punti` : '→ invariato'}
+              </div>
+            )}
+          </div>
           {error && <div className="text-sm text-red-600">{error}</div>}
-          <button onClick={closeSession} disabled={saving}
-            className="w-full py-3 rounded-xl bg-green-600 text-white font-bold disabled:opacity-60">
-            {saving ? 'Chiudo...' : '✓ Chiudi visita'}
+          <button onClick={closeSession} disabled={saving || !nrsPostTouched}
+            className="w-full py-3 rounded-xl bg-green-600 text-white font-bold disabled:opacity-60 disabled:cursor-not-allowed">
+            {saving ? 'Chiudo...' : nrsPostTouched ? '✓ Chiudi visita' : 'Registra l\u2019NRS di fine seduta per chiudere'}
           </button>
         </>
       )}

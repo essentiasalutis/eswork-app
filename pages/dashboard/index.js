@@ -6,13 +6,14 @@ import { getClients, getAssessmentCounts, getAllAcuteEvents } from '../../lib/st
 import { getDashboardFormazione } from '../../lib/org';
 import NavMenu from '../../components/NavMenu';
 import { TYPE_COLORS, TYPE_LABELS } from '../../lib/scoring';
-import { etichettaData } from '../../lib/checkup';
+import { etichettaData, ilGiorno } from '../../lib/checkup';
 
-// Righe dell'agenda "Questa settimana": cosa c'è da fare e quando.
+// Righe dell'agenda "Questa settimana": cosa c'è da fare e quando (e come si chiama
+// quando la data è già passata).
 const AGENDA = {
-  ricontatto: { icona: '🔁', testo: 'Ricontattare', passato: 'ricontatto previsto il' },
-  offerta: { icona: '⏳', testo: 'Offerta in scadenza', passato: 'offerta scaduta il' },
-  checkup: { icona: '📋', testo: 'Check-up in chiusura', passato: '' },
+  ricontatto: { icona: '🔁', testo: 'Ricontattare', scaduto: 'Ricontatto in ritardo' },
+  offerta: { icona: '⏳', testo: 'Offerta in scadenza', scaduto: 'Offerta scaduta' },
+  checkup: { icona: '📋', testo: 'Check-up in chiusura', scaduto: '' },
 };
 
 export default function Dashboard({ clients: initialClients, assessmentCounts, pendingAcuteCount, formazioneAlerts = [], solleciti: sollecitiIniziali = [], agenda = [], oggi = '' }) {
@@ -64,13 +65,13 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
             <div className="space-y-1">
               {agenda.map(v => {
                 const t = AGENDA[v.tipo];
-                const quando = v.scaduto ? `${t.passato} ${etichettaData(v.data)}` : v.data === oggi ? 'oggi' : etichettaData(v.data);
+                const quando = v.scaduto ? `era ${ilGiorno(v.data)}` : v.data === oggi ? 'oggi' : etichettaData(v.data);
                 return (
                   <Link key={`${v.tipo}-${v.client_id}`} href={v.tipo === 'checkup' ? `/dashboard/${v.client_id}` : '/dashboard/pipeline'}
                     className="flex items-center justify-between py-1.5 px-1 text-sm hover:bg-gray-50 rounded gap-2 flex-wrap">
                     <span className="flex items-center gap-2 min-w-0">
                       <span>{t.icona}</span>
-                      <span className="text-gray-500 text-xs">{t.testo}</span>
+                      <span className={`text-xs ${v.scaduto ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>{v.scaduto ? t.scaduto : t.testo}</span>
                       <span className="font-medium text-gray-800 truncate">{v.cliente}</span>
                       {v.is_demo && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">DEMO</span>}
                       {v.binario && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-900 text-white">{v.binario}</span>}

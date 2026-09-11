@@ -4,6 +4,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
 import { testoMailStima } from '../../lib/stima-mail';
+import ArgomentarioVoci from '../../components/ArgomentarioVoci';
 
 // Pagina STIMA (pre-assessment, cliente-facing). Mostra l'output di buildQuoteHtml
 // (UNICA fonte) in un iframe stampabile, con Scarica PDF (server). I numeri della
@@ -154,6 +155,7 @@ export default function StimaPage() {
         </header>
 
         <main className="flex-1 max-w-4xl w-full mx-auto p-4">
+          <div className="mb-3"><ArgomentarioVoci /></div>
           {html ? (
             <iframe ref={iframeRef} srcDoc={html} title="Stima ES Work" className="w-full bg-white rounded-xl shadow" style={{ height: 'calc(100vh - 110px)', border: 'none' }} />
           ) : (

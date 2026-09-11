@@ -14,6 +14,7 @@ import { calculatePricing, computeForchetta, realL1L2FromAssessment } from '../.
 import { getPricingSettingsV2, getServiziDeliverable, getNotaValidazione } from '../../../../lib/pricing/settings';
 import { ergonomiaDaColloquio } from '../../../../lib/pricing/v2';
 import { isFirmato } from '../../../../lib/checkup-server';
+import { cosaComprendeMarkdown, inserisciCosaComprende } from '../../../../lib/programma';
 import { getForchettaSnapshot, freezeStimaSnapshot } from '../../../../lib/pricing/snapshot';
 import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
@@ -91,7 +92,9 @@ export default requireAuth(async function handler(req, res) {
   // SOLO listino v2: per i clienti v1 il report resta ESATTAMENTE quello attuale.
   const isV2 = (client.pricing_version || 'v1') === 'v2';
   const isPacchetto = isV2 && client.tipo_prodotto === 'pacchetto_prevenzione';
-  let serviziBlock = '';
+  // "Cosa comprende il programma" (12 voci di Enrico + valori del Listino): la scrive il
+  // sistema, non l'AI — i testi restano quelli approvati (lib/programma.js).
+  let sezioneComprende = '';
   let v2Texts = {};
   let v2Params = {};
   if (isV2) {
@@ -102,10 +105,9 @@ export default requireAuth(async function handler(req, res) {
       ]);
       v2Texts = texts || {};
       v2Params = params || {};
-      if (!isPacchetto && servizi.length) {
-        serviziBlock = `\nCOSA INCLUDE IL PROGRAMMA (valori dichiarati per singola voce — NON sommarli, NON presentare MAI un totale, MAI "in omaggio"/"gratuito"):\n${servizi.map(s => `- ${s.voce}: €${Math.round(s.valore_dichiarato).toLocaleString('it-IT')}`).join('\n')}`;
-      }
+      if (!isPacchetto) sezioneComprende = cosaComprendeMarkdown({ servizi });
     } catch (_) {}
+    if (!isPacchetto && !sezioneComprende) sezioneComprende = cosaComprendeMarkdown();
   }
   const nomeProdotto = isPacchetto
     ? (v2Texts.naming_cliente_pacchetto_prevenzione || 'Pacchetto Prevenzione')
@@ -151,7 +153,7 @@ NON esiste una scala "rischio basso/medio/alto": non usarla e non invertire l'or
 NOTA PRIVACY: dove un gruppo è "n.d." è stato soppresso per anonimato (k-anonymity). NON dedurre, stimare o ricostruire i valori soppressi. ATTENZIONE: un gruppo può risultare soppresso ANCHE se conta ${K_ANON} persone o più — è la soppressione secondaria, che impedisce di ricavarlo per differenza dagli altri. Quindi NON affermare che i gruppi soppressi siano "inferiori a ${K_ANON}": di' solo che non sono pubblicabili per tutela dell'anonimato.
 ${clinicoBlock}
 CHECK-UP: ${stratTotal > 0 ? `${stratTotal} questionari raccolti` : 'nessun questionario ancora raccolto'}
-${isPacchetto ? '' : quoteBlock}${serviziBlock}
+${isPacchetto ? '' : quoteBlock}
 `.trim();
 
   // PARAMETRI OPERATIVI REALI. Senza questi l'AI riempie i vuoti da sola: nel primo
@@ -192,7 +194,7 @@ PRINCIPIO GUIDA: la stratificazione è la fotografia dello stato della popolazio
 
   // Fallback se manca la chiave
   if (!process.env.ANTHROPIC_API_KEY) {
-    const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { serviziBlock, isPacchetto, nomeProdotto, testoEvoluzione, firmato }));
+    const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { sezioneComprende, isPacchetto, nomeProdotto, testoEvoluzione, firmato }));
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', pdf_url: pdfUrl, report_id: rec?.id });
@@ -222,10 +224,7 @@ STRUTTURA DEL REPORT (usa markdown con ## per titoli):
 ${isPacchetto
   ? `(SOLO le attività del pacchetto: check-up già svolto, formazione collettiva, consulenza ergonomico-posturale — NESSUN trattamento incluso)`
   : `(turni di presa in carico, sportello osteopatico, formazione collettiva, dimensionati sulla popolazione indicata; se presente la PROPOSTA ECONOMICA COLLEGATA, citane l'investimento Anno 1 in chiusura)`}
-${serviziBlock ? `
-## Cosa include il programma
-(elenca le voci con i rispettivi valori dichiarati, una per riga, SENZA totale)
-` : ''}
+
 ## Raccomandazioni ${isPacchetto ? '' : 'Cliniche'}
 ${isPacchetto
   ? '(3-5 raccomandazioni SOLO su formazione, ergonomia e comportamenti organizzativi — vedi DIVIETI: niente monitoraggio/follow-up/trattamenti)'
@@ -238,18 +237,18 @@ ${isPacchetto
 ${parametriOperativi}${vincoliV2}${istruzioniPacchetto}
 ${firmato ? '' : 'STATO (tassativo): il contratto NON è ancora firmato, questo report PROPONE il programma. VIETATO scrivere che il programma è stato attivato, avviato, erogato o che è operativo, e VIETATO citare sessioni già svolte: scrivi «programma proposto», «si propone di attivare».\n'}IDENTITÀ PROFESSIONALE (tassativa): il servizio è OSTEOPATICO. Usa sempre "osteopata", "trattamento osteopatico", "sportello osteopatico". VIETATO "fisioterapista", "fisioterapico", "riabilitativo/riabilitazione" e ogni termine fisioterapico riferito al nostro servizio. VIETATO anche presentare il servizio come atto medico o come medicina del lavoro: mai "medicina osteopatica", "medico", "sanitario", "medicina del lavoro", "sorveglianza sanitaria" riferiti a noi. La sorveglianza sanitaria resta del Medico Competente aziendale; noi siamo un programma osteopatico di prevenzione e trattamento, distinto e complementare.
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
-CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
+CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.${sezioneComprende ? '\nCOMPONENTI: NON scrivere una sezione con l\'elenco delle componenti del programma né i loro valori (niente «Cosa include» / «Cosa comprende»): la inserisce il sistema con i testi approvati.' : ''}
 DATA: se includi un'intestazione con il riepilogo del cliente, riporta "Data: ${dataOggi}". Usa ESATTAMENTE questa data; non inventarne altre né citare altre date nel testo.
 Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole totali.`,
       }],
     });
 
-    const report = conNota(message.content[0]?.text || '');
+    const report = conNota(inserisciCosaComprende(message.content[0]?.text || '', sezioneComprende));
     const pdfUrl = await tryGeneratePdf(client, 'activation', report, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report, source: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
-    const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { serviziBlock, isPacchetto, nomeProdotto, testoEvoluzione, firmato }));
+    const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { sezioneComprende, isPacchetto, nomeProdotto, testoEvoluzione, firmato }));
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
@@ -257,7 +256,7 @@ Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole tota
 });
 
 function generateFallbackReport(client, l1, l2, l3, total, sessioni, settore, quoteBlock, v2 = {}) {
-  const { serviziBlock = '', isPacchetto = false, nomeProdotto = '', testoEvoluzione = '', firmato = false } = v2;
+  const { sezioneComprende = '', isPacchetto = false, nomeProdotto = '', testoEvoluzione = '', firmato = false } = v2;
   const small = tooSmall(total);
   const P = small ? null : Object.fromEntries(kAnonPartition([
     { key: 'l1', count: l1 }, { key: 'l2', count: l2 }, { key: 'l3', count: l3 },
@@ -307,9 +306,9 @@ ${isPacchetto
   : `Il piano prevede la presa in carico dei pazienti L1 distribuiti in turni di avvio mensili, con sportello osteopatico in sede. La formazione collettiva copre l'intera popolazione aziendale con moduli su ergonomia e postura.`}
 ${!isPacchetto && quoteBlock ? `
 ## Proposta economica collegata
-${quoteBlock.replace('PROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):', 'Investimento calcolato con le condizioni concordate al colloquio e la stratificazione reale:')}` : ''}${serviziBlock ? `
-## Cosa include il programma
-${serviziBlock.split('\n').filter(l => l.startsWith('- ')).join('\n')}` : ''}${isPacchetto && testoEvoluzione && !testoEvoluzione.startsWith('Segnaposto') ? `
+${quoteBlock.replace('PROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):', 'Investimento calcolato con le condizioni concordate al colloquio e la stratificazione reale:')}` : ''}${sezioneComprende ? `
+
+${sezioneComprende}` : ''}${isPacchetto && testoEvoluzione && !testoEvoluzione.startsWith('Segnaposto') ? `
 ## Evoluzione possibile
 ${testoEvoluzione}` : ''}
 ${isPacchetto ? `## Raccomandazioni

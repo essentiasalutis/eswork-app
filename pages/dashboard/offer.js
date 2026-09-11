@@ -14,6 +14,8 @@ import { CONFIG } from '../../lib/config';
 import { oggiRoma, aggiungiGiorni } from '../../lib/checkup';
 import { finoAl, fraseValidita } from '../../lib/offerta';
 import { normalizza } from '../../lib/pipeline';
+import { VOCI_PROGRAMMA, RIGA_CHIUSURA } from '../../lib/programma';
+import ArgomentarioVoci from '../../components/ArgomentarioVoci';
 
 // ─── Firma standard ───────────────────────────────────────────────────────────
 
@@ -111,7 +113,7 @@ function Page({ children, className = '' }) {
 
 // ─── Offer Document ───────────────────────────────────────────────────────────
 
-export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, date, offertaGiorniA = 10 }) {
+export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, date, offertaGiorniA = 10, serviziV2 = null }) {
   const [emailModal, setEmailModal] = useState(null);
   const [scadenza, setScadenza] = useState(() => scadenzaIniziale(client, offertaGiorniA));
   const [esitoInvio, setEsitoInvio] = useState(null); // { ok, testo }
@@ -148,6 +150,10 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
   // Offerta VERA = dopo il check-up (non il preventivo stimato dalla scheda colloquio):
   // solo questa ha validità e sposta l'azienda in "Offerta aperta".
   const offertaVera = !assessment.estimate;
+  // Programma completo sul listino v2: le 12 voci di Enrico + i valori del Listino
+  // (servizi_deliverable, mai un totale). Il listino v1 resta com'era (congelato).
+  const nuovoProgramma = Array.isArray(serviziV2);
+  const dettaglioVoce = n => (!calc ? '' : n === 3 && calc.days_osteo_y1 ? ` (${calc.days_osteo_y1} giornate nel primo anno)` : n === 6 && calc.training_sessions_y1 ? ` (${calc.training_sessions_y1} sessioni nel primo anno)` : '');
 
   async function registraInvio() {
     const r = await fetch(`/api/clients/${client.id}/offerta`, {
@@ -290,6 +296,8 @@ ${FIRMA}`;
             {esitoInvio && <span className={`font-semibold ${esitoInvio.ok ? 'text-green-700' : 'text-red-600'}`}>{esitoInvio.testo}</span>}
           </div>
         )}
+
+        <div className="mt-2"><ArgomentarioVoci /></div>
 
         {/* Confronto con la stima del colloquio — SOLO vista admin, mai nel PDF */}
         {forchetta && calc && (() => {
@@ -486,6 +494,30 @@ ${FIRMA}`;
       </Page>
 
       {/* ══════════════════════════════════════════════════════════════
+          Cosa comprende il programma — 12 voci (solo programma completo v2)
+          ══════════════════════════════════════════════════════════════ */}
+      {nuovoProgramma && (
+        <Page className="page-keep">
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginBottom: 10 }}>Cosa comprende il programma</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 9.5 }}>
+            <tbody>
+              {VOCI_PROGRAMMA.map(v => (
+                <tr key={v.n} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={{ padding: '5px 8px', fontWeight: 700, color: '#1e293b', width: '32%', verticalAlign: 'top' }}>
+                    <span style={{ color: '#16a34a', marginRight: 6 }}>{v.n}</span>{v.nome}{dettaglioVoce(v.n)}
+                  </td>
+                  <td style={{ padding: '5px 8px', color: '#4b5563', lineHeight: 1.45 }}>
+                    {v.cliente}{v.nota && <em> {v.nota}</em>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ marginTop: 10, fontSize: 10.5, fontWeight: 600, color: '#1e293b' }}>{RIGA_CHIUSURA}</div>
+        </Page>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════
           Investimento (subito sotto, niente interruzione)
           ══════════════════════════════════════════════════════════════ */}
       {calc && (
@@ -501,6 +533,23 @@ ${FIRMA}`;
             </div>
           </div>
 
+          {nuovoProgramma ? (
+            serviziV2.length > 0 && (
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '10px 12px', marginBottom: 10, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: '#16a34a', textTransform: 'uppercase', marginBottom: 6 }}>Valore dei servizi compresi</div>
+                {serviziV2.map((sv, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 14, padding: '4px 0', borderBottom: i < serviziV2.length - 1 ? '1px solid #dcfce7' : 'none' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#1e293b' }}>{sv.voce}</div>
+                    <div style={{ fontSize: 10, color: '#6b7280', whiteSpace: 'nowrap' }}>valore {fmt(sv.valore_dichiarato)}/anno</div>
+                  </div>
+                ))}
+                <div style={{ marginTop: 6, fontSize: 9.5, color: '#15803d', lineHeight: 1.5 }}>
+                  Valori per singola voce, già compresi nell&apos;investimento annuale. Le componenti del programma sono descritte nella pagina «Cosa comprende il programma».
+                </div>
+              </div>
+            )
+          ) : (
+            <>
           {/* ── BLOCCO A — Servizi clinici ── */}
           <div style={{ fontSize: 11, fontWeight: 800, color: '#1e293b', marginBottom: 3 }}>Il programma include</div>
           <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 3 }}>Servizi clinici</div>
@@ -527,7 +576,7 @@ ${FIRMA}`;
             {mgmtServices.map((s, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, padding: '4px 0', borderBottom: i < mgmtServices.length - 1 ? '1px solid #dcfce7' : 'none' }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#1e293b' }}>{s.label}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#1e293b' }}>{s.label.replace(/ con AI\b/, '')}</div>
                   {s.note && <div style={{ fontSize: 9, color: '#4b5563', lineHeight: 1.4, marginTop: 1 }}>{s.note}</div>}
                 </div>
                 {showMgmtValues && s.value != null && (
@@ -552,6 +601,9 @@ ${FIRMA}`;
             )}
           </div>
 
+            </>
+          )}
+
           {/* Anno 2 — descrizione + cifra (perché quel valore) */}
           <div style={{ background: '#eff6ff', borderRadius: 12, padding: '10px 14px', border: '1px solid #bfdbfe', marginBottom: 10, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
@@ -559,7 +611,7 @@ ${FIRMA}`;
               <div style={{ fontSize: 20, fontWeight: 800, color: '#1d4ed8' }}>{fmt(calc.price_y2)}/anno</div>
             </div>
             <div style={{ fontSize: 9.5, color: '#1e3a8a', lineHeight: 1.5, marginTop: 4 }}>
-              Dal secondo anno il programma entra nella fase di <strong>mantenimento e prevenzione</strong>, estesa ai dipendenti di Livello 1 e Livello 2 ({calc.pop_y2} persone): sportello osteopatico per consolidare i risultati, prevenzione attiva, un modulo formativo avanzato, piattaforma con AI, monitoraggio continuo e Report Annuale. L&apos;investimento si riduce rispetto all&apos;Anno 1 perché la fase intensiva iniziale di trattamento è già stata completata: si protegge il risultato raggiunto e si previene la ricaduta.
+              Dal secondo anno il programma entra nella fase di <strong>mantenimento e prevenzione</strong>, estesa ai dipendenti di Livello 1 e Livello 2 ({calc.pop_y2} persone): sportello osteopatico per consolidare i risultati, prevenzione attiva, un modulo formativo avanzato, Piattaforma digitale ES Work, monitoraggio continuo e Report Annuale. L&apos;investimento si riduce rispetto all&apos;Anno 1 perché la fase intensiva iniziale di trattamento è già stata completata: si protegge il risultato raggiunto e si previene la ricaduta.
             </div>
           </div>
 
@@ -726,6 +778,17 @@ function syntheticNmq(n, l1, l2) {
   };
 }
 
+// Valori dichiarati del Listino (servizi_deliverable) per la configurazione dell'azienda:
+// solo programma completo v2. null = listino v1 o Pacchetto → Offerta come prima.
+async function serviziPerOfferta(client, calc) {
+  if (!client || (client.pricing_version || 'v1') !== 'v2' || client.tipo_prodotto === 'pacchetto_prevenzione') return null;
+  try {
+    const { getServiziDeliverable } = await import('../../lib/pricing/settings');
+    const righe = await getServiziDeliverable({ soloAttivi: true, configurazione: (calc && calc.tier) || 'core' });
+    return righe.map(r => ({ voce: r.voce, valore_dichiarato: Number(r.valore_dichiarato) || 0 }));
+  } catch (_) { return []; }
+}
+
 export const getServerSideProps = requireAuthSsr(async (ctx) => {
   const q = ctx.query;
   const { assessmentId, clientId, n, l1, l2 } = q;
@@ -754,6 +817,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
           roi: null,
           date: today(),
           offertaGiorniA,
+          serviziV2: await serviziPerOfferta(client, calc),
         },
       };
     } catch (e) { console.error(e); return { notFound: true }; }
@@ -851,6 +915,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         forchetta,
         date: today(),
         offertaGiorniA,
+        serviziV2: await serviziPerOfferta(client, calc),
       },
     };
   } catch (e) {

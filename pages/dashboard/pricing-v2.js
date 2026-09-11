@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import NavMenu from '../../components/NavMenu';
 import { requireAuthSsr } from '../../lib/auth';
+import ArgomentarioVoci from '../../components/ArgomentarioVoci';
 
 // Etichette umane dei fattori numerici v2 (la v1 è congelata nel codice e NON
 // compare qui: impossibile modificarla da UI).
@@ -30,11 +31,6 @@ const TEXT_LABELS = {
   naming_cliente_programma_completo: 'Nome cliente-facing: programma completo',
   naming_cliente_pacchetto_prevenzione: 'Nome cliente-facing: pacchetto prevenzione',
   testo_evoluzione_pacchetto: 'Report pacchetto: testo "evoluzione verso il programma completo"',
-  argomentario_prevenzione_l2: 'Argomentario — Prevenzione L2',
-  argomentario_ergonomia: 'Argomentario — Ergonomia',
-  argomentario_buffer: 'Argomentario — Buffer clinico',
-  argomentario_formazione: 'Argomentario — Formazione',
-  argomentario_assessment_pacchetto: 'Argomentario — Check-up (pacchetto)',
 };
 
 // Testi del Report Annuale (T12) — sezione "L'andamento del programma".
@@ -162,6 +158,13 @@ export default function PricingV2Page() {
             <p className="text-[11px] text-gray-400 mt-2">Quando in Pipeline sposti un&apos;azienda del binario A in &laquo;Offerta aperta&raquo; la scadenza parte da oggi + questi giorni (modificabile). Binario B e non deciso: nessuna scadenza, la data si mette a mano solo se serve.</p>
           </div>
 
+          {/* Argomentario delle 12 voci (testi di Enrico, sola lettura: stessi di Stima e Offerta) */}
+          <div className={box}>
+            <h2 className="font-semibold text-gray-800 mb-2">Argomentario</h2>
+            <ArgomentarioVoci />
+            <p className="text-[11px] text-gray-400 mt-2">Le 12 voci e i loro testi (per il cliente e per te) sono una lista unica, la stessa della Stima, del Report di Attivazione e dell&apos;Offerta. Per cambiarli chiedi a me.</p>
+          </div>
+
           {/* Servizi & deliverable */}
           <div className={box}>
             <h2 className="font-semibold text-gray-800 mb-1">Servizi &amp; deliverable — valori dichiarati (€/anno)</h2>
@@ -176,16 +179,6 @@ export default function PricingV2Page() {
                     <tr key={voce} className="border-b border-gray-50 align-top">
                       <td className="py-2 pr-3 font-medium text-gray-800">
                         {voce}
-                        <details className="mt-1">
-                          <summary className="cursor-pointer text-[11px] text-gray-400">argomentario (solo interno)</summary>
-                          {CONFIGS.map(c => { const row = byVoceCfg(voce, c); return row ? (
-                            <div key={c} className="mt-1">
-                              <div className="text-[10px] uppercase text-gray-400">{c}</div>
-                              <textarea rows={2} defaultValue={row.descrizione_argomentario || ''} className={`${inputCls} text-xs font-normal`}
-                                onBlur={e => { if ((row.descrizione_argomentario || '') !== e.target.value) put({ tipo: 'servizio', id: row.id, descrizione_argomentario: e.target.value }, 'argomentario salvato'); }} />
-                            </div>
-                          ) : null; })}
-                        </details>
                       </td>
                       {CONFIGS.map(c => { const row = byVoceCfg(voce, c); return (
                         <td key={c} className="py-2 pr-2">

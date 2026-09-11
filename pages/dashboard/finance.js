@@ -5,21 +5,7 @@ import { getClients, getPatientsByClient } from '../../lib/store';
 import { calculatePricing, fmt } from '../../lib/calculator';
 import { tierFromEmployees } from '../../lib/pricing/tier';
 import NavMenu from '../../components/NavMenu';
-
-const STAGE_COLORS = {
-  prospect: 'bg-gray-100 text-gray-600',
-  contacted: 'bg-blue-50 text-blue-700',
-  proposal: 'bg-amber-50 text-amber-700',
-  negotiation: 'bg-purple-50 text-purple-700',
-  signed: 'bg-green-100 text-green-800',
-  active: 'bg-green-600 text-white',
-  closed: 'bg-gray-100 text-gray-400',
-};
-
-const STAGE_LABELS = {
-  prospect: 'Prospect', contacted: 'Contattato', proposal: 'Offerta inviata',
-  negotiation: 'In trattativa', signed: 'Firmato', active: 'Attivo', closed: 'Chiuso',
-};
+import { trovaStage, normalizza, isFirmato, isAperto } from '../../lib/pipeline';
 
 const TIER_COLORS = { core: '#6b7280', plus: '#2563eb', enterprise: '#7c3aed' };
 const TIER_LABELS = { core: 'Core', plus: 'Plus', enterprise: 'Enterprise' };
@@ -42,8 +28,11 @@ export default function FinancePage({ clients, patientCounts }) {
   const realClients = clients.filter(c => !c.is_demo);
   const demoCount = clients.length - realClients.length;
 
-  const activeClients = realClients.filter(c => c.pipeline_stage === 'active' || c.pipeline_stage === 'signed');
-  const prospectClients = realClients.filter(c => !['active', 'closed'].includes(c.pipeline_stage));
+  // Stati dalla fonte unica lib/pipeline.js. Accettato = contratto firmato: entra
+  // nell'ARR (ricavo annuo contrattualizzato). In trattativa = aperti tranne "Non ora".
+  const activeClients = realClients.filter(c => isFirmato(c.pipeline_stage));
+  const prospectClients = realClients.filter(c => isAperto(c.pipeline_stage) && normalizza(c.pipeline_stage) !== 'not_now');
+  const nonOraCount = realClients.filter(c => normalizza(c.pipeline_stage) === 'not_now').length;
 
   // KPI
   let totalARR = 0;
@@ -54,7 +43,7 @@ export default function FinancePage({ clients, patientCounts }) {
     // Instradato per versione listino del cliente (fail-safe v1): stessi default
     // della vecchia firma posizionale (tier/tariffe/gruppi da config).
     const calc = calculatePricing({ n: parseInt(c.employees) || 0, l1, l2, pricingVersion: c.pricing_version || 'v1' });
-    const isActive = c.pipeline_stage === 'active';
+    const isActive = isFirmato(c.pipeline_stage);
     const revenue = calc?.price_y1 || 0;
     const cost = calc?.total_cost_y1 || 0;
     const margin = cost > 0 ? Math.round((1 - cost / revenue) * 100) : 0;
@@ -71,16 +60,16 @@ export default function FinancePage({ clients, patientCounts }) {
 
   // Revenue per tier
   const byTier = { core: 0, plus: 0, enterprise: 0 };
-  clientsWithFinance.filter(c => c.pipeline_stage === 'active' && !c.is_demo).forEach(c => {
+  clientsWithFinance.filter(c => isFirmato(c.pipeline_stage) && !c.is_demo).forEach(c => {
     const t = getTier(c.employees);
     byTier[t] += c.revenue;
   });
 
-  // Forecast 6 mesi (signed → attivi entro 6 mesi)
-  const signedClients = realClients.filter(c => c.pipeline_stage === 'signed');
-  const forecast6m = signedClients.reduce((sum, c) => {
+  // Forecast 6 mesi: ARR + metà del valore delle offerte aperte (le più vicine alla firma).
+  const offerteAperte = realClients.filter(c => normalizza(c.pipeline_stage) === 'offer_open');
+  const forecast6m = offerteAperte.reduce((sum, c) => {
     const cf = clientsWithFinance.find(x => x.id === c.id);
-    return sum + (cf?.revenue || 0) * 0.5; // stima 50% del valore Y1 nei primi 6 mesi
+    return sum + (cf?.revenue || 0) * 0.5;
   }, 0);
 
   return (
@@ -107,10 +96,10 @@ export default function FinancePage({ clients, patientCounts }) {
           {/* KPI principali */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { label: 'ARR Attuale', value: fmt(totalARR), sub: `${activeClients.length} clienti attivi`, color: '#16a34a' },
+              { label: 'ARR Attuale', value: fmt(totalARR), sub: `${activeClients.length} ${activeClients.length === 1 ? 'cliente accettato' : 'clienti accettati'}`, color: '#16a34a' },
               { label: 'Margine Lordo', value: `${totalMargin}%`, sub: `Costi: ${fmt(totalCost)}`, color: totalMargin > 40 ? '#16a34a' : '#ca8a04' },
-              { label: 'Pipeline Value', value: fmt(pipelineValue), sub: `${prospectClients.length} prospect`, color: '#2563eb' },
-              { label: 'Forecast 6m', value: fmt(totalARR + forecast6m), sub: `+${fmt(forecast6m)} da signed`, color: '#7c3aed' },
+              { label: 'Pipeline Value', value: fmt(pipelineValue), sub: `${prospectClients.length} in trattativa${nonOraCount ? ` · ${nonOraCount} in Non ora` : ''}`, color: '#2563eb' },
+              { label: 'Forecast 6m', value: fmt(totalARR + forecast6m), sub: `+${fmt(forecast6m)} da ${offerteAperte.length} ${offerteAperte.length === 1 ? 'offerta aperta' : 'offerte aperte'}`, color: '#7c3aed' },
             ].map(k => (
               <div key={k.label} className="bg-white rounded-2xl border border-gray-200 p-4">
                 <div className="text-xs text-gray-400 mb-1">{k.label}</div>
@@ -122,7 +111,7 @@ export default function FinancePage({ clients, patientCounts }) {
 
           {/* Revenue per tier */}
           <div className="bg-white rounded-2xl border border-gray-200 p-5">
-            <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Revenue per tier (clienti attivi)</div>
+            <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Revenue per tier (clienti accettati)</div>
             <div className="grid grid-cols-3 gap-4">
               {['core', 'plus', 'enterprise'].map(t => (
                 <div key={t} className="text-center">
@@ -171,9 +160,11 @@ export default function FinancePage({ clients, patientCounts }) {
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STAGE_COLORS[c.pipeline_stage] || STAGE_COLORS.prospect}`}>
-                            {STAGE_LABELS[c.pipeline_stage] || c.pipeline_stage || '—'}
-                          </span>
+                          {(() => { const st = trovaStage(c.pipeline_stage); return (
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: st.bg, color: st.color, border: `1px solid ${st.border}` }}>
+                              {st.label}
+                            </span>
+                          ); })()}
                         </td>
                         <td className="px-4 py-3 text-gray-600">{c.l1} / {c.l2}</td>
                         <td className="px-4 py-3 font-semibold text-green-700">{c.revenue > 0 ? fmt(c.revenue) : '—'}</td>
@@ -193,7 +184,7 @@ export default function FinancePage({ clients, patientCounts }) {
 
           {/* Note */}
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-700">
-            <strong>Note:</strong> {demoCount > 0 && <>Le {demoCount} aziende marcate <strong>DEMO</strong> sono elencate ma <strong>escluse</strong> da ARR, pipeline, forecast, margini e revenue per tier. </>}I valori revenue e L1/L2 sono stime basate sul calcolatore quando i dati reali non sono disponibili. I clienti "signed" sono inclusi nel forecast ma non nell&apos;ARR corrente. Margini calcolati senza costi fissi aziendali.
+            <strong>Note:</strong> {demoCount > 0 && <>Le {demoCount} aziende marcate <strong>DEMO</strong> sono elencate ma <strong>escluse</strong> da ARR, pipeline, forecast, margini e revenue per tier. </>}I valori revenue e L1/L2 sono stime basate sul calcolatore quando i dati reali non sono disponibili. Gli stati sono quelli della Pipeline: gli <strong>accettati</strong> (contratto firmato) formano l&apos;ARR, il forecast aggiunge metà del valore delle <strong>offerte aperte</strong>, i &laquo;Non ora&raquo; restano fuori dal valore della pipeline. Margini calcolati senza costi fissi aziendali.
           </div>
         </main>
       </div>

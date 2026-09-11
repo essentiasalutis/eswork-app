@@ -6,8 +6,16 @@ import { getClients, getAssessmentCounts, getAllAcuteEvents } from '../../lib/st
 import { getDashboardFormazione } from '../../lib/org';
 import NavMenu from '../../components/NavMenu';
 import { TYPE_COLORS, TYPE_LABELS } from '../../lib/scoring';
+import { etichettaData } from '../../lib/checkup';
 
-export default function Dashboard({ clients: initialClients, assessmentCounts, pendingAcuteCount, formazioneAlerts = [], solleciti: sollecitiIniziali = [] }) {
+// Righe dell'agenda "Questa settimana": cosa c'è da fare e quando.
+const AGENDA = {
+  ricontatto: { icona: '🔁', testo: 'Ricontattare', passato: 'ricontatto previsto il' },
+  offerta: { icona: '⏳', testo: 'Offerta in scadenza', passato: 'offerta scaduta il' },
+  checkup: { icona: '📋', testo: 'Check-up in chiusura', passato: '' },
+};
+
+export default function Dashboard({ clients: initialClients, assessmentCounts, pendingAcuteCount, formazioneAlerts = [], solleciti: sollecitiIniziali = [], agenda = [], oggi = '' }) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
   const [solleciti, setSolleciti] = useState(sollecitiIniziali);
@@ -50,6 +58,32 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-6">
+        {agenda.length > 0 && (
+          <div className="mb-5 bg-white rounded-2xl border border-gray-200 p-4">
+            <h2 className="font-semibold text-gray-700 text-sm mb-2">📅 Questa settimana</h2>
+            <div className="space-y-1">
+              {agenda.map(v => {
+                const t = AGENDA[v.tipo];
+                const quando = v.scaduto ? `${t.passato} ${etichettaData(v.data)}` : v.data === oggi ? 'oggi' : etichettaData(v.data);
+                return (
+                  <Link key={`${v.tipo}-${v.client_id}`} href={v.tipo === 'checkup' ? `/dashboard/${v.client_id}` : '/dashboard/pipeline'}
+                    className="flex items-center justify-between py-1.5 px-1 text-sm hover:bg-gray-50 rounded gap-2 flex-wrap">
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span>{t.icona}</span>
+                      <span className="text-gray-500 text-xs">{t.testo}</span>
+                      <span className="font-medium text-gray-800 truncate">{v.cliente}</span>
+                      {v.is_demo && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">DEMO</span>}
+                      {v.binario && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-900 text-white">{v.binario}</span>}
+                    </span>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${v.scaduto ? 'bg-red-100 text-red-700' : v.data === oggi ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>
+                      {quando}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {solleciti.length > 0 && (
           <div className="mb-5 bg-white rounded-2xl border border-amber-200 p-4">
             <h2 className="font-semibold text-gray-700 text-sm mb-2">📣 Check-up da sollecitare oggi</h2>
@@ -191,5 +225,18 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     solleciti = await getSollecitiCheckup({ baseUrl: host ? `${proto}://${host}` : 'https://eswork-app.vercel.app' });
   } catch (_) {}
 
-  return { props: { clients, assessmentCounts, pendingAcuteCount, formazioneAlerts, solleciti } };
+  // Agenda della settimana: ricontatti "Non ora", offerte aperte in scadenza, check-up
+  // che chiudono. Le date già passate restano in cima, in rosso (lib/pipeline.js).
+  let agenda = [];
+  let oggi = '';
+  try {
+    const { oggiRoma, aggiungiGiorni } = await import('../../lib/checkup');
+    const { agendaSettimana } = await import('../../lib/pipeline');
+    const { getCheckupInChiusura } = await import('../../lib/checkup-server');
+    oggi = oggiRoma();
+    const checkups = await getCheckupInChiusura({ oggi, limite: aggiungiGiorni(oggi, 7) });
+    agenda = agendaSettimana({ clients, checkups, oggi });
+  } catch (_) {}
+
+  return { props: { clients, assessmentCounts, pendingAcuteCount, formazioneAlerts, solleciti, agenda, oggi } };
 });

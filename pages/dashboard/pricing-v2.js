@@ -147,6 +147,16 @@ export default function PricingV2Page() {
             <p className="text-[11px] text-gray-400 mt-2">La data di chiusura parte da oggi + questi giorni e si può cambiare a ogni avvio. Il check-up chiude alle 23:59 di quel giorno; chi aveva già iniziato ha 30 minuti per inviare.</p>
           </div>
 
+          {/* Offerta: validità per il binario A (il B non scade) */}
+          <div className={box}>
+            <h2 className="font-semibold text-gray-800 mb-3">Offerta</h2>
+            <label className="block text-xs text-gray-500 max-w-xs">Validità dell'offerta — binario A (giorni, 1–90)
+              <input type="number" min="1" max="90" step="1" defaultValue={texts.offerta_giorni_a ?? ''} placeholder="10" className={`${inputCls} mt-1`}
+                onBlur={e => { const v = e.target.value; if ((texts.offerta_giorni_a ?? '') !== v && /^\d+$/.test(v) && +v >= 1 && +v <= 90) put({ tipo: 'setting', key: 'offerta_giorni_a', value: v }, 'validità dell\'offerta salvata'); }} />
+            </label>
+            <p className="text-[11px] text-gray-400 mt-2">Quando in Pipeline sposti un&apos;azienda del binario A in &laquo;Offerta aperta&raquo; la scadenza parte da oggi + questi giorni (modificabile). Binario B e non deciso: nessuna scadenza, la data si mette a mano solo se serve.</p>
+          </div>
+
           {/* Servizi & deliverable */}
           <div className={box}>
             <h2 className="font-semibold text-gray-800 mb-1">Servizi &amp; deliverable — valori dichiarati (€/anno)</h2>

@@ -12,6 +12,7 @@ import { getClientById, getFirstMeeting } from '../../lib/store';
 import { getPricingSettingsV2 } from '../../lib/pricing/settings';
 import { validatePacchetto, calculatePacchetto } from '../../lib/pricing/v2';
 import { buildStimaSnapshot, writeStimaSnapshotIfOpen, isChainClosed, getStimaSnapshot } from '../../lib/pricing/snapshot';
+import { avanzaPipeline } from '../../lib/pipeline-server';
 
 export const config = { maxDuration: 60 };
 
@@ -76,6 +77,8 @@ export default requireAuth(async function handler(req, res) {
         v2Params, pacchettoPrice: pacchetto?.price, at: new Date().toISOString(),
       }),
     });
+    // Stima impegnata → pipeline "Stima inviata" (solo in avanti, mai da Accettato/No/Declinato).
+    if (b.store && b.clientId) await avanzaPipeline(b.clientId, 'stima_sent');
     // Template DEDICATO: naming parametrico, nessun trattamento come incluso.
     const pHtml = buildPacchettoHtml({
       client: { name: b.name || '—', employees: employees || '—', contact_name: b.contact_name || null },
@@ -113,6 +116,7 @@ export default requireAuth(async function handler(req, res) {
       v2Params, forchetta, at: new Date().toISOString(),
     }),
   });
+  if (b.store && b.clientId) await avanzaPipeline(b.clientId, 'stima_sent');
   // Se la catena è chiusa mostriamo la forbice CONGELATA (decisione: nessun ricalcolo).
   const forchettaOut = (frozenSnap && frozenSnap.forchetta) ? frozenSnap.forchetta : forchetta;
 

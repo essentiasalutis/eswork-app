@@ -2,6 +2,7 @@ import { getCheckupCorrente, scriviAssessmentTollerante } from '../../../lib/che
 import { isYmd, oggiRoma, aggiungiGiorni } from '../../../lib/checkup';
 import { getOrgParams } from '../../../lib/org';
 import { requireAuth } from '../../../lib/auth';
+import { avanzaPipeline } from '../../../lib/pipeline-server';
 import {
   getClientById,
   shareCodeExists,
@@ -45,6 +46,8 @@ export default requireAuth(async function handler(req, res) {
       chiude_il: chiude_il || aggiungiGiorni(oggiRoma(), giorni),
     });
 
+    // Check-up avviato → pipeline "Check-up inviato" (solo in avanti).
+    await avanzaPipeline(client_id, 'assessment_sent');
     return res.status(201).json({ ...assessment, ...(v51Mancante ? { avviso: 'Scadenza non salvata: manca la migration v51.' } : {}) });
   } catch (e) {
     return res.status(500).json({ error: e.message });

@@ -14,7 +14,7 @@ import { calculatePricing, computeForchetta, realL1L2FromAssessment } from '../.
 import { getPricingSettingsV2, getServiziDeliverable, getNotaValidazione } from '../../../../lib/pricing/settings';
 import { ergonomiaDaColloquio } from '../../../../lib/pricing/v2';
 import { isFirmato } from '../../../../lib/checkup-server';
-import { cosaComprendeMarkdown, inserisciCosaComprende } from '../../../../lib/programma';
+import { cosaComprendeMarkdown, inserisciCosaComprende, VOCI_PROGRAMMA } from '../../../../lib/programma';
 import { getForchettaSnapshot, freezeStimaSnapshot } from '../../../../lib/pricing/snapshot';
 import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
@@ -169,7 +169,10 @@ PARAMETRI OPERATIVI REALI (usa ESATTAMENTE questi, non altri):
 - Una giornata di sportello in sede vale ${CONFIG.hours_per_day} ore di erogazione
 VIETATO inventare dettagli di erogazione che non trovi qui sopra: quante sedute stanno in una giornata, la cadenza degli accessi (settimanale, quindicinale, mensile), durate, calendari, orari. Se un dato non ti è stato fornito, NON scriverlo: il report fissa il prezzo, ogni numero che scrivi diventa un impegno.
 VIETATO attribuire alla Piattaforma digitale ES Work funzioni che non ti sono state elencate (alert automatici, contenuti educativi personalizzati, questionari periodici, notifiche, tracciamento in tempo reale): è lo strumento con cui il programma viene gestito e i report prodotti, nient'altro.
-ERGONOMIA: descrivila SOLO con le voci e i numeri della riga «consulenza ergonomico-posturale» della PROPOSTA ECONOMICA COLLEGATA, senza aggiungerne. Se lì non compaiono addetti di reparto, NON citare alcuna formazione degli addetti; se non compaiono postazioni tipo di produzione, NON parlare di «studio delle postazioni». In ufficio l'intervento è per persona.
+ERGONOMIA: descrivila SOLO con le voci e i numeri della riga «consulenza ergonomico-posturale» della PROPOSTA ECONOMICA COLLEGATA, senza aggiungerne. Se lì non compaiono addetti di reparto, NON citare alcuna formazione degli addetti; se non compaiono postazioni tipo di produzione, NON parlare di «studio delle postazioni». In ufficio l'intervento è per persona. Se la PROPOSTA ECONOMICA COLLEGATA manca o non ha quella riga, descrivila solo in termini generali (osservazione delle postazioni e del gesto, raccomandazioni di adeguamento), senza addetti e senza elenchi di interventi tecnici.
+COMPONENTI DEL PROGRAMMA (le SOLE che esistono; la sezione con i loro testi la inserisce il sistema): ${VOCI_PROGRAMMA.map(v => v.nome).join('; ')}.
+TEMPI (tassativi): le review intermedie al mese 3 e al mese 6 sono REPORT di andamento, NON nuovi check-up; il check-up si ripete UNA sola volta, a 12 mesi, con il Report annuale. VIETATO proporre check-up semestrali, periodici o intermedi, «ricalibrazioni» o aggiornamenti della stratificazione durante l'anno, e qualsiasi attività che non sia tra le componenti qui sopra.
+DESTINATARI: la formazione su postura ed ergonomia è aperta a TUTTI i dipendenti, non solo al Livello 3; la prevenzione individuale è per il Livello 2; i cicli clinici per il Livello 1.
 VIETATO raccomandare al cliente attività che sono GIÀ comprese nell'investimento (in particolare la consulenza ergonomico-posturale — studio delle postazioni e formazione degli addetti sulla propria postazione — se compare nella PROPOSTA ECONOMICA COLLEGATA): sono incluse, non sono cose "da valutare".`;
 
   // Vincoli di wording per i documenti v2 (mai violarli nel testo generato).

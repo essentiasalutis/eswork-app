@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { aggiungiGiorni, oggiRoma, etichettaData, ilGiorno, alGiorno, giorniAllaChiusura, avvisiAvvioCheckup } from '../../lib/checkup';
-import { testoKit, firmaKit, bloccoKit } from '../../lib/riepilogo';
+import { testoKit, testoKitCheckupDopoFirma, firmaKit, bloccoKit } from '../../lib/riepilogo';
 import { isFirmato } from '../../lib/pipeline';
 import MailAvvio from '../../components/MailAvvio';
 import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getDocumentsByClient, getProfessionals, getMonitoringByClient, getTreatmentCapacity } from '../../lib/store';
@@ -415,10 +415,15 @@ export default function ClientPage({ client: initialClient, assessments: initial
     const scadenzaCorrente = aperto && aperto.chiude_il ? aperto.chiude_il : null;
     const referente = client.contact_name || 'referente';
     // Prima della firma: il kit di comunicazione di Enrico (punto 5), che dice "stiamo
-    // valutando". Il testo qui sotto ("l'azienda ha avviato…") vale solo dopo la firma.
-    if (!isFirmato(client.pipeline_stage)) {
+    // valutando". Dopo la firma, binario A: l'invito al check-up post-firma (testo di Enrico).
+    // Il testo generico qui sotto ("l'azienda ha avviato…") resta per gli altri casi firmati.
+    const firmato = isFirmato(client.pipeline_stage);
+    if (!firmato || client.binario === 'A') {
       if (!scadenzaCorrente) { alert('Avvia prima il check-up: il testo per i dipendenti ha bisogno della data di chiusura.'); return; }
-      const kit = testoKit({ variante: client.binario === 'A' ? 'A' : 'B', link: url, scadenza: scadenzaCorrente, firma: firmaKit({ referente: client.contact_name, azienda: client.name }) });
+      const firmaAz = firmaKit({ referente: client.contact_name, azienda: client.name });
+      const kit = firmato
+        ? testoKitCheckupDopoFirma({ link: url, scadenza: scadenzaCorrente, firma: firmaAz })
+        : testoKit({ variante: client.binario === 'A' ? 'A' : 'B', link: url, scadenza: scadenzaCorrente, firma: firmaAz });
       setEmailModal({
         to: client.contact_email || '',
         subject: `Check-up ES Work — ${client.name}`,

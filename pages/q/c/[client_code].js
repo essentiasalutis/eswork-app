@@ -30,15 +30,15 @@ function ESLogo({ size = 56 }) {
 
 // ─── Fase 0: Welcome screen ───────────────────────────────────────────────────
 
-function WelcomeScreen({ clientName, chiudeEtichetta, onIdentified }) {
+function WelcomeScreen({ clientName, chiudeFrase, onIdentified }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 max-w-lg mx-auto w-full">
         <ESLogo size={64} />
         <div className="text-2xl font-bold text-gray-900 mt-4 mb-1 text-center">ES Work</div>
-        {clientName && <div className={`text-sm text-gray-500 text-center ${chiudeEtichetta ? 'mb-2' : 'mb-6'}`}>per {clientName}</div>}
-        {chiudeEtichetta && (
-          <div className="text-xs font-semibold text-green-800 bg-green-100 rounded-full px-3 py-1 mb-6">Aperto fino al {chiudeEtichetta}</div>
+        {clientName && <div className={`text-sm text-gray-500 text-center ${chiudeFrase ? 'mb-2' : 'mb-6'}`}>per {clientName}</div>}
+        {chiudeFrase && (
+          <div className="text-xs font-semibold text-green-800 bg-green-100 rounded-full px-3 py-1 mb-6">Aperto fino {chiudeFrase}</div>
         )}
 
         <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6 w-full">
@@ -340,7 +340,7 @@ export default function SelfDeclarePage({ client, error: serverError, checkup })
     const testo = chiusoMsg
       || (checkup.stato === 'non_avviato'
         ? 'Il check-up non è ancora aperto.'
-        : `Il check-up si è chiuso${checkup.chiusoEtichetta ? ` il ${checkup.chiusoEtichetta}` : ''}. Grazie per l'interesse.`);
+        : `Il check-up si è chiuso${checkup.chiusoFrase ? ` ${checkup.chiusoFrase}` : ''}. Grazie per l'interesse.`);
     return (
       <>
         <Head><title>Check-up — {client?.name || 'ES Work'}</title></Head>
@@ -366,7 +366,7 @@ export default function SelfDeclarePage({ client, error: serverError, checkup })
       {phase === PHASES.WELCOME && (
         <WelcomeScreen
           clientName={client.name}
-          chiudeEtichetta={checkup?.chiudeEtichetta || null}
+          chiudeFrase={checkup?.chiudeFrase || null}
           onIdentified={() => setPhase(PHASES.CONSENT)}
         />
       )}
@@ -424,13 +424,13 @@ export async function getServerSideProps({ params }) {
     // Stato del check-up calcolato QUI, al caricamento: se è chiuso il dipendente
     // lo sa prima di iniziare, non dopo 5 minuti di risposte.
     const { statoCheckupCliente } = await import('../../../lib/checkup-server');
-    const { etichettaData } = await import('../../../lib/checkup');
+    const { ilGiorno, alGiorno, oggiRoma } = await import('../../../lib/checkup');
     const st = await statoCheckupCliente(client).catch(() => null);
     const checkup = st ? {
       stato: st.stato,
-      chiudeEtichetta: st.stato === 'aperto' && st.chiudeIl ? etichettaData(st.chiudeIl) : null,
-      chiusoEtichetta: st.stato === 'chiuso' && (st.chiusoAlle || st.chiudeIl)
-        ? etichettaData(st.chiusoAlle ? new Date(st.chiusoAlle).toISOString().slice(0, 10) : st.chiudeIl) : null,
+      chiudeFrase: st.stato === 'aperto' && st.chiudeIl ? alGiorno(st.chiudeIl) : null,      // "al 15 settembre"
+      chiusoFrase: st.stato === 'chiuso' && (st.chiusoAlle || st.chiudeIl)
+        ? ilGiorno(st.chiusoAlle ? oggiRoma(new Date(st.chiusoAlle)) : st.chiudeIl) : null,  // "l'11 settembre"
     } : null;
     return { props: { client: { id: client.id, name: client.name, share_code: client_code, tier }, checkup } };
   } catch (e) {

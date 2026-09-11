@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { aggiungiGiorni, oggiRoma, etichettaData, giorniAllaChiusura } from '../../lib/checkup';
+import { aggiungiGiorni, oggiRoma, etichettaData, ilGiorno, alGiorno, giorniAllaChiusura } from '../../lib/checkup';
 import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getDocumentsByClient, getProfessionals, getMonitoringByClient, getTreatmentCapacity } from '../../lib/store';
 import { TYPE_LABELS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
@@ -381,7 +381,7 @@ Il questionario è riservato, si compila dallo smartphone in circa 5 minuti.
 
 Le chiedo di inoltrare questo link a tutti i dipendenti tramite i vostri canali interni:
 ${url}
-${scadenzaCorrente ? `\nIl questionario resta aperto fino al ${etichettaData(scadenzaCorrente)}: chi non risponde entro quella data non rientra nell'analisi.\n` : ''}
+${scadenzaCorrente ? `\nIl questionario resta aperto fino ${alGiorno(scadenzaCorrente)}: chi non risponde entro quella data non rientra nell'analisi.\n` : ''}
 Le chiedo inoltre di comunicare ai dipendenti che l'azienda ha avviato un'iniziativa di salute organizzativa e che i dati sono trattati in modo riservato da Essentia Salutis, nel rispetto del segreto professionale: l'azienda non vedrà mai i dati individuali, ma solo risultati in forma aggregata.
 
 Per qualsiasi domanda, sono a disposizione.
@@ -800,7 +800,7 @@ ${FIRMA}`;
                         {a.status === 'active' && a.chiude_il && (() => {
                           const g = giorniAllaChiusura(a.chiude_il);
                           return g === null
-                            ? <span className="text-xs font-semibold text-red-600">scaduto il {etichettaData(a.chiude_il)} — il link è chiuso</span>
+                            ? <span className="text-xs font-semibold text-red-600">scaduto {ilGiorno(a.chiude_il)} — il link è chiuso</span>
                             : <span className="text-xs text-gray-500">chiude {g === 0 ? 'oggi' : g === 1 ? 'domani' : `tra ${g} giorni`} ({etichettaData(a.chiude_il)})</span>;
                         })()}
                         <div className="ml-auto flex flex-wrap items-center gap-2">

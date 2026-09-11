@@ -160,7 +160,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
   );
 }
 
-export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async () => {
+export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async (ctx) => {
   const [clients, assessmentCounts] = await Promise.all([
     getClients(),
     getAssessmentCounts(),
@@ -181,7 +181,12 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
   let solleciti = [];
   try {
     const { getSollecitiCheckup } = await import('../../lib/checkup-server');
-    solleciti = await getSollecitiCheckup({ baseUrl: process.env.NEXT_PUBLIC_BASE_URL || 'https://eswork-app.vercel.app' });
+    // Il link nella mail = l'indirizzo da cui Enrico sta usando la piattaforma (come la
+    // scheda azienda con window.location), non una variabile d'ambiente da tenere allineata.
+    const h = (ctx && ctx.req && ctx.req.headers) || {};
+    const host = h['x-forwarded-host'] || h.host;
+    const proto = h['x-forwarded-proto'] || (host && /^localhost|^127\./.test(host) ? 'http' : 'https');
+    solleciti = await getSollecitiCheckup({ baseUrl: host ? `${proto}://${host}` : 'https://eswork-app.vercel.app' });
   } catch (_) {}
 
   return { props: { clients, assessmentCounts, pendingAcuteCount, formazioneAlerts, solleciti } };

@@ -14,14 +14,14 @@ import { computeLevel } from '../../../lib/scoring';
 import { hashIp } from '../../../lib/crypto-utils';
 import { getClientIp } from '../../../lib/rate-limit';
 import { statoCheckupCliente } from '../../../lib/checkup-server';
-import { etichettaData, etichettaOra } from '../../../lib/checkup';
+import { ilGiorno, etichettaOra, oggiRoma as giornoRoma } from '../../../lib/checkup';
 
 // Messaggio al dipendente quando il check-up è chiuso: onesto e senza dettagli tecnici.
 function messaggioChiuso(st, inviate) {
   if (st.stato === 'non_avviato') return 'Il check-up non è ancora aperto.';
   const quando = st.chiusoAlle
-    ? `il ${etichettaData(new Date(st.chiusoAlle).toISOString().slice(0, 10))} alle ${etichettaOra(st.chiusoAlle)}`
-    : (st.chiudeIl ? `il ${etichettaData(st.chiudeIl)}` : '');
+    ? `${ilGiorno(giornoRoma(st.chiusoAlle))} alle ${etichettaOra(st.chiusoAlle)}`
+    : (st.chiudeIl ? ilGiorno(st.chiudeIl) : '');
   return inviate
     ? `Il check-up si è chiuso${quando ? ' ' + quando : ''}: queste risposte non sono state registrate. Grazie per il tempo che ci hai dedicato.`
     : `Il check-up si è chiuso${quando ? ' ' + quando : ''}. Grazie per l'interesse.`;

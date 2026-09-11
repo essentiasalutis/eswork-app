@@ -1,20 +1,19 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { requireAuthSsr } from '../../lib/auth';
-import { getAssessmentById, getClientById, getResponsesByAssessment, getFirstMeeting } from '../../lib/store';
+import { getClientById } from '../../lib/store';
 import { getPricingSettingsV2 } from '../../lib/pricing/settings';
-import { getForchettaSnapshot } from '../../lib/pricing/snapshot';
+import { datiOffertaDaCheckup } from '../../lib/offerta-server';
 import {
-  aggregateNMQ,
   trafficLight, TL_COLOR, TL_BG, TL_BORDER, TYPE_LABELS, generateSummaryText, BODY_ZONES,
 } from '../../lib/scoring';
-import { calculatePricing, computeForchetta, realL1L2FromAssessment, calculateROI, fmt } from '../../lib/calculator';
-import { ergonomiaDaColloquio } from '../../lib/pricing/v2';
+import { calculatePricing, fmt } from '../../lib/calculator';
 import { CONFIG } from '../../lib/config';
 import { oggiRoma, aggiungiGiorni } from '../../lib/checkup';
 import { finoAl, fraseValidita } from '../../lib/offerta';
 import { normalizza } from '../../lib/pipeline';
-import { VOCI_PROGRAMMA, RIGA_CHIUSURA } from '../../lib/programma';
+import { VOCI_PROGRAMMA, RIGA_CHIUSURA, quantitaPrimoAnno } from '../../lib/programma';
+import { vistaRiservata, K_ANON, SUPPRESSED } from '../../lib/kanon';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
 
 // ─── Firma standard ───────────────────────────────────────────────────────────
@@ -113,7 +112,7 @@ function Page({ children, className = '' }) {
 
 // ─── Offer Document ───────────────────────────────────────────────────────────
 
-export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, date, offertaGiorniA = 10, serviziV2 = null }) {
+export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, date, offertaGiorniA = 10 }) {
   const [emailModal, setEmailModal] = useState(null);
   const [scadenza, setScadenza] = useState(() => scadenzaIniziale(client, offertaGiorniA));
   const [esitoInvio, setEsitoInvio] = useState(null); // { ok, testo }
@@ -122,11 +121,15 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
 
   useEffect(() => {
     if (!nmq) return;
+    // Riservatezza: con meno di k risposte niente piano per zone; le zone sotto soglia
+    // non entrano nel piano (sarebbero stampate con la loro percentuale).
+    const r = assessment && !assessment.estimate ? vistaRiservata(nmq) : null;
+    if (r && !r.pubblicabile) { setAiPlan([]); setAiSource('non_pubblicabile'); return; }
     fetch('/api/ai/intervention-plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        zones: nmq.zones,
+        zones: r ? r.zone.filter(z => !z.soppressa) : nmq.zones,
         clientName: client?.name || 'Azienda',
         sector: client?.sector ?? 2,
         level1Count: nmq.level1.count,
@@ -146,13 +149,31 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
     );
   }
 
-  const summaryText = generateSummaryText(nmq);
   // Offerta VERA = dopo il check-up (non il preventivo stimato dalla scheda colloquio):
   // solo questa ha validità e sposta l'azienda in "Offerta aperta".
   const offertaVera = !assessment.estimate;
-  // Programma completo sul listino v2: le 12 voci di Enrico + i valori del Listino
-  // (servizi_deliverable, mai un totale). Il listino v1 resta com'era (congelato).
-  const nuovoProgramma = Array.isArray(serviziV2);
+  // Programma completo sul listino v2: le 12 voci di Enrico + le quantità del primo anno.
+  // Mai valori in euro accanto alle voci (decisione Enrico): un solo numero, l'investimento.
+  const nuovoProgramma = (client.pricing_version || 'v1') === 'v2' && client.tipo_prodotto !== 'pacchetto_prevenzione';
+  // Riservatezza: stesse soglie del Report sulla scheda (lib/kanon.js). Il preventivo
+  // stimato dal colloquio non ha dati del check-up (numeri stimati), quindi niente soglie.
+  const riservata = assessment.estimate ? null : vistaRiservata(nmq);
+  const nonPubblicabile = !!(riservata && !riservata.pubblicabile);
+  const cella = (key) => {
+    const l = nmq[{ l1: 'level1', l2: 'level2', l3: 'level3' }[key]];
+    if (!riservata) return { count: l.count, pct: l.pct, suppressed: false };
+    return riservata.livelli ? riservata.livelli.find(c => c.key === key) : { count: null, pct: null, suppressed: true };
+  };
+  const zoneMostrate = riservata ? riservata.zone : nmq.zones;
+  const prevalenzaMostrata = riservata ? riservata.prevalenza : nmq.prevalence.pct;
+  const summaryText = (() => {
+    if (!riservata) return generateSummaryText(nmq);
+    if (!riservata.pubblicabile) return '';
+    const soppressi = riservata.livelli.some(c => c.suppressed);
+    const top = riservata.zone.find(z => !z.soppressa && z.pct12 > 0);
+    if (!soppressi) return generateSummaryText({ ...nmq, zones: top ? [top] : [] });
+    return `Su ${riservata.n} risposte, la distribuzione di dettaglio per livello non è mostrata: uno o più gruppi contano meno di ${K_ANON} persone e vengono soppressi a tutela della riservatezza.${top ? ` La zona più colpita è ${top.zone} (${top.pct12}%).` : ''}`;
+  })();
   const dettaglioVoce = n => (!calc ? '' : n === 3 && calc.days_osteo_y1 ? ` (${calc.days_osteo_y1} giornate nel primo anno)` : n === 6 && calc.training_sessions_y1 ? ` (${calc.training_sessions_y1} sessioni nel primo anno)` : '');
 
   async function registraInvio() {
@@ -172,8 +193,6 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
   const withPrevention = offerTier === 'plus' || offerTier === 'enterprise';
   const mgmtServices = (CONFIG.management_services && CONFIG.management_services[offerTier])
     || (CONFIG.management_services && CONFIG.management_services.core) || [];
-  const mgmtTotal = mgmtServices.reduce((s, x) => s + (x.value || 0), 0);
-  const showMgmtValues = mgmtTotal > 0;
 
   function openOfferEmail() {
     const referente = client.contact_name ? `Gentile ${client.contact_name},` : `Gentile referente,`;
@@ -203,10 +222,11 @@ ${FIRMA}`;
     });
   }
 
+  const semaforo = (key, base) => { const c = cella(key); return c.suppressed ? { ...base, value: SUPPRESSED, color: 'gray', sub: `gruppo < ${K_ANON}` } : { ...base, score: c.pct, value: `${c.pct}%` }; };
   const semaphoreData = [
-    { type: 'nmq', score: nmq.level1.pct, value: `${nmq.level1.pct}%`, label: 'Livello 1', sub: 'Trattamento' },
-    { type: 'plain', score: nmq.level2.pct, value: `${nmq.level2.pct}%`, label: 'Livello 2', sub: 'Monitoraggio', color: 'yellow' },
-    { type: 'plain', score: nmq.level3.pct, value: `${nmq.level3.pct}%`, label: 'Livello 3', sub: 'Formazione', color: 'green' },
+    semaforo('l1', { type: 'nmq', label: 'Livello 1', sub: 'Trattamento' }),
+    semaforo('l2', { type: 'plain', label: 'Livello 2', sub: 'Monitoraggio', color: 'yellow' }),
+    semaforo('l3', { type: 'plain', label: 'Livello 3', sub: 'Formazione', color: 'green' }),
   ];
 
   return (
@@ -276,6 +296,12 @@ ${FIRMA}`;
           >
             ✉ Invia offerta via email
           </button>
+          {offertaVera && (
+            <>
+              <a href={`/dashboard/presentazione/${client.id}`} className="flex items-center gap-1 text-sm text-white bg-gray-900 px-4 py-2 rounded-xl font-semibold">🖥 Presenta</a>
+              <a href={`/dashboard/sintesi/${client.id}`} className="flex items-center gap-1 text-sm text-gray-700 border border-gray-300 bg-white px-4 py-2 rounded-xl font-semibold">📄 Sintesi</a>
+            </>
+          )}
         </div>
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-xs text-amber-800">
           <strong>Per un PDF pulito:</strong> nel dialog di stampa Chrome → <em>Altre impostazioni</em> → deseleziona <strong>&quot;Intestazioni e piè di pagina&quot;</strong> → salva come PDF
@@ -356,7 +382,12 @@ ${FIRMA}`;
         <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 2 }}>Cruscotto sintetico</div>
         <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 14 }}>{client.name} · {TYPE_LABELS[assessment.type]} · {assessment.n} risposte</div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${semaphoreData.length}, 1fr)`, gap: 10, marginBottom: 14 }}>
+        {nonPubblicabile && (
+          <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, marginBottom: 14, fontSize: 12, color: '#374151', lineHeight: 1.6 }}>
+            🔒 <strong>Risultati aggregati non pubblicabili.</strong> Le risposte raccolte sono meno di {K_ANON}: a tutela della riservatezza dei dipendenti i risultati del check-up vengono mostrati solo con almeno {K_ANON} risposte.
+          </div>
+        )}
+        {!nonPubblicabile && <div style={{ display: 'grid', gridTemplateColumns: `repeat(${semaphoreData.length}, 1fr)`, gap: 10, marginBottom: 14 }}>
           {semaphoreData.map((s, i) => {
             const color = s.color || trafficLight(s.type, s.score);
             return (
@@ -368,12 +399,12 @@ ${FIRMA}`;
               </div>
             );
           })}
-        </div>
+        </div>}
 
-        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, marginBottom: 10 }}>
+        {!nonPubblicabile && <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, marginBottom: 10 }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 6 }}>Sintesi</div>
           <p style={{ fontSize: 12, color: '#374151', lineHeight: 1.7, margin: 0 }}>{summaryText}</p>
-        </div>
+        </div>}
 
         {/* Riquadro piattaforma — si chiama solo "Piattaforma digitale ES Work" (mai "AI" come nome); testo: voce 11 di Enrico */}
         <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: '8px 12px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
@@ -391,11 +422,18 @@ ${FIRMA}`;
         {/* — Disturbi MSK — */}
         <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 12 }}>Disturbi muscolo-scheletrici</div>
 
-        <div>
+        {nonPubblicabile ? (
+          <div style={{ fontSize: 12, color: '#6b7280' }}>Dati non pubblicabili: meno di {K_ANON} risposte (vedi sopra).</div>
+        ) : <div>
           {/* zone corporee — barre (sopra) */}
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Zone corporee — ultimi 12 mesi</div>
-            {nmq.zones.map((z, i) => {
+            {zoneMostrate.map((z, i) => z.soppressa ? (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                <div style={{ width: 120, fontSize: 10, color: '#374151', textAlign: 'right', flexShrink: 0 }}>{z.zone}</div>
+                <div style={{ flex: 1, fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>{SUPPRESSED} (gruppo &lt; {K_ANON})</div>
+              </div>
+            ) : (() => {
               const c = z.pct12 > 50 ? '#dc2626' : z.pct12 > 30 ? '#ca8a04' : '#16a34a';
               const w = Math.max((z.pct12 / 100) * 100, z.pct12 > 0 ? 5 : 0);
               return (
@@ -408,9 +446,9 @@ ${FIRMA}`;
                   </div>
                 </div>
               );
-            })}
+            })())}
             <div style={{ fontSize: 10, color: '#4b5563', marginTop: 8 }}>
-              Prevalenza: {nmq.prevalence.pct}% ha almeno un disturbo negli ultimi 12 mesi
+              Prevalenza: {prevalenzaMostrata == null ? `${SUPPRESSED} (gruppo < ${K_ANON})` : `${prevalenzaMostrata}% ha almeno un disturbo negli ultimi 12 mesi`}
             </div>
           </div>
 
@@ -419,19 +457,20 @@ ${FIRMA}`;
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Stratificazione — 3 livelli</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
               {[
-                { count: nmq.level1.count, pct: nmq.level1.pct, label: 'Trattamento — Anno 1', sub: 'Impatto funzionale', bg: '#FFEBEE', border: '#E74C3C', color: '#E74C3C' },
-                { count: nmq.level2.count, pct: nmq.level2.pct, label: 'Prevenzione — Anno 2', sub: 'Segnali da monitorare', bg: '#FFF8E1', border: '#F39C12', color: '#F39C12' },
-                { count: nmq.level3.count, pct: nmq.level3.pct, label: 'Solo formazione', sub: 'Postura ed ergonomia', bg: '#E8F5E9', border: '#16a34a', color: '#16a34a' },
+                { ...cella('l1'), label: 'Trattamento — Anno 1', sub: 'Impatto funzionale', bg: '#FFEBEE', border: '#E74C3C', color: '#E74C3C' },
+                // Listino v2: la prevenzione del Livello 2 parte dal primo anno (voce 5 di Enrico).
+                { ...cella('l2'), label: nuovoProgramma ? 'Prevenzione — dal primo anno' : 'Prevenzione — Anno 2', sub: 'Segnali da monitorare', bg: '#FFF8E1', border: '#F39C12', color: '#F39C12' },
+                { ...cella('l3'), label: 'Solo formazione', sub: 'Postura ed ergonomia', bg: '#E8F5E9', border: '#16a34a', color: '#16a34a' },
               ].map((l, i) => (
                 <div key={i} style={{ background: l.bg, border: `1px solid ${l.border}`, borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: l.color, lineHeight: 1 }}>{l.count}</div>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: l.color, lineHeight: 1 }}>{l.suppressed ? SUPPRESSED : l.count}</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: l.color }}>{l.label}</div>
-                  <div style={{ fontSize: 10, color: '#4b5563', lineHeight: 1.4 }}>{l.pct}% dipendenti — {l.sub}</div>
+                  <div style={{ fontSize: 10, color: '#4b5563', lineHeight: 1.4 }}>{l.suppressed ? `gruppo < ${K_ANON}` : `${l.pct}% dipendenti`} — {l.sub}</div>
                 </div>
               ))}
             </div>
           </div>
-        </div>
+        </div>}
       </Page>
 
       {/* ══════════════════════════════════════════════════════════════
@@ -534,20 +573,16 @@ ${FIRMA}`;
           </div>
 
           {nuovoProgramma ? (
-            serviziV2.length > 0 && (
-              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '10px 12px', marginBottom: 10, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: '#16a34a', textTransform: 'uppercase', marginBottom: 6 }}>Valore dei servizi compresi</div>
-                {serviziV2.map((sv, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 14, padding: '4px 0', borderBottom: i < serviziV2.length - 1 ? '1px solid #dcfce7' : 'none' }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#1e293b' }}>{sv.voce}</div>
-                    <div style={{ fontSize: 10, color: '#6b7280', whiteSpace: 'nowrap' }}>valore {fmt(sv.valore_dichiarato)}/anno</div>
-                  </div>
-                ))}
-                <div style={{ marginTop: 6, fontSize: 9.5, color: '#15803d', lineHeight: 1.5 }}>
-                  Valori per singola voce, già compresi nell&apos;investimento annuale. Le componenti del programma sono descritte nella pagina «Cosa comprende il programma».
-                </div>
+            // Quantità del primo anno, niente euro accanto alle voci (decisione Enrico).
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '10px 12px', marginBottom: 10, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: '#16a34a', textTransform: 'uppercase', marginBottom: 6 }}>Il vostro programma nel primo anno</div>
+              <div style={{ fontSize: 10, color: '#1e293b', lineHeight: 1.7 }}>
+                {quantitaPrimoAnno(calc, { mostraCicli: !riservata || riservata.l1Visibile }).join(' · ')}
               </div>
-            )
+              <div style={{ marginTop: 6, fontSize: 9.5, color: '#15803d', lineHeight: 1.5 }}>
+                Tutte le componenti sono comprese nell&apos;investimento annuale indicato sopra; sono descritte nella pagina «Cosa comprende il programma».
+              </div>
+            </div>
           ) : (
             <>
           {/* ── BLOCCO A — Servizi clinici ── */}
@@ -579,26 +614,12 @@ ${FIRMA}`;
                   <div style={{ fontSize: 10, fontWeight: 700, color: '#1e293b' }}>{s.label.replace(/ con AI\b/, '')}</div>
                   {s.note && <div style={{ fontSize: 9, color: '#4b5563', lineHeight: 1.4, marginTop: 1 }}>{s.note}</div>}
                 </div>
-                {showMgmtValues && s.value != null && (
-                  <div style={{ fontSize: 10, color: '#6b7280', whiteSpace: 'nowrap', flexShrink: 0, paddingTop: 1 }}>valore {fmt(s.value)}/anno</div>
-                )}
+
               </div>
             ))}
-            {showMgmtValues ? (
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '2px solid #16a34a' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#1e293b' }}>Valore dei servizi di piattaforma e gestione</div>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: '#1e293b' }}>{fmt(mgmtTotal)}/anno</div>
-                </div>
-                <div style={{ fontSize: 9.5, color: '#15803d', lineHeight: 1.5, marginTop: 4 }}>
-                  Tutte queste voci sono parte integrante del programma e sono <strong>già comprese nell&apos;investimento annuale di {fmt(calc.price_y1)}</strong>: l&apos;azienda riceve questo valore in aggiunta ai servizi clinici, all&apos;interno dello stesso investimento.
-                </div>
-              </div>
-            ) : (
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #dcfce7', fontSize: 10, fontWeight: 600, color: '#16a34a' }}>
-                Tutti i servizi di piattaforma e gestione sono inclusi nel programma annuale.
-              </div>
-            )}
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #dcfce7', fontSize: 10, fontWeight: 600, color: '#16a34a' }}>
+              Tutti i servizi di piattaforma e gestione sono inclusi nel programma annuale.
+            </div>
           </div>
 
             </>
@@ -778,17 +799,6 @@ function syntheticNmq(n, l1, l2) {
   };
 }
 
-// Valori dichiarati del Listino (servizi_deliverable) per la configurazione dell'azienda:
-// solo programma completo v2. null = listino v1 o Pacchetto → Offerta come prima.
-async function serviziPerOfferta(client, calc) {
-  if (!client || (client.pricing_version || 'v1') !== 'v2' || client.tipo_prodotto === 'pacchetto_prevenzione') return null;
-  try {
-    const { getServiziDeliverable } = await import('../../lib/pricing/settings');
-    const righe = await getServiziDeliverable({ soloAttivi: true, configurazione: (calc && calc.tier) || 'core' });
-    return righe.map(r => ({ voce: r.voce, valore_dichiarato: Number(r.valore_dichiarato) || 0 }));
-  } catch (_) { return []; }
-}
-
 export const getServerSideProps = requireAuthSsr(async (ctx) => {
   const q = ctx.query;
   const { assessmentId, clientId, n, l1, l2 } = q;
@@ -817,7 +827,6 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
           roi: null,
           date: today(),
           offertaGiorniA,
-          serviziV2: await serviziPerOfferta(client, calc),
         },
       };
     } catch (e) { console.error(e); return { notFound: true }; }
@@ -828,94 +837,22 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
   }
 
   try {
-    const assessment = await getAssessmentById(assessmentId);
-    if (!assessment) return { notFound: true };
-
-    const [client, responses] = await Promise.all([
-      getClientById(assessment.client_id),
-      getResponsesByAssessment(assessmentId),
-    ]);
-
-    const nmq = aggregateNMQ(responses);
-    const responders = responses.length;
-    const totalN = n ? parseInt(n) : (client?.employees || responders);
-
-    // ── Parametri salvati dalla scheda colloquio ─────────────────────────────
-    // Il preventivo post-assessment usa le STESSE condizioni concordate al
-    // colloquio (tier, tariffe, IVA, gruppi) con i numeri REALI dell'assessment.
-    // Priorità: override in query > parametri scheda > default di config.
-    let schedaDefaults = null;
-    let forchetta = null; // stima colloquio min/med/max (vista admin, non nel PDF)
-    let l2Mult = CONFIG.l2_multiplier_default;
-    // Versione listino SEMPRE dal record cliente (mai da query); fail-safe v1.
-    const pricingVersion = client?.pricing_version || 'v1';
-    const v2Params = pricingVersion === 'v2' ? (await getPricingSettingsV2()).params : null;
-    let ergonomiaV2; // input colloquio (Blocco C li scrive in step2); default motore: tutta la popolazione ufficio
-    let snap = null;
-    try {
-      const fm = await getFirstMeeting(assessment.client_id);
-      snap = getForchettaSnapshot(fm);
-      const fmd = fm?.data;
-      if (fmd) {
-        const s2 = fmd.step2 || {};
-        const sp = fmd.params || {};
-        const sedi = Array.isArray(s2.sedi) ? s2.sedi : [];
-        const cap = Math.max(1, parseInt(s2.capienza) || CONFIG.classroom_capacity_default);
-        const fmN = sedi.reduce((a, e) => a + (parseInt(e.employees) || 0), 0) || totalN;
-        const fmGroups = s2.training_mode === 'accorpa'
-          ? Math.max(1, Math.ceil(fmN / cap))
-          : (sedi.reduce((a, e) => a + Math.ceil((parseInt(e.employees) || 0) / cap), 0) || Math.max(1, Math.ceil(totalN / cap)));
-        schedaDefaults = {
-          tier: s2.tier || undefined,
-          groups: fmGroups,
-          rates: sp.rates || undefined,
-          vatExempt: sp.vat_exempt,
-        };
-        // Forchetta del colloquio (SORGENTE UNICA computeForchetta) per il confronto
-        // dentro/fuori — vista admin, non nel PDF cliente.
-        const sectorKey = fmd.step1?.sector || (client?.sector === 1 ? 'manufacturing' : 'services');
-        l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
-        // Lettura unica (lib/pricing/v2): stessi numeri della Stima e del Report.
-        ergonomiaV2 = ergonomiaDaColloquio(s2, fmN);
-        const fch = computeForchetta({ n: fmN, sector: sectorKey, l2Mult, pricingVersion, v2Params, ergonomia: ergonomiaV2, ...schedaDefaults });
-        if (fch.min.price_y1 != null) forchetta = { min: fch.min.price_y1, avg: fch.avg.price_y1, max: fch.max.price_y1 };
-      }
-    } catch (_) {}
-
-    // Precedenza: SNAPSHOT (promessa congelata) → live. Se lo snapshot esiste, il
-    // banner confronta il prezzo reale (parametri snapshottati) contro la forbice
-    // PERSISTITA — coerente col flag quote_compliance del Report.
-    const usableSnap = snap && snap.forchetta;
-    const si = usableSnap ? (snap.inputs || {}) : null;
-    const nBasis = usableSnap ? (parseInt(si.n) || totalN) : totalN;
-    const l2MultBasis = usableSnap ? (si.l2Mult != null ? Number(si.l2Mult) : l2Mult) : l2Mult;
-    const v2ParamsBasis = usableSnap ? snap.v2Params : v2Params;
-    const ergBasis = usableSnap ? si.ergonomia : ergonomiaV2;
-    const condBasis = usableSnap
-      ? { tier: si.tier, groups: si.groups, rates: si.rates, vatExempt: si.vatExempt }
-      : (custom || schedaDefaults);
-    if (usableSnap) forchetta = { min: snap.forchetta.min?.price_y1, avg: snap.forchetta.avg?.price_y1, max: snap.forchetta.max?.price_y1 };
-
-    // "Prezzo reale" OMOGENEO con la forbice: prevalenza L1 osservata × forza
-    // lavoro (snapshottata se presente), L2 derivato. Override manuale via query l1/l2.
-    const auto = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: nBasis, l2Mult: l2MultBasis, pricingVersion, v2Params: v2ParamsBasis });
-    const l1v = l1 !== undefined ? parseInt(l1) : auto.l1;
-    const l2v = l2 !== undefined ? parseInt(l2) : auto.l2;
-
-    const calc = calculatePricing({ n: nBasis, l1: l1v, l2: l2v, pricingVersion, v2Params: v2ParamsBasis, ergonomia: ergBasis, ...(condBasis || {}) });
+    // Numeri dalla fonte unica (lib/offerta-server.js), condivisa con Presentazione e Sintesi.
+    const d = await datiOffertaDaCheckup({ assessmentId, n, l1, l2, custom });
+    if (!d) return { notFound: true };
+    const { client, assessment, nmq, calc, forchetta } = d;
     const roi = null; // ROI only from calculator (requires absence days input)
 
     return {
       props: {
         client,
-        assessment: { ...assessment, n: responses.length },
+        assessment,
         nmq,
         calc,
         roi,
         forchetta,
         date: today(),
         offertaGiorniA,
-        serviziV2: await serviziPerOfferta(client, calc),
       },
     };
   } catch (e) {

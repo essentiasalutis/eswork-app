@@ -148,6 +148,22 @@ export default function PricingV2Page() {
             <p className="text-[11px] text-gray-400 mt-2">La data di chiusura parte da oggi + questi giorni e si può cambiare a ogni avvio. Il check-up chiude alle 23:59 di quel giorno; chi aveva già iniziato ha 30 minuti per inviare.</p>
           </div>
 
+          {/* Leve della presentazione del Report: il costo delle assenze è sempre uno scenario dichiarato */}
+          <div className={box}>
+            <h2 className="font-semibold text-gray-800 mb-3">Leve della presentazione — costo delle assenze</h2>
+            <div className="grid md:grid-cols-2 gap-3 max-w-xl">
+              <label className="block text-xs text-gray-500">Incidenza ipotizzata del programma (%)
+                <input type="number" min="1" max="100" step="any" defaultValue={texts.assenze_incidenza_pct ?? ''} placeholder="10" className={`${inputCls} mt-1`}
+                  onBlur={e => { const v = e.target.value; if ((texts.assenze_incidenza_pct ?? '') !== v && +v > 0 && +v <= 100) put({ tipo: 'setting', key: 'assenze_incidenza_pct', value: v }, 'incidenza salvata'); }} />
+              </label>
+              <label className="block text-xs text-gray-500">Costo di una giornata di assenza (€)
+                <input type="number" min="1" step="any" defaultValue={texts.costo_giornata_assenza ?? ''} placeholder="160" className={`${inputCls} mt-1`}
+                  onBlur={e => { const v = e.target.value; if ((texts.costo_giornata_assenza ?? '') !== v && +v > 0) put({ tipo: 'setting', key: 'costo_giornata_assenza', value: v }, 'costo giornata salvato'); }} />
+              </label>
+            </div>
+            <p className="text-[11px] text-gray-400 mt-2">Compaiono sempre in chiaro nella frase («ipotizzando un&apos;incidenza del 10%», «un costo stimato di €160 per giornata»). Solo risparmio lordo, mai al netto del prezzo. Senza i giorni di malattia dal colloquio la leva non si mostra.</p>
+          </div>
+
           {/* Offerta: validità per il binario A (il B non scade) */}
           <div className={box}>
             <h2 className="font-semibold text-gray-800 mb-3">Offerta</h2>
@@ -168,7 +184,7 @@ export default function PricingV2Page() {
           {/* Servizi & deliverable */}
           <div className={box}>
             <h2 className="font-semibold text-gray-800 mb-1">Servizi &amp; deliverable — valori dichiarati (€/anno)</h2>
-            <p className="text-xs text-gray-500 mb-3">Le configurazioni (core/plus/enterprise) sono nomi interni: nei documenti cliente compaiono solo le voci con i valori — mai un totale, mai «in omaggio».</p>
+            <p className="text-xs text-gray-500 mb-3">Solo per te, per ragionare: questi valori <strong>non compaiono mai</strong> nei documenti del cliente (decisione del 11/9: niente euro accanto alle voci, un solo numero — l&apos;investimento). Le configurazioni (core/plus/enterprise) sono nomi interni.</p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[560px]">
                 <thead><tr className="text-left text-xs uppercase tracking-wide text-gray-400 border-b border-gray-100">

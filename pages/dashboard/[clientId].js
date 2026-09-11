@@ -945,6 +945,20 @@ ${FIRMA}`;
                               📄 Preventivo (PDF)
                             </button>
                           )}
+                          {rCount > 0 && a.type === 'initial' && sortedAssessments[0] && a.id === sortedAssessments[0].id && (
+                            <>
+                              <Link href={`/dashboard/presentazione/${client.id}`}
+                                className="text-xs font-semibold text-white bg-gray-900 px-3 py-1.5 rounded-xl hover:bg-gray-700"
+                                title="Presentazione a schermo del Report di Attivazione (secondo incontro)">
+                                🖥 Presenta
+                              </Link>
+                              <Link href={`/dashboard/sintesi/${client.id}`}
+                                className="text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-300 px-3 py-1.5 rounded-xl hover:bg-gray-100"
+                                title="La pagina da lasciare al cliente, in PDF">
+                                📄 Sintesi
+                              </Link>
+                            </>
+                          )}
                           {a.status === 'active' && (
                             <button onClick={() => closeAssessment(a.id)}
                               className="text-xs font-medium text-gray-600 border border-gray-300 px-3 py-1.5 rounded-xl hover:bg-gray-50">

@@ -13,6 +13,7 @@ import { getPricingSettingsV2 } from '../../lib/pricing/settings';
 import { validatePacchetto, calculatePacchetto } from '../../lib/pricing/v2';
 import { buildStimaSnapshot, writeStimaSnapshotIfOpen, isChainClosed, getStimaSnapshot } from '../../lib/pricing/snapshot';
 import { avanzaPipeline } from '../../lib/pipeline-server';
+import { quantitaStima } from '../../lib/programma';
 
 export const config = { maxDuration: 60 };
 
@@ -125,7 +126,8 @@ export default requireAuth(async function handler(req, res) {
     forchetta: forchettaOut,
     sector_label: SECTOR_LABELS[sector] || '—',
     // Sezione componenti SOLO per v2 (v1 resta byte-identico)
-    v2Doc: pricingVersion === 'v2' ? { ergonomiaPostazioni: (ergonomia && ergonomia.nPostazioni) || 0, ergonomiaAddetti: (ergonomia && ergonomia.nAddetti) || 0 } : null,
+    // Quantità dalla forbice LIVE (sportello: tra lo scenario minimo e il massimo); mai euro accanto alle voci.
+    v2Doc: pricingVersion === 'v2' ? { ergonomiaPostazioni: (ergonomia && ergonomia.nPostazioni) || 0, ergonomiaAddetti: (ergonomia && ergonomia.nAddetti) || 0, quantita: quantitaStima(forchetta) } : null,
   });
 
   // `forchetta`+`snapshot` in risposta: solo admin (requireAuth). Servono alla UI

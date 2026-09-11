@@ -81,6 +81,9 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
   const [prevNote, setPrevNote] = useState(s1.prev_note || '');
   const [assenteismo, setAssenteismo] = useState(s1.assenteismo || false);
   const [absenceDays, setAbsenceDays] = useState(s1.absence_days ?? meeting?.absence_days ?? '');
+  // Leve della presentazione (punto 7): facoltativi, "se lo sanno" — mai bloccanti.
+  const [absenceDaysMsk, setAbsenceDaysMsk] = useState(s1.absence_days_msk ?? '');
+  const [premioInail, setPremioInail] = useState(s1.premio_inail ?? '');
   const [note1, setNote1] = useState(s1.note || meeting?.notes || '');
 
   // STEP 2
@@ -159,7 +162,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
 
   function buildData() {
     return {
-      step1: { nome, ref_nome: refNome, ref_ruolo: refRuolo, binario: binario || null, ref_email: refEmail, ref_tel: refTel, work_desc: workDesc, sector, disturbi, disturbi_altro: disturbiAltro, prev_fatta: prevFatta, prev_note: prevNote, assenteismo, absence_days: absenceDays, note: note1 },
+      step1: { nome, ref_nome: refNome, ref_ruolo: refRuolo, binario: binario || null, ref_email: refEmail, ref_tel: refTel, work_desc: workDesc, sector, disturbi, disturbi_altro: disturbiAltro, prev_fatta: prevFatta, prev_note: prevNote, assenteismo, absence_days: absenceDays, absence_days_msk: absenceDaysMsk, premio_inail: premioInail, note: note1 },
       step2: { sedi, capienza, training_mode: trainingMode, fatturato, hr_maturity: hrMaturity, tier_override: tierOverride, tier, ergonomia_ufficio: nErgUfficio, ergonomia_ufficio_auto: ergUffAuto, ergonomia_addetti: nErgAddetti, ergonomia_postazioni: nErgPostazioni },
       step3: { spazio, spazio_note: spazioNote, fasce, mc, mc_nome: mcNome, mc_contatti: mcContatti, esg, refop_nome: refOpNome, refop_ruolo: refOpRuolo, refop_contatti: refOpContatti },
       params: { rates, l2_mult: l2Mult, vat_exempt: vatExempt },
@@ -212,7 +215,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
     const t = setTimeout(() => save({ silent: true }), 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nome, refNome, refRuolo, refEmail, refTel, workDesc, sector, disturbi, disturbiAltro, prevFatta, prevNote, assenteismo, absenceDays, note1, sedi, capienza, trainingMode, fatturato, hrMaturity, tierOverride, spazio, spazioNote, fasce, mc, mcNome, mcContatti, esg, refOpNome, refOpRuolo, refOpContatti, rates, l2Mult, vatExempt, ergUffAuto, ergUffManuale, ergAddetti, ergPostazioni, binario]);
+  }, [nome, refNome, refRuolo, refEmail, refTel, workDesc, sector, disturbi, disturbiAltro, prevFatta, prevNote, assenteismo, absenceDays, absenceDaysMsk, premioInail, note1, sedi, capienza, trainingMode, fatturato, hrMaturity, tierOverride, spazio, spazioNote, fasce, mc, mcNome, mcContatti, esg, refOpNome, refOpRuolo, refOpContatti, rates, l2Mult, vatExempt, ergUffAuto, ergUffManuale, ergAddetti, ergPostazioni, binario]);
 
   function toggleArr(arr, set, v) { set(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]); }
   function setSede(i, k, v) { setSedi(prev => prev.map((s, j) => j === i ? { ...s, [k]: k === 'employees' ? (v === '' ? '' : Math.max(0, parseInt(v) || 0)) : v } : s)); }
@@ -318,6 +321,14 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
               <input type="number" min="0" value={absenceDays} onChange={e => { setAbsenceDays(e.target.value); setAssenteismo(e.target.value !== '' && +e.target.value > 0); }} className={inputCls} />
             </Field>
             <div className="grid grid-cols-2 gap-3">
+              <Field label="di cui per disturbi muscolo-scheletrici" hint="se lo sanno">
+                <input type="number" min="0" value={absenceDaysMsk} onChange={e => setAbsenceDaysMsk(e.target.value)} className={inputCls} />
+              </Field>
+              <Field label="Premio INAIL annuo (€)" hint="se lo sanno">
+                <input type="number" min="0" value={premioInail} onChange={e => setPremioInail(e.target.value)} className={inputCls} />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <Field label="Decisore — nome"><input value={refNome} onChange={e => setRefNome(e.target.value)} className={inputCls} /></Field>
               <Field label="Ruolo">
                 <select value={refRuolo} onChange={e => setRefRuolo(e.target.value)} className={inputCls}>
@@ -390,6 +401,14 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
               <Toggle checked={assenteismo} onChange={setAssenteismo} label={assenteismo ? 'Sì' : 'No'} />
               {assenteismo && <div className="mt-2"><div className="text-xs text-gray-400 mb-1">Giorni assenza malattia ultimi 12 mesi (per ROI)</div><input type="number" value={absenceDays} onChange={e => setAbsenceDays(e.target.value)} placeholder="es. 120" className={inputCls} /></div>}
             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="di cui per disturbi muscolo-scheletrici" hint="se lo sanno">
+                <input type="number" min="0" value={absenceDaysMsk} onChange={e => setAbsenceDaysMsk(e.target.value)} className={inputCls} />
+              </Field>
+              <Field label="Premio INAIL annuo (€)" hint="se lo sanno">
+                <input type="number" min="0" value={premioInail} onChange={e => setPremioInail(e.target.value)} className={inputCls} />
+              </Field>
+            </div>
             <Field label="Note del colloquio"><textarea value={note1} onChange={e => setNote1(e.target.value)} rows={4} className={inputCls + ' resize-none'} placeholder="Appunti liberi…" /></Field>
             <button onClick={() => goStep(2)} disabled={!nome.trim()} className="w-full py-3.5 rounded-2xl bg-green-600 text-white font-bold disabled:opacity-40">Avanti →</button>
           </div>

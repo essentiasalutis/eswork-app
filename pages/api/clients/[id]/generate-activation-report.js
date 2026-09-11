@@ -11,10 +11,10 @@ import {
 } from '../../../../lib/store';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { calculatePricing, computeForchetta, realL1L2FromAssessment } from '../../../../lib/calculator';
-import { getPricingSettingsV2, getServiziDeliverable, getNotaValidazione } from '../../../../lib/pricing/settings';
+import { getPricingSettingsV2, getNotaValidazione } from '../../../../lib/pricing/settings';
 import { ergonomiaDaColloquio } from '../../../../lib/pricing/v2';
 import { isFirmato } from '../../../../lib/checkup-server';
-import { cosaComprendeMarkdown, inserisciCosaComprende, VOCI_PROGRAMMA } from '../../../../lib/programma';
+import { cosaComprendeMarkdown, inserisciCosaComprende, VOCI_PROGRAMMA, quantitaPrimoAnno } from '../../../../lib/programma';
 import { getForchettaSnapshot, freezeStimaSnapshot } from '../../../../lib/pricing/snapshot';
 import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
@@ -82,7 +82,7 @@ export default requireAuth(async function handler(req, res) {
 
   // Rapporto col preventivo: condizioni della scheda colloquio + numeri REALI
   // della stratificazione (prezzo cliente; mai margini/costi nel report).
-  const { block: quoteBlock, compliance: quoteCompliance } = await buildQuoteBlock(id, client, answers);
+  const { block: quoteBlock, compliance: quoteCompliance, calc: quoteCalc } = await buildQuoteBlock(id, client, answers);
   // La generazione del Report CHIUDE la catena Stima→Report → timbra frozen_at
   // sullo snapshot (se esiste). Fatto qui, NON in buildQuoteBlock (usata anche
   // dall'endpoint read-only di regressione).
@@ -99,15 +99,18 @@ export default requireAuth(async function handler(req, res) {
   let v2Params = {};
   if (isV2) {
     try {
-      const [{ texts, params }, servizi] = await Promise.all([
-        getPricingSettingsV2(),
-        getServiziDeliverable({ soloAttivi: true, configurazione: tier }),
-      ]);
+      const { texts, params } = await getPricingSettingsV2();
       v2Texts = texts || {};
       v2Params = params || {};
-      if (!isPacchetto) sezioneComprende = cosaComprendeMarkdown({ servizi });
     } catch (_) {}
-    if (!isPacchetto && !sezioneComprende) sezioneComprende = cosaComprendeMarkdown();
+    // Quantità del primo anno + un solo numero (l'investimento): mai valori per voce
+    // (decisione Enrico). I cicli si citano solo se il Livello 1 supera la soglia di riservatezza.
+    if (!isPacchetto) {
+      const l1Visibile = stratTotal >= K_ANON && !kAnonPartition([
+        { key: 'l1', count: l1Count }, { key: 'l2', count: l2Count }, { key: 'l3', count: l3Count },
+      ], stratTotal).find(c => c.key === 'l1').suppressed;
+      sezioneComprende = cosaComprendeMarkdown({ quantita: quantitaPrimoAnno(quoteCalc, { mostraCicli: l1Visibile }), investimento: quoteCalc ? quoteCalc.price_y1 : null });
+    }
   }
   const nomeProdotto = isPacchetto
     ? (v2Texts.naming_cliente_pacchetto_prevenzione || 'Pacchetto Prevenzione')
@@ -178,7 +181,8 @@ VIETATO raccomandare al cliente attività che sono GIÀ comprese nell'investimen
   // Vincoli di wording per i documenti v2 (mai violarli nel testo generato).
   const vincoliV2 = isV2 ? `
 VINCOLI TASSATIVI SUL TESTO:
-- MAI presentare la somma dei valori delle voci ("Cosa include il programma") né affiancarla all'investimento.
+- MAI cifre in euro accanto alle singole voci o componenti del programma: le uniche cifre in euro sono l'investimento (Anno 1 e Anno 2 indicativo).
+- MAI inventare quantità (giornate, sessioni, cicli, sedute, postazioni, addetti, report) che non trovi nei dati forniti: usa SOLO quelle che ti vengono passate.
 - MAI espressioni come "in omaggio", "compreso gratuitamente", "gratis".
 - MAI "AI" o "intelligenza artificiale" nel nome della piattaforma (si chiama solo "Piattaforma digitale ES Work").
 - MAI i termini Core, Plus, Enterprise, "tier", "modello Core/Plus/Enterprise": sono nomi INTERNI, non ti vengono forniti e non vanno inventati. Il prodotto si chiama SOLO "${nomeProdotto}".` : '';
@@ -240,7 +244,7 @@ ${isPacchetto
 ${parametriOperativi}${vincoliV2}${istruzioniPacchetto}
 ${firmato ? '' : 'STATO (tassativo): il contratto NON è ancora firmato, questo report PROPONE il programma. VIETATO scrivere che il programma è stato attivato, avviato, erogato o che è operativo, e VIETATO citare sessioni già svolte: scrivi «programma proposto», «si propone di attivare».\n'}IDENTITÀ PROFESSIONALE (tassativa): il servizio è OSTEOPATICO. Usa sempre "osteopata", "trattamento osteopatico", "sportello osteopatico". VIETATO "fisioterapista", "fisioterapico", "riabilitativo/riabilitazione" e ogni termine fisioterapico riferito al nostro servizio. VIETATO anche presentare il servizio come atto medico o come medicina del lavoro: mai "medicina osteopatica", "medico", "sanitario", "medicina del lavoro", "sorveglianza sanitaria" riferiti a noi. La sorveglianza sanitaria resta del Medico Competente aziendale; noi siamo un programma osteopatico di prevenzione e trattamento, distinto e complementare.
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
-CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.${sezioneComprende ? '\nCOMPONENTI: NON scrivere una sezione con l\'elenco delle componenti del programma né i loro valori (niente «Cosa include» / «Cosa comprende»): la inserisce il sistema con i testi approvati.' : ''}
+CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.${sezioneComprende ? '\nCOMPONENTI: NON scrivere una sezione con l\'elenco delle componenti del programma né le loro quantità (niente «Cosa include» / «Cosa comprende»): la inserisce il sistema con i testi approvati.' : ''}
 DATA: se includi un'intestazione con il riepilogo del cliente, riporta "Data: ${dataOggi}". Usa ESATTAMENTE questa data; non inventarne altre né citare altre date nel testo.
 Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole totali.`,
       }],
@@ -436,7 +440,7 @@ export async function buildQuoteBlock(client_id, client, answers) {
       : '';
 
     const block = `\nPROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):\n- Programma Anno 1: €${eur(realPrice)}${inLinea} (${calc.days_osteo_y1} giornate sportello, ${calc.training_sessions_y1} sessioni formative)\n- Anno 2 e successivi (indicativo): €${eur(calc.price_y2)}${rigaDimensionamento}${rigaErgonomia}`;
-    return { block, compliance };
+    return { block, compliance, calc };
   } catch {
     return { block: '', compliance: null };
   }

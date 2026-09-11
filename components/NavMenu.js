@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Clienti', icon: '🏢', color: 'gray' },
+  { href: '/dashboard/comunicazioni', label: 'Comunicazioni', icon: '✉️', color: 'blue', badgeComunicazioni: true },
   { href: '/dashboard/pipeline', label: 'Pipeline', icon: '📊', color: 'purple' },
   { href: '/dashboard/professionals', label: 'Professionisti', icon: '👨‍⚕️', color: 'indigo' },
   { href: '/dashboard/professional-compliance', label: 'Conformità prof.', icon: '🛡️', color: 'rose' },
@@ -22,8 +23,17 @@ const NAV_ITEMS = [
 
 export default function NavMenu({ pendingAcuteCount = 0, onLogout }) {
   const [open, setOpen] = useState(false);
+  const [nonLette, setNonLette] = useState(0);
   const ref = useRef(null);
   const router = useRouter();
+
+  // Messaggi dalle aziende non ancora letti: il menu lo chiede da solo, così il
+  // contatore compare su ogni pagina della dashboard senza toccarle una per una.
+  useEffect(() => {
+    fetch('/api/admin/comunicazioni?solo=conteggio')
+      .then(r => (r.ok ? r.json() : null)).then(j => { if (j && Number.isFinite(j.nonLette)) setNonLette(j.nonLette); })
+      .catch(() => {});
+  }, [router.pathname]);
 
   // Close on outside click
   useEffect(() => {
@@ -62,6 +72,11 @@ export default function NavMenu({ pendingAcuteCount = 0, onLogout }) {
             {pendingAcuteCount > 9 ? '9+' : pendingAcuteCount}
           </span>
         )}
+        {pendingAcuteCount === 0 && nonLette > 0 && !open && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
+            {nonLette > 9 ? '9+' : nonLette}
+          </span>
+        )}
       </button>
 
       {/* Dropdown */}
@@ -84,6 +99,11 @@ export default function NavMenu({ pendingAcuteCount = 0, onLogout }) {
               >
                 <span className="text-base w-5 text-center flex-shrink-0">{item.icon}</span>
                 <span className="flex-1">{item.label}</span>
+                {item.badgeComunicazioni && nonLette > 0 && (
+                  <span className="w-5 h-5 bg-blue-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                    {nonLette > 9 ? '9+' : nonLette}
+                  </span>
+                )}
                 {item.badge && pendingAcuteCount > 0 && (
                   <span className="w-5 h-5 bg-red-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
                     {pendingAcuteCount > 9 ? '9+' : pendingAcuteCount}

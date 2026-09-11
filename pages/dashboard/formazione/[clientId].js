@@ -21,7 +21,7 @@ export default function FormazionePage({ clientId }) {
   const [st, setSt] = useState(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState('');
-  const [nuovo, setNuovo] = useState({ nome: '', data_ingresso: '', matricola: '' });
+  const [nuovo, setNuovo] = useState({ nome: '', data_ingresso: '', matricola: '', area: '' });
   const [params, setParams] = useState(null);
   const [importTxt, setImportTxt] = useState('');
   const [erogaFor, setErogaFor] = useState(null); // sessione in erogazione
@@ -47,14 +47,14 @@ export default function FormazionePage({ clientId }) {
 
   if (!st) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400 text-sm">{err || 'Caricamento…'}</div>;
 
-  const { dipendenti, partecipazioni, sessioni, duplicati, coda, proposta, aggregati } = st;
+  const { dipendenti, partecipazioni, sessioni, duplicati, coda, proposta, aggregati, ergonomiaCoda } = st;
   const nomeById = Object.fromEntries(dipendenti.map(d => [d.id, d.nome]));
 
   async function addDip(e) {
     e.preventDefault();
     if (!nuovo.nome.trim()) return;
     const r = await call('POST', `/api/org/${clientId}/dipendenti`, nuovo, 'add');
-    if (r) setNuovo({ nome: '', data_ingresso: '', matricola: '' });
+    if (r) setNuovo({ nome: '', data_ingresso: '', matricola: '', area: '' });
   }
   async function doImport() {
     const lista = importTxt.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
@@ -164,6 +164,12 @@ export default function FormazionePage({ clientId }) {
                     <div className="text-sm text-green-700 mt-1">
                       Proposta: <strong>{proposta.proposta.tipo === 'base_concentrata' ? 'Base concentrata (1h30)' : 'Base completa (due moduli)'}</strong> · {proposta.proposta.nGruppi} gruppo/i · {proposta.proposta.nPartecipanti} partecipanti · stima <strong>{eur(proposta.proposta.importo)}</strong>
                     </div>
+                    {ergonomiaCoda && (
+                      <div className="text-sm text-green-700 mt-1">
+                        + Ergonomia nella stessa visita: {ergonomiaCoda.nUfficio + ergonomiaCoda.nNonIndicata} ufficio · {ergonomiaCoda.nReparto} reparto · {ergonomiaCoda.minuti}′ · <strong>{eur(ergonomiaCoda.importo)}</strong> <span className="text-xs text-green-600">(a consumo)</span>
+                        {ergonomiaCoda.nNonIndicata > 0 && <div className="text-xs text-amber-700 mt-0.5">{ergonomiaCoda.nNonIndicata} senza area indicata: contati come ufficio. Correggi nell'anagrafica qui sotto.</div>}
+                      </div>
+                    )}
                     <button onClick={() => call('POST', `/api/org/${clientId}/genera-recupero`, {}, 'genera')} disabled={busy === 'genera' || !params.capienza_gruppo} className="mt-2 text-sm font-semibold text-white bg-green-600 px-4 py-2 rounded-xl hover:bg-green-700 disabled:opacity-50">Genera sessione di recupero</button>
                   </div>
                 ) : <p className="text-xs text-gray-400 mt-2">Trigger non ancora attivo (sotto soglia e &lt; 6 mesi).</p>}
@@ -202,12 +208,15 @@ export default function FormazionePage({ clientId }) {
               <input placeholder="Nome e cognome *" value={nuovo.nome} onChange={e => setNuovo(n => ({ ...n, nome: e.target.value }))} className={inputCls} />
               <input type="date" value={nuovo.data_ingresso} onChange={e => setNuovo(n => ({ ...n, data_ingresso: e.target.value }))} className={inputCls} />
               <input placeholder="Matricola (opz.)" value={nuovo.matricola} onChange={e => setNuovo(n => ({ ...n, matricola: e.target.value }))} className={inputCls} />
+              <select value={nuovo.area} onChange={e => setNuovo(n => ({ ...n, area: e.target.value }))} className={inputCls}>
+                <option value="">Area…</option><option value="ufficio">Ufficio</option><option value="reparto">Reparto</option>
+              </select>
               <button disabled={busy === 'add'} className="text-sm font-semibold text-white bg-gray-800 px-4 py-2 rounded-xl hover:bg-gray-700 disabled:opacity-50">+ Aggiungi</button>
             </form>
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[640px]">
                 <thead><tr className="text-left text-xs uppercase tracking-wide text-gray-400 border-b border-gray-100">
-                  <th className="py-2">Nome</th><th>Matricola</th><th>Ingresso</th><th>Base</th><th>Origine</th><th>Invito</th><th></th>
+                  <th className="py-2">Nome</th><th>Matricola</th><th>Ingresso</th><th>Area</th><th>Base</th><th>Origine</th><th>Invito</th><th></th>
                 </tr></thead>
                 <tbody>
                   {dipendenti.map(d => {
@@ -217,6 +226,11 @@ export default function FormazionePage({ clientId }) {
                         <td className="py-2 font-medium text-gray-800">{d.nome}{d.straordinario && <span className="ml-1 text-[10px] bg-purple-100 text-purple-700 px-1.5 rounded">straordinario</span>}{!d.attivo && <span className="ml-1 text-[10px] bg-red-100 text-red-700 px-1.5 rounded">cessato</span>}</td>
                         <td className="text-gray-500">{d.matricola || '—'}</td>
                         <td className="text-gray-500">{fmt(d.data_ingresso)}</td>
+                        <td>
+                          <select value={d.area || ''} onChange={e => call('PUT', `/api/org/${clientId}/dipendenti/${d.id}`, { area: e.target.value || null }, d.id)} className="text-xs border border-gray-200 rounded-lg px-1.5 py-1 bg-white">
+                            <option value="">—</option><option value="ufficio">Ufficio</option><option value="reparto">Reparto</option>
+                          </select>
+                        </td>
                         <td className={sb.cls}>{sb.label}{sb.data ? ` · ${fmt(sb.data)}` : ''}</td>
                         <td className="text-gray-400 text-xs">{d.inserito_da}</td>
                         <td className="text-xs">
@@ -239,7 +253,7 @@ export default function FormazionePage({ clientId }) {
                       </tr>
                     );
                   })}
-                  {dipendenti.length === 0 && <tr><td colSpan={7} className="py-6 text-center text-gray-400">Nessun dipendente. Usa "Importa nomi dall'assessment" o aggiungi sopra.</td></tr>}
+                  {dipendenti.length === 0 && <tr><td colSpan={8} className="py-6 text-center text-gray-400">Nessun dipendente. Usa "Importa nomi dall'assessment" o aggiungi sopra.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -256,7 +270,7 @@ export default function FormazionePage({ clientId }) {
             {sessioni.length === 0 ? <p className="text-sm text-gray-400">Nessuna sessione.</p> : sessioni.map(s => (
               <div key={s.id} className="py-2 border-b border-gray-100 text-sm">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <span><strong>{s.tipo === 'base_concentrata' ? 'Base concentrata' : s.tipo === 'base' ? 'Base completa' : 'Aggiornamento'}</strong> · {s.origine.replace(/_/g, ' ')} · Anno {s.anno_programma} · <span className={s.stato === 'erogata' ? 'text-green-700' : s.stato === 'annullata' ? 'text-gray-400' : 'text-amber-700'}>{s.stato}</span>{s.a_consumo && s.importo_dovuto ? ` · ${eur(s.importo_dovuto)}` : ''}</span>
+                  <span><strong>{s.tipo === 'base_concentrata' ? 'Base concentrata' : s.tipo === 'base' ? 'Base completa' : 'Aggiornamento'}</strong> · {s.origine.replace(/_/g, ' ')} · Anno {s.anno_programma} · <span className={s.stato === 'erogata' ? 'text-green-700' : s.stato === 'annullata' ? 'text-gray-400' : 'text-amber-700'}>{s.stato}</span>{s.a_consumo && s.importo_dovuto ? ` · ${eur(s.importo_dovuto)}` : ''}{s.importo_ergonomia ? ` · ergonomia ${eur(s.importo_ergonomia)}` : ''}</span>
                   {s.stato === 'pianificata' && <button onClick={() => { setErogaFor(s); setPresenti(Object.fromEntries(partecipazioni.filter(p => p.sessione_formativa_id === s.id).map(p => [p.dipendente_id, true]))); }} className="text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-1 rounded-lg">Marca erogata</button>}
                 </div>
                 <div className="text-xs text-gray-400">{s.note}</div>

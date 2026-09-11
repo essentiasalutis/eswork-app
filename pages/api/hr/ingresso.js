@@ -30,6 +30,9 @@ export default async function handler(req, res) {
       nome,
       data_ingresso: b.data_ingresso || null,
       identificativo_hr: typeof b.identificativo_hr === 'string' && b.identificativo_hr.trim() ? b.identificativo_hr.trim() : null,
+      // area (ufficio/reparto): decide i minuti di ergonomia del nuovo ingresso.
+      // Valori ammessi fissi; qualunque altro valore viene ignorato, mai inoltrato.
+      area: b.area === 'ufficio' || b.area === 'reparto' ? b.area : null,
       inserito_da: 'hr',
     });
     return res.status(200).json({ ok: true, message: NEUTRO_OK }); // neutro anche su duplicato

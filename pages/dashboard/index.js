@@ -11,6 +11,7 @@ import { etichettaData, ilGiorno } from '../../lib/checkup';
 // Righe dell'agenda "Questa settimana": cosa c'è da fare e quando (e come si chiama
 // quando la data è già passata).
 const AGENDA = {
+  incontro: { icona: '📊', testo: 'Presentazione del Report', scaduto: '' },
   ricontatto: { icona: '🔁', testo: 'Ricontattare', scaduto: 'Ricontatto in ritardo' },
   offerta: { icona: '⏳', testo: 'Offerta in scadenza', scaduto: 'Offerta scaduta' },
   checkup: { icona: '📋', testo: 'Check-up in chiusura', scaduto: '' },
@@ -76,7 +77,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
                 const t = AGENDA[v.tipo];
                 const quando = v.scaduto ? `era ${ilGiorno(v.data)}` : v.data === oggi ? 'oggi' : etichettaData(v.data);
                 return (
-                  <Link key={`${v.tipo}-${v.client_id}`} href={v.tipo === 'checkup' ? `/dashboard/${v.client_id}` : '/dashboard/pipeline'}
+                  <Link key={`${v.tipo}-${v.client_id}`} href={v.tipo === 'checkup' || v.tipo === 'incontro' ? `/dashboard/${v.client_id}` : '/dashboard/pipeline'}
                     className="flex items-center justify-between py-1.5 px-1 text-sm hover:bg-gray-50 rounded gap-2 flex-wrap">
                     <span className="flex items-center gap-2 min-w-0">
                       <span>{t.icona}</span>

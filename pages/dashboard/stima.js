@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
 import { testoMailStima } from '../../lib/stima-mail';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
+import MailRiepilogo from '../../components/MailRiepilogo';
 
 // Pagina STIMA (pre-assessment, cliente-facing). Mostra l'output di buildQuoteHtml
 // (UNICA fonte) in un iframe stampabile, con Scarica PDF (server). I numeri della
@@ -29,7 +30,11 @@ export default function StimaPage() {
   // dell'azienda: il prodotto si cambia nel colloquio solo se il cliente lo sceglie.
   const [variante, setVariante] = useState('programma');
   const [variantePacchetto, setVariantePacchetto] = useState(false);
+  const [riepilogo, setRiepilogo] = useState(null); // { forchetta: {min, max}, url } → finestra aperta
   const iframeRef = useRef(null);
+  // Mail di riepilogo (punto 4+5) per il programma completo di un'azienda esistente; per
+  // il Pacchetto (o una Stima senza azienda) resta la mail breve di prima.
+  const conRiepilogo = !!q.clientId && variante === 'programma' && q.prodotto !== 'pacchetto_prevenzione';
 
   function buildBody(store, v = variante) {
     return {
@@ -72,10 +77,9 @@ export default function StimaPage() {
     if (w) { w.focus(); w.print(); }
   }
 
-  // "Invia al referente": genera il PDF (così la forbice diventa la promessa fatta
-  // al cliente) e apre la posta di Enrico con il testo pronto. Testo = paragrafo
-  // "Stima di investimento" della mail di riepilogo di Enrico; al punto 4 del funnel
-  // verrà sostituito dalla mail di riepilogo completa (check-up, date, kit).
+  // "Invia al referente" (Pacchetto o Stima senza azienda): genera il PDF (così la forbice
+  // diventa la promessa fatta al cliente) e apre la posta con la mail breve. Per il
+  // programma completo c'è la mail di riepilogo (apriRiepilogo, qui sotto).
   async function mostraVariante(v) {
     setBusy(true); setErr('');
     try {
@@ -103,6 +107,22 @@ export default function StimaPage() {
     setBusy(false);
   }
 
+  // "Mail di riepilogo": come sopra genera il PDF (forbice impegnata, pipeline "Stima
+  // inviata"), poi apre la finestra con la mail completa di Enrico.
+  async function apriRiepilogo() {
+    setBusy(true); setErr('');
+    try {
+      const r = await fetch('/api/stima', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildBody(true)) });
+      const j = await r.json();
+      setSnapMeta(j.snapshot ?? snapMeta);
+      if (j.html) setHtml(j.html);
+      if (!j.ok || !j.forchetta) { setErr(j.error || 'Stima non generata'); setBusy(false); return; }
+      if (!j.url) setErr(j.message || j.error || 'PDF non disponibile: allegalo alla mail dopo averlo salvato con Stampa.');
+      setRiepilogo({ forchetta: { min: j.forchetta.min && j.forchetta.min.price_y1, max: j.forchetta.max && j.forchetta.max.price_y1 }, url: j.url || null });
+    } catch { setErr('Errore di rete'); }
+    setBusy(false);
+  }
+
   async function scaricaPdf() {
     setBusy(true); setErr('');
     try {
@@ -126,7 +146,9 @@ export default function StimaPage() {
             <div className="flex items-center gap-2">
               <button onClick={stampa} disabled={!html} className="text-sm font-semibold text-gray-700 bg-gray-100 border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-200 disabled:opacity-50">🖨 Stampa</button>
               <button onClick={scaricaPdf} disabled={busy || !html} className="text-sm font-semibold text-white bg-green-600 px-4 py-2 rounded-xl hover:bg-green-700 disabled:opacity-50">{busy ? '…' : '⬇ Scarica PDF'}</button>
-              <button onClick={inviaAlReferente} disabled={busy || !html} className="text-sm font-semibold text-white bg-gray-900 px-4 py-2 rounded-xl hover:bg-gray-700 disabled:opacity-50">✉️ Invia al referente</button>
+              {conRiepilogo
+                ? <button onClick={apriRiepilogo} disabled={busy || !html} className="text-sm font-semibold text-white bg-gray-900 px-4 py-2 rounded-xl hover:bg-gray-700 disabled:opacity-50">✉️ Mail di riepilogo</button>
+                : <button onClick={inviaAlReferente} disabled={busy || !html} className="text-sm font-semibold text-white bg-gray-900 px-4 py-2 rounded-xl hover:bg-gray-700 disabled:opacity-50">✉️ Invia al referente</button>}
               {variantePacchetto && q.prodotto !== 'pacchetto_prevenzione' && (
                 <button onClick={() => mostraVariante(variante === 'programma' ? 'pacchetto' : 'programma')} disabled={busy}
                   className="text-sm font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 disabled:opacity-50">
@@ -154,6 +176,7 @@ export default function StimaPage() {
           {err && <div className="max-w-4xl mx-auto px-5 pb-2 text-xs text-amber-700">{err}</div>}
         </header>
 
+        {riepilogo && <MailRiepilogo clientId={q.clientId} forchetta={riepilogo.forchetta} urlStima={riepilogo.url} onClose={() => setRiepilogo(null)} />}
         <main className="flex-1 max-w-4xl w-full mx-auto p-4">
           <div className="mb-3"><ArgomentarioVoci /></div>
           {html ? (

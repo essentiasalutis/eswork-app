@@ -8,6 +8,7 @@ import { getOrgParams } from '../../../lib/org';
 import { aggiornaClienteTollerante } from '../../../lib/pipeline-server';
 
 const V54 = ['ricontatto_il', 'offerta_scade_il'];
+const DATE_SEMPLICI = [...V54, 'secondo_incontro_il'];
 
 export default requireAuth(async function handler(req, res) {
   const { id } = req.query;
@@ -61,7 +62,7 @@ export default requireAuth(async function handler(req, res) {
       if ('pipeline_stage' in body && !TUTTI.some(x => x.id === body.pipeline_stage)) {
         return res.status(422).json({ error: 'stato della pipeline non valido' });
       }
-      for (const k of V54) {
+      for (const k of DATE_SEMPLICI) {
         if (k in body && body[k] !== null && !isYmd(String(body[k]))) return res.status(422).json({ error: 'data non valida' });
       }
       const attuale = normalizza(client.pipeline_stage);
@@ -115,7 +116,7 @@ export default requireAuth(async function handler(req, res) {
       const { data: updated } = await aggiornaClienteTollerante(id, body);
       return res.json(updated);
     } catch (e) {
-      if (e && (e.code === 'PGRST204' || e.code === '42703')) return res.status(409).json({ error: 'Nel database manca una migration: applica le ultime (fino alla v55) in Supabase e riprova.' });
+      if (e && (e.code === 'PGRST204' || e.code === '42703')) return res.status(409).json({ error: 'Nel database manca una migration non ancora applicata: applicala in Supabase e riprova.' });
       return res.status(500).json({ error: e.message });
     }
   }

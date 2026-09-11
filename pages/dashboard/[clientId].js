@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { aggiungiGiorni, oggiRoma, etichettaData, ilGiorno, alGiorno, giorniAllaChiusura } from '../../lib/checkup';
+import { aggiungiGiorni, oggiRoma, etichettaData, ilGiorno, alGiorno, giorniAllaChiusura, avvisiAvvioCheckup } from '../../lib/checkup';
+import { testoKit, firmaKit, bloccoKit } from '../../lib/riepilogo';
+import { isFirmato } from '../../lib/pipeline';
 import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getDocumentsByClient, getProfessionals, getMonitoringByClient, getTreatmentCapacity } from '../../lib/store';
 import { TYPE_LABELS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
@@ -343,12 +345,10 @@ export default function ClientPage({ client: initialClient, assessments: initial
   // v4: si crea solo l'assessment INIZIALE (uno per ciclo). I checkpoint T3/T6
   // sono mini-check automatici; il T12 è il re-assessment con link personali.
   async function createAssessment() {
-    if (client.binario === 'B' && !['inviata', 'firmata'].includes(client.lettera_stato)
-      && !confirm('Lettera di incarico non ancora inviata a questa azienda (binario B).\n\nAvviare comunque il check-up?')) return;
-    // Regola dei massimo N check-up aperti non convertiti: avviso, non blocco.
-    const altriAperti = checkupAperti.aziende.filter(x => x.id !== client.id);
-    if (!client.is_demo && altriAperti.length >= checkupAperti.limite
-      && !confirm(`Hai già ${altriAperti.length} check-up aperti non convertiti (limite ${checkupAperti.limite}):\n${altriAperti.map(x => `• ${x.name}`).join('\n')}\n\nAvviare comunque il check-up?`)) return;
+    // Avvisi (non blocchi): Lettera B non inviata, limite dei check-up non convertiti.
+    for (const avviso of avvisiAvvioCheckup({ client, altriAperti: checkupAperti.aziende.filter(x => x.id !== client.id), limite: checkupAperti.limite })) {
+      if (!confirm(avviso)) return;
+    }
     setSaving(true); setCheckupErr('');
     const res = await fetch('/api/assessments', {
       method: 'POST',
@@ -412,6 +412,26 @@ export default function ClientPage({ client: initialClient, assessments: initial
     const aperto = assessments.find(a => a.status === 'active');
     const scadenzaCorrente = aperto && aperto.chiude_il ? aperto.chiude_il : null;
     const referente = client.contact_name || 'referente';
+    // Prima della firma: il kit di comunicazione di Enrico (punto 5), che dice "stiamo
+    // valutando". Il testo qui sotto ("l'azienda ha avviato…") vale solo dopo la firma.
+    if (!isFirmato(client.pipeline_stage)) {
+      if (!scadenzaCorrente) { alert('Avvia prima il check-up: il testo per i dipendenti ha bisogno della data di chiusura.'); return; }
+      const kit = testoKit({ variante: client.binario === 'A' ? 'A' : 'B', link: url, scadenza: scadenzaCorrente, firma: firmaKit({ referente: client.contact_name, azienda: client.name }) });
+      setEmailModal({
+        to: client.contact_email || '',
+        subject: `Check-up ES Work — ${client.name}`,
+        body: `Gentile ${referente},
+
+come concordato, ecco il testo già pronto da inoltrare ai dipendenti per il check-up: non dovete scrivere nulla.
+
+${bloccoKit(kit)}
+
+Per qualsiasi domanda, sono a disposizione.
+
+${FIRMA}`,
+      });
+      return;
+    }
     const body = `Gentile ${referente},
 
 come concordato, le invio il link per il check-up ES Work dedicato ai dipendenti di ${client.name}.
@@ -753,6 +773,12 @@ ${FIRMA}`;
                   className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${(client.binario || '') === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
               ))}
             </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap text-sm">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">📊 Secondo incontro (Report)</span>
+            <input type="date" value={client.secondo_incontro_il || ''} onChange={e => aggiornaAzienda({ secondo_incontro_il: e.target.value || null })}
+              className="text-xs border border-gray-300 rounded-lg px-2 py-1" />
+            <span className="text-[11px] text-gray-400">compare in dashboard nella settimana della data</span>
           </div>
           {client.binario === 'B' && (
             <div className="border-t border-gray-100 pt-3">

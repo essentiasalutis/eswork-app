@@ -17,7 +17,9 @@ const PARAM_LABELS = {
   training_modules_y1: 'Moduli formazione Anno 1',
   training_modules_y2: 'Moduli formazione Anno 2+',
   ergonomia_minuti_persona: 'Ergonomia ufficio: minuti a persona',
-  ergonomia_minuti_postazione: 'Ergonomia produzione: minuti a postazione tipo',
+  ergonomia_minuti_addetto: 'Ergonomia reparto: formazione addetto sulla sua postazione, minuti a persona',
+  ergonomia_forfait_postazione: 'Ergonomia reparto: studio postazione tipo, € a forfait',
+  ergonomia_minuti_postazione: 'Ergonomia reparto: tempo in sede per studio postazione (minuti — solo pianificazione e minimo ore, NON prezzo)',
   ergonomia_minimo_ore: 'Ergonomia: minimo fatturabile (ore)',
   soglia_ingresso: 'Soglia pacchetto prevenzione (dipendenti max)',
   assessment_prezzo_per_dipendente: 'Assessment nel pacchetto: € per dipendente dichiarato',
@@ -114,7 +116,7 @@ export default function PricingV2Page() {
                 </label>
               ))}
             </div>
-            <p className="text-[11px] text-gray-400 mt-3">Solo fattori primitivi: i costi si calcolano (es. ergonomia ufficio = minuti/60 × tariffa oraria sportello del cliente; assessment pacchetto = n dipendenti × €/dipendente).</p>
+            <p className="text-[11px] text-gray-400 mt-3">Solo fattori primitivi: i costi si calcolano (es. ergonomia ufficio e reparto = minuti/60 × tariffa oraria sportello del cliente; studio postazione = forfait × n postazioni; assessment pacchetto = n dipendenti × €/dipendente).</p>
           </div>
 
           {/* Parametri formazione (org) — turnover/recupero */}

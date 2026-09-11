@@ -92,14 +92,25 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
   const [showParams, setShowParams] = useState(false);
   const [scenario, setScenario] = useState('avg');
 
-  // v2: ergonomia (ufficio per persona, produzione per postazione tipo) + prodotto
-  const [ergUfficio, setErgUfficio] = useState(s2.ergonomia_ufficio ?? '');
-  const [ergPostazioni, setErgPostazioni] = useState(s2.ergonomia_postazioni ?? '');
+  // v2: ergonomia a 3 voci (ufficio · addetti di reparto · postazioni tipo) + prodotto.
+  // Il campo ufficio NON ha più regole invisibili: in automatico vale
+  // "totale − addetti" e lo si vede; se lo si scrive a mano resta quel numero.
+  // Colloqui salvati prima (ufficio null) → automatico, cioè come li leggeva la Stima.
+  const [ergUffAuto, setErgUffAuto] = useState(s2.ergonomia_ufficio_auto ?? (s2.ergonomia_ufficio == null));
+  const [ergUffManuale, setErgUffManuale] = useState(s2.ergonomia_ufficio != null ? String(s2.ergonomia_ufficio) : '');
+  const [ergAddetti, setErgAddetti] = useState(s2.ergonomia_addetti != null ? String(s2.ergonomia_addetti) : '0');
+  const [ergPostazioni, setErgPostazioni] = useState(s2.ergonomia_postazioni != null ? String(s2.ergonomia_postazioni) : '0');
   const [tipoProdotto, setTipoProdotto] = useState(initialClient?.tipo_prodotto || 'programma_completo');
   const [prodottoErr, setProdottoErr] = useState('');
 
   // ─── Derivati calcolatore ───────────────────────────────────────────────────
   const n = useMemo(() => sedi.reduce((a, e) => a + (parseInt(e.employees) || 0), 0), [sedi]);
+  // Ergonomia: numeri ESPLICITI, sempre (vuoto = 0). Una sola lettura per anteprima,
+  // salvataggio e Stima: niente più tre interpretazioni dello stesso campo.
+  const nErgAddetti = Math.max(0, parseInt(ergAddetti) || 0);
+  const nErgPostazioni = Math.max(0, parseInt(ergPostazioni) || 0);
+  const nErgUfficio = ergUffAuto ? Math.max(0, n - nErgAddetti) : Math.max(0, parseInt(ergUffManuale) || 0);
+  const ergAssegnati = nErgUfficio + nErgAddetti;
   const suggestedTier = useMemo(() => getTier(n, { fatturato: fatturatoNum(fatturato), hrMaturity }), [n, fatturato, hrMaturity]);
   const tier = tierOverride || suggestedTier;
   const groups = useMemo(() => {
@@ -111,21 +122,17 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
   // Forbice unica (stessa funzione usata da pagina Stima / PDF / flag STEP 2),
   // instradata per versione listino (v2: parametri admin + ergonomia).
   const forchetta = useMemo(() => {
-    const ergonomia = isV2 && (ergUfficio !== '' || ergPostazioni !== '')
-      ? { nUfficio: parseInt(ergUfficio) || 0, nPostazioni: parseInt(ergPostazioni) || 0 }
-      : undefined;
+    const ergonomia = isV2 ? { nUfficio: nErgUfficio, nAddetti: nErgAddetti, nPostazioni: nErgPostazioni } : undefined;
     return computeForchetta({ n, sector, tier, groups, rates, vatExempt, l2Mult, pricingVersion, v2Params, ergonomia });
-  }, [n, sector, tier, groups, rates, vatExempt, l2Mult, pricingVersion, v2Params, ergUfficio, ergPostazioni, isV2]);
+  }, [n, sector, tier, groups, rates, vatExempt, l2Mult, pricingVersion, v2Params, nErgUfficio, nErgAddetti, nErgPostazioni, isV2]);
   // Pacchetto prevenzione (v2, sotto soglia): prezzo dal motore, regole dure lato server.
   const sogliaIngresso = (v2Params && v2Params.soglia_ingresso) || 80;
   const pacchettoDisponibile = isV2 && n > 0 && n <= sogliaIngresso;
   const pacchetto = useMemo(() => {
     if (!isV2 || tipoProdotto !== 'pacchetto_prevenzione') return null;
-    const ergonomia = (ergUfficio !== '' || ergPostazioni !== '')
-      ? { nUfficio: parseInt(ergUfficio) || 0, nPostazioni: parseInt(ergPostazioni) || 0 }
-      : undefined;
+    const ergonomia = { nUfficio: nErgUfficio, nAddetti: nErgAddetti, nPostazioni: nErgPostazioni };
     return calculatePacchetto({ n, groups, rates, vatExempt, v2Params, ergonomia });
-  }, [isV2, tipoProdotto, n, groups, rates, vatExempt, v2Params, ergUfficio, ergPostazioni]);
+  }, [isV2, tipoProdotto, n, groups, rates, vatExempt, v2Params, nErgUfficio, nErgAddetti, nErgPostazioni]);
   const scen = forchetta;                 // {min, avg, max}, ognuno {pct, l1, l2, ...calcolo}
   const calcMin = forchetta.min, calcAvg = forchetta.avg, calcMax = forchetta.max;
   const calc = scenario === 'min' ? calcMin : scenario === 'max' ? calcMax : calcAvg;
@@ -135,7 +142,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
   function buildData() {
     return {
       step1: { nome, ref_nome: refNome, ref_ruolo: refRuolo, ref_email: refEmail, ref_tel: refTel, work_desc: workDesc, sector, disturbi, disturbi_altro: disturbiAltro, prev_fatta: prevFatta, prev_note: prevNote, assenteismo, absence_days: absenceDays, note: note1 },
-      step2: { sedi, capienza, training_mode: trainingMode, fatturato, hr_maturity: hrMaturity, tier_override: tierOverride, tier, ergonomia_ufficio: ergUfficio === '' ? null : parseInt(ergUfficio) || 0, ergonomia_postazioni: ergPostazioni === '' ? null : parseInt(ergPostazioni) || 0 },
+      step2: { sedi, capienza, training_mode: trainingMode, fatturato, hr_maturity: hrMaturity, tier_override: tierOverride, tier, ergonomia_ufficio: nErgUfficio, ergonomia_ufficio_auto: ergUffAuto, ergonomia_addetti: nErgAddetti, ergonomia_postazioni: nErgPostazioni },
       step3: { spazio, spazio_note: spazioNote, fasce, mc, mc_nome: mcNome, mc_contatti: mcContatti, esg, refop_nome: refOpNome, refop_ruolo: refOpRuolo, refop_contatti: refOpContatti },
       params: { rates, l2_mult: l2Mult, vat_exempt: vatExempt },
     };
@@ -178,7 +185,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
     const t = setTimeout(() => save({ silent: true }), 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nome, refNome, refRuolo, refEmail, refTel, workDesc, sector, disturbi, disturbiAltro, prevFatta, prevNote, assenteismo, absenceDays, note1, sedi, capienza, trainingMode, fatturato, hrMaturity, tierOverride, spazio, spazioNote, fasce, mc, mcNome, mcContatti, esg, refOpNome, refOpRuolo, refOpContatti, rates, l2Mult, vatExempt, ergUfficio, ergPostazioni]);
+  }, [nome, refNome, refRuolo, refEmail, refTel, workDesc, sector, disturbi, disturbiAltro, prevFatta, prevNote, assenteismo, absenceDays, note1, sedi, capienza, trainingMode, fatturato, hrMaturity, tierOverride, spazio, spazioNote, fasce, mc, mcNome, mcContatti, esg, refOpNome, refOpRuolo, refOpContatti, rates, l2Mult, vatExempt, ergUffAuto, ergUffManuale, ergAddetti, ergPostazioni]);
 
   function toggleArr(arr, set, v) { set(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]); }
   function setSede(i, k, v) { setSedi(prev => prev.map((s, j) => j === i ? { ...s, [k]: k === 'employees' ? (v === '' ? '' : Math.max(0, parseInt(v) || 0)) : v } : s)); }
@@ -197,8 +204,9 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
     });
     // v2: input ergonomia + prodotto (la versione resta risolta SERVER-side dal clientId)
     if (isV2) {
-      if (ergUfficio !== '') params.set('ergu', String(parseInt(ergUfficio) || 0));
-      if (ergPostazioni !== '') params.set('ergp', String(parseInt(ergPostazioni) || 0));
+      params.set('ergu', String(nErgUfficio));
+      params.set('erga', String(nErgAddetti));
+      params.set('ergp', String(nErgPostazioni));
       if (tipoProdotto === 'pacchetto_prevenzione') params.set('prodotto', 'pacchetto_prevenzione');
     }
     router.push(`/dashboard/stima?${params}`);
@@ -301,13 +309,23 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
             {isV2 && (
               <div className="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
                 <div className="text-sm font-semibold text-gray-700">🪑 Consulenza ergonomico-posturale</div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Dipendenti ufficio" hint={`vuoto = tutti (${n}) · ${v2Params?.ergonomia_minuti_persona ?? 10}′ a persona`}>
-                    <input type="number" min="0" value={ergUfficio} onChange={e => setErgUfficio(e.target.value)} placeholder={String(n)} className={inputCls} />
+                <div className="grid grid-cols-3 gap-3">
+                  <Field label="Dipendenti ufficio" hint={ergUffAuto ? `automatico: ${n} − addetti · ${v2Params?.ergonomia_minuti_persona ?? 5}′ a persona` : `scritto a mano · ${v2Params?.ergonomia_minuti_persona ?? 5}′ a persona`}>
+                    <input type="number" min="0" value={nErgUfficio} onChange={e => { setErgUffAuto(false); setErgUffManuale(e.target.value); }} className={inputCls} />
+                    {!ergUffAuto && (
+                      <button type="button" onClick={() => setErgUffAuto(true)} className="text-[11px] text-blue-600 hover:underline mt-1">↺ torna automatico</button>
+                    )}
                   </Field>
-                  <Field label="Postazioni tipo (produzione)" hint={`stima — conteggio definitivo al sopralluogo · ${v2Params?.ergonomia_minuti_postazione ?? 60}′ a postazione`}>
-                    <input type="number" min="0" value={ergPostazioni} onChange={e => setErgPostazioni(e.target.value)} placeholder="0" className={inputCls} />
+                  <Field label="Addetti di reparto" hint={`formati sulla propria postazione · ${v2Params?.ergonomia_minuti_addetto ?? 5}′ a persona`}>
+                    <input type="number" min="0" value={ergAddetti} onChange={e => setErgAddetti(e.target.value)} className={inputCls} />
                   </Field>
+                  <Field label="Postazioni tipo (reparto)" hint={`studio a forfait €${v2Params?.ergonomia_forfait_postazione ?? 120} · conteggio definitivo al sopralluogo`}>
+                    <input type="number" min="0" value={ergPostazioni} onChange={e => setErgPostazioni(e.target.value)} className={inputCls} />
+                  </Field>
+                </div>
+                <div className={`text-xs rounded-xl px-3 py-2 border ${ergAssegnati > n ? 'bg-red-50 border-red-200 text-red-700' : 'bg-gray-50 border-gray-200 text-gray-600'}`}>
+                  Assegnati <strong>{ergAssegnati}</strong> su {n} dipendenti (ufficio {nErgUfficio} + reparto {nErgAddetti})
+                  {ergAssegnati > n ? ' — più persone che dipendenti: controlla i numeri.' : ergAssegnati < n ? ` · ${n - ergAssegnati} senza consulenza ergonomica` : ''}
                 </div>
                 {forchetta?.avg?.y1?.ergonomia_sotto_minimo && (
                   <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">

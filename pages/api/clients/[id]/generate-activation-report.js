@@ -12,6 +12,7 @@ import {
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { calculatePricing, computeForchetta, realL1L2FromAssessment } from '../../../../lib/calculator';
 import { getPricingSettingsV2, getServiziDeliverable, getNotaValidazione } from '../../../../lib/pricing/settings';
+import { ergonomiaDaColloquio } from '../../../../lib/pricing/v2';
 import { getForchettaSnapshot, freezeStimaSnapshot } from '../../../../lib/pricing/snapshot';
 import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
@@ -159,7 +160,7 @@ PARAMETRI OPERATIVI REALI (usa ESATTAMENTE questi, non altri):
 - Una giornata di sportello in sede vale ${CONFIG.hours_per_day} ore di erogazione
 VIETATO inventare dettagli di erogazione che non trovi qui sopra: quante sedute stanno in una giornata, la cadenza degli accessi (settimanale, quindicinale, mensile), durate, calendari, orari. Se un dato non ti è stato fornito, NON scriverlo: il report fissa il prezzo, ogni numero che scrivi diventa un impegno.
 VIETATO attribuire alla Piattaforma digitale ES Work funzioni che non ti sono state elencate (alert automatici, contenuti educativi personalizzati, questionari periodici, notifiche, tracciamento in tempo reale): è lo strumento con cui il programma viene gestito e i report prodotti, nient'altro.
-VIETATO raccomandare al cliente attività che sono GIÀ comprese nell'investimento (in particolare la valutazione ergonomica delle postazioni, se compare nella PROPOSTA ECONOMICA COLLEGATA): sono incluse, non sono cose "da valutare".`;
+VIETATO raccomandare al cliente attività che sono GIÀ comprese nell'investimento (in particolare la consulenza ergonomico-posturale — studio delle postazioni e formazione degli addetti sulla propria postazione — se compare nella PROPOSTA ECONOMICA COLLEGATA): sono incluse, non sono cose "da valutare".`;
 
   // Vincoli di wording per i documenti v2 (mai violarli nel testo generato).
   const vincoliV2 = isV2 ? `
@@ -359,9 +360,8 @@ export async function buildQuoteBlock(client_id, client, answers) {
         ? Math.max(1, Math.ceil(nEmp / cap))
         : (sedi.reduce((a, e) => a + Math.ceil((parseInt(e.employees) || 0) / cap), 0) || Math.max(1, Math.ceil(nEmp / cap)));
       const v2Params = pricingVersion === 'v2' ? (await getPricingSettingsV2()).params : null;
-      const ergonomiaV2 = (s2.ergonomia_ufficio != null || s2.ergonomia_postazioni != null)
-        ? { nUfficio: parseInt(s2.ergonomia_ufficio) || 0, nPostazioni: parseInt(s2.ergonomia_postazioni) || 0 }
-        : undefined;
+      // Lettura unica degli input del colloquio (lib/pricing/v2): stessi numeri della Stima.
+      const ergonomiaV2 = pricingVersion === 'v2' ? ergonomiaDaColloquio(s2, nEmp) : undefined;
       conditions = { pricingVersion, v2Params, ergonomia: ergonomiaV2, tier: s2.tier || undefined, groups, rates: sp.rates || undefined, vatExempt: sp.vat_exempt };
       const sectorKey = fmd?.step1?.sector || (client.sector === 1 ? 'manufacturing' : 'services');
       l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
@@ -401,13 +401,16 @@ export async function buildQuoteBlock(client_id, client, answers) {
     // ERGONOMIA: e' una voce PAGATA (fino a qui invisibile nel documento). Senza
     // questa riga il cliente paga la valutazione delle postazioni e nel report
     // non se ne parla — e l'AI e' arrivata a raccomandarla come cosa da valutare.
+    // I conteggi arrivano dal MOTORE (calc.y1.ergonomia), non ricalcolati qui:
+    // il documento descrive esattamente ciò che è stato messo nel prezzo.
     const ergo = calc.y1 && calc.y1.ergonomia;
-    // Stessi default del motore v2 (nUfficio assente = tutta la popolazione).
-    const nUff = conditions.ergonomia && conditions.ergonomia.nUfficio != null ? conditions.ergonomia.nUfficio : nEmp;
-    const nPost = (conditions.ergonomia && conditions.ergonomia.nPostazioni) || 0;
-    const pezzi = [nUff ? `${nUff} postazioni d'ufficio` : null, nPost ? `${nPost} postazioni tipo di produzione` : null].filter(Boolean);
+    const pezzi = ergo ? [
+      ergo.nUfficio ? `${ergo.nUfficio} dipendenti d'ufficio sulla propria postazione` : null,
+      ergo.nPostazioni ? `studio di ${ergo.nPostazioni} postazioni tipo di reparto` : null,
+      ergo.nAddetti ? `formazione di ${ergo.nAddetti} addetti di reparto sulla postura della propria postazione` : null,
+    ].filter(Boolean) : [];
     const rigaErgonomia = (ergo && ergo.sell > 0 && pezzi.length)
-      ? `\n- Include la valutazione ergonomica delle postazioni di lavoro (${pezzi.join(' + ')}): è già compresa nell'investimento, non è un'attività da acquistare a parte`
+      ? `\n- Include la consulenza ergonomico-posturale (${pezzi.join('; ')}): è già compresa nell'investimento, non è un'attività da acquistare a parte`
       : '';
 
     const block = `\nPROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):\n- Programma Anno 1: €${eur(realPrice)}${inLinea} (${calc.days_osteo_y1} giornate sportello, ${calc.training_sessions_y1} sessioni formative)\n- Stima Anno 2+: €${eur(calc.price_y2)}${rigaDimensionamento}${rigaErgonomia}`;

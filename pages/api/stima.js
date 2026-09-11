@@ -57,7 +57,7 @@ export default requireAuth(async function handler(req, res) {
   const settingsV2 = pricingVersion === 'v2' ? await getPricingSettingsV2() : null;
   const v2Params = settingsV2 ? settingsV2.params : null;
   const ergonomia = pricingVersion === 'v2'
-    ? { nUfficio: b.ergonomiaUfficio != null ? parseInt(b.ergonomiaUfficio) || 0 : undefined, nPostazioni: parseInt(b.ergonomiaPostazioni) || 0 }
+    ? { nUfficio: b.ergonomiaUfficio != null ? parseInt(b.ergonomiaUfficio) || 0 : undefined, nAddetti: parseInt(b.ergonomiaAddetti) || 0, nPostazioni: parseInt(b.ergonomiaPostazioni) || 0 }
     : undefined;
 
   // Prodotto d'ingresso: REGOLE DURE lato server (la UI può nascondere l'opzione,
@@ -114,7 +114,7 @@ export default requireAuth(async function handler(req, res) {
     forchetta: forchettaOut,
     sector_label: SECTOR_LABELS[sector] || '—',
     // Sezione componenti SOLO per v2 (v1 resta byte-identico)
-    v2Doc: pricingVersion === 'v2' ? { ergonomiaPostazioni: (ergonomia && ergonomia.nPostazioni) || 0 } : null,
+    v2Doc: pricingVersion === 'v2' ? { ergonomiaPostazioni: (ergonomia && ergonomia.nPostazioni) || 0, ergonomiaAddetti: (ergonomia && ergonomia.nAddetti) || 0 } : null,
   });
 
   // `forchetta`+`snapshot` in risposta: solo admin (requireAuth). Servono alla UI

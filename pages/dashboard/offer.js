@@ -9,6 +9,7 @@ import {
   trafficLight, TL_COLOR, TL_BG, TL_BORDER, TYPE_LABELS, generateSummaryText, BODY_ZONES,
 } from '../../lib/scoring';
 import { calculatePricing, computeForchetta, realL1L2FromAssessment, calculateROI, fmt } from '../../lib/calculator';
+import { ergonomiaDaColloquio } from '../../lib/pricing/v2';
 import { CONFIG } from '../../lib/config';
 
 // ─── Firma standard ───────────────────────────────────────────────────────────
@@ -763,9 +764,8 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         // dentro/fuori — vista admin, non nel PDF cliente.
         const sectorKey = fmd.step1?.sector || (client?.sector === 1 ? 'manufacturing' : 'services');
         l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
-        if (s2.ergonomia_ufficio != null || s2.ergonomia_postazioni != null) {
-          ergonomiaV2 = { nUfficio: parseInt(s2.ergonomia_ufficio) || 0, nPostazioni: parseInt(s2.ergonomia_postazioni) || 0 };
-        }
+        // Lettura unica (lib/pricing/v2): stessi numeri della Stima e del Report.
+        ergonomiaV2 = ergonomiaDaColloquio(s2, fmN);
         const fch = computeForchetta({ n: fmN, sector: sectorKey, l2Mult, pricingVersion, v2Params, ergonomia: ergonomiaV2, ...schedaDefaults });
         if (fch.min.price_y1 != null) forchetta = { min: fch.min.price_y1, avg: fch.avg.price_y1, max: fch.max.price_y1 };
       }

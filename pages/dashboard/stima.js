@@ -40,6 +40,7 @@ export default function StimaPage() {
       // v2: input ergonomia + prodotto (la versione del listino resta risolta
       // server-side dal clientId; questi sono solo input di calcolo)
       ergonomiaUfficio: q.ergu != null ? Number(q.ergu) : undefined,
+      ergonomiaAddetti: q.erga != null ? Number(q.erga) : undefined,
       ergonomiaPostazioni: q.ergp != null ? Number(q.ergp) : undefined,
       tipoProdotto: q.prodotto === 'pacchetto_prevenzione' ? 'pacchetto_prevenzione' : undefined,
       store,

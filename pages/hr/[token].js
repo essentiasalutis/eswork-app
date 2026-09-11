@@ -61,12 +61,12 @@ export default function HrIngressoPage() {
 
   async function submit(e) {
     e.preventDefault();
-    if (!nome.trim()) return;
+    if (!nome.trim() || !data || !area) return;
     setBusy(true); setMsg(null);
     try {
       const r = await fetch('/api/hr/ingresso', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, nome: nome.trim(), data_ingresso: data || null, area: area || null }),
+        body: JSON.stringify({ token, nome: nome.trim(), data_ingresso: data, area }),
       });
       const j = await r.json();
       setMsg({ ok: !!j.ok, text: j.message || (j.ok ? 'Ingresso registrato. Grazie.' : 'Non è stato possibile registrare l\'ingresso, riprova.') });
@@ -114,7 +114,7 @@ export default function HrIngressoPage() {
               <input value={nome} onChange={e => setNome(e.target.value)} className={inputCls} placeholder="Nome del nuovo ingresso" />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Data di ingresso</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Data di ingresso *</label>
               <input type="date" value={data} onChange={e => setData(e.target.value)} className={inputCls} />
             </div>
             <div>
@@ -127,7 +127,7 @@ export default function HrIngressoPage() {
               </div>
               <p className="text-[11px] text-gray-400 mt-1">Serve a preparare la consulenza ergonomica sulla sua postazione.</p>
             </div>
-            <button type="submit" disabled={busy || !nome.trim() || !area} className="w-full py-3.5 rounded-2xl bg-green-600 text-white font-bold disabled:opacity-50">
+            <button type="submit" disabled={busy || !nome.trim() || !data || !area} className="w-full py-3.5 rounded-2xl bg-green-600 text-white font-bold disabled:opacity-50">
               {busy ? 'Invio…' : 'Registra ingresso'}
             </button>
             {msg && (

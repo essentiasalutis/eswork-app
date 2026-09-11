@@ -16,7 +16,13 @@ export default async function handler(req, res) {
   try {
     const b = req.body || {};
     const nome = typeof b.nome === 'string' ? b.nome.trim() : '';
-    if (!nome || !b.token) return res.status(200).json({ ok: false, message: NEUTRO_ERR });
+    // Data OBBLIGATORIA dal canale HR: una persona senza data non risulta mai
+    // "nuovo ingresso" (isNuovoIngresso richiede data_ingresso > avvio programma)
+    // e resterebbe fuori, in silenzio, da formazione ed ergonomia. L'admin può
+    // ancora inserire senza data: lì servono anche i dipendenti già presenti.
+    const dataOk = typeof b.data_ingresso === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.data_ingresso)
+      && !Number.isNaN(Date.parse(b.data_ingresso));
+    if (!nome || !b.token || !dataOk) return res.status(200).json({ ok: false, message: NEUTRO_ERR });
 
     const client_id = await resolveHrToken(b.token);
     if (!client_id) return res.status(200).json({ ok: false, message: NEUTRO_ERR }); // invalido/revocato/altra azienda: identico
@@ -28,7 +34,7 @@ export default async function handler(req, res) {
     // duplicato) è consumato SOLO server-side; all'HR non torna nulla di specifico.
     await aggiungiDipendente(client_id, {
       nome,
-      data_ingresso: b.data_ingresso || null,
+      data_ingresso: b.data_ingresso,
       identificativo_hr: typeof b.identificativo_hr === 'string' && b.identificativo_hr.trim() ? b.identificativo_hr.trim() : null,
       // area (ufficio/reparto): decide i minuti di ergonomia del nuovo ingresso.
       // Valori ammessi fissi; qualunque altro valore viene ignorato, mai inoltrato.

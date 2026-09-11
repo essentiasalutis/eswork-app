@@ -161,6 +161,11 @@ export default function PricingV2Page() {
                   onBlur={e => { const v = e.target.value; if ((texts.costo_giornata_assenza ?? '') !== v && +v > 0) put({ tipo: 'setting', key: 'costo_giornata_assenza', value: v }, 'costo giornata salvato'); }} />
               </label>
             </div>
+            <label className="block text-xs text-gray-500 max-w-xs mt-3">Scarto Livello 2 — soglia di avviso (punti %)
+              <input type="number" min="1" max="100" step="1" defaultValue={texts.scarto_l2_soglia ?? ''} placeholder="15" className={`${inputCls} mt-1`}
+                onBlur={e => { const v = e.target.value; if ((texts.scarto_l2_soglia ?? '') !== v && +v >= 1 && +v <= 100) put({ tipo: 'setting', key: 'scarto_l2_soglia', value: v }, 'soglia salvata'); }} />
+            </label>
+            <p className="text-[11px] text-gray-400 mt-2">Scarto = differenza tra il Livello 2 osservato nel check-up e quello usato dal prezzo (Livello 1 × moltiplicatore). Oltre la soglia ti avviso prima di presentare e sull&apos;Offerta; il prezzo non cambia.</p>
             <p className="text-[11px] text-gray-400 mt-2">Compaiono sempre in chiaro nella frase («ipotizzando un&apos;incidenza del 10%», «un costo stimato di €160 per giornata»). Solo risparmio lordo, mai al netto del prezzo. Senza i giorni di malattia dal colloquio la leva non si mostra.</p>
           </div>
 

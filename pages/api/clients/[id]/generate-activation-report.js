@@ -182,7 +182,7 @@ VIETATO raccomandare al cliente attività che sono GIÀ comprese nell'investimen
   const vincoliV2 = isV2 ? `
 VINCOLI TASSATIVI SUL TESTO:
 - MAI cifre in euro accanto alle singole voci o componenti del programma: le uniche cifre in euro sono l'investimento (Anno 1 e Anno 2 indicativo).
-- MAI inventare quantità (giornate, sessioni, cicli, sedute, postazioni, addetti, report) che non trovi nei dati forniti: usa SOLO quelle che ti vengono passate.
+- MAI inventare quantità (giornate, sessioni, cicli, sedute, postazioni, addetti, report) che non trovi nei dati forniti: usa SOLO quelle che ti vengono passate, con la LORO unità (persone in ufficio restano persone, postazioni tipo restano postazioni: mai «40 postazioni» se il dato è «40 persone»).
 - MAI espressioni come "in omaggio", "compreso gratuitamente", "gratis".
 - MAI "AI" o "intelligenza artificiale" nel nome della piattaforma (si chiama solo "Piattaforma digitale ES Work").
 - MAI i termini Core, Plus, Enterprise, "tier", "modello Core/Plus/Enterprise": sono nomi INTERNI, non ti vengono forniti e non vanno inventati. Il prodotto si chiama SOLO "${nomeProdotto}".` : '';
@@ -211,7 +211,7 @@ PRINCIPIO GUIDA: la stratificazione è la fotografia dello stato della popolazio
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
-      max_tokens: 2000,
+      max_tokens: 4000,
       messages: [{
         role: 'user',
         content: `Sei un consulente clinico di ES Work (Essentia Salutis). Genera un Report di Attivazione professionale per un'azienda cliente.
@@ -243,6 +243,7 @@ ${isPacchetto
   : '(5 step operativi con timeframe indicativo)'}
 ${parametriOperativi}${vincoliV2}${istruzioniPacchetto}
 ${firmato ? '' : 'STATO (tassativo): il contratto NON è ancora firmato, questo report PROPONE il programma. VIETATO scrivere che il programma è stato attivato, avviato, erogato o che è operativo, e VIETATO citare sessioni già svolte: scrivi «programma proposto», «si propone di attivare».\n'}IDENTITÀ PROFESSIONALE (tassativa): il servizio è OSTEOPATICO. Usa sempre "osteopata", "trattamento osteopatico", "sportello osteopatico". VIETATO "fisioterapista", "fisioterapico", "riabilitativo/riabilitazione" e ogni termine fisioterapico riferito al nostro servizio. VIETATO anche presentare il servizio come atto medico o come medicina del lavoro: mai "medicina osteopatica", "medico", "sanitario", "medicina del lavoro", "sorveglianza sanitaria" riferiti a noi. La sorveglianza sanitaria resta del Medico Competente aziendale; noi siamo un programma osteopatico di prevenzione e trattamento, distinto e complementare.
+RISULTATI CLINICI (tassativo): MAI promettere risultati clinici — niente «risolvere», «eliminare», «guarire» il dolore o la sintomatologia. Il programma promette presa in carico e misura: scrivi «trattare», «prendere in carico», «monitorare».
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.${sezioneComprende ? '\nCOMPONENTI: NON scrivere una sezione con l\'elenco delle componenti del programma né le loro quantità (niente «Cosa include» / «Cosa comprende»): la inserisce il sistema con i testi approvati.' : ''}
 DATA: se includi un'intestazione con il riepilogo del cliente, riporta "Data: ${dataOggi}". Usa ESATTAMENTE questa data; non inventarne altre né citare altre date nel testo.
@@ -250,6 +251,8 @@ Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole tota
       }],
     });
 
+    // Testo troncato (visto l'11/9: "Prossimi Passi" finiva a metà frase) → meglio il testo di riserva.
+    if (message.stop_reason === 'max_tokens') throw new Error('testo dell\'AI troncato: troppo lungo');
     const report = conNota(inserisciCosaComprende(message.content[0]?.text || '', sezioneComprende));
     const pdfUrl = await tryGeneratePdf(client, 'activation', report, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);

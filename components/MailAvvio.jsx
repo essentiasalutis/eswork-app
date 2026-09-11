@@ -9,14 +9,15 @@ export default function MailAvvio({ client, onClose, onDataSalvata }) {
   const [to, setTo] = useState(client.contact_email || '');
   const [dataAvvio, setDataAvvio] = useState(client.data_avvio_programma || '');
   const [prenotazione, setPrenotazione] = useState('');
+  const [variante, setVariante] = useState(client.binario === 'A' ? 'A' : 'B');
   const [contatto, setContatto] = useState([client.contact_name, client.contact_email ? `(${client.contact_email})` : ''].filter(Boolean).join(' '));
   const [corpo, setCorpo] = useState('');
   const [msg, setMsg] = useState('');
 
   const generato = useMemo(() => {
-    const kit = testoKitAvvio({ dataAvvio, prenotazione, contatto, firma: firmaKit({ referente: client.contact_name, azienda: client.name }) });
+    const kit = testoKitAvvio({ variante, dataAvvio, prenotazione, contatto, firma: firmaKit({ referente: client.contact_name, azienda: client.name }) });
     return testoMailAvvio({ referente: client.contact_name, azienda: client.name, kit });
-  }, [dataAvvio, prenotazione, contatto, client.contact_name, client.name]);
+  }, [variante, dataAvvio, prenotazione, contatto, client.contact_name, client.name]);
   // Cambiando un campo il testo si ricompone (le correzioni fatte a mano si perdono).
   useEffect(() => { setCorpo(generato.corpo); }, [generato]);
 
@@ -56,6 +57,12 @@ export default function MailAvvio({ client, onClose, onDataSalvata }) {
         <label className="block text-xs font-semibold text-gray-500">Per qualsiasi domanda (contatto per i dipendenti)
           <input value={contatto} onChange={e => setContatto(e.target.value)} className={`${inputCls} mt-1 font-normal`} />
         </label>
+        <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
+          <span className="font-semibold">Tono:</span>
+          {[['A', 'diretto (A — «Ciao a tutti»)'], ['B', 'istituzionale (B — «Gentili colleghe e colleghi»)']].map(([v, l]) => (
+            <button key={v} onClick={() => setVariante(v)} className={`px-2.5 py-1 rounded-lg font-semibold ${variante === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'}`}>{l}</button>
+          ))}
+        </div>
         <div>
           <div className="text-xs font-semibold text-gray-500 mb-1">Oggetto: <span className="font-normal text-gray-700">{generato.oggetto}</span></div>
           <textarea value={corpo} onChange={e => setCorpo(e.target.value)} rows={14} className={`${inputCls} font-mono text-xs resize-y`} />

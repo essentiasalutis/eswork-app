@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../../lib/auth';
 import { etichettaData } from '../../../lib/checkup';
+import { testoScartoLivello2 } from '../../../lib/offerta';
 
 // Presentazione del Report di Attivazione (punto 7) — a schermo, nell'ordine di Enrico:
 // fotografia → stratificazione → piano → preventivo dentro la forbice → leve (prima
@@ -204,6 +205,7 @@ export default function PresentazionePage({ d }) {
     else if (d.inRange === false) righe.push(['warn', `Fuori forbice: ${eur(d.prezzo.y1)} contro ${eur(d.forchetta.min)} – ${eur(d.forchetta.max)}. Prepara la motivazione: la schermata del preventivo lo mostra.`]);
     else righe.push(['info', 'Nessuna Stima di riferimento: la schermata del preventivo mostra solo il prezzo.']);
     righe.push(d.vista.pubblicabile ? ['ok', `${d.checkup.risposte} risposte al check-up.`] : ['warn', 'Meno di 5 risposte: fotografia e stratificazione non mostrano dati.']);
+    if (d.scartoL2) righe.push([d.scartoL2.sopra ? 'warn' : 'info', testoScartoLivello2(d.scartoL2)]);
     if (d.checkup.stato === 'aperto') righe.push(['warn', `Il check-up è ancora aperto${d.checkup.chiude_il ? ` (chiude il ${etichettaData(d.checkup.chiude_il)})` : ''}: i numeri possono ancora cambiare.`]);
     righe.push(['info', d.leve.sostenibilita ? 'Binario B: inclusa la schermata «Standard e sostenibilità».' : 'La schermata «Standard e sostenibilità» è esclusa (solo per il binario B).']);
     const icona = { ok: '✓', warn: '⚠', info: 'ℹ' };

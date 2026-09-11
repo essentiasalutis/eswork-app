@@ -10,7 +10,7 @@ import {
 import { calculatePricing, fmt } from '../../lib/calculator';
 import { CONFIG } from '../../lib/config';
 import { oggiRoma, aggiungiGiorni } from '../../lib/checkup';
-import { finoAl, fraseValidita } from '../../lib/offerta';
+import { finoAl, fraseValidita, scartoLivello2, testoScartoLivello2 } from '../../lib/offerta';
 import { normalizza } from '../../lib/pipeline';
 import { VOCI_PROGRAMMA, RIGA_CHIUSURA, quantitaPrimoAnno } from '../../lib/programma';
 import { vistaRiservata, K_ANON, SUPPRESSED } from '../../lib/kanon';
@@ -112,7 +112,7 @@ function Page({ children, className = '' }) {
 
 // ─── Offer Document ───────────────────────────────────────────────────────────
 
-export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, date, offertaGiorniA = 10 }) {
+export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, date, offertaGiorniA = 10, scartoL2 = null }) {
   const [emailModal, setEmailModal] = useState(null);
   const [scadenza, setScadenza] = useState(() => scadenzaIniziale(client, offertaGiorniA));
   const [esitoInvio, setEsitoInvio] = useState(null); // { ok, testo }
@@ -323,6 +323,9 @@ ${FIRMA}`;
           </div>
         )}
 
+        {scartoL2 && scartoL2.sopra && (
+          <div className="mt-2 rounded-xl px-4 py-2.5 text-xs border bg-amber-50 border-amber-300 text-amber-900">⚠ <strong>Solo per te:</strong> {testoScartoLivello2(scartoL2)}</div>
+        )}
         <div className="mt-2"><ArgomentarioVoci /></div>
 
         {/* Confronto con la stima del colloquio — SOLO vista admin, mai nel PDF */}
@@ -804,7 +807,8 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
   const { assessmentId, clientId, n, l1, l2 } = q;
   const custom = readPricingParams(q);
   let offertaGiorniA = 10;
-  try { offertaGiorniA = (await (await import('../../lib/org')).getOrgParams()).offertaGiorniA; } catch (_) {}
+  let scartoL2Soglia = 15;
+  try { ({ offertaGiorniA, scartoL2Soglia } = await (await import('../../lib/org')).getOrgParams()); } catch (_) {}
 
   // MODALITÀ PREVENTIVO da scheda colloquio: clientId + numeri stimati, nessun assessment
   if (!assessmentId && clientId) {
@@ -841,6 +845,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     const d = await datiOffertaDaCheckup({ assessmentId, n, l1, l2, custom });
     if (!d) return { notFound: true };
     const { client, assessment, nmq, calc, forchetta } = d;
+    const scartoL2 = scartoLivello2({ nmq, calc, dipendenti: client && client.employees, l2Mult: d.l2Mult, soglia: scartoL2Soglia });
     const roi = null; // ROI only from calculator (requires absence days input)
 
     return {
@@ -853,6 +858,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         forchetta,
         date: today(),
         offertaGiorniA,
+        scartoL2,
       },
     };
   } catch (e) {

@@ -30,9 +30,14 @@ export default function NavMenu({ pendingAcuteCount = 0, onLogout }) {
   // Messaggi dalle aziende non ancora letti: il menu lo chiede da solo, così il
   // contatore compare su ogni pagina della dashboard senza toccarle una per una.
   useEffect(() => {
-    fetch('/api/admin/comunicazioni?solo=conteggio')
+    const aggiorna = () => fetch('/api/admin/comunicazioni?solo=conteggio')
       .then(r => (r.ok ? r.json() : null)).then(j => { if (j && Number.isFinite(j.nonLette)) setNonLette(j.nonLette); })
       .catch(() => {});
+    aggiorna();
+    // La pagina Comunicazioni avvisa quando si legge un messaggio: il pallino si
+    // aggiorna subito, senza aspettare il cambio di pagina.
+    window.addEventListener('comunicazioni:aggiornate', aggiorna);
+    return () => window.removeEventListener('comunicazioni:aggiornate', aggiorna);
   }, [router.pathname]);
 
   // Close on outside click

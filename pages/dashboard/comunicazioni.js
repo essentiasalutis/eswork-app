@@ -30,6 +30,7 @@ export default function ComunicazioniPage() {
     if (!r.ok) { const j = await r.json().catch(() => ({})); setErr(j.error || 'Errore'); return; }
     const up = await r.json();
     setItems(prev => prev.map(x => (x.id === id ? { ...x, ...up } : x)));
+    window.dispatchEvent(new Event('comunicazioni:aggiornate')); // pallino del menu
   }
 
   function apri(c) {

@@ -22,6 +22,18 @@ const seg = (val, cur, set, label) => (
   <button key={val} type="button" onClick={() => set(val)}
     className={`flex-1 py-2.5 px-2 text-sm font-semibold rounded-xl transition-colors ${cur === val ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{label}</button>
 );
+// Divide i dipendenti in k sedi (parti uguali, il resto alle prime): usata dall'intake
+// telefonico, dove si chiede solo "quante sedi". Nel colloquio completo si correggono una per una.
+function dividiSedi(tot, k, prev = []) {
+  const n = Math.max(0, parseInt(tot) || 0), m = Math.max(1, parseInt(k) || 1);
+  const base = Math.floor(n / m), resto = n % m;
+  return Array.from({ length: m }, (_, i) => ({
+    nome: (prev[i] && prev[i].nome) || (i === 0 ? 'Sede principale' : `Sede ${i + 1}`),
+    employees: base + (i < resto ? 1 : 0),
+  }));
+}
+const RUOLI_DECISORE = ['Titolare', 'Responsabile HR', 'Direzione', 'Altro'];
+
 function Field({ label, hint, children }) {
   return <div><label className="block text-sm font-semibold text-gray-700 mb-1">{label}</label>{hint && <p className="text-xs text-gray-400 mb-1.5">{hint}</p>}{children}</div>;
 }
@@ -36,7 +48,7 @@ function Toggle({ checked, onChange, label }) {
   );
 }
 
-export default function FirstMeetingScheda({ client: initialClient, meeting, v2Params }) {
+export default function FirstMeetingScheda({ client: initialClient, meeting, v2Params, modoIniziale = 'completo' }) {
   const router = useRouter();
   const d = meeting?.data || {};
   const s1 = d.step1 || {}, s2 = d.step2 || {}, s3 = d.step3 || {}, sp = d.params || {};
@@ -46,6 +58,9 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
 
   const [clientId, setClientId] = useState(initialClient?.id || null);
   const [step, setStep] = useState(1);
+  // Intake telefonico ('rapido') = una schermata con i sei dati per la Stima; stessi dati e
+  // stesso salvataggio del colloquio completo, che al primo incontro li ritrova compilati.
+  const [modo, setModo] = useState(modoIniziale);
   const [savedAt, setSavedAt] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -158,7 +173,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
     if (!res.ok) return null;
     const c = await res.json();
     setClientId(c.id);
-    router.replace(`/dashboard/first-meeting?clientId=${c.id}`, undefined, { shallow: true });
+    router.replace(`/dashboard/first-meeting?clientId=${c.id}${modo === 'rapido' ? '&modo=rapido' : ''}`, undefined, { shallow: true });
     return c.id;
   }
 
@@ -176,6 +191,15 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
     if (!silent) setBusy(false);
     return true;
   }
+
+  // Intake telefonico: crea l'azienda da sola appena ci sono nome e dipendenti, poi
+  // l'autosave qui sotto la aggiorna. Al telefono non si deve ricordare di premere "Salva".
+  useEffect(() => {
+    if (modo !== 'rapido' || clientId || nome.trim().length < 2 || n <= 0) return;
+    const t = setTimeout(() => save({ silent: true }), 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modo, clientId, nome, n]);
 
   // Autosave debounce (solo se cliente già creato)
   const firstRender = useRef(true);
@@ -238,12 +262,18 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           </Link>
           <div className="flex-1 min-w-0">
-            <div className="font-semibold text-gray-900 truncate">Scheda colloquio</div>
+            <div className="font-semibold text-gray-900 truncate">{modo === 'rapido' ? 'Intake telefonico' : 'Scheda colloquio'}</div>
             <div className="text-xs text-gray-500">{nome || 'Nuova azienda'}{savedAt && <span className="text-green-600 ml-2">✓ salvato</span>}</div>
           </div>
           <NavMenu />
         </div>
-        <div className="max-w-2xl mx-auto px-5 pb-3 flex gap-2">
+        <div className="max-w-2xl mx-auto px-5 pb-2 flex gap-1 text-xs">
+          {[['rapido', '📞 Telefonata'], ['completo', '📋 Colloquio completo']].map(([v, l]) => (
+            <button key={v} type="button" onClick={() => { setModo(v); if (v === 'completo') setStep(1); }}
+              className={`px-3 py-1.5 rounded-lg font-semibold ${modo === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
+          ))}
+        </div>
+        <div className={`max-w-2xl mx-auto px-5 pb-3 flex gap-2 ${modo === 'rapido' ? 'hidden' : ''}`}>
           {STEPS.map((label, i) => (
             <button key={i} onClick={() => goStep(i + 1)} className={`flex-1 text-left ${step === i + 1 ? '' : 'opacity-60'}`}>
               <div className={`h-1.5 rounded-full mb-1 ${i + 1 <= step ? 'bg-green-500' : 'bg-gray-200'}`} />
@@ -254,8 +284,65 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
       </header>
 
       <main className="max-w-2xl mx-auto px-5 py-5 space-y-5">
+        {modo === 'rapido' && (
+          <div className="space-y-5">
+            <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+              I dati per la Stima, mentre sei al telefono. Si salvano da soli. Il resto lo completi al primo incontro nel colloquio completo, dove ritrovi già compilato quello che scrivi qui.
+            </p>
+            <Field label="Nome azienda *"><input value={nome} onChange={e => setNome(e.target.value)} placeholder="Es. Acme S.p.A." className={inputCls} /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Dipendenti *">
+                <input type="number" min="1" value={n || ''} onChange={e => setSedi(dividiSedi(e.target.value, sedi.length, sedi))} className={inputCls} />
+              </Field>
+              <Field label="Settore *">
+                <select value={sector} onChange={e => setSector(e.target.value)} className={inputCls}>
+                  {SECTORS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </Field>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="Di cui in reparto" hint={`in ufficio: ${nErgUfficio}`}>
+                <input type="number" min="0" value={ergAddetti} onChange={e => setErgAddetti(e.target.value)} className={inputCls} />
+              </Field>
+              <Field label="Sedi" hint="dipendenti divisi in parti uguali">
+                <input type="number" min="1" value={sedi.length} onChange={e => setSedi(dividiSedi(n, e.target.value, sedi))} className={inputCls} />
+              </Field>
+              <Field label="Postazioni tipo" hint="di reparto">
+                <input type="number" min="0" value={ergPostazioni} onChange={e => setErgPostazioni(e.target.value)} className={inputCls} />
+              </Field>
+            </div>
+            <Field label="Giorni di malattia l'anno" hint="se li conoscono">
+              <input type="number" min="0" value={absenceDays} onChange={e => { setAbsenceDays(e.target.value); setAssenteismo(e.target.value !== '' && +e.target.value > 0); }} className={inputCls} />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Decisore — nome"><input value={refNome} onChange={e => setRefNome(e.target.value)} className={inputCls} /></Field>
+              <Field label="Ruolo">
+                <select value={refRuolo} onChange={e => setRefRuolo(e.target.value)} className={inputCls}>
+                  <option value="">—</option>
+                  {[...RUOLI_DECISORE, ...(refRuolo && !RUOLI_DECISORE.includes(refRuolo) ? [refRuolo] : [])].map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </Field>
+            </div>
+            <Field label="Email del referente" hint="serve per inviare la Stima"><input type="email" value={refEmail} onChange={e => setRefEmail(e.target.value)} className={inputCls} /></Field>
 
-        {step === 1 && (
+            {n > 0 && (
+              <div className="bg-green-600 rounded-2xl p-5 text-white">
+                <div className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-1">Stima di investimento — Anno 1</div>
+                <div className="text-3xl font-bold">{fmt(forchetta.min.price_y1)} – {fmt(forchetta.max.price_y1)}</div>
+                <div className="text-sm opacity-90 mt-1">scenario medio {fmt(forchetta.avg.price_y1)} · si aggiorna mentre scrivi</div>
+              </div>
+            )}
+            {isV2 && forchetta?.avg?.y1?.ergonomia_sotto_minimo && (
+              <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">⚠ Ergonomia sotto il minimo fatturabile ({v2Params?.ergonomia_minimo_ore ?? 4}h): accorpare ad altra attività in sede.</div>
+            )}
+            <button onClick={goToStima} disabled={!nome.trim() || n <= 0}
+              className="w-full py-3.5 rounded-2xl bg-green-600 text-white font-bold disabled:opacity-50">Genera Stima di investimento →</button>
+            <button type="button" onClick={() => { setModo('completo'); setStep(1); window.scrollTo({ top: 0 }); }}
+              className="w-full py-3 rounded-2xl border border-gray-300 text-gray-700 font-semibold">Continua col colloquio completo →</button>
+          </div>
+        )}
+
+        {modo === 'completo' && step === 1 && (
           <div className="space-y-5">
             <Field label="Nome azienda *"><input value={nome} onChange={e => setNome(e.target.value)} placeholder="Es. Acme S.p.A." className={inputCls} /></Field>
             <div className="grid grid-cols-2 gap-3">
@@ -289,7 +376,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
           </div>
         )}
 
-        {step === 2 && (
+        {modo === 'completo' && step === 2 && (
           <div className="space-y-5">
             <Field label="Sedi operative" hint="Numero dipendenti per sede (il totale alimenta tier e calcolo)">
               <div className="space-y-2">{sedi.map((s, i) => (
@@ -351,7 +438,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
           </div>
         )}
 
-        {step === 3 && (
+        {modo === 'completo' && step === 3 && (
           <div className="space-y-5">
             <Field label="Avete uno spazio in sede per lo sportello? *">
               <div className="flex flex-col gap-2">{[['dedicata', 'Sì, stanza dedicata'], ['condivisa', 'Sì, sala condivisa'], ['da_trovare', 'No, da trovare']].map(([v, l]) => (
@@ -378,7 +465,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
           </div>
         )}
 
-        {step === 4 && (
+        {modo === 'completo' && step === 4 && (
           <div className="space-y-4">
             {n <= 0 ? (
               <div className="text-center text-gray-400 py-8 text-sm">Inserisci i dipendenti nello Step 2 per calcolare il preventivo.</div>
@@ -507,8 +594,11 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
   const { clientId } = ctx.query;
   // Parametri v2 sempre in props: un'azienda nuova (senza record) nasce v2.
   const { params: v2Params } = await getPricingSettingsV2();
-  if (!clientId) return { props: { client: null, meeting: null, v2Params } };
+  // Modalità: ?modo=rapido esplicito, altrimenti azienda nuova → intake telefonico,
+  // azienda esistente → colloquio completo (si cambia dall'interruttore in alto).
+  const modoIniziale = ctx.query.modo === 'rapido' || !clientId ? 'rapido' : 'completo';
+  if (!clientId) return { props: { client: null, meeting: null, v2Params, modoIniziale } };
   const [client, meeting] = await Promise.all([getClientById(clientId), getFirstMeeting(clientId)]);
   if (!client) return { notFound: true };
-  return { props: { client, meeting: meeting || null, v2Params } };
+  return { props: { client, meeting: meeting || null, v2Params, modoIniziale } };
 });

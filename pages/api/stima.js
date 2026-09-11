@@ -48,9 +48,11 @@ export default requireAuth(async function handler(req, res) {
   // body/query). Prospect senza record → 'v2' (le nuove aziende nascono v2);
   // cliente esistente senza colonna/valore → fail-safe 'v1'.
   let pricingVersion = 'v2';
+  let referente = null; // per la mail "Invia al referente" (endpoint solo admin)
   if (b.clientId) {
     const client = await getClientById(b.clientId).catch(() => null);
     pricingVersion = client?.pricing_version || 'v1';
+    if (client) referente = { nome: client.contact_name || null, email: client.contact_email || null };
   }
 
   // Parametri v2 (override admin dal DB) + input ergonomia dal colloquio.
@@ -81,13 +83,13 @@ export default requireAuth(async function handler(req, res) {
       naming: settingsV2?.texts?.naming_cliente_pacchetto_prevenzione,
       sector_label: SECTOR_LABELS[sector] || '—',
     });
-    if (!b.store) return res.json({ ok: true, pacchetto, html: pHtml, snapshot });
-    if (!process.env.BLOB_READ_WRITE_TOKEN) return res.json({ ok: true, pacchetto, html: pHtml, url: null, snapshot, message: 'Storage PDF non configurato — usa Stampa per salvare in PDF' });
+    if (!b.store) return res.json({ ok: true, referente, pacchetto, html: pHtml, snapshot });
+    if (!process.env.BLOB_READ_WRITE_TOKEN) return res.json({ ok: true, referente, pacchetto, html: pHtml, url: null, snapshot, message: 'Storage PDF non configurato — usa Stampa per salvare in PDF' });
     try {
       const { url } = await generateAndStorePdf(pHtml, `stima_pacchetto_${b.clientId || 'x'}_${Date.now()}.pdf`, 'quotes');
-      return res.json({ ok: true, pacchetto, url, html: pHtml, snapshot });
+      return res.json({ ok: true, referente, pacchetto, url, html: pHtml, snapshot });
     } catch (e) {
-      return res.json({ ok: true, pacchetto, html: pHtml, url: null, snapshot, error: `PDF non generato: ${e.message}` });
+      return res.json({ ok: true, referente, pacchetto, html: pHtml, url: null, snapshot, error: `PDF non generato: ${e.message}` });
     }
   }
 
@@ -120,17 +122,17 @@ export default requireAuth(async function handler(req, res) {
   // `forchetta`+`snapshot` in risposta: solo admin (requireAuth). Servono alla UI
   // colloquio (dettaglio + label "ANTEPRIMA — forbice non impegnata" quando
   // store=false e snapshot NULL); il documento cliente resta le tre cifre.
-  if (!b.store) return res.json({ ok: true, html, forchetta: forchettaOut, snapshot });
+  if (!b.store) return res.json({ ok: true, referente, html, forchetta: forchettaOut, snapshot });
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return res.json({ ok: true, html, url: null, forchetta: forchettaOut, snapshot, message: 'Storage PDF non configurato — usa Stampa per salvare in PDF' });
+    return res.json({ ok: true, referente, html, url: null, forchetta: forchettaOut, snapshot, message: 'Storage PDF non configurato — usa Stampa per salvare in PDF' });
   }
   try {
     const filename = `stima_${b.clientId || 'x'}_${Date.now()}.pdf`;
     const { url } = await generateAndStorePdf(html, filename, 'quotes');
-    return res.json({ ok: true, url, html, forchetta: forchettaOut, snapshot });
+    return res.json({ ok: true, referente, url, html, forchetta: forchettaOut, snapshot });
   } catch (e) {
     console.error('[stima]', e.message);
-    return res.json({ ok: true, html, url: null, forchetta: forchettaOut, snapshot, error: `PDF non generato: ${e.message}` });
+    return res.json({ ok: true, referente, html, url: null, forchetta: forchettaOut, snapshot, error: `PDF non generato: ${e.message}` });
   }
 });

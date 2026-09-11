@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
+import { testoMailStima } from '../../lib/stima-mail';
 
 // Pagina STIMA (pre-assessment, cliente-facing). Mostra l'output di buildQuoteHtml
 // (UNICA fonte) in un iframe stampabile, con Scarica PDF (server). I numeri della
@@ -65,6 +66,26 @@ export default function StimaPage() {
     if (w) { w.focus(); w.print(); }
   }
 
+  // "Invia al referente": genera il PDF (così la forbice diventa la promessa fatta
+  // al cliente) e apre la posta di Enrico con il testo pronto. Testo = paragrafo
+  // "Stima di investimento" della mail di riepilogo di Enrico; al punto 4 del funnel
+  // verrà sostituito dalla mail di riepilogo completa (check-up, date, kit).
+  async function inviaAlReferente() {
+    setBusy(true); setErr('');
+    try {
+      const r = await fetch('/api/stima', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildBody(true)) });
+      const j = await r.json();
+      setSnapMeta(j.snapshot ?? snapMeta);
+      if (j.html) setHtml(j.html);
+      if (!j.ok) { setErr(j.error || 'Stima non generata'); setBusy(false); return; }
+      const ref = j.referente || {};
+      const { oggetto, corpo } = testoMailStima({ azienda: q.name, referente: ref.nome || q.contact, forchetta: j.forchetta, pacchetto: j.pacchetto, url: j.url });
+      if (!j.url) setErr(j.message || j.error || 'PDF non disponibile: allegalo alla mail dopo averlo salvato con Stampa.');
+      window.location.href = `mailto:${encodeURIComponent(ref.email || '')}?subject=${encodeURIComponent(oggetto)}&body=${encodeURIComponent(corpo)}`;
+    } catch { setErr('Errore di rete'); }
+    setBusy(false);
+  }
+
   async function scaricaPdf() {
     setBusy(true); setErr('');
     try {
@@ -88,6 +109,7 @@ export default function StimaPage() {
             <div className="flex items-center gap-2">
               <button onClick={stampa} disabled={!html} className="text-sm font-semibold text-gray-700 bg-gray-100 border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-200 disabled:opacity-50">🖨 Stampa</button>
               <button onClick={scaricaPdf} disabled={busy || !html} className="text-sm font-semibold text-white bg-green-600 px-4 py-2 rounded-xl hover:bg-green-700 disabled:opacity-50">{busy ? '…' : '⬇ Scarica PDF'}</button>
+              <button onClick={inviaAlReferente} disabled={busy || !html} className="text-sm font-semibold text-white bg-gray-900 px-4 py-2 rounded-xl hover:bg-gray-700 disabled:opacity-50">✉️ Invia al referente</button>
             </div>
           </div>
           {snapMeta && (() => {

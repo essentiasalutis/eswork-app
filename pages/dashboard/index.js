@@ -98,7 +98,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-lg font-semibold text-gray-800">Aziende clienti</h1>
           <button
-            onClick={() => router.push('/dashboard/first-meeting')}
+            onClick={() => router.push('/dashboard/first-meeting?modo=rapido')}
             className="bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl active:bg-green-700"
           >
             + Nuova azienda

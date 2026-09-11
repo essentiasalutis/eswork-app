@@ -401,8 +401,8 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                     <div className="bg-blue-600 rounded-2xl p-5 text-white">
                       <div className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-1">Pacchetto prevenzione — 12 mesi, non rinnovabile</div>
                       <div className="text-4xl font-bold mb-1">{fmt(pacchetto.price)}</div>
-                      <div className="text-sm opacity-90">Formazione {fmt(pacchetto.training.sell)} · Ergonomia {fmt(pacchetto.ergonomia.sell)} · Assessment {fmt(pacchetto.assessment.sell)}</div>
-                      <div className="text-xs opacity-80 mt-1">Include assessment completo (consensi identici al programma), formazione 2 moduli, ergonomia. ESCLUDE cicli L1, prevenzione L2 e buffer clinico.</div>
+                      <div className="text-sm opacity-90">Formazione {fmt(pacchetto.training.sell)} · Ergonomia {fmt(pacchetto.ergonomia.sell)} · Check-up {fmt(pacchetto.assessment.sell)}</div>
+                      <div className="text-xs opacity-80 mt-1">Include check-up completo (consensi identici al programma), formazione 2 moduli, ergonomia. ESCLUDE cicli L1, prevenzione L2 e buffer clinico.</div>
                     </div>
                     {pacchetto.ergonomia_sotto_minimo && (
                       <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">⚠ Ergonomia sotto il minimo fatturabile: accorpare ad altra attività in sede (solo avviso).</div>
@@ -445,13 +445,13 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                 </div>
 
                 <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-                  <div className="text-xs font-semibold text-blue-600 uppercase tracking-widest mb-1">Stima Anno 2+</div>
+                  <div className="text-xs font-semibold text-blue-600 uppercase tracking-widest mb-1">Anno 2 e successivi (indicativo)</div>
                   <div className="text-2xl font-bold text-blue-700">{fmt(calc.price_y2)}</div>
                   <div className="text-xs text-blue-500 mt-1">Formazione 1 modulo · nuovi L1 trattati{tierIncludesL2Prevention(tier) ? ' · L2 in prevenzione' : ''}</div>
                 </div>
 
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 leading-relaxed">
-                  <strong>Clausola di adeguamento:</strong> il corrispettivo è confermato dopo l'assessment. Se i L1 reali sono ≤ scenario medio ({scen.avg.l1}) → resta al valore medio ({fmt(calcAvg.price_y1)}); se superiori → sale fino al tetto massimo ({fmt(calcMax.price_y1)}), eccedenza al canale B2C/welfare.
+                  <strong>Clausola di adeguamento:</strong> il corrispettivo è confermato dopo il check-up. Se i L1 reali sono ≤ scenario medio ({scen.avg.l1}) → resta al valore medio ({fmt(calcAvg.price_y1)}); se superiori → sale fino al tetto massimo ({fmt(calcMax.price_y1)}), eccedenza al canale B2C/welfare.
                 </div>
 
                 {roi && (
@@ -474,7 +474,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                         <div>
                           <label className="text-[11px] text-gray-500 mb-1 flex items-center gap-1">
                             Moltiplicatore L2 (da tarare)
-                            <span title="Stima dei Livello 2 attesi = L1 attesi × questo moltiplicatore. Incide sul preventivo SOLO per i tier Plus/Enterprise (dove i L2 ricevono prevenzione attiva); per i Core non cambia il prezzo. È un'ipotesi: il numero reale di L2 emerge dopo l'assessment NMQ."
+                            <span title="Stima dei Livello 2 attesi = L1 attesi × questo moltiplicatore. Incide sul preventivo SOLO per i tier Plus/Enterprise (dove i L2 ricevono prevenzione attiva); per i Core non cambia il prezzo. È un'ipotesi: il numero reale di L2 emerge dopo il check-up (questionario NMQ)."
                               className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold flex items-center justify-center cursor-help">?</span>
                           </label>
                           <input type="number" step="0.1" value={l2Mult} onChange={e => setL2Mult(parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" />

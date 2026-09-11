@@ -359,7 +359,7 @@ export default function ReferralsPage({ codes: initialCodes }) {
                     <tr key={u.id} className="hover:bg-gray-50">
                       <td className="px-5 py-3 font-mono text-xs text-blue-700">{c.code}</td>
                       <td className="px-4 py-3 text-gray-700">{c.clients?.name || '—'}</td>
-                      <td className="px-4 py-3 text-gray-600">{u.patient_name || <span className="text-gray-400 italic">anonimo</span>}</td>
+                      <td className="px-4 py-3 text-gray-600">{u.patient_name || <span className="text-gray-400 italic">nome non indicato</span>}</td>
                       <td className="px-4 py-3 text-center text-gray-500">{fmtDate(u.used_at)}</td>
                     </tr>
                   ))

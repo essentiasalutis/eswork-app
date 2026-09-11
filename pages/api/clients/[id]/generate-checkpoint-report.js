@@ -143,8 +143,8 @@ export default requireAuth(async function handler(req, res) {
 DATI ANNO 1 (i valori "n.d." sono soppressi per anonimato/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
 - Prevalenza osservata all'intake (${t12.t0N} risposte T0): ${t12.t0Strat}
 - Sessioni completate/pianificate: ${completed}/${planned}
-- Re-assessment a 12 mesi completati: ${t12.count}
-- Prevalenza osservata a 12 mesi (${t12.t12N} re-assessment): ${t12.t12Strat}
+- Check-up a 12 mesi completati: ${t12.count}
+- Prevalenza osservata a 12 mesi (${t12.t12N} check-up): ${t12.t12Strat}
 - Settore: ${client.sector === 1 ? 'Manifattura' : 'Servizi'}
 
 STRUTTURA (markdown, ## per titoli):
@@ -166,7 +166,8 @@ IMPORTANTE: riporta le percentuali di prevalenza ESATTAMENTE come indicate sopra
 ## Raccomandazioni per l'Anno 2
 (3-4 azioni: mantenimento, prevenzione L2, formazione avanzata)
 
-${t12.count === 0 ? 'NOTA: nessun re-assessment a 12 mesi ancora registrato — segnala che i KPI di esito saranno disponibili al completamento dei re-assessment.' : ''}
+${t12.count === 0 ? 'NOTA: nessun check-up a 12 mesi ancora registrato — segnala che i KPI di esito saranno disponibili al completamento dei check-up.' : ''}
+LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
 Tono: clinico, orientato ai risultati e alla direzione. Italiano. Max 650 parole.` : `Sei un consulente clinico ES Work. Genera un Report Intermedio professionale a ${checkLabel} per il cliente ${client.name}.
 
 DATI CLINICI (i valori "n.d." sono soppressi per anonimato/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
@@ -201,6 +202,7 @@ STRUTTURA REPORT (markdown, ## per titoli):
 ## Prossimi Passi
 (3-4 azioni per i prossimi ${checkpoint === 't3' ? '3' : '6'} mesi)
 
+LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
 Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
 
   const reportType = `checkpoint_${checkpoint}`;
@@ -328,7 +330,7 @@ function generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, 
   if (checkpoint === 't12' && t12) {
     return `## Report Annuale — ${client.name}
 
-Sintesi dei risultati del programma ES Work al termine dell'Anno 1${t12.count === 0 ? ' (re-assessment a 12 mesi non ancora completati: i KPI di esito saranno disponibili al loro completamento).' : '.'}
+Sintesi dei risultati del programma ES Work al termine dell'Anno 1${t12.count === 0 ? ' (check-up a 12 mesi non ancora completati: i KPI di esito saranno disponibili al loro completamento).' : '.'}
 
 ## I tre KPI di risultato
 
@@ -347,7 +349,7 @@ Elementi per la richiesta di riduzione del tasso (modello OT23): ${completed} in
 1. Mantenimento dei risultati per i dipendenti trattati
 2. Prevenzione attiva per i L2 idonei
 3. Modulo formativo avanzato
-4. Re-assessment annuale di controllo`;
+4. Check-up annuale di controllo`;
   }
   return `## Highlights Principali a ${checkLabel}
 

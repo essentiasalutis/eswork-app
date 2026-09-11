@@ -37,7 +37,7 @@ export default function RetentionPage({ review }) {
 
         <main className="max-w-5xl mx-auto px-6 py-6 space-y-6">
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 leading-relaxed">
-            <strong>Cancellazione assistita (non automatica).</strong> Il sistema <em>segnala</em> qui i dati che hanno superato il termine di conservazione di {review.years} anni; la cancellazione è eseguita e validata dal titolare del trattamento (mai in automatico su dati sanitari). Le risposte anonime aggregate dell&apos;assessment restano negli aggregati e non sono riconducibili alla persona.
+            <strong>Cancellazione assistita (non automatica).</strong> Il sistema <em>segnala</em> qui i dati che hanno superato il termine di conservazione di {review.years} anni; la cancellazione è eseguita e validata dal titolare del trattamento (mai in automatico su dati sanitari). Le risposte riservate aggregate del check-up restano negli aggregati e non sono riconducibili alla persona.
           </div>
 
           {/* DA CANCELLARE */}

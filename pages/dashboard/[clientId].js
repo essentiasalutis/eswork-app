@@ -171,7 +171,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
 
   // Elimina un paziente/dipendente e tutti i suoi dati collegati
   async function deletePatient(p) {
-    if (!confirm(`Eliminare ${p.first_name} ${p.last_name}?\n\nVerranno rimossi anche cicli, sedute, mini-check, pre-validazioni, segnalazioni e voci in lista d'attesa. Le risposte anonime dell'assessment restano negli aggregati.\n\nL'operazione non è reversibile.`)) return;
+    if (!confirm(`Eliminare ${p.first_name} ${p.last_name}?\n\nVerranno rimossi anche cicli, sedute, mini-check, pre-validazioni, segnalazioni e voci in lista d'attesa. Le risposte riservate del check-up restano negli aggregati.\n\nL'operazione non è reversibile.`)) return;
     const res = await fetch(`/api/admin/patients/${p.id}`, { method: 'DELETE' });
     if (res.ok) {
       router.replace(router.asPath); // ricarica i dati della pagina
@@ -340,7 +340,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
   }
 
   async function closeAssessment(id) {
-    if (!confirm('Chiudere questo assessment? I dipendenti non potranno più rispondere.')) return;
+    if (!confirm('Chiudere questo check-up? I dipendenti non potranno più rispondere.')) return;
     const res = await fetch(`/api/assessments/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -358,7 +358,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
 
   async function deleteAssessment(id, e) {
     e.stopPropagation();
-    if (!confirm('Eliminare questo assessment e tutte le risposte?')) return;
+    if (!confirm('Eliminare questo check-up e tutte le risposte?')) return;
     const res = await fetch(`/api/assessments/${id}`, { method: 'DELETE' });
     if (res.ok) {
       setAssessments(prev => prev.filter(a => a.id !== id));
@@ -375,7 +375,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
     const referente = client.contact_name || 'referente';
     const body = `Gentile ${referente},
 
-come concordato, le invio il link per l'assessment ES Work dedicato ai dipendenti di ${client.name}.
+come concordato, le invio il link per il check-up ES Work dedicato ai dipendenti di ${client.name}.
 
 Il questionario è riservato, si compila dallo smartphone in circa 5 minuti.
 
@@ -389,7 +389,7 @@ Per qualsiasi domanda, sono a disposizione.
 ${FIRMA}`;
     setEmailModal({
       to: client.contact_email || '',
-      subject: `Assessment ES Work — ${client.name}`,
+      subject: `Check-up ES Work — ${client.name}`,
       body,
     });
   }
@@ -706,7 +706,7 @@ ${FIRMA}`;
         {/* ── Gestione Dipendenti & Campagna Assessment ──────────── */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">👥 Dipendenti &amp; Assessment</h2>
+            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">👥 Dipendenti &amp; Check-up</h2>
             <Link href={`/dashboard/${client.id}/waitlist`}
               className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-100">
               📋 Waitlist L1
@@ -758,7 +758,7 @@ ${FIRMA}`;
           {/* ── Assessment iniziale: ciclo di vita (hub unico v4) ── */}
           <div className="border-t border-gray-100 pt-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Assessment iniziale</div>
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Check-up iniziale</div>
               <button
                 onClick={emailGenericLink}
                 className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100"
@@ -769,14 +769,14 @@ ${FIRMA}`;
 
             {sortedAssessments.length === 0 ? (
               <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 rounded-xl px-4 py-3">
-                <p className="text-sm text-gray-500">Nessun assessment. Avvialo, poi fai distribuire il link qui sopra dal referente HR.</p>
+                <p className="text-sm text-gray-500">Nessun check-up. Avvialo, poi fai distribuire il link qui sopra dal referente HR.</p>
                 <div className="flex items-center gap-2">
                   <label className="text-xs text-gray-500">Chiude il
                     <input type="date" value={chiudeIlNuovo} min={oggiRoma()} onChange={e => setChiudeIlNuovo(e.target.value)} className="ml-1 text-xs border border-gray-300 rounded-lg px-2 py-1.5" />
                   </label>
                   <button onClick={createAssessment} disabled={saving || !chiudeIlNuovo}
                     className="text-sm font-semibold bg-green-600 text-white px-4 py-2 rounded-xl disabled:opacity-50">
-                    {saving ? 'Creazione…' : '▶️ Avvia assessment'}
+                    {saving ? 'Creazione…' : '▶️ Avvia check-up'}
                   </button>
                 </div>
               </div>
@@ -787,7 +787,7 @@ ${FIRMA}`;
                   return (
                     <div key={a.id} className="rounded-xl border border-gray-200 px-4 py-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium text-gray-800 text-sm">{TYPE_LABELS[a.type] || 'Assessment'}</span>
+                        <span className="font-medium text-gray-800 text-sm">{TYPE_LABELS[a.type] || 'Check-up'}</span>
                         {a.status === 'active'
                           ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">ATTIVO</span>
                           : <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">CHIUSO</span>}
@@ -813,7 +813,7 @@ ${FIRMA}`;
                           {rCount > 0 && a.type === 'initial' && (
                             <button onClick={() => openRealQuote(a)}
                               className="text-xs font-semibold text-green-700 bg-green-50 border border-green-300 px-3 py-1.5 rounded-xl hover:bg-green-100"
-                              title="Preventivo con i dati reali dell'assessment e le condizioni della scheda colloquio">
+                              title="Preventivo con i dati reali del check-up e le condizioni della scheda colloquio">
                               📄 Preventivo (PDF)
                             </button>
                           )}
@@ -875,7 +875,7 @@ ${FIRMA}`;
                     </label>
                     <button onClick={createAssessment} disabled={saving || !chiudeIlNuovo}
                       className="text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-xl hover:bg-green-100 disabled:opacity-50">
-                      {saving ? 'Creazione…' : '+ Nuovo assessment iniziale (nuovo ciclo annuale)'}
+                      {saving ? 'Creazione…' : '+ Nuovo check-up (nuovo ciclo annuale)'}
                     </button>
                   </div>
                 )}
@@ -1060,7 +1060,7 @@ ${FIRMA}`;
               </div>
               <div className="text-xs text-gray-500">
                 <strong className="text-gray-700">{capacity.used}</strong> cicli avviati · <strong className="text-gray-700">{capacity.pending}</strong> in coda · budget <strong className="text-gray-700">{capacity.budget}</strong> percorsi
-                <span className="text-gray-400"> = {capacity.contracted} L1 {capacity.source === 'contratto' ? 'a contratto' : 'da assessment'} + buffer {Math.round(capacity.buffer_pct * 100)}%</span>
+                <span className="text-gray-400"> = {capacity.contracted} L1 {capacity.source === 'contratto' ? 'a contratto' : 'da check-up'} + buffer {Math.round(capacity.buffer_pct * 100)}%</span>
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <label className="text-xs text-gray-400">L1 a contratto:</label>
@@ -1072,7 +1072,7 @@ ${FIRMA}`;
                   className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-50 disabled:opacity-50">
                   {savingContracted ? '…' : 'Salva'}
                 </button>
-                <span className="text-xs text-gray-300">vuoto = usa gli L1 reali dell&apos;assessment</span>
+                <span className="text-xs text-gray-300">vuoto = usa gli L1 reali del check-up</span>
               </div>
             </div>
           );
@@ -1132,13 +1132,13 @@ ${FIRMA}`;
           <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">📡 Monitoraggio T3 / T6 / T12</h2>
           <div className="text-xs text-gray-400 mt-0.5 mb-4">
             T3/T6: mini-check ancorati al 1° ciclo del paziente — invio email automatico ogni mattina (richiede dominio email verificato).
-            T12: re-assessment annuale con PGIC di tutta la popolazione. Qui i link personali per l&apos;invio manuale (HR/WhatsApp).
+            T12: check-up annuale con PGIC di tutta la popolazione. Qui i link personali per l&apos;invio manuale (HR/WhatsApp).
           </div>
           <div className="grid sm:grid-cols-3 gap-3">
             {[
               { fase: 't3', label: 'Mini-check T3 (3 mesi)', done: monit.doneT3, due: monit.dueT3, color: 'blue' },
               { fase: 't6', label: 'Mini-check T6 (6 mesi)', done: monit.doneT6, due: monit.dueT6, color: 'purple' },
-              { fase: 't12', label: 'Re-assessment T12 + PGIC', done: monit.doneT12, due: monit.dueT12, color: 'amber' },
+              { fase: 't12', label: 'Check-up T12 + PGIC', done: monit.doneT12, due: monit.dueT12, color: 'amber' },
             ].map(({ fase, label, done, due, color }) => {
               const colorCls = { blue: 'text-blue-700 border-blue-200 bg-blue-50', purple: 'text-purple-700 border-purple-200 bg-purple-50', amber: 'text-amber-700 border-amber-200 bg-amber-50' }[color];
               return (

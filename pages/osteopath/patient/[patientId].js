@@ -238,7 +238,7 @@ export default function OsteopathPatientView({ patient, sessions, cycles, preVal
           {/* Re-assessment T12 */}
           {reassessmentT12 && (
             <div className="bg-white rounded-2xl border border-gray-200 p-5">
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Re-assessment 12 mesi</div>
+              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Check-up a 12 mesi</div>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><div className="text-xs text-gray-400">Livello risultante</div>
                   <div className={`font-bold ${reassessmentT12.computed_level === 'level1' ? 'text-blue-700' : reassessmentT12.computed_level === 'level2' ? 'text-amber-700' : 'text-green-700'}`}>

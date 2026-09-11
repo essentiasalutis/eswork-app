@@ -209,7 +209,7 @@ function DashboardL2({ patient, miniChecks, onSelfTrigger, remaining }) {
         <div style={{ fontSize: 12, opacity: .8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Il tuo programma ES Work</div>
         <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>Sei in monitoraggio preventivo.</div>
         <div style={{ fontSize: 13, opacity: .85, marginTop: 8, lineHeight: 1.6 }}>
-          Il tuo assessment indica una situazione che non richiede trattamento attivo al momento. Sei monitorato con i mini-check a 3 e 6 mesi.<br />
+          Il tuo check-up indica una situazione che non richiede trattamento attivo al momento. Sei monitorato con i mini-check a 3 e 6 mesi.<br />
           Se il tuo stato cambia, puoi segnalarlo tramite il bottone qui sotto.
         </div>
       </div>
@@ -247,7 +247,7 @@ function DashboardL3({ patient, onSelfTrigger, remaining }) {
         <div style={{ fontSize: 12, opacity: .8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Il tuo programma ES Work</div>
         <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>Ottima salute dell'apparato muscolo-scheletrico! 🎉</div>
         <div style={{ fontSize: 13, opacity: .85, marginTop: 8, lineHeight: 1.6 }}>
-          Il tuo assessment indica una buona condizione fisica. Parteciperai alla formazione collettiva per mantenere e migliorare il tuo stato. Il programma resta a tua disposizione tramite i mini-check periodici.
+          Il tuo check-up indica una buona condizione fisica. Parteciperai alla formazione collettiva per mantenere e migliorare il tuo stato. Il programma resta a tua disposizione tramite i mini-check periodici.
         </div>
       </div>
 
@@ -452,7 +452,7 @@ export default function EmployeeDashboard() {
             <>
               {/* Patient greeting */}
               <div style={{ padding: '20px 16px 4px', borderBottom: '1px solid #e2e8f0', background: '#fff' }}>
-                <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>Ciao, {patient.first_name}! 👋</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>Ciao{patient.first_name && !['Anonimo', 'Nome non indicato'].includes(patient.first_name) ? `, ${patient.first_name}` : ''}! 👋</div>
                 <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
                   {patient.clients?.name && <span>{patient.clients.name} · </span>}
                   <span style={{ fontWeight: 600, color: level === 'level1' ? '#1d4ed8' : level === 'level2' ? '#92400e' : '#166534' }}>

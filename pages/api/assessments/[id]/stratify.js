@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     // Prendi assessment + risposte
     const { data: assessment, error: ae } = await supabase
       .from('assessments').select('*, responses(*)').eq('id', id).single();
-    if (ae || !assessment) return res.status(404).json({ error: 'Assessment non trovato' });
+    if (ae || !assessment) return res.status(404).json({ error: 'Check-up non trovato' });
 
     // Calcola livello con la funzione unica
     const computed_level = computeCampaignLevel(assessment.responses || []);

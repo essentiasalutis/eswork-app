@@ -34,7 +34,7 @@ export default function Login() {
           <div className="text-4xl font-bold text-gray-900">
             ES <span className="text-green-600">Work</span>
           </div>
-          <div className="text-sm text-gray-500 mt-1">Assessment & Benessere</div>
+          <div className="text-sm text-gray-500 mt-1">Check-up & Benessere</div>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">

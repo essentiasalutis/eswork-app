@@ -118,7 +118,7 @@ export default function OsteopathDashboard({ proName, l1Patients, acuteEvents, w
                         {w.patients?.first_name} {w.patients?.last_name}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {w.patients?.clients?.name || '—'} · {w.source === 'restratification' ? 'Ri-stratificazione' : 'Assessment'}
+                        {w.patients?.clients?.name || '—'} · {w.source === 'restratification' ? 'Ri-stratificazione' : 'Check-up'}
                       </div>
                       {w.notes && <div className="text-xs text-gray-400 italic mt-1">{w.notes}</div>}
                     </div>

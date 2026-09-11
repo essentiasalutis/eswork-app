@@ -78,7 +78,7 @@ export default function FormazionePage({ clientId }) {
       const r = await fetch(`/api/org/${clientId}/invito`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dipendente_id: d.id, action: 'genera', override }) });
       const j = await r.json().catch(() => ({}));
       if (r.status === 409 && !override) {
-        const msg = j.error === 'GIA_COMPLETATO' ? `${d.nome} ha già completato l'assessment.` : `${d.nome} ha già un invito consumato.`;
+        const msg = j.error === 'GIA_COMPLETATO' ? `${d.nome} ha già completato il check-up.` : `${d.nome} ha già un invito consumato.`;
         setBusy('');
         if (confirm(`${msg}\n\nProcedere è un RECUPERO ECCEZIONALE: crea una NUOVA cartella clinica scollegata dalla precedente. Continuare?`)) return genInvito(d, true);
         return;
@@ -201,7 +201,7 @@ export default function FormazionePage({ clientId }) {
               <h2 className="font-bold text-gray-900">👥 Anagrafica ({dipendenti.length})</h2>
               <div className="flex gap-2">
                 <a href={`/api/org/${clientId}/export`} className="text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-xl hover:bg-gray-200">⬇ Esporta CSV</a>
-                <button onClick={() => call('POST', `/api/org/${clientId}/seed`, {}, 'seed')} disabled={busy === 'seed'} className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl disabled:opacity-50">Importa nomi dall'assessment</button>
+                <button onClick={() => call('POST', `/api/org/${clientId}/seed`, {}, 'seed')} disabled={busy === 'seed'} className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl disabled:opacity-50">Importa nomi dal check-up</button>
               </div>
             </div>
             <form onSubmit={addDip} className="flex gap-2 flex-wrap mb-3">
@@ -253,7 +253,7 @@ export default function FormazionePage({ clientId }) {
                       </tr>
                     );
                   })}
-                  {dipendenti.length === 0 && <tr><td colSpan={8} className="py-6 text-center text-gray-400">Nessun dipendente. Usa "Importa nomi dall'assessment" o aggiungi sopra.</td></tr>}
+                  {dipendenti.length === 0 && <tr><td colSpan={8} className="py-6 text-center text-gray-400">Nessun dipendente. Usa "Importa nomi dal check-up" o aggiungi sopra.</td></tr>}
                 </tbody>
               </table>
             </div>

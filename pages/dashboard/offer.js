@@ -146,7 +146,7 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
     const prezzoY1 = calc ? fmt(calc.price_y1) : '–';
     const body = `${referente}
 
-Le invio in allegato la proposta di intervento per ${client.name}, elaborata a seguito dell'assessment ES Work.
+Le invio in allegato la proposta di intervento per ${client.name}, elaborata a seguito del check-up ES Work.
 
 In sintesi, il programma anno 1 prevede:
 • Sportello osteopatico in sede (trattamento individuale)
@@ -156,7 +156,7 @@ In sintesi, il programma anno 1 prevede:
 
 Investimento Anno 1: ${prezzoY1}
 
-Il documento allegato contiene tutti i dettagli: dati emersi dall'assessment, piano di intervento, analisi ROI e metodologia.
+Il documento allegato contiene tutti i dettagli: dati emersi dal check-up, piano di intervento, analisi ROI e metodologia.
 
 Sono disponibile per qualsiasi domanda o per fissare una call di approfondimento.
 
@@ -287,7 +287,7 @@ ${FIRMA}`;
 
           <div style={{ marginTop: 48, width: '100%', maxWidth: 480, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 16, padding: '16px 24px', textAlign: 'left' }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Contenuto del documento</div>
-            {['Cruscotto sintetico e dati emersi dall\'assessment', 'Disturbi muscolo-scheletrici — mappa corporea e stratificazione', 'Piano di intervento proposto', 'Investimento e analisi costi', 'Metodologia e timeline anno 1'].map((v, i, arr) => (
+            {['Cruscotto sintetico e dati emersi dal check-up', 'Disturbi muscolo-scheletrici — mappa corporea e stratificazione', 'Piano di intervento proposto', 'Investimento e analisi costi', 'Metodologia e timeline anno 1'].map((v, i, arr) => (
               <div key={i} style={{ fontSize: 12, color: '#374151', paddingTop: 5, paddingBottom: 5, borderBottom: i < arr.length - 1 ? '1px solid #f3f4f6' : 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ color: '#16a34a', fontWeight: 700 }}>{i + 1}.</span> {v}
               </div>
@@ -323,14 +323,13 @@ ${FIRMA}`;
           <p style={{ fontSize: 12, color: '#374151', lineHeight: 1.7, margin: 0 }}>{summaryText}</p>
         </div>
 
-        {/* AI branding box */}
+        {/* Riquadro piattaforma — si chiama solo "Piattaforma digitale ES Work" (mai "AI" come nome); testo: voce 11 di Enrico */}
         <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: '8px 12px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-          <span style={{ fontSize: 18 }}>🤖</span>
+          <span style={{ fontSize: 18 }}>📊</span>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#1d4ed8', marginBottom: 1 }}>Tecnologia ES Work AI</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#1d4ed8', marginBottom: 1 }}>Piattaforma digitale ES Work</div>
             <div style={{ fontSize: 10, color: '#3b82f6', lineHeight: 1.5 }}>
-              Piattaforma digitale con intelligenza artificiale per la prevenzione e cura dell'apparato muscolo-scheletrico e la salute dei dipendenti.
-              I risultati e il piano di intervento sono elaborati automaticamente dai dati reali della vostra azienda.
+              Piattaforma digitale dedicata: check-up, cartella clinica del professionista, monitoraggio degli indicatori, report periodici alla direzione. L&apos;azienda accede esclusivamente a dati aggregati.
             </div>
           </div>
         </div>
@@ -392,8 +391,8 @@ ${FIRMA}`;
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3b82f6', flexShrink: 0, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
           <span style={{ fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>
-            Piano generato da ES Work AI sulla base dei dati specifici della vostra azienda
-            {aiSource === 'ai' && <span style={{ marginLeft: 6, color: '#3b82f6', fontWeight: 600 }}>✦ AI</span>}
+            Piano elaborato sui dati della vostra azienda con il supporto di strumenti di intelligenza artificiale e validato da un professionista osteopata di Essentia Salutis
+            {aiSource === 'ai' && <span className="no-print" style={{ marginLeft: 6, color: '#3b82f6', fontWeight: 600 }}>✦ AI</span>}
           </span>
         </div>
         <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 12 }}>
@@ -405,7 +404,7 @@ ${FIRMA}`;
           <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20, textAlign: 'center' }}>
             <div style={{ fontSize: 12, color: '#6b7280' }}>
               <span style={{ display: 'inline-block', marginRight: 8 }}>⏳</span>
-              Generazione piano AI in corso…
+              Elaborazione del piano in corso…
             </div>
           </div>
         ) : (
@@ -437,7 +436,7 @@ ${FIRMA}`;
         )}
 
         <div style={{ marginTop: 12, background: '#f9fafb', borderRadius: 12, padding: 12, fontSize: 11, color: '#374151', lineHeight: 1.7 }}>
-          <strong>Nota metodologica:</strong> I dati derivano dall&apos;assessment NMQ completato dai dipendenti.
+          <strong>Nota metodologica:</strong> I dati derivano dal check-up (questionario NMQ) compilato dai dipendenti.
           Il programma ES Work prevede un approccio integrato: sportello osteopatico individuale + formazione collettiva + monitoraggio continuo.
         </div>
       </Page>
@@ -464,7 +463,7 @@ ${FIRMA}`;
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 9.5, marginBottom: 10 }}>
             <tbody>
               {[
-                ['Assessment iniziale + Report di Attivazione', 'Fotografia clinica della salute muscolo-scheletrica dell\'intera popolazione aziendale. Ogni dipendente compila un questionario validato in meno di 5 minuti. Produce la stratificazione dei bisogni e il piano di intervento personalizzato per la vostra azienda.'],
+                ['Check-up iniziale + Report di Attivazione', 'Fotografia clinica della salute muscolo-scheletrica dell\'intera popolazione aziendale. Ogni dipendente compila un questionario validato in meno di 5 minuti. Produce la stratificazione dei bisogni e il piano di intervento personalizzato per la vostra azienda.'],
                 [`Sportello osteopatico in sede (${calc.days_osteo_y1} gg/anno)`, 'Trattamento osteopatico individuale erogato direttamente nella vostra sede, riservato ai dipendenti con reale indicazione clinica. Ogni percorso è preceduto da una pre-validazione con l\'osteopata e monitorato sessione per sessione con misure di esito oggettive.'],
                 ['Pre-validazioni cliniche', 'Valutazione clinica iniziale con l\'osteopata prima di ogni percorso di trattamento: conferma l\'indicazione, definisce gli obiettivi e garantisce che le risorse vadano a chi ne ha realmente bisogno.'],
                 ...(withPrevention ? [['Prevenzione attiva L2', 'Sessioni di prevenzione attiva dedicate ai dipendenti con segnali precoci, per intervenire prima che il disturbo evolva in patologia conclamata.']] : []),
@@ -512,7 +511,7 @@ ${FIRMA}`;
           {/* Anno 2 — descrizione + cifra (perché quel valore) */}
           <div style={{ background: '#eff6ff', borderRadius: 12, padding: '10px 14px', border: '1px solid #bfdbfe', marginBottom: 10, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
-              <div style={{ fontSize: 9, color: '#2563eb', letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700 }}>Stima Anno 2+</div>
+              <div style={{ fontSize: 9, color: '#2563eb', letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700 }}>Anno 2 e successivi (indicativo)</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: '#1d4ed8' }}>{fmt(calc.price_y2)}/anno</div>
             </div>
             <div style={{ fontSize: 9.5, color: '#1e3a8a', lineHeight: 1.5, marginTop: 4 }}>
@@ -560,7 +559,7 @@ ${FIRMA}`;
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
           {[
-            { num: '1', title: 'Misurare', desc: 'Assessment scientifico con analisi AI dei dati — già completato. I risultati in questo report sono generati dalla piattaforma ES Work con intelligenza artificiale.' },
+            { num: '1', title: 'Misurare', desc: 'Check-up già completato: i risultati di questo documento derivano dai questionari compilati dai vostri dipendenti.' },
             { num: '2', title: 'Trattare', desc: 'Sportello osteopatico in sede secondo calendario concordato. Accesso prioritario per dipendenti Livello 1.' },
             { num: '3', title: 'Formare', desc: 'Sessioni formative collettive su postura, ergonomia e gestione del rischio muscolo-scheletrico.' },
             { num: '4', title: 'Monitorare', desc: 'Checkpoint a 3 e 6 mesi, report annuale, revisione del piano. Adattamento continuo ai risultati.' },
@@ -579,11 +578,11 @@ ${FIRMA}`;
           <div style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', marginBottom: 10 }}>Timeline Anno 1</div>
           <div style={{ display: 'flex' }}>
             {[
-              ['Mese 1-2', 'Assessment + attivazione sportello', '#16a34a'],
+              ['Mese 1-2', 'Check-up + attivazione sportello', '#16a34a'],
               ['Mese 3-4', 'Sessioni intensive + formazione', '#2563eb'],
               ['Mese 5-6', 'Mantenimento + review 6 mesi', '#ca8a04'],
               ['Mese 7-10', 'Mantenimento continuo', '#7c3aed'],
-              ['Mese 11-12', 'Assessment finale + report', '#16a34a'],
+              ['Mese 11-12', 'Check-up finale + Report annuale', '#16a34a'],
             ].map(([period, desc, color], i) => (
               <div key={i} style={{ flex: 1, borderLeft: `3px solid ${color}`, paddingLeft: 8, paddingRight: 4 }}>
                 <div style={{ fontSize: 9, fontWeight: 700, color, marginBottom: 3 }}>{period}</div>

@@ -294,7 +294,7 @@ function ReportFooter() {
           </div>
         </div>
         <div className="text-right">
-          <div className="text-xs text-gray-400 italic mb-1">Powered by ES Work AI · Piattaforma digitale per la prevenzione e cura dell'apparato muscolo-scheletrico</div>
+          <div className="text-xs text-gray-400 italic mb-1">Piattaforma digitale ES Work · prevenzione e cura dell'apparato muscolo-scheletrico</div>
           <div className="text-xs text-gray-400">
             Documento riservato e confidenziale.<br/>
             Riproduzione vietata senza autorizzazione scritta.
@@ -411,7 +411,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Sintesi</div>
         <div className="flex items-center gap-1.5 mb-2">
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3b82f6', display: 'inline-block', flexShrink: 0 }} />
-          <span className="text-xs text-gray-400 italic">Analisi generata da ES Work AI — sistema di intelligenza artificiale per la prevenzione e cura dell'apparato muscolo-scheletrico</span>
+          <span className="text-xs text-gray-400 italic">Sintesi elaborata sui dati aggregati del check-up</span>
         </div>
         <p className="text-sm text-gray-700 leading-relaxed">
           {anyLevelSuppressed
@@ -603,7 +603,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
           <SectionTitle>Migrazione tra livelli — Baseline vs Finale</SectionTitle>
           <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3 print-page">
             <div className="text-xs text-gray-500 mb-3">
-              Variazione nella distribuzione della popolazione tra i 3 livelli di rischio.
+              Variazione nella distribuzione della popolazione tra i 3 livelli.
             </div>
             {[
               { label: 'Livello 1 (Trattamento)', before: baseNmq.level1.count, after: nmq.level1.count, beforePct: baseNmq.level1.pct, afterPct: nmq.level1.pct, color: '#E74C3C', inverse: true },

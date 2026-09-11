@@ -10,7 +10,7 @@ import NavMenu from '../../components/NavMenu';
 const STAGES = [
   { id: 'contacted',          label: 'Contattato',       color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb' },
   { id: 'meeting_scheduled',  label: 'Colloquio fissato',color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
-  { id: 'assessment_sent',    label: 'Assessment inviato',color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+  { id: 'assessment_sent',    label: 'Check-up inviato',color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
   { id: 'report_presented',   label: 'Report presentato',color: '#ca8a04', bg: '#fffbeb', border: '#fde68a' },
   { id: 'signed',             label: 'Contratto firmato',color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
   { id: 'lost',               label: 'Perso',            color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },

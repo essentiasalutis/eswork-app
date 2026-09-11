@@ -269,7 +269,7 @@ function AnamnesisBlock({ patient: initial, onUpdated }) {
       </div>
 
       {/* Livello */}
-      <FormRow label="Livello (da assessment NMQ)">
+      <FormRow label="Livello (da check-up NMQ)">
         <select value={f.level} onChange={e => upd('level', e.target.value)}
           className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500">
           <option value="">— non specificato —</option>

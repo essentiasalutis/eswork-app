@@ -301,7 +301,7 @@ export default function CalculatorPage({ client, prefill }) {
 
             {/* Anno 2+ */}
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-              <div className="text-xs font-semibold text-blue-600 uppercase tracking-widest mb-1">Stima Anno 2+</div>
+              <div className="text-xs font-semibold text-blue-600 uppercase tracking-widest mb-1">Anno 2 e successivi (indicativo)</div>
               <div className="text-3xl font-bold text-blue-700 mb-1">{fmt(calc.price_y2)}</div>
               <div className="text-sm text-blue-600">
                 Formazione 1 modulo · nuovi L1 trattati{tierIncludesL2Prevention(tier) ? ` · L2 in prevenzione` : ''}. I L1 non migliorati dell’Anno 1 non rientrano nel calcolo.
@@ -311,7 +311,7 @@ export default function CalculatorPage({ client, prefill }) {
 
             {/* Clausola di adeguamento */}
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 leading-relaxed">
-              <strong>Clausola di adeguamento (asimmetrica):</strong> il corrispettivo è confermato dopo l’assessment.
+              <strong>Clausola di adeguamento (asimmetrica):</strong> il corrispettivo è confermato dopo il check-up.
               Se i L1 reali sono ≤ scenario medio ({scen.avg.l1}) → resta al valore medio ({fmt(calcAvg.price_y1)}).
               Se superiori → sale fino al tetto massimo ({fmt(calcMax.price_y1)}); le sedute eccedenti il tetto sono gestite tramite il canale B2C/welfare.
             </div>

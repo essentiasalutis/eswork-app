@@ -28,7 +28,7 @@ function Header() {
       <div style={{ width: 32, height: 32, background: '#16a34a', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🌿</div>
       <div>
         <div style={{ color: '#fff', fontWeight: 800, fontSize: 16, lineHeight: 1 }}>ES Work</div>
-        <div style={{ color: '#94a3b8', fontSize: 11 }}>Re-assessment 12 mesi</div>
+        <div style={{ color: '#94a3b8', fontSize: 11 }}>Check-up a 12 mesi</div>
       </div>
     </div>
   );
@@ -100,16 +100,16 @@ export default function ReassessmentT12() {
 
   return (
     <>
-      <Head><title>Re-assessment 12 mesi — ES Work</title></Head>
+      <Head><title>Check-up a 12 mesi — ES Work</title></Head>
       <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: 520, margin: '0 auto' }}>
         <Header />
 
         {phase === 'done' ? (
           <div style={{ padding: '48px 20px', textAlign: 'center' }}>
             <div style={{ fontSize: 56, marginBottom: 20 }}>🎉</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>Re-assessment completato!</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>Check-up completato!</div>
             <div style={{ fontSize: 15, color: '#64748b', lineHeight: 1.7 }}>
-              Grazie per aver completato il tuo re-assessment annuale. I risultati saranno elaborati dal nostro team e ti verrà comunicato l&apos;aggiornamento del tuo percorso.
+              Grazie per aver completato il tuo check-up annuale. I risultati saranno elaborati dal nostro team e ti verrà comunicato l&apos;aggiornamento del tuo percorso.
             </div>
           </div>
         ) : phase === 'pgic' ? (
@@ -137,7 +137,7 @@ export default function ReassessmentT12() {
             {pgic && (
               <button onClick={submit} disabled={sending}
                 style={{ width: '100%', marginTop: 20, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 14, padding: '18px', fontSize: 17, fontWeight: 700, cursor: 'pointer' }}>
-                {sending ? 'Invio...' : 'Completa re-assessment →'}
+                {sending ? 'Invio...' : 'Completa il check-up →'}
               </button>
             )}
           </div>

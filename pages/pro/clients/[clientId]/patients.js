@@ -71,7 +71,7 @@ function NewPatientForm({ clientId, proName, onCreated, onCancel }) {
           className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
       </div>
       <div>
-        <label className="text-xs text-gray-500 block mb-1">Livello (da assessment)</label>
+        <label className="text-xs text-gray-500 block mb-1">Livello (da check-up)</label>
         <select value={form.level} onChange={e => set('level', e.target.value)}
           className="w-full px-3 py-2 rounded-xl border border-gray-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500">
           <option value="">— non specificato —</option>

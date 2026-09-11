@@ -143,7 +143,7 @@ NON esiste una scala "rischio basso/medio/alto": non usarla e non invertire l'or
 
 NOTA PRIVACY: dove un gruppo è "n.d." è stato soppresso per anonimato (k-anonymity). NON dedurre, stimare o ricostruire i valori soppressi. ATTENZIONE: un gruppo può risultare soppresso ANCHE se conta ${K_ANON} persone o più — è la soppressione secondaria, che impedisce di ricavarlo per differenza dagli altri. Quindi NON affermare che i gruppi soppressi siano "inferiori a ${K_ANON}": di' solo che non sono pubblicabili per tutela dell'anonimato.
 ${clinicoBlock}
-ASSESSMENT: ${stratTotal > 0 ? `${stratTotal} questionari raccolti` : 'nessun questionario ancora raccolto'}
+CHECK-UP: ${stratTotal > 0 ? `${stratTotal} questionari raccolti` : 'nessun questionario ancora raccolto'}
 ${isPacchetto ? '' : quoteBlock}${serviziBlock}
 `.trim();
 
@@ -171,7 +171,7 @@ VINCOLI TASSATIVI SUL TESTO:
 - MAI i termini Core, Plus, Enterprise, "tier", "modello Core/Plus/Enterprise": sono nomi INTERNI, non ti vengono forniti e non vanno inventati. Il prodotto si chiama SOLO "${nomeProdotto}".` : '';
   const istruzioniPacchetto = isPacchetto ? `
 ════ PRODOTTO "${nomeProdotto}" — 12 mesi, non rinnovabile, AUTOCONCLUSIVO ════
-Include SOLO: assessment completo (già svolto), formazione (2 moduli), consulenza ergonomico-posturale.
+Include SOLO: check-up completo (già svolto), formazione (2 moduli), consulenza ergonomico-posturale.
 NON include: trattamenti individuali, percorsi clinici, prevenzione attiva, sportello osteopatico, follow-up, monitoraggio.
 
 DIVIETI ASSOLUTI — valgono su TUTTO il testo, incluse le PARAFRASI che aggirano la lettera del divieto ma ne violano lo spirito:
@@ -212,7 +212,7 @@ STRUTTURA DEL REPORT (usa markdown con ## per titoli):
 
 ## Piano Operativo Proposto
 ${isPacchetto
-  ? `(SOLO le attività del pacchetto: assessment già svolto, formazione collettiva, consulenza ergonomico-posturale — NESSUN trattamento incluso)`
+  ? `(SOLO le attività del pacchetto: check-up già svolto, formazione collettiva, consulenza ergonomico-posturale — NESSUN trattamento incluso)`
   : `(turni di presa in carico, sportello osteopatico, formazione collettiva, dimensionati sulla popolazione indicata; se presente la PROPOSTA ECONOMICA COLLEGATA, citane l'investimento Anno 1 in chiusura)`}
 ${serviziBlock ? `
 ## Cosa include il programma
@@ -229,6 +229,7 @@ ${isPacchetto
   : '(5 step operativi con timeframe indicativo)'}
 ${parametriOperativi}${vincoliV2}${istruzioniPacchetto}
 IDENTITÀ PROFESSIONALE (tassativa): il servizio è OSTEOPATICO. Usa sempre "osteopata", "trattamento osteopatico", "sportello osteopatico". VIETATO "fisioterapista", "fisioterapico", "riabilitativo/riabilitazione" e ogni termine fisioterapico riferito al nostro servizio. VIETATO anche presentare il servizio come atto medico o come medicina del lavoro: mai "medicina osteopatica", "medico", "sanitario", "medicina del lavoro", "sorveglianza sanitaria" riferiti a noi. La sorveglianza sanitaria resta del Medico Competente aziendale; noi siamo un programma osteopatico di prevenzione e trattamento, distinto e complementare.
+LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
 DATA: se includi un'intestazione con il riepilogo del cliente, riporta "Data: ${dataOggi}". Usa ESATTAMENTE questa data; non inventarne altre né citare altre date nel testo.
 Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole totali.`,
       }],
@@ -254,7 +255,7 @@ function generateFallbackReport(client, l1, l2, l3, total, sessioni, settore, qu
   ], total).map(c => [c.key, c]));
   const dip = c => c.suppressed ? `n.d. (gruppo < ${K_ANON})` : `${c.count} dipendenti (${c.pct}%)`;
   const pctL1txt = small || P.l1.suppressed ? 'non pubblicata per anonimato' : `${P.l1.pct}%`;
-  const riskTxt = small || P.l1.suppressed ? 'non determinabile in forma anonima' : (P.l1.pct > 20 ? 'elevato' : P.l1.pct > 10 ? 'moderato' : 'contenuto');
+  const riskTxt = small || P.l1.suppressed ? 'non determinabile nel rispetto della riservatezza' : (P.l1.pct > 20 ? 'elevato' : P.l1.pct > 10 ? 'moderato' : 'contenuto');
   const mappa = small
     ? `La popolazione valutata è inferiore alla soglia minima di aggregazione (${K_ANON}): la distribuzione per livello non viene pubblicata a tutela dell'anonimato dei dipendenti (k-anonymity).`
     : isPacchetto
@@ -269,12 +270,12 @@ function generateFallbackReport(client, l1, l2, l3, total, sessioni, settore, qu
   return `## Executive Summary
 
 ${isPacchetto
-  ? `Il percorso ${nomeProdotto || 'd\'ingresso'} per **${client.name}** (${settore}, ${client.employees || 'n.d.'} dipendenti) ha completato l'assessment della popolazione con ${total} dipendenti valutati.
+  ? `Il percorso ${nomeProdotto || 'd\'ingresso'} per **${client.name}** (${settore}, ${client.employees || 'n.d.'} dipendenti) ha completato il check-up della popolazione con ${total} dipendenti valutati.
 
 La fotografia raccolta indica una quota in Livello 1 pari a ${pctL1txt}: il dettaglio per livello è riportato nella Mappa Clinica.
 
 Il percorso prosegue con le attività previste: formazione collettiva e consulenza ergonomico-posturale.`
-  : `Il programma ES Work per **${client.name}** (${settore}, ${client.employees || 'n.d.'} dipendenti) ha completato la fase di assessment iniziale con ${total} dipendenti valutati.
+  : `Il programma ES Work per **${client.name}** (${settore}, ${client.employees || 'n.d.'} dipendenti) ha completato il check-up iniziale con ${total} dipendenti valutati.
 
 La distribuzione clinica evidenzia una quota in Livello 1 (trattamento attivo) pari a ${pctL1txt}, profilo di rischio ${riskTxt}. Sono state erogate ${sessioni} sessioni osteopatiche ad oggi.
 
@@ -287,7 +288,7 @@ ${mappa}
 ## Piano Operativo Proposto
 
 ${isPacchetto
-  ? `Il percorso ${nomeProdotto || 'd\'ingresso'} (12 mesi) comprende l'assessment completo della popolazione — già svolto —, la formazione collettiva su ergonomia e postura e la consulenza ergonomico-posturale sulle postazioni di lavoro. Il percorso non comprende trattamenti individuali: la stratificazione qui presentata fotografa lo stato della popolazione rilevato dal questionario.`
+  ? `Il percorso ${nomeProdotto || 'd\'ingresso'} (12 mesi) comprende il check-up completo della popolazione — già svolto —, la formazione collettiva su ergonomia e postura e la consulenza ergonomico-posturale sulle postazioni di lavoro. Il percorso non comprende trattamenti individuali: la stratificazione qui presentata fotografa lo stato della popolazione rilevato dal questionario.`
   : `Il piano prevede la presa in carico dei pazienti L1 distribuiti in turni di avvio mensili, con sportello osteopatico in sede. La formazione collettiva copre l'intera popolazione aziendale con moduli su ergonomia e postura.`}
 ${!isPacchetto && quoteBlock ? `
 ## Proposta economica collegata
@@ -298,14 +299,14 @@ ${serviziBlock.split('\n').filter(l => l.startsWith('- ')).join('\n')}` : ''}${i
 ${testoEvoluzione}` : ''}
 ${isPacchetto ? `## Raccomandazioni
 
-1. Condividere con la direzione la fotografia emersa dall'assessment
+1. Condividere con la direzione la fotografia emersa dal check-up
 2. Formazione focalizzata sulle zone di rischio prevalenti
 3. Programmare il sopralluogo per confermare le postazioni di produzione
 4. Rivalutare a fine percorso l'evoluzione più adatta al bisogno emerso
 
 ## Prossimi Passi
 
-1. **Settimana 1-2**: Restituzione dei risultati dell'assessment alla direzione
+1. **Settimana 1-2**: Restituzione dei risultati del check-up alla direzione
 2. **Mese 1**: Prima sessione formativa collettiva
 3. **Mese 1-2**: Sopralluogo ergonomico e conferma delle postazioni
 4. **Mese 2-3**: Completamento formazione e consulenza ergonomico-posturale
@@ -386,7 +387,7 @@ export async function buildQuoteBlock(client_id, client, answers) {
     const eur = v => v.toLocaleString('it-IT', { useGrouping: 'always' });
     // Testo CLIENTE: prezzo + framing positivo "in linea con la stima" se rientra.
     // MAI il flag grezzo dentro/fuori (resta dato interno persistito).
-    const inLinea = inRange ? ', in linea con la stima presentata al colloquio' : '';
+    const inLinea = inRange ? ', in linea con la Stima di investimento presentata al colloquio' : '';
 
     // PONTE rispondenti -> popolazione. Il prezzo NON si dimensiona sui soli
     // rispondenti: la prevalenza osservata viene riportata sull'intera forza
@@ -413,7 +414,7 @@ export async function buildQuoteBlock(client_id, client, answers) {
       ? `\n- Include la consulenza ergonomico-posturale (${pezzi.join('; ')}): è già compresa nell'investimento, non è un'attività da acquistare a parte`
       : '';
 
-    const block = `\nPROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):\n- Programma Anno 1: €${eur(realPrice)}${inLinea} (${calc.days_osteo_y1} giornate sportello, ${calc.training_sessions_y1} sessioni formative)\n- Stima Anno 2+: €${eur(calc.price_y2)}${rigaDimensionamento}${rigaErgonomia}`;
+    const block = `\nPROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):\n- Programma Anno 1: €${eur(realPrice)}${inLinea} (${calc.days_osteo_y1} giornate sportello, ${calc.training_sessions_y1} sessioni formative)\n- Anno 2 e successivi (indicativo): €${eur(calc.price_y2)}${rigaDimensionamento}${rigaErgonomia}`;
     return { block, compliance };
   } catch {
     return { block: '', compliance: null };

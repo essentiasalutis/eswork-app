@@ -30,7 +30,7 @@ function ESLogo({ size = 56 }) {
 
 // ─── Fase 0: Welcome screen ───────────────────────────────────────────────────
 
-function WelcomeScreen({ clientName, chiudeFrase, onIdentified }) {
+function WelcomeScreen({ clientName, chiudeFrase, firmato, onIdentified }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 max-w-lg mx-auto w-full">
@@ -43,7 +43,9 @@ function WelcomeScreen({ clientName, chiudeFrase, onIdentified }) {
 
         <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6 w-full">
           <p className="text-sm text-gray-700 leading-relaxed mb-3">
-            <strong>La tua azienda ha attivato ES Work</strong>, il programma di prevenzione e cura dell'apparato muscolo-scheletrico.
+            {firmato
+              ? <><strong>La tua azienda ha attivato ES Work</strong>, il programma di prevenzione e cura dell'apparato muscolo-scheletrico.</>
+              : <><strong>La tua azienda sta valutando ES Work</strong>, un programma di prevenzione e cura dell'apparato muscolo-scheletrico, e ti chiede di partecipare a un breve check-up.</>}
           </p>
           <p className="text-sm text-gray-700 leading-relaxed mb-3">
             Questo questionario raccoglie informazioni sugli eventuali disturbi fisici nelle varie zone del corpo. Si compila in circa 5 minuti.
@@ -61,8 +63,7 @@ function WelcomeScreen({ clientName, chiudeFrase, onIdentified }) {
             ✅ Sì, ho capito e proseguo
           </button>
           <p className="text-xs text-gray-400 text-center leading-relaxed px-2">
-            Se preferisci non compilare il questionario puoi semplicemente chiudere questa pagina.
-            In quel caso però non potrai essere contattato né accedere al programma di trattamento e prevenzione ES Work.
+            Se preferisci non compilare il check-up puoi semplicemente chiudere questa pagina.
           </p>
         </div>
       </div>
@@ -359,7 +360,7 @@ export default function SelfDeclarePage({ client, error: serverError, checkup })
   return (
     <>
       <Head>
-        <title>Questionario — {client?.name || 'ES Work'}</title>
+        <title>Check-up — {client?.name || 'ES Work'}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </Head>
 
@@ -367,6 +368,7 @@ export default function SelfDeclarePage({ client, error: serverError, checkup })
         <WelcomeScreen
           clientName={client.name}
           chiudeFrase={checkup?.chiudeFrase || null}
+          firmato={!!checkup?.firmato}
           onIdentified={() => setPhase(PHASES.CONSENT)}
         />
       )}
@@ -423,11 +425,12 @@ export async function getServerSideProps({ params }) {
     const tier = client.tier || (n <= 150 ? 'core' : n <= 500 ? 'plus' : 'enterprise');
     // Stato del check-up calcolato QUI, al caricamento: se è chiuso il dipendente
     // lo sa prima di iniziare, non dopo 5 minuti di risposte.
-    const { statoCheckupCliente } = await import('../../../lib/checkup-server');
+    const { statoCheckupCliente, isFirmato } = await import('../../../lib/checkup-server');
     const { ilGiorno, alGiorno, oggiRoma } = await import('../../../lib/checkup');
     const st = await statoCheckupCliente(client).catch(() => null);
     const checkup = st ? {
       stato: st.stato,
+      firmato: isFirmato(client),  // la frase di benvenuto dipende dalla fase: "sta valutando" / "ha attivato"
       chiudeFrase: st.stato === 'aperto' && st.chiudeIl ? alGiorno(st.chiudeIl) : null,      // "al 15 settembre"
       chiusoFrase: st.stato === 'chiuso' && (st.chiusoAlle || st.chiudeIl)
         ? ilGiorno(st.chiusoAlle ? oggiRoma(new Date(st.chiusoAlle)) : st.chiudeIl) : null,  // "l'11 settembre"

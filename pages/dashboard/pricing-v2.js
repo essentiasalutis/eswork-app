@@ -22,7 +22,7 @@ const PARAM_LABELS = {
   ergonomia_minuti_postazione: 'Ergonomia reparto: tempo in sede per studio postazione (minuti — solo pianificazione e minimo ore, NON prezzo)',
   ergonomia_minimo_ore: 'Ergonomia: minimo fatturabile (ore)',
   soglia_ingresso: 'Soglia pacchetto prevenzione (dipendenti max)',
-  assessment_prezzo_per_dipendente: 'Assessment nel pacchetto: € per dipendente dichiarato',
+  assessment_prezzo_per_dipendente: 'Check-up nel pacchetto: € per dipendente dichiarato',
 };
 
 const TEXT_LABELS = {
@@ -34,7 +34,7 @@ const TEXT_LABELS = {
   argomentario_ergonomia: 'Argomentario — Ergonomia',
   argomentario_buffer: 'Argomentario — Buffer clinico',
   argomentario_formazione: 'Argomentario — Formazione',
-  argomentario_assessment_pacchetto: 'Argomentario — Assessment (pacchetto)',
+  argomentario_assessment_pacchetto: 'Argomentario — Check-up (pacchetto)',
 };
 
 // Testi del Report Annuale (T12) — sezione "L'andamento del programma".
@@ -116,7 +116,7 @@ export default function PricingV2Page() {
                 </label>
               ))}
             </div>
-            <p className="text-[11px] text-gray-400 mt-3">Solo fattori primitivi: i costi si calcolano (es. ergonomia ufficio e reparto = minuti/60 × tariffa oraria sportello del cliente; studio postazione = forfait × n postazioni; assessment pacchetto = n dipendenti × €/dipendente).</p>
+            <p className="text-[11px] text-gray-400 mt-3">Solo fattori primitivi: i costi si calcolano (es. ergonomia ufficio e reparto = minuti/60 × tariffa oraria sportello del cliente; studio postazione = forfait × n postazioni; check-up pacchetto = n dipendenti × €/dipendente).</p>
           </div>
 
           {/* Parametri formazione (org) — turnover/recupero */}

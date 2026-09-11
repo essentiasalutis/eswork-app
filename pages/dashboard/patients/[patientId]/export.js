@@ -216,7 +216,7 @@ export default function PatientExport({ patient, client, documents, sessions, as
         )}
 
         {/* ── CONSENSO PRE-QUESTIONARIO (prova GDPR) ── */}
-        <h2>Consenso pre-questionario (assessment)</h2>
+        <h2>Consenso pre-questionario (check-up)</h2>
         {assessmentConsent ? (
           <table>
             <tbody>

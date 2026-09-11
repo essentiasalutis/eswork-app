@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { aggiungiGiorni, oggiRoma, etichettaData, ilGiorno, alGiorno, giorniAllaChiusura, avvisiAvvioCheckup } from '../../lib/checkup';
 import { testoKit, firmaKit, bloccoKit } from '../../lib/riepilogo';
 import { isFirmato } from '../../lib/pipeline';
+import MailAvvio from '../../components/MailAvvio';
 import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getDocumentsByClient, getProfessionals, getMonitoringByClient, getTreatmentCapacity } from '../../lib/store';
 import { TYPE_LABELS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
@@ -186,6 +187,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [saving, setSaving] = useState(false);
   const [reportAssessment, setReportAssessment] = useState(null);
   const [emailModal, setEmailModal] = useState(null); // { to, subject, body }
+  const [kitAvvio, setKitAvvio] = useState(false); // finestra "Kit di avvio" (punto 12)
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editSaving, setEditSaving] = useState(false);
@@ -763,6 +765,20 @@ ${FIRMA}`;
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-6 space-y-6">
+        {/* ── Avvio del programma (solo dopo la firma): kit di avvio per i dipendenti ── */}
+        {isFirmato(client.pipeline_stage) && (
+          <div className="bg-white rounded-2xl border border-green-200 p-5 flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">🚀 Avvio del programma</h2>
+              <p className="text-xs text-gray-500 mt-1">
+                {client.data_avvio_programma ? `Avvio in sede: ${etichettaData(client.data_avvio_programma)} ${client.data_avvio_programma.slice(0, 4)}.` : 'Data di avvio non ancora fissata.'} Il kit annuncia ai dipendenti la partenza del programma (con il calendario in allegato).
+              </p>
+            </div>
+            <button onClick={() => setKitAvvio(true)} className="text-sm font-semibold text-white bg-green-600 px-4 py-2 rounded-xl hover:bg-green-700">🚀 Kit di avvio</button>
+          </div>
+        )}
+        {kitAvvio && <MailAvvio client={client} onClose={() => setKitAvvio(false)} onDataSalvata={d => setClient(prev => ({ ...prev, data_avvio_programma: d }))} />}
+
         {/* ── Binario commerciale (scelta manuale) + Lettera di incarico (solo B) ── */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">

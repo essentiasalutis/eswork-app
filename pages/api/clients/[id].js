@@ -8,7 +8,7 @@ import { getOrgParams } from '../../../lib/org';
 import { aggiornaClienteTollerante } from '../../../lib/pipeline-server';
 
 const V54 = ['ricontatto_il', 'offerta_scade_il'];
-const DATE_SEMPLICI = [...V54, 'secondo_incontro_il'];
+const DATE_SEMPLICI = [...V54, 'secondo_incontro_il', 'data_avvio_programma'];
 
 export default requireAuth(async function handler(req, res) {
   const { id } = req.query;

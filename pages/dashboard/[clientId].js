@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { aggiungiGiorni, oggiRoma, etichettaData, ilGiorno, alGiorno, giorniAllaChiusura, avvisiAvvioCheckup } from '../../lib/checkup';
+import { aggiungiGiorni, oggiRoma, etichettaData, ilGiorno, giorniAllaChiusura, avvisiAvvioCheckup } from '../../lib/checkup';
 import { testoKit, testoKitCheckupDopoFirma, firmaKit, bloccoKit } from '../../lib/riepilogo';
 import { isFirmato } from '../../lib/pipeline';
 import MailAvvio from '../../components/MailAvvio';
@@ -414,20 +414,19 @@ export default function ClientPage({ client: initialClient, assessments: initial
     const aperto = assessments.find(a => a.status === 'active');
     const scadenzaCorrente = aperto && aperto.chiude_il ? aperto.chiude_il : null;
     const referente = client.contact_name || 'referente';
-    // Prima della firma: il kit di comunicazione di Enrico (punto 5), che dice "stiamo
-    // valutando". Dopo la firma, binario A: l'invito al check-up post-firma (testo di Enrico).
-    // Il testo generico qui sotto ("l'azienda ha avviato…") resta per gli altri casi firmati.
-    const firmato = isFirmato(client.pipeline_stage);
-    if (!firmato || client.binario === 'A') {
-      if (!scadenzaCorrente) { alert('Avvia prima il check-up: il testo per i dipendenti ha bisogno della data di chiusura.'); return; }
-      const firmaAz = firmaKit({ referente: client.contact_name, azienda: client.name });
-      const kit = firmato
-        ? testoKitCheckupDopoFirma({ link: url, scadenza: scadenzaCorrente, firma: firmaAz })
-        : testoKit({ variante: client.binario === 'A' ? 'A' : 'B', link: url, scadenza: scadenzaCorrente, firma: firmaAz });
-      setEmailModal({
-        to: client.contact_email || '',
-        subject: `Check-up ES Work — ${client.name}`,
-        body: `Gentile ${referente},
+    // Testi di Enrico per i dipendenti: prima della firma il kit del punto 5 ("stiamo
+    // valutando"); dopo la firma l'invito post-firma (A diretto, B istituzionale; binario non
+    // deciso → B, il tono più prudente).
+    if (!scadenzaCorrente) { alert('Avvia prima il check-up: il testo per i dipendenti ha bisogno della data di chiusura.'); return; }
+    const firmaAz = firmaKit({ referente: client.contact_name, azienda: client.name });
+    const variante = client.binario === 'A' ? 'A' : 'B';
+    const kit = isFirmato(client.pipeline_stage)
+      ? testoKitCheckupDopoFirma({ variante, link: url, scadenza: scadenzaCorrente, firma: firmaAz })
+      : testoKit({ variante, link: url, scadenza: scadenzaCorrente, firma: firmaAz });
+    setEmailModal({
+      to: client.contact_email || '',
+      subject: `Check-up ES Work — ${client.name}`,
+      body: `Gentile ${referente},
 
 come concordato, ecco il testo già pronto da inoltrare ai dipendenti per il check-up: non dovete scrivere nulla.
 
@@ -436,27 +435,6 @@ ${bloccoKit(kit)}
 Per qualsiasi domanda, sono a disposizione.
 
 ${FIRMA}`,
-      });
-      return;
-    }
-    const body = `Gentile ${referente},
-
-come concordato, le invio il link per il check-up ES Work dedicato ai dipendenti di ${client.name}.
-
-Il questionario è riservato, si compila dallo smartphone in circa 5 minuti.
-
-Le chiedo di inoltrare questo link a tutti i dipendenti tramite i vostri canali interni:
-${url}
-${scadenzaCorrente ? `\nIl questionario resta aperto fino ${alGiorno(scadenzaCorrente)}: chi non risponde entro quella data non rientra nell'analisi.\n` : ''}
-Le chiedo inoltre di comunicare ai dipendenti che l'azienda ha avviato un'iniziativa di salute organizzativa e che i dati sono trattati in modo riservato da Essentia Salutis, nel rispetto del segreto professionale: l'azienda non vedrà mai i dati individuali, ma solo risultati in forma aggregata.
-
-Per qualsiasi domanda, sono a disposizione.
-
-${FIRMA}`;
-    setEmailModal({
-      to: client.contact_email || '',
-      subject: `Check-up ES Work — ${client.name}`,
-      body,
     });
   }
 

@@ -11,6 +11,9 @@ import {
 import { calculatePricing, computeForchetta, realL1L2FromAssessment, calculateROI, fmt } from '../../lib/calculator';
 import { ergonomiaDaColloquio } from '../../lib/pricing/v2';
 import { CONFIG } from '../../lib/config';
+import { oggiRoma, aggiungiGiorni } from '../../lib/checkup';
+import { finoAl, fraseValidita } from '../../lib/offerta';
+import { normalizza } from '../../lib/pipeline';
 
 // ─── Firma standard ───────────────────────────────────────────────────────────
 
@@ -21,7 +24,15 @@ ${CONFIG.contact_email}`;
 
 // ─── Modale email ─────────────────────────────────────────────────────────────
 
-function EmailModal({ modal, onClose }) {
+// Scadenza proposta sulla pagina: quella già salvata se l'offerta è aperta, altrimenti
+// binario A = oggi + giorni del Listino, B e non deciso = nessuna (decisione Enrico).
+function scadenzaIniziale(client, giorniA) {
+  if (!client) return '';
+  if (normalizza(client.pipeline_stage) === 'offer_open') return client.offerta_scade_il || '';
+  return client.binario === 'A' ? aggiungiGiorni(oggiRoma(), giorniA) : '';
+}
+
+function EmailModal({ modal, onClose, onInvia }) {
   const [to, setTo] = useState(modal.to);
   const [subject, setSubject] = useState(modal.subject);
   const [body, setBody] = useState(modal.body);
@@ -63,6 +74,7 @@ function EmailModal({ modal, onClose }) {
         <div className="flex gap-3">
           <a
             href={href}
+            onClick={() => { if (onInvia) onInvia(); }}
             className="flex-1 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold text-center hover:bg-green-700"
           >
             Apri in Mail
@@ -99,8 +111,10 @@ function Page({ children, className = '' }) {
 
 // ─── Offer Document ───────────────────────────────────────────────────────────
 
-export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, date }) {
+export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, date, offertaGiorniA = 10 }) {
   const [emailModal, setEmailModal] = useState(null);
+  const [scadenza, setScadenza] = useState(() => scadenzaIniziale(client, offertaGiorniA));
+  const [esitoInvio, setEsitoInvio] = useState(null); // { ok, testo }
   const [aiPlan, setAiPlan] = useState(null);       // null = caricamento, [] = pronto
   const [aiSource, setAiSource] = useState(null);   // 'ai' | 'fallback' | 'fallback_no_key'
 
@@ -131,6 +145,20 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
   }
 
   const summaryText = generateSummaryText(nmq);
+  // Offerta VERA = dopo il check-up (non il preventivo stimato dalla scheda colloquio):
+  // solo questa ha validità e sposta l'azienda in "Offerta aperta".
+  const offertaVera = !assessment.estimate;
+
+  async function registraInvio() {
+    const r = await fetch(`/api/clients/${client.id}/offerta`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ azione: 'inviata', scade_il: scadenza || null }),
+    }).catch(() => null);
+    const j = r ? await r.json().catch(() => ({})) : {};
+    if (!r || !r.ok) setEsitoInvio({ ok: false, testo: j.error || 'Offerta non registrata in Pipeline: riprova.' });
+    else if (j.spostata) setEsitoInvio({ ok: true, testo: 'Azienda spostata in «Offerta aperta».' });
+    else if (j.stage === 'offer_open') setEsitoInvio({ ok: true, testo: 'Scadenza dell\'offerta aggiornata in Pipeline.' });
+  }
 
   // ─── Blocco B — Servizi di piattaforma e gestione (differenziato per tier) ────
   // I nomi dei tier NON compaiono nel PDF: cambia solo il contenuto mostrato.
@@ -155,7 +183,7 @@ In sintesi, il programma anno 1 prevede:
 • Coordinamento completo e documentazione INAIL OT23
 
 Investimento Anno 1: ${prezzoY1}
-
+${offertaVera && scadenza ? `\n${fraseValidita(scadenza)}\n` : ''}
 Il documento allegato contiene tutti i dettagli: dati emersi dal check-up, piano di intervento, analisi ROI e metodologia.
 
 Sono disponibile per qualsiasi domanda o per fissare una call di approfondimento.
@@ -178,7 +206,7 @@ ${FIRMA}`;
   return (
     <>
       <Head>
-        <title>Offerta ES Work — {client.name}</title>
+        <title>{`Offerta ES Work — ${client.name}`}</title>
       </Head>
 
       <style>{`
@@ -247,6 +275,22 @@ ${FIRMA}`;
           <strong>Per un PDF pulito:</strong> nel dialog di stampa Chrome → <em>Altre impostazioni</em> → deseleziona <strong>&quot;Intestazioni e piè di pagina&quot;</strong> → salva come PDF
         </div>
 
+        {/* Validità dell'offerta — scelta qui, stampata nel documento se c'è una data */}
+        {offertaVera && (
+          <div className="mt-2 rounded-xl px-4 py-2.5 text-xs border bg-white border-gray-200 text-gray-700 flex items-center gap-2 flex-wrap">
+            <strong>⏳ Validità dell&apos;offerta</strong>
+            <input type="date" value={scadenza} min={oggiRoma()} onChange={e => setScadenza(e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1" />
+            {scadenza
+              ? <button onClick={() => setScadenza('')} className="text-gray-500 underline">togli la scadenza</button>
+              : <span className="font-semibold text-gray-600">senza scadenza</span>}
+            <span className="text-gray-500">
+              {client.binario === 'A' ? `Binario A: proposta dal Listino (${offertaGiorniA} giorni).` : 'Binario B o non deciso: senza scadenza, metti una data solo se ti serve.'}
+              {' '}Con «Invia offerta via email» l&apos;azienda passa in «Offerta aperta» con questa data.
+            </span>
+            {esitoInvio && <span className={`font-semibold ${esitoInvio.ok ? 'text-green-700' : 'text-red-600'}`}>{esitoInvio.testo}</span>}
+          </div>
+        )}
+
         {/* Confronto con la stima del colloquio — SOLO vista admin, mai nel PDF */}
         {forchetta && calc && (() => {
           const inRange = calc.price_y1 >= forchetta.min && calc.price_y1 <= forchetta.max;
@@ -261,7 +305,7 @@ ${FIRMA}`;
         })()}
       </div>
 
-      {emailModal && <EmailModal modal={emailModal} onClose={() => setEmailModal(null)} />}
+      {emailModal && <EmailModal modal={emailModal} onClose={() => setEmailModal(null)} onInvia={offertaVera ? registraInvio : null} />}
 
       {/* ══════════════════════════════════════════════════════════════
           PAG 1 — Copertina
@@ -597,6 +641,7 @@ ${FIRMA}`;
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Accettazione offerta</div>
           <div style={{ fontSize: 11, color: '#374151', lineHeight: 1.7, marginBottom: 20 }}>
             Il/La sottoscritto/a dichiara di accettare integralmente la presente proposta di intervento ES Work per <strong>{client.name}</strong>, nei termini e alle condizioni indicate.
+            {offertaVera && scadenza && <> La presente offerta è valida <strong>{finoAl(scadenza)}</strong>.</>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 }}>
             <div>
@@ -685,6 +730,8 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
   const q = ctx.query;
   const { assessmentId, clientId, n, l1, l2 } = q;
   const custom = readPricingParams(q);
+  let offertaGiorniA = 10;
+  try { offertaGiorniA = (await (await import('../../lib/org')).getOrgParams()).offertaGiorniA; } catch (_) {}
 
   // MODALITÀ PREVENTIVO da scheda colloquio: clientId + numeri stimati, nessun assessment
   if (!assessmentId && clientId) {
@@ -706,6 +753,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
           calc,
           roi: null,
           date: today(),
+          offertaGiorniA,
         },
       };
     } catch (e) { console.error(e); return { notFound: true }; }
@@ -802,6 +850,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         roi,
         forchetta,
         date: today(),
+        offertaGiorniA,
       },
     };
   } catch (e) {

@@ -5,6 +5,7 @@ import { validatePacchetto } from '../../../lib/pricing/v2';
 import { TUTTI, normalizza } from '../../../lib/pipeline';
 import { isYmd, oggiRoma, aggiungiGiorni } from '../../../lib/checkup';
 import { getOrgParams } from '../../../lib/org';
+import { aggiornaClienteTollerante } from '../../../lib/pipeline-server';
 
 const V54 = ['ricontatto_il', 'offerta_scade_il'];
 
@@ -74,9 +75,14 @@ export default requireAuth(async function handler(req, res) {
       }
       // Offerta aperta: binario A scade dopo i giorni del Listino; B (e non deciso) non
       // scade — può essere un sì in attesa del nuovo budget. Una data esplicita vince.
-      if (finale === 'offer_open' && attuale !== 'offer_open' && !('offerta_scade_il' in body)) {
-        const binario = 'binario' in body ? body.binario : client.binario;
-        body.offerta_scade_il = binario === 'A' ? aggiungiGiorni(oggiRoma(), (await getOrgParams()).offertaGiorniA) : null;
+      if (finale === 'offer_open' && attuale !== 'offer_open') {
+        if (!('offerta_scade_il' in body)) {
+          const binario = 'binario' in body ? body.binario : client.binario;
+          body.offerta_scade_il = binario === 'A' ? aggiungiGiorni(oggiRoma(), (await getOrgParams()).offertaGiorniA) : null;
+        }
+        // Da qui si conta la metà validità per il promemoria (v55).
+        body.offerta_aperta_il = oggiRoma();
+        body.offerta_sollecito_at = null;
       }
 
       // Prodotto d'ingresso: REGOLE DURE lato server (la UI può nascondere
@@ -105,21 +111,11 @@ export default requireAuth(async function handler(req, res) {
         body.stato_ingresso = 'upgradato';
       }
 
-      try {
-        const updated = await updateClient(id, body);
-        return res.json(updated);
-      } catch (e) {
-        // v54 non ancora applicata: senza la data "Non ora" non si può salvare; per il
-        // resto si salva lo stato e si avvisa che la scadenza non è stata registrata.
-        if (!(e && (e.code === 'PGRST204' || e.code === '42703')) || !V54.some(k => k in body)) throw e;
-        if (finale === 'not_now' || body.ricontatto_il) return res.status(409).json({ error: 'Serve la migration v54 (date di ricontatto e scadenza dell\'offerta): applicala in Supabase e riprova.' });
-        const senza = { ...body };
-        V54.forEach(k => delete senza[k]);
-        const updated = await updateClient(id, senza);
-        return res.json({ ...updated, ...(body.offerta_scade_il ? { avviso: 'Scadenza dell\'offerta non salvata: manca la migration v54.' } : {}) });
-      }
+      // Senza v55 si salva tutto il resto (il promemoria a metà validità parte dopo).
+      const { data: updated } = await aggiornaClienteTollerante(id, body);
+      return res.json(updated);
     } catch (e) {
-      if (e && (e.code === 'PGRST204' || e.code === '42703')) return res.status(409).json({ error: 'Serve la migration v53 (binario e Lettera di incarico): applicala in Supabase e riprova.' });
+      if (e && (e.code === 'PGRST204' || e.code === '42703')) return res.status(409).json({ error: 'Nel database manca una migration: applica le ultime (fino alla v55) in Supabase e riprova.' });
       return res.status(500).json({ error: e.message });
     }
   }

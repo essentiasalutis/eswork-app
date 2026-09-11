@@ -16,10 +16,11 @@ const AGENDA = {
   checkup: { icona: '📋', testo: 'Check-up in chiusura', scaduto: '' },
 };
 
-export default function Dashboard({ clients: initialClients, assessmentCounts, pendingAcuteCount, formazioneAlerts = [], solleciti: sollecitiIniziali = [], agenda = [], oggi = '' }) {
+export default function Dashboard({ clients: initialClients, assessmentCounts, pendingAcuteCount, formazioneAlerts = [], solleciti: sollecitiIniziali = [], sollecitiOfferta: sollecitiOffertaIniziali = [], agenda = [], oggi = '' }) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
   const [solleciti, setSolleciti] = useState(sollecitiIniziali);
+  const [sollecitiOfferta, setSollecitiOfferta] = useState(sollecitiOffertaIniziali);
 
   // "Scrivi al referente": apre la posta con il testo pronto e segna il sollecito come
   // fatto, così sparisce. Se la segnatura fallisce il promemoria resta (meglio doppio che perso).
@@ -28,6 +29,14 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sollecito: s.tipo }),
     }).catch(() => null);
     if (r && r.ok) setSolleciti(prev => prev.filter(x => x.assessment_id !== s.assessment_id));
+  }
+
+  // Offerta a metà validità: stessa logica del sollecito del check-up.
+  async function segnaSollecitoOfferta(s) {
+    const r = await fetch(`/api/clients/${s.client_id}/offerta`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ azione: 'sollecitata' }),
+    }).catch(() => null);
+    if (r && r.ok) setSollecitiOfferta(prev => prev.filter(x => x.client_id !== s.client_id));
   }
 
   async function logout() {
@@ -101,6 +110,29 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
                         {s.giorni === 0 ? 'chiude oggi' : s.giorni === 1 ? 'chiude domani' : `chiude tra ${s.giorni} giorni`}
                       </span>
                       <a href={href} onClick={() => segnaSollecito(s)}
+                        className="font-semibold text-white bg-gray-900 px-3 py-1 rounded-lg hover:bg-gray-700">✉️ Scrivi al referente</a>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {sollecitiOfferta.length > 0 && (
+          <div className="mb-5 bg-white rounded-2xl border border-orange-200 p-4">
+            <h2 className="font-semibold text-gray-700 text-sm mb-2">📣 Offerte da sollecitare oggi</h2>
+            <div className="space-y-1.5">
+              {sollecitiOfferta.map(s => {
+                const href = `mailto:${encodeURIComponent(s.email)}?subject=${encodeURIComponent(s.oggetto)}&body=${encodeURIComponent(s.corpo)}`;
+                return (
+                  <div key={s.client_id} className="flex items-center justify-between py-1.5 px-1 text-sm gap-2 flex-wrap">
+                    <span className="flex items-center gap-2">
+                      <Link href={`/dashboard/${s.client_id}`} className="font-medium text-gray-800 hover:underline">{s.cliente}</Link>
+                      {s.is_demo && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">DEMO</span>}
+                    </span>
+                    <span className="flex items-center gap-2 text-xs flex-wrap">
+                      <span className="px-2 py-0.5 rounded-full font-semibold bg-orange-100 text-orange-800">a metà validità · scade {s.scadeIl === oggi ? 'oggi' : `il ${etichettaData(s.scadeIl)}`}</span>
+                      <a href={href} onClick={() => segnaSollecitoOfferta(s)}
                         className="font-semibold text-white bg-gray-900 px-3 py-1 rounded-lg hover:bg-gray-700">✉️ Scrivi al referente</a>
                     </span>
                   </div>
@@ -239,5 +271,15 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     agenda = agendaSettimana({ clients, checkups, oggi });
   } catch (_) {}
 
-  return { props: { clients, assessmentCounts, pendingAcuteCount, formazioneAlerts, solleciti, agenda, oggi } };
+  // Offerte arrivate a metà validità e non ancora sollecitate (lib/offerta.js).
+  let sollecitiOfferta = [];
+  try {
+    const { sollecitoOffertaDovuto, testoSollecitoOfferta } = await import('../../lib/offerta');
+    sollecitiOfferta = clients.filter(c => sollecitoOffertaDovuto(c, oggi)).map(c => ({
+      client_id: c.id, cliente: c.name, is_demo: !!c.is_demo, email: c.contact_email || '', scadeIl: c.offerta_scade_il,
+      ...testoSollecitoOfferta({ azienda: c.name, referente: c.contact_name, inviataIl: c.offerta_aperta_il, scadeIl: c.offerta_scade_il }),
+    }));
+  } catch (_) {}
+
+  return { props: { clients, assessmentCounts, pendingAcuteCount, formazioneAlerts, solleciti, sollecitiOfferta, agenda, oggi } };
 });

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireAuthSsr } from '../../lib/auth';
 import NavMenu from '../../components/NavMenu';
-import { STAGES, STAGES_LATERALI, TUTTI, trovaStage, normalizza, isFirmato, isChiuso } from '../../lib/pipeline';
+import { STAGES, STAGES_LATERALI, TUTTI, trovaStage, normalizza, isFirmato, isChiuso, checkupNonConvertiti } from '../../lib/pipeline';
 import { oggiRoma, aggiungiGiorni, etichettaData } from '../../lib/checkup';
 
 // ─── Costanti ─────────────────────────────────────────────────────────────────
@@ -188,7 +188,7 @@ function Colonna({ stage, clienti, onMove, onNote }) {
 
 // ─── Pagina principale ────────────────────────────────────────────────────────
 
-export default function PipelinePage({ clients: initialClients, offertaGiorniA = 10 }) {
+export default function PipelinePage({ clients: initialClients, offertaGiorniA = 10, checkupMaxAperti = 3 }) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
   const [filterSource, setFilterSource] = useState('all');
@@ -304,6 +304,11 @@ export default function PipelinePage({ clients: initialClients, offertaGiorniA =
           <span className="text-green-700">Accettati: <strong>{stats.signed}</strong></span>
           <span className="text-gray-500">No: <strong>{stats.no}</strong></span>
           <span className="text-red-600">Declinati: <strong>{stats.lost}</strong></span>
+          {(() => { const n = checkupNonConvertiti(clients).length; return (
+            <span className={n >= checkupMaxAperti ? 'text-red-600 font-semibold' : 'text-blue-700'} title="Aziende in Check-up inviato, Report presentato o Offerta aperta (demo escluse)">
+              Check-up non convertiti: <strong>{n}/{checkupMaxAperti}</strong>
+            </span>
+          ); })()}
           {demoCount > 0 && <span className="text-gray-400">(+{demoCount} demo, non conteggiate)</span>}
         </div>
       </div>
@@ -374,10 +379,12 @@ export const getServerSideProps = requireAuthSsr(async () => {
   const { getClients } = require('../../lib/store');
   const clients = await getClients();
   let offertaGiorniA = 10;
-  try { offertaGiorniA = (await (await import('../../lib/org')).getOrgParams()).offertaGiorniA; } catch (_) {}
+  let checkupMaxAperti = 3;
+  try { ({ offertaGiorniA, checkupMaxAperti } = await (await import('../../lib/org')).getOrgParams()); } catch (_) {}
   return {
     props: {
       offertaGiorniA,
+      checkupMaxAperti,
       clients: clients.map(c => ({
         ...c,
         pipeline_stage: normalizza(c.pipeline_stage), // i vecchi 'won'/'active'/'closed' letti come i nuovi

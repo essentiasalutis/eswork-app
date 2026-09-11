@@ -144,6 +144,11 @@ export default function PricingV2Page() {
               <input type="number" min="1" max="60" step="1" defaultValue={texts.checkup_giorni_default ?? ''} placeholder="10" className={`${inputCls} mt-1`}
                 onBlur={e => { const v = e.target.value; if ((texts.checkup_giorni_default ?? '') !== v && /^\d+$/.test(v) && +v >= 1 && +v <= 60) put({ tipo: 'setting', key: 'checkup_giorni_default', value: v }, 'giorni del check-up salvati'); }} />
             </label>
+            <label className="block text-xs text-gray-500 max-w-xs mt-3">Massimo check-up aperti non convertiti (1–20)
+              <input type="number" min="1" max="20" step="1" defaultValue={texts.checkup_max_aperti ?? ''} placeholder="3" className={`${inputCls} mt-1`}
+                onBlur={e => { const v = e.target.value; if ((texts.checkup_max_aperti ?? '') !== v && /^\d+$/.test(v) && +v >= 1 && +v <= 20) put({ tipo: 'setting', key: 'checkup_max_aperti', value: v }, 'limite dei check-up salvato'); }} />
+            </label>
+            <p className="text-[11px] text-gray-400 mt-2">Non convertiti = aziende reali in Check-up inviato, Report presentato o Offerta aperta. Oltre il limite, all&apos;avvio di un nuovo check-up compare un avviso (non un blocco).</p>
             <p className="text-[11px] text-gray-400 mt-2">La data di chiusura parte da oggi + questi giorni e si può cambiare a ogni avvio. Il check-up chiude alle 23:59 di quel giorno; chi aveva già iniziato ha 30 minuti per inviare.</p>
           </div>
 

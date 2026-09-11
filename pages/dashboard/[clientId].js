@@ -99,7 +99,7 @@ function NrsBar({ value, max = 10 }) {
   );
 }
 
-export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist, generatedReports: initialReports, allProfessionals, monitoring, capacity: initialCapacity, checkupGiorni = 10 }) {
+export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist, generatedReports: initialReports, allProfessionals, monitoring, capacity: initialCapacity, checkupGiorni = 10, checkupAperti = { limite: 3, aziende: [] } }) {
   const router = useRouter();
   const [client, setClient] = useState(initialClient);
   const [assessments, setAssessments] = useState(initial);
@@ -345,6 +345,10 @@ export default function ClientPage({ client: initialClient, assessments: initial
   async function createAssessment() {
     if (client.binario === 'B' && !['inviata', 'firmata'].includes(client.lettera_stato)
       && !confirm('Lettera di incarico non ancora inviata a questa azienda (binario B).\n\nAvviare comunque il check-up?')) return;
+    // Regola dei massimo N check-up aperti non convertiti: avviso, non blocco.
+    const altriAperti = checkupAperti.aziende.filter(x => x.id !== client.id);
+    if (!client.is_demo && altriAperti.length >= checkupAperti.limite
+      && !confirm(`Hai già ${altriAperti.length} check-up aperti non convertiti (limite ${checkupAperti.limite}):\n${altriAperti.map(x => `• ${x.name}`).join('\n')}\n\nAvviare comunque il check-up?`)) return;
     setSaving(true); setCheckupErr('');
     const res = await fetch('/api/assessments', {
       method: 'POST',
@@ -834,7 +838,13 @@ ${FIRMA}`;
           {/* ── Assessment iniziale: ciclo di vita (hub unico v4) ── */}
           <div className="border-t border-gray-100 pt-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Check-up iniziale</div>
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Check-up iniziale
+                <span className={`ml-2 normal-case tracking-normal font-medium ${checkupAperti.aziende.length >= checkupAperti.limite ? 'text-red-600' : 'text-gray-400'}`}
+                  title={checkupAperti.aziende.map(x => x.name).join(', ') || 'nessuno'}>
+                  · check-up non convertiti {checkupAperti.aziende.length}/{checkupAperti.limite}
+                </span>
+              </div>
               <button
                 onClick={emailGenericLink}
                 className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100"
@@ -1550,7 +1560,15 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
   } catch (_) {}
 
   let checkupGiorni = 10;
-  try { checkupGiorni = (await (await import('../../lib/org')).getOrgParams()).checkupGiorni; } catch (_) {}
+  const checkupAperti = { limite: 3, aziende: [] };
+  try {
+    const params = await (await import('../../lib/org')).getOrgParams();
+    checkupGiorni = params.checkupGiorni;
+    checkupAperti.limite = params.checkupMaxAperti;
+    const { checkupNonConvertiti } = await import('../../lib/pipeline');
+    const { getClients } = await import('../../lib/store');
+    checkupAperti.aziende = checkupNonConvertiti(await getClients()).map(c => ({ id: c.id, name: c.name }));
+  } catch (_) {}
 
-  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist, generatedReports, allProfessionals, monitoring, capacity, checkupGiorni } };
+  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist, generatedReports, allProfessionals, monitoring, capacity, checkupGiorni, checkupAperti } };
 });

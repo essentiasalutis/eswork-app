@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getPatientsWithEmailByClient, getDocumentsByClient, getProfessionals, getMonitoringByClient, getTreatmentCapacity } from '../../lib/store';
+import { aggiungiGiorni, oggiRoma, etichettaData, giorniAllaChiusura } from '../../lib/checkup';
+import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getDocumentsByClient, getProfessionals, getMonitoringByClient, getTreatmentCapacity } from '../../lib/store';
 import { TYPE_LABELS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
 import ReportDoc, { reportPrintHtml } from '../../components/ReportDoc';
@@ -98,7 +99,7 @@ function NrsBar({ value, max = 10 }) {
   );
 }
 
-export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist, generatedReports: initialReports, allProfessionals, monitoring, capacity: initialCapacity }) {
+export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist, generatedReports: initialReports, allProfessionals, monitoring, capacity: initialCapacity, checkupGiorni = 10 }) {
   const router = useRouter();
   const [client, setClient] = useState(initialClient);
   const [assessments, setAssessments] = useState(initial);
@@ -194,6 +195,21 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [generatingReport, setGeneratingReport] = useState(null); // 'activation'|'t3'|'t6'|null
   const [reportModal, setReportModal] = useState(null); // { title, content, pdf_url }
   const [copiedAssessmentLink, setCopiedAssessmentLink] = useState(false);
+  // Check-up: data di chiusura proposta (oggi + giorni del Listino), conteggi live, errori
+  const [chiudeIlNuovo, setChiudeIlNuovo] = useState(() => aggiungiGiorni(oggiRoma(), checkupGiorni));
+  const [dataProroga, setDataProroga] = useState({}); // id → 'YYYY-MM-DD'
+  const [conteggiLive, setConteggiLive] = useState({}); // id → n questionari
+  const [checkupErr, setCheckupErr] = useState('');
+  useEffect(() => {
+    const aperto = (assessments || []).find(a => a.status === 'active');
+    if (!aperto) return;
+    const t = setInterval(() => {
+      fetch(`/api/assessments/${aperto.id}?solo=conteggio`).then(r => (r.ok ? r.json() : null))
+        .then(j => { if (j && Number.isFinite(j.risposte)) setConteggiLive(prev => ({ ...prev, [aperto.id]: j.risposte })); })
+        .catch(() => {});
+    }, 60000);
+    return () => clearInterval(t);
+  }, [assessments]);
   const [copiedMonitor, setCopiedMonitor] = useState(null); // patient_id+fase copiato
   const [showNrsTable, setShowNrsTable] = useState(false);  // tabella NRS a scomparsa
   const [showWaitlistTable, setShowWaitlistTable] = useState(false); // lista d'attesa a scomparsa
@@ -294,17 +310,33 @@ export default function ClientPage({ client: initialClient, assessments: initial
   // v4: si crea solo l'assessment INIZIALE (uno per ciclo). I checkpoint T3/T6
   // sono mini-check automatici; il T12 è il re-assessment con link personali.
   async function createAssessment() {
-    setSaving(true);
+    setSaving(true); setCheckupErr('');
     const res = await fetch('/api/assessments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: client.id, type: 'initial' }),
+      body: JSON.stringify({ client_id: client.id, type: 'initial', chiude_il: chiudeIlNuovo }),
     });
+    const a = await res.json().catch(() => ({}));
     if (res.ok) {
-      const a = await res.json();
       setAssessments(prev => [a, ...prev]);
-    }
+      if (a.avviso) setCheckupErr(a.avviso);
+    } else setCheckupErr(a.error || 'Errore');
     setSaving(false);
+  }
+
+  // Proroga (check-up aperto) o riapertura fino a una data (chiuso/scaduto).
+  // Dopo il Report di Attivazione il server rifiuta: l'analisi è congelata.
+  async function prorogaCheckup(a, riapri) {
+    const data = dataProroga[a.id];
+    if (!data) { setCheckupErr('Scegli la nuova data di chiusura.'); return; }
+    setCheckupErr('');
+    const res = await fetch(`/api/assessments/${a.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(riapri ? { status: 'active', chiude_il: data } : { chiude_il: data }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (res.ok) { setAssessments(prev => prev.map(x => x.id === a.id ? { ...x, ...j } : x)); if (j.avviso) setCheckupErr(j.avviso); }
+    else setCheckupErr(j.error || 'Errore');
   }
 
   async function closeAssessment(id) {
@@ -316,23 +348,11 @@ export default function ClientPage({ client: initialClient, assessments: initial
     });
     if (res.ok) {
       const data = await res.json();
-      setAssessments(prev => prev.map(a => a.id === id ? { ...a, status: 'closed' } : a));
+      setAssessments(prev => prev.map(a => a.id === id ? { ...a, status: 'closed', chiuso_at: data.chiuso_at || new Date().toISOString() } : a));
       if (data.referral_code_p || data.referral_code_f) {
         const codesRes = await fetch(`/api/referrals?clientId=${client.id}`);
         if (codesRes.ok) setReferralCodes(await codesRes.json());
       }
-    }
-  }
-
-  async function reopenAssessment(id) {
-    if (!confirm('Riaprire questo assessment? I dipendenti potranno tornare a rispondere.')) return;
-    const res = await fetch(`/api/assessments/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'active' }),
-    });
-    if (res.ok) {
-      setAssessments(prev => prev.map(a => a.id === id ? { ...a, status: 'active' } : a));
     }
   }
 
@@ -350,6 +370,8 @@ export default function ClientPage({ client: initialClient, assessments: initial
   // è LUI a distribuirlo internamente (figura autorevole → più adesione).
   function emailGenericLink() {
     const url = `${baseUrl}/q/c/${client.assessment_share_code}`;
+    const aperto = assessments.find(a => a.status === 'active');
+    const scadenzaCorrente = aperto && aperto.chiude_il ? aperto.chiude_il : null;
     const referente = client.contact_name || 'referente';
     const body = `Gentile ${referente},
 
@@ -359,7 +381,7 @@ Il questionario è riservato, si compila dallo smartphone in circa 5 minuti.
 
 Le chiedo di inoltrare questo link a tutti i dipendenti tramite i vostri canali interni:
 ${url}
-
+${scadenzaCorrente ? `\nIl questionario resta aperto fino al ${etichettaData(scadenzaCorrente)}: chi non risponde entro quella data non rientra nell'analisi.\n` : ''}
 Le chiedo inoltre di comunicare ai dipendenti che l'azienda ha avviato un'iniziativa di salute organizzativa e che i dati sono trattati in modo riservato da Essentia Salutis, nel rispetto del segreto professionale: l'azienda non vedrà mai i dati individuali, ma solo risultati in forma aggregata.
 
 Per qualsiasi domanda, sono a disposizione.
@@ -533,6 +555,8 @@ ${FIRMA}`;
   }
 
   const sortedAssessments = [...assessments].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const reportDopo = a => generatedReports.some(r => r.report_type === 'activation' && r.created_at >= a.created_at);
+  const idAperto = (sortedAssessments.find(a => a.status === 'active') || {}).id;
 
   return (
     <>
@@ -730,22 +754,6 @@ ${FIRMA}`;
             );
           })()}
 
-          {/* Tasso di adesione */}
-          {patientsNrs && patientsNrs.length > 0 && (
-            <div className="grid grid-cols-4 gap-3">
-              {[
-                { label: 'Totale', value: patientsNrs.length, color: 'text-gray-700' },
-                { label: 'Auto-dich.', value: patientsNrs.filter(p => p.self_declared).length, color: 'text-blue-700' },
-                { label: 'Completati', value: patientsNrs.filter(p => p.assessment_completed_at).length, color: 'text-green-700' },
-                { label: 'Tasso', value: patientsNrs.length > 0 ? `${Math.round(patientsNrs.filter(p => p.assessment_completed_at).length / patientsNrs.length * 100)}%` : '0%', color: 'text-purple-700' },
-              ].map(k => (
-                <div key={k.label} className="bg-gray-50 rounded-xl p-3 text-center">
-                  <div className={`text-xl font-bold ${k.color}`}>{k.value}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">{k.label}</div>
-                </div>
-              ))}
-            </div>
-          )}
 
           {/* ── Assessment iniziale: ciclo di vita (hub unico v4) ── */}
           <div className="border-t border-gray-100 pt-4">
@@ -762,10 +770,15 @@ ${FIRMA}`;
             {sortedAssessments.length === 0 ? (
               <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 rounded-xl px-4 py-3">
                 <p className="text-sm text-gray-500">Nessun assessment. Avvialo, poi fai distribuire il link qui sopra dal referente HR.</p>
-                <button onClick={createAssessment} disabled={saving}
-                  className="text-sm font-semibold bg-green-600 text-white px-4 py-2 rounded-xl disabled:opacity-50">
-                  {saving ? 'Creazione…' : '▶️ Avvia assessment'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-500">Chiude il
+                    <input type="date" value={chiudeIlNuovo} min={oggiRoma()} onChange={e => setChiudeIlNuovo(e.target.value)} className="ml-1 text-xs border border-gray-300 rounded-lg px-2 py-1.5" />
+                  </label>
+                  <button onClick={createAssessment} disabled={saving || !chiudeIlNuovo}
+                    className="text-sm font-semibold bg-green-600 text-white px-4 py-2 rounded-xl disabled:opacity-50">
+                    {saving ? 'Creazione…' : '▶️ Avvia assessment'}
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="space-y-2">
@@ -784,6 +797,12 @@ ${FIRMA}`;
                         {a.consents && a.consents.length > 0 && (
                           <span className="text-xs text-green-600">✅ {a.consents.length} consensi GDPR</span>
                         )}
+                        {a.status === 'active' && a.chiude_il && (() => {
+                          const g = giorniAllaChiusura(a.chiude_il);
+                          return g === null
+                            ? <span className="text-xs font-semibold text-red-600">scaduto il {etichettaData(a.chiude_il)} — il link è chiuso</span>
+                            : <span className="text-xs text-gray-500">chiude {g === 0 ? 'oggi' : g === 1 ? 'domani' : `tra ${g} giorni`} ({etichettaData(a.chiude_il)})</span>;
+                        })()}
                         <div className="ml-auto flex flex-wrap items-center gap-2">
                           {rCount > 0 && (
                             <button onClick={() => openReport(a)}
@@ -798,15 +817,10 @@ ${FIRMA}`;
                               📄 Preventivo (PDF)
                             </button>
                           )}
-                          {a.status === 'active' ? (
+                          {a.status === 'active' && (
                             <button onClick={() => closeAssessment(a.id)}
                               className="text-xs font-medium text-gray-600 border border-gray-300 px-3 py-1.5 rounded-xl hover:bg-gray-50">
                               Chiudi raccolta
-                            </button>
-                          ) : (
-                            <button onClick={() => reopenAssessment(a.id)}
-                              className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl hover:bg-amber-100">
-                              🔓 Riapri
                             </button>
                           )}
                           <button onClick={e => deleteAssessment(a.id, e)} className="p-1.5 text-gray-300 hover:text-red-400" title="Elimina">
@@ -816,15 +830,56 @@ ${FIRMA}`;
                           </button>
                         </div>
                       </div>
+                      {/* Tasso di risposta: questionari / dipendenti dichiarati, aggiornato ogni minuto.
+                          Sono QUESTIONARI, non persone: il check-up è riservato, un doppio invio non si esclude. */}
+                      {a.id === idAperto && (() => {
+                        const n = conteggiLive[a.id] ?? rCount;
+                        const dip = parseInt(client.employees) || 0;
+                        const pct = dip > 0 ? Math.min(100, Math.round((n / dip) * 100)) : null;
+                        return (
+                          <div className="mt-3">
+                            <div className="flex items-center justify-between text-xs mb-1 gap-2">
+                              <span className="text-gray-700"><strong>{n}</strong> questionari{dip > 0 && <> su <strong>{dip}</strong> dipendenti</>}{pct != null && <> — <strong>{pct}%</strong></>}</span>
+                              <span className="text-gray-400">si aggiorna ogni minuto</span>
+                            </div>
+                            {pct != null && <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-green-500 rounded-full" style={{ width: `${pct}%` }} /></div>}
+                          </div>
+                        );
+                      })()}
+                      {/* Proroga (aperto) / riapertura fino a una data (chiuso o scaduto). Dopo il
+                          Report di Attivazione di QUESTO check-up l'analisi è congelata. */}
+                      {(() => {
+                        const scaduto = a.status === 'active' && a.chiude_il && giorniAllaChiusura(a.chiude_il) === null;
+                        const riapri = a.status !== 'active' || scaduto;
+                        if (riapri && (a.id !== sortedAssessments[0]?.id || (idAperto && idAperto !== a.id))) return null;
+                        if (reportDopo(a)) return <div className="mt-2 text-xs text-gray-500">🔒 Analisi congelata: il Report di Attivazione è già stato generato su questo check-up.</div>;
+                        return (
+                          <div className="mt-2 flex items-center gap-2 flex-wrap">
+                            <span className="text-xs text-gray-500">{riapri ? 'Riapri fino al' : 'Proroga al'}</span>
+                            <input type="date" min={oggiRoma()} value={dataProroga[a.id] || ''} onChange={e => setDataProroga(prev => ({ ...prev, [a.id]: e.target.value }))}
+                              className="text-xs border border-gray-300 rounded-lg px-2 py-1" />
+                            <button onClick={() => prorogaCheckup(a, riapri)} disabled={!dataProroga[a.id]}
+                              className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-xl hover:bg-amber-100 disabled:opacity-50">
+                              {riapri ? '🔓 Riapri' : 'Proroga'}
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}
                 {!sortedAssessments.some(a => a.status === 'active') && (
-                  <button onClick={createAssessment} disabled={saving}
-                    className="text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-xl hover:bg-green-100 disabled:opacity-50">
-                    {saving ? 'Creazione…' : '+ Nuovo assessment iniziale (nuovo ciclo annuale)'}
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="text-xs text-gray-500">Chiude il
+                      <input type="date" value={chiudeIlNuovo} min={oggiRoma()} onChange={e => setChiudeIlNuovo(e.target.value)} className="ml-1 text-xs border border-gray-300 rounded-lg px-2 py-1.5" />
+                    </label>
+                    <button onClick={createAssessment} disabled={saving || !chiudeIlNuovo}
+                      className="text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-xl hover:bg-green-100 disabled:opacity-50">
+                      {saving ? 'Creazione…' : '+ Nuovo assessment iniziale (nuovo ciclo annuale)'}
+                    </button>
+                  </div>
                 )}
+                {checkupErr && <div className="text-xs text-red-600">{checkupErr}</div>}
               </div>
             )}
           </div>
@@ -1418,5 +1473,8 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     capacity = await getTreatmentCapacity(clientId);
   } catch (_) {}
 
-  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist, generatedReports, allProfessionals, monitoring, capacity } };
+  let checkupGiorni = 10;
+  try { checkupGiorni = (await (await import('../../lib/org')).getOrgParams()).checkupGiorni; } catch (_) {}
+
+  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist, generatedReports, allProfessionals, monitoring, capacity, checkupGiorni } };
 });

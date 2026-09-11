@@ -137,6 +137,16 @@ export default function PricingV2Page() {
             <p className="text-[11px] text-gray-400 mt-2">Globali, editabili qui. Override per-azienda opzionale sui listini (colonna cliente); capienza gruppo resta per-azienda. Precedenza: override cliente → questi → default.</p>
           </div>
 
+          {/* Check-up: durata proposta all'avvio (modificabile caso per caso) */}
+          <div className={box}>
+            <h2 className="font-semibold text-gray-800 mb-3">Check-up</h2>
+            <label className="block text-xs text-gray-500 max-w-xs">Giorni di apertura proposti all'avvio (1–60)
+              <input type="number" min="1" max="60" step="1" defaultValue={texts.checkup_giorni_default ?? ''} placeholder="10" className={`${inputCls} mt-1`}
+                onBlur={e => { const v = e.target.value; if ((texts.checkup_giorni_default ?? '') !== v && /^\d+$/.test(v) && +v >= 1 && +v <= 60) put({ tipo: 'setting', key: 'checkup_giorni_default', value: v }, 'giorni del check-up salvati'); }} />
+            </label>
+            <p className="text-[11px] text-gray-400 mt-2">La data di chiusura parte da oggi + questi giorni e si può cambiare a ogni avvio. Il check-up chiude alle 23:59 di quel giorno; chi aveva già iniziato ha 30 minuti per inviare.</p>
+          </div>
+
           {/* Servizi & deliverable */}
           <div className={box}>
             <h2 className="font-semibold text-gray-800 mb-1">Servizi &amp; deliverable — valori dichiarati (€/anno)</h2>

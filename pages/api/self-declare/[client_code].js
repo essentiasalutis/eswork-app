@@ -4,7 +4,6 @@
 import {
   getClientByAssessmentShareCode,
   createSelfDeclaredPatient,
-  getActiveAssessmentByClient,
   insertResponse,
   insertAssessmentConsent,
   updatePatient,
@@ -14,6 +13,19 @@ import {
 import { computeLevel } from '../../../lib/scoring';
 import { hashIp } from '../../../lib/crypto-utils';
 import { getClientIp } from '../../../lib/rate-limit';
+import { statoCheckupCliente } from '../../../lib/checkup-server';
+import { etichettaData, etichettaOra } from '../../../lib/checkup';
+
+// Messaggio al dipendente quando il check-up è chiuso: onesto e senza dettagli tecnici.
+function messaggioChiuso(st, inviate) {
+  if (st.stato === 'non_avviato') return 'Il check-up non è ancora aperto.';
+  const quando = st.chiusoAlle
+    ? `il ${etichettaData(new Date(st.chiusoAlle).toISOString().slice(0, 10))} alle ${etichettaOra(st.chiusoAlle)}`
+    : (st.chiudeIl ? `il ${etichettaData(st.chiudeIl)}` : '');
+  return inviate
+    ? `Il check-up si è chiuso${quando ? ' ' + quando : ''}: queste risposte non sono state registrate. Grazie per il tempo che ci hai dedicato.`
+    : `Il check-up si è chiuso${quando ? ' ' + quando : ''}. Grazie per l'interesse.`;
+}
 
 export default async function handler(req, res) {
   const { client_code } = req.query;
@@ -21,7 +33,11 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const client = await getClientByAssessmentShareCode(client_code);
     if (!client) return res.status(404).json({ error: 'Link non valido' });
-    return res.json({ client: { id: client.id, name: client.name } });
+    const st = await statoCheckupCliente(client).catch(() => null);
+    return res.json({
+      client: { id: client.id, name: client.name },
+      checkup: st ? { stato: st.stato, chiude_il: st.chiudeIl, messaggio: st.accetta ? null : messaggioChiuso(st, false) } : null,
+    });
   }
 
   if (req.method === 'POST') {
@@ -45,6 +61,17 @@ export default async function handler(req, res) {
     // entrambi i consensi espliciti. Difesa lato server, non solo gate UI.
     if (consent_privacy !== true || consent_health !== true) {
       return res.status(400).json({ error: 'Consensi obbligatori mancanti: privacy e dati di salute.' });
+    }
+
+    // GATE CHECK-UP — PRIMA di creare qualunque cosa. Prima di questo gate il
+    // record del dipendente nasceva comunque e la risposta si perdeva in silenzio
+    // se il check-up era chiuso. Ora: chiuso = nulla salvato, e lo si dice.
+    // All'invio vale la grazia (lib/checkup.js): chi aveva iniziato in tempo non perde le risposte.
+    let st;
+    try { st = await statoCheckupCliente(client, { conGrazia: true }); }
+    catch (_) { return res.status(503).json({ error: 'Servizio momentaneamente non disponibile, riprova tra qualche minuto.' }); }
+    if (!st.accetta) {
+      return res.status(410).json({ codice: 'checkup_chiuso', error: messaggioChiuso(st, true) });
     }
 
     try {
@@ -81,8 +108,10 @@ export default async function handler(req, res) {
         assessment_completed_at: now,
       }).catch(e => console.error('updatePatient error:', e.message));
 
-      // 4. Salva risposte NMQ nell'assessment attivo (non-fatale)
-      const assessment = await getActiveAssessmentByClient(client.id).catch(() => null);
+      // 4. Salva le risposte NMQ nell'analisi del check-up — SOLO se è aperta.
+      //    In adesione (azienda firmata, check-up chiuso) la persona entra nel
+      //    programma ma l'analisi, base del Report di Attivazione, resta intatta.
+      const assessment = st.salvaRisposta ? st.assessment : null;
       if (assessment && answers) {
         await insertResponse({
           id: generateId('r'),

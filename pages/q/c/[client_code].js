@@ -30,13 +30,16 @@ function ESLogo({ size = 56 }) {
 
 // ─── Fase 0: Welcome screen ───────────────────────────────────────────────────
 
-function WelcomeScreen({ clientName, onIdentified }) {
+function WelcomeScreen({ clientName, chiudeEtichetta, onIdentified }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 max-w-lg mx-auto w-full">
         <ESLogo size={64} />
         <div className="text-2xl font-bold text-gray-900 mt-4 mb-1 text-center">ES Work</div>
-        {clientName && <div className="text-sm text-gray-500 mb-6 text-center">per {clientName}</div>}
+        {clientName && <div className={`text-sm text-gray-500 text-center ${chiudeEtichetta ? 'mb-2' : 'mb-6'}`}>per {clientName}</div>}
+        {chiudeEtichetta && (
+          <div className="text-xs font-semibold text-green-800 bg-green-100 rounded-full px-3 py-1 mb-6">Aperto fino al {chiudeEtichetta}</div>
+        )}
 
         <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6 w-full">
           <p className="text-sm text-gray-700 leading-relaxed mb-3">
@@ -249,7 +252,7 @@ const PHASES = {
   DONE: 'done',
 };
 
-export default function SelfDeclarePage({ client, error: serverError }) {
+export default function SelfDeclarePage({ client, error: serverError, checkup }) {
   const [phase, setPhase] = useState(PHASES.WELCOME);
   const [wantsContact, setWantsContact] = useState(true);
   const [contactData, setContactData] = useState(null);
@@ -257,6 +260,7 @@ export default function SelfDeclarePage({ client, error: serverError }) {
   const [answers, setAnswers] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [chiusoMsg, setChiusoMsg] = useState(null); // check-up chiuso scoperto all'invio (oltre la grazia)
   const [level, setLevel] = useState(null);
   const [careToken, setCareToken] = useState(null);
   const [consentVersion, setConsentVersion] = useState(null);
@@ -307,6 +311,9 @@ export default function SelfDeclarePage({ client, error: serverError }) {
         setCareToken(data.care_token || null);
         if (STORAGE_KEY) { try { localStorage.removeItem(STORAGE_KEY); } catch {} }
         setPhase(PHASES.DONE);
+      } else if (res.status === 410 && data.codice === 'checkup_chiuso') {
+        if (STORAGE_KEY) { try { localStorage.removeItem(STORAGE_KEY); } catch {} }
+        setChiusoMsg(data.error);
       } else {
         setSubmitError(data.error || `Errore ${res.status} — riprova tra qualche secondo.`);
       }
@@ -328,6 +335,27 @@ export default function SelfDeclarePage({ client, error: serverError }) {
     );
   }
 
+  const chiusoAlCaricamento = checkup && (checkup.stato === 'chiuso' || checkup.stato === 'non_avviato');
+  if (chiusoAlCaricamento || chiusoMsg) {
+    const testo = chiusoMsg
+      || (checkup.stato === 'non_avviato'
+        ? 'Il check-up non è ancora aperto.'
+        : `Il check-up si è chiuso${checkup.chiusoEtichetta ? ` il ${checkup.chiusoEtichetta}` : ''}. Grazie per l'interesse.`);
+    return (
+      <>
+        <Head><title>Check-up — {client?.name || 'ES Work'}</title></Head>
+        <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center px-6">
+          <div className="max-w-sm text-center">
+            <ESLogo size={56} />
+            <div className="text-2xl font-bold text-gray-900 mt-4 mb-1">ES Work</div>
+            {client?.name && <div className="text-sm text-gray-500 mb-6">per {client.name}</div>}
+            <div className="bg-white rounded-2xl border border-gray-200 p-5 text-sm text-gray-700 leading-relaxed">{testo}</div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <Head>
@@ -338,6 +366,7 @@ export default function SelfDeclarePage({ client, error: serverError }) {
       {phase === PHASES.WELCOME && (
         <WelcomeScreen
           clientName={client.name}
+          chiudeEtichetta={checkup?.chiudeEtichetta || null}
           onIdentified={() => setPhase(PHASES.CONSENT)}
         />
       )}
@@ -392,7 +421,18 @@ export async function getServerSideProps({ params }) {
     // tier: usa il valore salvato o derivalo dal numero di dipendenti
     const n = parseInt(client.employees) || 0;
     const tier = client.tier || (n <= 150 ? 'core' : n <= 500 ? 'plus' : 'enterprise');
-    return { props: { client: { id: client.id, name: client.name, share_code: client_code, tier } } };
+    // Stato del check-up calcolato QUI, al caricamento: se è chiuso il dipendente
+    // lo sa prima di iniziare, non dopo 5 minuti di risposte.
+    const { statoCheckupCliente } = await import('../../../lib/checkup-server');
+    const { etichettaData } = await import('../../../lib/checkup');
+    const st = await statoCheckupCliente(client).catch(() => null);
+    const checkup = st ? {
+      stato: st.stato,
+      chiudeEtichetta: st.stato === 'aperto' && st.chiudeIl ? etichettaData(st.chiudeIl) : null,
+      chiusoEtichetta: st.stato === 'chiuso' && (st.chiusoAlle || st.chiudeIl)
+        ? etichettaData(st.chiusoAlle ? new Date(st.chiusoAlle).toISOString().slice(0, 10) : st.chiudeIl) : null,
+    } : null;
+    return { props: { client: { id: client.id, name: client.name, share_code: client_code, tier }, checkup } };
   } catch (e) {
     return { props: { client: null, error: 'Errore interno: ' + e.message } };
   }

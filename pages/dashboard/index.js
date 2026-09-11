@@ -7,9 +7,19 @@ import { getDashboardFormazione } from '../../lib/org';
 import NavMenu from '../../components/NavMenu';
 import { TYPE_COLORS, TYPE_LABELS } from '../../lib/scoring';
 
-export default function Dashboard({ clients: initialClients, assessmentCounts, pendingAcuteCount, formazioneAlerts = [] }) {
+export default function Dashboard({ clients: initialClients, assessmentCounts, pendingAcuteCount, formazioneAlerts = [], solleciti: sollecitiIniziali = [] }) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
+  const [solleciti, setSolleciti] = useState(sollecitiIniziali);
+
+  // "Scrivi al referente": apre la posta con il testo pronto e segna il sollecito come
+  // fatto, così sparisce. Se la segnatura fallisce il promemoria resta (meglio doppio che perso).
+  async function segnaSollecito(s) {
+    const r = await fetch(`/api/assessments/${s.assessment_id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sollecito: s.tipo }),
+    }).catch(() => null);
+    if (r && r.ok) setSolleciti(prev => prev.filter(x => x.assessment_id !== s.assessment_id));
+  }
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -40,6 +50,30 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-6">
+        {solleciti.length > 0 && (
+          <div className="mb-5 bg-white rounded-2xl border border-amber-200 p-4">
+            <h2 className="font-semibold text-gray-700 text-sm mb-2">📣 Check-up da sollecitare oggi</h2>
+            <div className="space-y-1.5">
+              {solleciti.map(s => {
+                const pct = s.dipendenti > 0 ? Math.round((s.n / s.dipendenti) * 100) : null;
+                const href = `mailto:${encodeURIComponent(s.email)}?subject=${encodeURIComponent(s.oggetto)}&body=${encodeURIComponent(s.corpo)}`;
+                return (
+                  <div key={s.assessment_id} className="flex items-center justify-between py-1.5 px-1 text-sm gap-2 flex-wrap">
+                    <Link href={`/dashboard/${s.client_id}`} className="font-medium text-gray-800 hover:underline">{s.cliente}</Link>
+                    <span className="flex items-center gap-2 text-xs flex-wrap">
+                      <span className="text-gray-600">{s.n}{s.dipendenti > 0 ? ` su ${s.dipendenti}` : ''} questionari{pct != null ? ` · ${pct}%` : ''}</span>
+                      <span className={`px-2 py-0.5 rounded-full font-semibold ${s.tipo === 'finale' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'}`}>
+                        {s.giorni === 0 ? 'chiude oggi' : s.giorni === 1 ? 'chiude domani' : `chiude tra ${s.giorni} giorni`}
+                      </span>
+                      <a href={href} onClick={() => segnaSollecito(s)}
+                        className="font-semibold text-white bg-gray-900 px-3 py-1 rounded-lg hover:bg-gray-700">✉️ Scrivi al referente</a>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         {formazioneAlerts.length > 0 && (
           <div className="mb-5 bg-white rounded-2xl border border-gray-200 p-4">
             <h2 className="font-semibold text-gray-700 text-sm mb-2">📚 Formazione — nuovi ingressi da recuperare</h2>
@@ -144,5 +178,11 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
   let formazioneAlerts = [];
   try { formazioneAlerts = await getDashboardFormazione(new Date().toISOString().slice(0, 10)); } catch (_) {}
 
-  return { props: { clients, assessmentCounts, pendingAcuteCount, formazioneAlerts } };
+  let solleciti = [];
+  try {
+    const { getSollecitiCheckup } = await import('../../lib/checkup-server');
+    solleciti = await getSollecitiCheckup({ baseUrl: process.env.NEXT_PUBLIC_BASE_URL || 'https://eswork-app.vercel.app' });
+  } catch (_) {}
+
+  return { props: { clients, assessmentCounts, pendingAcuteCount, formazioneAlerts, solleciti } };
 });

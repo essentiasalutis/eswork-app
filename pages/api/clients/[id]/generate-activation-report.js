@@ -160,6 +160,7 @@ PARAMETRI OPERATIVI REALI (usa ESATTAMENTE questi, non altri):
 - Una giornata di sportello in sede vale ${CONFIG.hours_per_day} ore di erogazione
 VIETATO inventare dettagli di erogazione che non trovi qui sopra: quante sedute stanno in una giornata, la cadenza degli accessi (settimanale, quindicinale, mensile), durate, calendari, orari. Se un dato non ti è stato fornito, NON scriverlo: il report fissa il prezzo, ogni numero che scrivi diventa un impegno.
 VIETATO attribuire alla Piattaforma digitale ES Work funzioni che non ti sono state elencate (alert automatici, contenuti educativi personalizzati, questionari periodici, notifiche, tracciamento in tempo reale): è lo strumento con cui il programma viene gestito e i report prodotti, nient'altro.
+ERGONOMIA: descrivila SOLO con le voci e i numeri della riga «consulenza ergonomico-posturale» della PROPOSTA ECONOMICA COLLEGATA, senza aggiungerne. Se lì non compaiono addetti di reparto, NON citare alcuna formazione degli addetti; se non compaiono postazioni tipo di produzione, NON parlare di «studio delle postazioni». In ufficio l'intervento è per persona.
 VIETATO raccomandare al cliente attività che sono GIÀ comprese nell'investimento (in particolare la consulenza ergonomico-posturale — studio delle postazioni e formazione degli addetti sulla propria postazione — se compare nella PROPOSTA ECONOMICA COLLEGATA): sono incluse, non sono cose "da valutare".`;
 
   // Vincoli di wording per i documenti v2 (mai violarli nel testo generato).
@@ -171,7 +172,7 @@ VINCOLI TASSATIVI SUL TESTO:
 - MAI i termini Core, Plus, Enterprise, "tier", "modello Core/Plus/Enterprise": sono nomi INTERNI, non ti vengono forniti e non vanno inventati. Il prodotto si chiama SOLO "${nomeProdotto}".` : '';
   const istruzioniPacchetto = isPacchetto ? `
 ════ PRODOTTO "${nomeProdotto}" — 12 mesi, non rinnovabile, AUTOCONCLUSIVO ════
-Include SOLO: check-up completo (già svolto), formazione (2 moduli), consulenza ergonomico-posturale.
+Include SOLO: check-up completo (già svolto), formazione (2 moduli), consulenza ergonomico-posturale (osservazione delle postazioni e del gesto, con raccomandazioni di adeguamento: descrivila in termini generali, SENZA citare numeri di postazioni o di addetti).
 NON include: trattamenti individuali, percorsi clinici, prevenzione attiva, sportello osteopatico, follow-up, monitoraggio.
 
 DIVIETI ASSOLUTI — valgono su TUTTO il testo, incluse le PARAFRASI che aggirano la lettera del divieto ma ne violano lo spirito:
@@ -230,6 +231,7 @@ ${isPacchetto
 ${parametriOperativi}${vincoliV2}${istruzioniPacchetto}
 IDENTITÀ PROFESSIONALE (tassativa): il servizio è OSTEOPATICO. Usa sempre "osteopata", "trattamento osteopatico", "sportello osteopatico". VIETATO "fisioterapista", "fisioterapico", "riabilitativo/riabilitazione" e ogni termine fisioterapico riferito al nostro servizio. VIETATO anche presentare il servizio come atto medico o come medicina del lavoro: mai "medicina osteopatica", "medico", "sanitario", "medicina del lavoro", "sorveglianza sanitaria" riferiti a noi. La sorveglianza sanitaria resta del Medico Competente aziendale; noi siamo un programma osteopatico di prevenzione e trattamento, distinto e complementare.
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
+CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
 DATA: se includi un'intestazione con il riepilogo del cliente, riporta "Data: ${dataOggi}". Usa ESATTAMENTE questa data; non inventarne altre né citare altre date nel testo.
 Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole totali.`,
       }],
@@ -404,14 +406,18 @@ export async function buildQuoteBlock(client_id, client, answers) {
     // non se ne parla — e l'AI e' arrivata a raccomandarla come cosa da valutare.
     // I conteggi arrivano dal MOTORE (calc.y1.ergonomia), non ricalcolati qui:
     // il documento descrive esattamente ciò che è stato messo nel prezzo.
+    // Testo = voce 7 di Enrico ("In ufficio l'intervento è per persona; in produzione
+    // per postazione tipo") + SOLO le voci davvero nel prezzo: nel test del lessico,
+    // con 40 in ufficio e 0 addetti, l'AI aveva scritto "studio delle postazioni
+    // d'ufficio e formazione degli addetti" — due cose che quel prezzo non contiene.
     const ergo = calc.y1 && calc.y1.ergonomia;
     const pezzi = ergo ? [
-      ergo.nUfficio ? `${ergo.nUfficio} dipendenti d'ufficio sulla propria postazione` : null,
-      ergo.nPostazioni ? `studio di ${ergo.nPostazioni} postazioni tipo di reparto` : null,
-      ergo.nAddetti ? `formazione di ${ergo.nAddetti} addetti di reparto sulla postura della propria postazione` : null,
+      ergo.nUfficio ? `in ufficio, per persona: ${ergo.nUfficio} dipendenti` : null,
+      ergo.nPostazioni ? `in produzione, per postazione tipo: ${ergo.nPostazioni} postazioni` : null,
+      ergo.nAddetti ? `formazione di ${ergo.nAddetti} addetti di reparto alla postura corretta sulla propria postazione` : null,
     ].filter(Boolean) : [];
     const rigaErgonomia = (ergo && ergo.sell > 0 && pezzi.length)
-      ? `\n- Include la consulenza ergonomico-posturale (${pezzi.join('; ')}): è già compresa nell'investimento, non è un'attività da acquistare a parte`
+      ? `\n- Include la consulenza ergonomico-posturale — osservazione delle postazioni di lavoro e del gesto, con raccomandazioni di adeguamento e indicazioni personalizzate — ${pezzi.join('; ')}. È già compresa nell'investimento, non è un'attività da acquistare a parte. Non sostituisce la valutazione dei rischi ai sensi del D.Lgs. 81/2008, che resta di competenza del datore di lavoro e dell'RSPP.`
       : '';
 
     const block = `\nPROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):\n- Programma Anno 1: €${eur(realPrice)}${inLinea} (${calc.days_osteo_y1} giornate sportello, ${calc.training_sessions_y1} sessioni formative)\n- Anno 2 e successivi (indicativo): €${eur(calc.price_y2)}${rigaDimensionamento}${rigaErgonomia}`;

@@ -168,6 +168,7 @@ IMPORTANTE: riporta le percentuali di prevalenza ESATTAMENTE come indicate sopra
 
 ${t12.count === 0 ? 'NOTA: nessun check-up a 12 mesi ancora registrato — segnala che i KPI di esito saranno disponibili al completamento dei check-up.' : ''}
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
+CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
 Tono: clinico, orientato ai risultati e alla direzione. Italiano. Max 650 parole.` : `Sei un consulente clinico ES Work. Genera un Report Intermedio professionale a ${checkLabel} per il cliente ${client.name}.
 
 DATI CLINICI (i valori "n.d." sono soppressi per anonimato/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
@@ -203,6 +204,7 @@ STRUTTURA REPORT (markdown, ## per titoli):
 (3-4 azioni per i prossimi ${checkpoint === 't3' ? '3' : '6'} mesi)
 
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
+CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
 Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
 
   const reportType = `checkpoint_${checkpoint}`;

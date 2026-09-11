@@ -38,6 +38,18 @@ export default requireAuth(async function handler(req, res) {
       // pricing_version NON è modificabile via API: si decide alla creazione
       // (esistenti v1, nuove v2). Requisito #1: mai spostare un cliente di versione.
       delete body.pricing_version;
+      delete body.lettera_file_path; // il file della Lettera passa solo da /api/clients/[id]/lettera-incarico
+
+      // Binario commerciale: scelta MANUALE di Enrico (A/B) o non deciso (null).
+      if ('binario' in body && body.binario !== null && !['A', 'B'].includes(body.binario)) {
+        return res.status(422).json({ error: 'binario non valido (A, B o vuoto)' });
+      }
+      if ('lettera_stato' in body && body.lettera_stato !== null && !['da_inviare', 'inviata', 'firmata'].includes(body.lettera_stato)) {
+        return res.status(422).json({ error: 'stato della Lettera non valido' });
+      }
+      for (const k of ['lettera_inviata_il', 'lettera_firmata_il']) {
+        if (k in body && body[k] !== null && !/^\d{4}-\d{2}-\d{2}$/.test(String(body[k]))) return res.status(422).json({ error: 'data non valida' });
+      }
 
       // Prodotto d'ingresso: REGOLE DURE lato server (la UI può nascondere
       // l'opzione, ma è qui che viene rifiutata).
@@ -68,6 +80,7 @@ export default requireAuth(async function handler(req, res) {
       const updated = await updateClient(id, body);
       return res.json(updated);
     } catch (e) {
+      if (e && (e.code === 'PGRST204' || e.code === '42703')) return res.status(409).json({ error: 'Serve la migration v53 (binario e Lettera di incarico): applicala in Supabase e riprova.' });
       return res.status(500).json({ error: e.message });
     }
   }

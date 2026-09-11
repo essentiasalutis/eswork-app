@@ -200,6 +200,39 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [dataProroga, setDataProroga] = useState({}); // id → 'YYYY-MM-DD'
   const [conteggiLive, setConteggiLive] = useState({}); // id → n questionari
   const [checkupErr, setCheckupErr] = useState('');
+  // Binario commerciale (scelta manuale) e Lettera di incarico (binario B)
+  const [aziendaErr, setAziendaErr] = useState('');
+  const [dataLettera, setDataLettera] = useState(() => oggiRoma());
+  const [letteraBusy, setLetteraBusy] = useState(false);
+  async function aggiornaAzienda(fields) {
+    setAziendaErr('');
+    const r = await fetch(`/api/clients/${client.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) setClient(prev => ({ ...prev, ...j })); else setAziendaErr(j.error || 'Errore');
+  }
+  // File firmato → archivio privato con link firmato (stesso metodo dei documenti dei professionisti)
+  async function caricaLettera(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.type !== 'application/pdf') { setAziendaErr('Carica la lettera in PDF'); return; }
+    setLetteraBusy(true); setAziendaErr('');
+    try {
+      const s = await fetch(`/api/clients/${client.id}/lettera-incarico`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ azione: 'link-caricamento', content_type: file.type }) });
+      const sj = await s.json(); if (!s.ok) throw new Error(sj.error || 'Caricamento non disponibile');
+      const up = await fetch(sj.signed_url, { method: 'PUT', headers: { 'Content-Type': file.type, 'x-upsert': 'true' }, body: file });
+      if (!up.ok) throw new Error('Caricamento del file non riuscito');
+      const c = await fetch(`/api/clients/${client.id}/lettera-incarico`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ azione: 'conferma', path: sj.path }) });
+      const cj = await c.json(); if (!c.ok) throw new Error(cj.error || 'Registrazione non riuscita');
+      setClient(prev => ({ ...prev, ...cj }));
+    } catch (err) { setAziendaErr(err.message); }
+    setLetteraBusy(false);
+  }
+  async function apriLettera() {
+    const r = await fetch(`/api/clients/${client.id}/lettera-incarico`);
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.url) window.open(j.url, '_blank'); else setAziendaErr(j.error || 'Impossibile aprire la lettera');
+  }
   useEffect(() => {
     const aperto = (assessments || []).find(a => a.status === 'active');
     if (!aperto) return;
@@ -310,6 +343,8 @@ export default function ClientPage({ client: initialClient, assessments: initial
   // v4: si crea solo l'assessment INIZIALE (uno per ciclo). I checkpoint T3/T6
   // sono mini-check automatici; il T12 è il re-assessment con link personali.
   async function createAssessment() {
+    if (client.binario === 'B' && !['inviata', 'firmata'].includes(client.lettera_stato)
+      && !confirm('Lettera di incarico non ancora inviata a questa azienda (binario B).\n\nAvviare comunque il check-up?')) return;
     setSaving(true); setCheckupErr('');
     const res = await fetch('/api/assessments', {
       method: 'POST',
@@ -682,6 +717,7 @@ ${FIRMA}`;
                 style={{ background: TIER_COLORS[tier] + '18', color: TIER_COLORS[tier] }}>
                 {TIER_LABELS[tier]}
               </span>
+              {client.binario && <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-gray-900 text-white">Binario {client.binario}</span>}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -703,6 +739,46 @@ ${FIRMA}`;
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-6 space-y-6">
+        {/* ── Binario commerciale (scelta manuale) + Lettera di incarico (solo B) ── */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">🧭 Binario commerciale</h2>
+            <div className="flex gap-1 flex-wrap">
+              {[['A', 'A — titolare, micro/piccola'], ['B', 'B — HR/board, media/grande'], ['', 'Da decidere']].map(([v, l]) => (
+                <button key={v || 'nd'} onClick={() => aggiornaAzienda({ binario: v || null })}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${(client.binario || '') === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
+              ))}
+            </div>
+          </div>
+          {client.binario === 'B' && (
+            <div className="border-t border-gray-100 pt-3">
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">📄 Lettera di incarico</div>
+              <div className="flex items-center gap-2 flex-wrap text-sm">
+                {client.lettera_stato === 'firmata'
+                  ? <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-100 text-green-800">Firmata {client.lettera_firmata_il ? ilGiorno(client.lettera_firmata_il) : ''}</span>
+                  : client.lettera_stato === 'inviata'
+                    ? <span className="text-xs font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-800">Inviata {client.lettera_inviata_il ? ilGiorno(client.lettera_inviata_il) : ''}</span>
+                    : <span className="text-xs font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-800">Da inviare</span>}
+                {client.lettera_stato !== 'firmata' && (
+                  <>
+                    <input type="date" value={dataLettera} onChange={e => setDataLettera(e.target.value)} className="text-xs border border-gray-300 rounded-lg px-2 py-1" />
+                    {client.lettera_stato !== 'inviata'
+                      ? <button onClick={() => aggiornaAzienda({ lettera_stato: 'inviata', lettera_inviata_il: dataLettera })} className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1 rounded-lg">Segna inviata</button>
+                      : <button onClick={() => aggiornaAzienda({ lettera_stato: 'firmata', lettera_firmata_il: dataLettera })} className="text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-1 rounded-lg">Segna firmata</button>}
+                  </>
+                )}
+                <label className={`text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-200 px-3 py-1 rounded-lg cursor-pointer ${letteraBusy ? 'opacity-50' : ''}`}>
+                  📎 {letteraBusy ? 'Caricamento…' : client.lettera_file_path ? 'Sostituisci la lettera firmata' : 'Carica la lettera firmata (PDF)'}
+                  <input type="file" accept="application/pdf" hidden disabled={letteraBusy} onChange={caricaLettera} />
+                </label>
+                {client.lettera_file_path && <button onClick={apriLettera} className="text-xs font-semibold text-gray-700 underline">Apri la lettera firmata</button>}
+              </div>
+              <p className="text-[11px] text-gray-400 mt-2">Il testo della Lettera è quello dell&apos;avvocato: qui si tiene traccia dello stato e si conserva il file firmato, in un archivio privato (si apre solo con un link a scadenza).</p>
+            </div>
+          )}
+          {aziendaErr && <div className="text-xs text-red-600">{aziendaErr}</div>}
+        </div>
+
         {/* ── Gestione Dipendenti & Campagna Assessment ──────────── */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
           <div className="flex items-center justify-between">

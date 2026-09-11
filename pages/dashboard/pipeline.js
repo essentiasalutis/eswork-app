@@ -48,6 +48,7 @@ function ClientCard({ client, onMove }) {
         <Link href={`/dashboard/${client.id}`} className="font-semibold text-gray-900 text-sm leading-tight hover:text-green-700 flex-1 min-w-0 truncate">
           {client.name}
           {client.is_demo && <span className="ml-1.5 text-[9px] font-bold px-1 py-0.5 rounded bg-gray-200 text-gray-500 align-middle">DEMO</span>}
+          {client.binario && <span className="ml-1 text-[9px] font-bold px-1 py-0.5 rounded bg-gray-900 text-white align-middle">{client.binario}</span>}
         </Link>
         <span className="text-xs text-gray-400 whitespace-nowrap">{client.employees} dip.</span>
       </div>

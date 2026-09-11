@@ -33,6 +33,8 @@ function dividiSedi(tot, k, prev = []) {
   }));
 }
 const RUOLI_DECISORE = ['Titolare', 'Responsabile HR', 'Direzione', 'Altro'];
+// Binario commerciale: scelta MANUALE (decisione di Enrico, nessuna regola automatica).
+const BINARI = [['A', 'A — titolare, micro/piccola'], ['B', 'B — HR/board, media/grande'], ['', 'Da decidere']];
 
 function Field({ label, hint, children }) {
   return <div><label className="block text-sm font-semibold text-gray-700 mb-1">{label}</label>{hint && <p className="text-xs text-gray-400 mb-1.5">{hint}</p>}{children}</div>;
@@ -68,6 +70,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
   const [nome, setNome] = useState(initialClient?.name || s1.nome || '');
   const [refNome, setRefNome] = useState(s1.ref_nome || initialClient?.contact_name || '');
   const [refRuolo, setRefRuolo] = useState(s1.ref_ruolo || '');
+  const [binario, setBinario] = useState(initialClient?.binario ?? s1.binario ?? '');
   const [refEmail, setRefEmail] = useState(s1.ref_email || initialClient?.contact_email || '');
   const [refTel, setRefTel] = useState(s1.ref_tel || initialClient?.contact_phone || '');
   const [workDesc, setWorkDesc] = useState(s1.work_desc || '');
@@ -156,7 +159,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
 
   function buildData() {
     return {
-      step1: { nome, ref_nome: refNome, ref_ruolo: refRuolo, ref_email: refEmail, ref_tel: refTel, work_desc: workDesc, sector, disturbi, disturbi_altro: disturbiAltro, prev_fatta: prevFatta, prev_note: prevNote, assenteismo, absence_days: absenceDays, note: note1 },
+      step1: { nome, ref_nome: refNome, ref_ruolo: refRuolo, binario: binario || null, ref_email: refEmail, ref_tel: refTel, work_desc: workDesc, sector, disturbi, disturbi_altro: disturbiAltro, prev_fatta: prevFatta, prev_note: prevNote, assenteismo, absence_days: absenceDays, note: note1 },
       step2: { sedi, capienza, training_mode: trainingMode, fatturato, hr_maturity: hrMaturity, tier_override: tierOverride, tier, ergonomia_ufficio: nErgUfficio, ergonomia_ufficio_auto: ergUffAuto, ergonomia_addetti: nErgAddetti, ergonomia_postazioni: nErgPostazioni },
       step3: { spazio, spazio_note: spazioNote, fasce, mc, mc_nome: mcNome, mc_contatti: mcContatti, esg, refop_nome: refOpNome, refop_ruolo: refOpRuolo, refop_contatti: refOpContatti },
       params: { rates, l2_mult: l2Mult, vat_exempt: vatExempt },
@@ -209,7 +212,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
     const t = setTimeout(() => save({ silent: true }), 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nome, refNome, refRuolo, refEmail, refTel, workDesc, sector, disturbi, disturbiAltro, prevFatta, prevNote, assenteismo, absenceDays, note1, sedi, capienza, trainingMode, fatturato, hrMaturity, tierOverride, spazio, spazioNote, fasce, mc, mcNome, mcContatti, esg, refOpNome, refOpRuolo, refOpContatti, rates, l2Mult, vatExempt, ergUffAuto, ergUffManuale, ergAddetti, ergPostazioni]);
+  }, [nome, refNome, refRuolo, refEmail, refTel, workDesc, sector, disturbi, disturbiAltro, prevFatta, prevNote, assenteismo, absenceDays, note1, sedi, capienza, trainingMode, fatturato, hrMaturity, tierOverride, spazio, spazioNote, fasce, mc, mcNome, mcContatti, esg, refOpNome, refOpRuolo, refOpContatti, rates, l2Mult, vatExempt, ergUffAuto, ergUffManuale, ergAddetti, ergPostazioni, binario]);
 
   function toggleArr(arr, set, v) { set(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]); }
   function setSede(i, k, v) { setSedi(prev => prev.map((s, j) => j === i ? { ...s, [k]: k === 'employees' ? (v === '' ? '' : Math.max(0, parseInt(v) || 0)) : v } : s)); }
@@ -323,6 +326,14 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                 </select>
               </Field>
             </div>
+            <Field label="Binario" hint="lo decidi tu, capendo chi hai di fronte">
+                <div className="flex gap-1">
+                  {BINARI.map(([v, l]) => (
+                    <button key={v || 'nd'} type="button" onClick={() => setBinario(v)}
+                      className={`flex-1 py-2.5 px-2 text-xs font-semibold rounded-xl ${binario === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
+                  ))}
+                </div>
+              </Field>
             <Field label="Email del referente" hint="serve per inviare la Stima"><input type="email" value={refEmail} onChange={e => setRefEmail(e.target.value)} className={inputCls} /></Field>
 
             {n > 0 && (
@@ -349,6 +360,14 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
               <Field label="Referente — nome *"><input value={refNome} onChange={e => setRefNome(e.target.value)} placeholder="Mario Rossi" className={inputCls} /></Field>
               <Field label="Referente — ruolo *"><input value={refRuolo} onChange={e => setRefRuolo(e.target.value)} placeholder="HR / Direzione / Titolare" className={inputCls} /></Field>
             </div>
+            <Field label="Binario" hint="lo decidi tu, capendo chi hai di fronte">
+                <div className="flex gap-1">
+                  {BINARI.map(([v, l]) => (
+                    <button key={v || 'nd'} type="button" onClick={() => setBinario(v)}
+                      className={`flex-1 py-2.5 px-2 text-xs font-semibold rounded-xl ${binario === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
+                  ))}
+                </div>
+              </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Email referente"><input value={refEmail} onChange={e => setRefEmail(e.target.value)} placeholder="email@azienda.it" className={inputCls} /></Field>
               <Field label="Telefono referente"><input value={refTel} onChange={e => setRefTel(e.target.value)} placeholder="333…" className={inputCls} /></Field>

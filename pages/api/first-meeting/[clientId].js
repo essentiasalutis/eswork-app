@@ -38,7 +38,17 @@ export default requireAuth(async function handler(req, res) {
       if (testo(s1.ref_nome)) clientPatch.contact_name = testo(s1.ref_nome);
       if (testo(s1.ref_email)) clientPatch.contact_email = testo(s1.ref_email);
       if (testo(s1.ref_tel)) clientPatch.contact_phone = testo(s1.ref_tel);
-      if (Object.keys(clientPatch).length) await updateClient(clientId, clientPatch).catch(() => {});
+      // Binario: decisione manuale di Enrico nel colloquio (anche "non deciso" = null).
+      if ('binario' in s1) clientPatch.binario = s1.binario === 'A' || s1.binario === 'B' ? s1.binario : null;
+      if (Object.keys(clientPatch).length) {
+        // Senza v53 la colonna binario non esiste: si riprova senza, gli altri campi si allineano comunque.
+        await updateClient(clientId, clientPatch).catch(async (e) => {
+          if (e && (e.code === 'PGRST204' || e.code === '42703') && 'binario' in clientPatch) {
+            const { binario, ...resto } = clientPatch;
+            if (Object.keys(resto).length) await updateClient(clientId, resto).catch(() => {});
+          }
+        });
+      }
 
       return res.status(200).json(meeting);
     } catch (e) {

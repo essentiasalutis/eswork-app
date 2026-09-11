@@ -93,6 +93,11 @@ export default requireAuth(async function handler(req, res) {
     }
   }
 
+  // Variante "Pacchetto d'ingresso" mostrabile come ripiego (regola di Enrico: il
+  // prodotto è sempre il programma completo, il Pacchetto si mostra su resistenza):
+  // stesse regole dure del Pacchetto — solo v2 e sotto la soglia di dipendenti.
+  const variantePacchetto = pricingVersion === 'v2' && validatePacchetto({ employees, pricingVersion, v2Params }).ok;
+
   // Sorgente UNICA della forbice (live).
   const forchetta = computeForchetta({
     n: employees, sector, tier: b.tier, groups: b.groups,
@@ -122,17 +127,17 @@ export default requireAuth(async function handler(req, res) {
   // `forchetta`+`snapshot` in risposta: solo admin (requireAuth). Servono alla UI
   // colloquio (dettaglio + label "ANTEPRIMA — forbice non impegnata" quando
   // store=false e snapshot NULL); il documento cliente resta le tre cifre.
-  if (!b.store) return res.json({ ok: true, referente, html, forchetta: forchettaOut, snapshot });
+  if (!b.store) return res.json({ ok: true, referente, html, forchetta: forchettaOut, snapshot, variantePacchetto });
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return res.json({ ok: true, referente, html, url: null, forchetta: forchettaOut, snapshot, message: 'Storage PDF non configurato — usa Stampa per salvare in PDF' });
+    return res.json({ ok: true, referente, html, url: null, forchetta: forchettaOut, snapshot, variantePacchetto, message: 'Storage PDF non configurato — usa Stampa per salvare in PDF' });
   }
   try {
     const filename = `stima_${b.clientId || 'x'}_${Date.now()}.pdf`;
     const { url } = await generateAndStorePdf(html, filename, 'quotes');
-    return res.json({ ok: true, referente, url, html, forchetta: forchettaOut, snapshot });
+    return res.json({ ok: true, referente, url, html, forchetta: forchettaOut, snapshot, variantePacchetto });
   } catch (e) {
     console.error('[stima]', e.message);
-    return res.json({ ok: true, referente, html, url: null, forchetta: forchettaOut, snapshot, error: `PDF non generato: ${e.message}` });
+    return res.json({ ok: true, referente, html, url: null, forchetta: forchettaOut, snapshot, variantePacchetto, error: `PDF non generato: ${e.message}` });
   }
 });

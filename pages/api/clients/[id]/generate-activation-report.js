@@ -13,6 +13,7 @@ import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { calculatePricing, computeForchetta, realL1L2FromAssessment } from '../../../../lib/calculator';
 import { getPricingSettingsV2, getServiziDeliverable, getNotaValidazione } from '../../../../lib/pricing/settings';
 import { ergonomiaDaColloquio } from '../../../../lib/pricing/v2';
+import { isFirmato } from '../../../../lib/checkup-server';
 import { getForchettaSnapshot, freezeStimaSnapshot } from '../../../../lib/pricing/snapshot';
 import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
@@ -122,7 +123,12 @@ export default requireAuth(async function handler(req, res) {
 
   // Per il pacchetto NON passiamo sessioni/NRS/tier: sono 0/interni e inducono
   // l'AI a citare trattamenti "non ancora erogati". Solo la fotografia neutra.
-  const clinicoBlock = isPacchetto ? '' : `
+  // FASE. Il Report di Attivazione di norma precede il contratto: il programma è PROPOSTO.
+  // Nei test l'AI ha scritto "Il programma ES Work è stato attivato presso…" e il testo di
+  // riserva diceva "Sono state erogate 0 sessioni… Il programma è operativamente attivo":
+  // falsi prima della firma. Se l'azienda ha già firmato (binario A) si può dire "attivo".
+  const firmato = isFirmato(client);
+  const clinicoBlock = (isPacchetto || !firmato) ? '' : `
 SESSIONI EROGATE: ${sessions.length}
 NRS medio pre-sessione: ${avgNrsPre.toFixed(1)}/10
 NRS medio post-sessione: ${avgNrsPost.toFixed(1)}/10
@@ -132,6 +138,7 @@ Riduzione media NRS: ${(avgNrsPre - avgNrsPost).toFixed(1)} punti
 CLIENTE: ${client.name}
 Settore: ${sectorLabel}
 Dipendenti totali: ${client.employees || 'n.d.'}
+STATO DEL PROGRAMMA: ${firmato ? 'attivo (contratto firmato)' : 'PROPOSTO (contratto non ancora firmato)'}
 STRATIFICAZIONE (${stratTotal} questionari compilati):
 ${stratLines(l1Count, l2Count, l3Count, stratTotal)}
 
@@ -185,7 +192,7 @@ PRINCIPIO GUIDA: la stratificazione è la fotografia dello stato della popolazio
 
   // Fallback se manca la chiave
   if (!process.env.ANTHROPIC_API_KEY) {
-    const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { serviziBlock, isPacchetto, nomeProdotto, testoEvoluzione }));
+    const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { serviziBlock, isPacchetto, nomeProdotto, testoEvoluzione, firmato }));
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', pdf_url: pdfUrl, report_id: rec?.id });
@@ -229,7 +236,7 @@ ${isPacchetto
   ? '(SOLO gli step del pacchetto: restituzione dei risultati alla direzione, formazione collettiva, sopralluogo ergonomico e conferma delle postazioni, consulenza ergonomico-posturale; NIENTE monitoraggio, follow-up clinici o trattamenti)'
   : '(5 step operativi con timeframe indicativo)'}
 ${parametriOperativi}${vincoliV2}${istruzioniPacchetto}
-IDENTITÀ PROFESSIONALE (tassativa): il servizio è OSTEOPATICO. Usa sempre "osteopata", "trattamento osteopatico", "sportello osteopatico". VIETATO "fisioterapista", "fisioterapico", "riabilitativo/riabilitazione" e ogni termine fisioterapico riferito al nostro servizio. VIETATO anche presentare il servizio come atto medico o come medicina del lavoro: mai "medicina osteopatica", "medico", "sanitario", "medicina del lavoro", "sorveglianza sanitaria" riferiti a noi. La sorveglianza sanitaria resta del Medico Competente aziendale; noi siamo un programma osteopatico di prevenzione e trattamento, distinto e complementare.
+${firmato ? '' : 'STATO (tassativo): il contratto NON è ancora firmato, questo report PROPONE il programma. VIETATO scrivere che il programma è stato attivato, avviato, erogato o che è operativo, e VIETATO citare sessioni già svolte: scrivi «programma proposto», «si propone di attivare».\n'}IDENTITÀ PROFESSIONALE (tassativa): il servizio è OSTEOPATICO. Usa sempre "osteopata", "trattamento osteopatico", "sportello osteopatico". VIETATO "fisioterapista", "fisioterapico", "riabilitativo/riabilitazione" e ogni termine fisioterapico riferito al nostro servizio. VIETATO anche presentare il servizio come atto medico o come medicina del lavoro: mai "medicina osteopatica", "medico", "sanitario", "medicina del lavoro", "sorveglianza sanitaria" riferiti a noi. La sorveglianza sanitaria resta del Medico Competente aziendale; noi siamo un programma osteopatico di prevenzione e trattamento, distinto e complementare.
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
 DATA: se includi un'intestazione con il riepilogo del cliente, riporta "Data: ${dataOggi}". Usa ESATTAMENTE questa data; non inventarne altre né citare altre date nel testo.
@@ -242,7 +249,7 @@ Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole tota
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report, source: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
-    const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { serviziBlock, isPacchetto, nomeProdotto, testoEvoluzione }));
+    const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { serviziBlock, isPacchetto, nomeProdotto, testoEvoluzione, firmato }));
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
@@ -250,7 +257,7 @@ Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole tota
 });
 
 function generateFallbackReport(client, l1, l2, l3, total, sessioni, settore, quoteBlock, v2 = {}) {
-  const { serviziBlock = '', isPacchetto = false, nomeProdotto = '', testoEvoluzione = '' } = v2;
+  const { serviziBlock = '', isPacchetto = false, nomeProdotto = '', testoEvoluzione = '', firmato = false } = v2;
   const small = tooSmall(total);
   const P = small ? null : Object.fromEntries(kAnonPartition([
     { key: 'l1', count: l1 }, { key: 'l2', count: l2 }, { key: 'l3', count: l3 },
@@ -276,12 +283,18 @@ ${isPacchetto
 
 La fotografia raccolta indica una quota in Livello 1 pari a ${pctL1txt}: il dettaglio per livello è riportato nella Mappa Clinica.
 
-Il percorso prosegue con le attività previste: formazione collettiva e consulenza ergonomico-posturale.`
-  : `Il programma ES Work per **${client.name}** (${settore}, ${client.employees || 'n.d.'} dipendenti) ha completato il check-up iniziale con ${total} dipendenti valutati.
+${firmato ? 'Il percorso prosegue con le attività previste' : 'Il percorso proposto prevede'}: formazione collettiva e consulenza ergonomico-posturale.`
+  : firmato
+  ? `Il programma ES Work per **${client.name}** (${settore}, ${client.employees || 'n.d.'} dipendenti) ha completato il check-up iniziale con ${total} dipendenti valutati.
 
-La distribuzione clinica evidenzia una quota in Livello 1 (trattamento attivo) pari a ${pctL1txt}, profilo di rischio ${riskTxt}. Sono state erogate ${sessioni} sessioni osteopatiche ad oggi.
+La distribuzione clinica evidenzia una quota in Livello 1 (trattamento attivo) pari a ${pctL1txt}, profilo di rischio ${riskTxt}.${sessioni > 0 ? ` Sono state erogate ${sessioni} sessioni osteopatiche ad oggi.` : ''}
 
-Il programma è operativamente attivo e i risultati preliminari confermano la pertinenza dell'intervento.`}
+Il programma è attivo: il piano operativo è riportato di seguito.`
+  : `Il check-up per **${client.name}** (${settore}, ${client.employees || 'n.d.'} dipendenti) ha coinvolto ${total} dipendenti.
+
+La distribuzione clinica evidenzia una quota in Livello 1 (trattamento attivo) pari a ${pctL1txt}, profilo di rischio ${riskTxt}.
+
+Il programma proposto è dimensionato su questi dati: il piano operativo e l'investimento sono riportati di seguito.`}
 
 ## Mappa Clinica della Popolazione
 

@@ -24,9 +24,13 @@ export default function StimaPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [snapMeta, setSnapMeta] = useState(null); // { exists, frozen, source, preview, at }
+  // Variante "Pacchetto d'ingresso" mostrata al cliente SENZA cambiare il prodotto
+  // dell'azienda: il prodotto si cambia nel colloquio solo se il cliente lo sceglie.
+  const [variante, setVariante] = useState('programma');
+  const [variantePacchetto, setVariantePacchetto] = useState(false);
   const iframeRef = useRef(null);
 
-  function buildBody(store) {
+  function buildBody(store, v = variante) {
     return {
       clientId: q.clientId || null,
       name: q.name || '—',
@@ -43,7 +47,7 @@ export default function StimaPage() {
       ergonomiaUfficio: q.ergu != null ? Number(q.ergu) : undefined,
       ergonomiaAddetti: q.erga != null ? Number(q.erga) : undefined,
       ergonomiaPostazioni: q.ergp != null ? Number(q.ergp) : undefined,
-      tipoProdotto: q.prodotto === 'pacchetto_prevenzione' ? 'pacchetto_prevenzione' : undefined,
+      tipoProdotto: q.prodotto === 'pacchetto_prevenzione' || v === 'pacchetto' ? 'pacchetto_prevenzione' : undefined,
       store,
     };
   }
@@ -55,6 +59,7 @@ export default function StimaPage() {
         const r = await fetch('/api/stima', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildBody(false)) });
         const j = await r.json();
         setSnapMeta(j.snapshot ?? null);
+        setVariantePacchetto(!!j.variantePacchetto);
         if (j.html) setHtml(j.html); else setErr(j.error || 'Errore nella generazione');
       } catch { setErr('Errore di rete'); }
     })();
@@ -70,6 +75,17 @@ export default function StimaPage() {
   // al cliente) e apre la posta di Enrico con il testo pronto. Testo = paragrafo
   // "Stima di investimento" della mail di riepilogo di Enrico; al punto 4 del funnel
   // verrà sostituito dalla mail di riepilogo completa (check-up, date, kit).
+  async function mostraVariante(v) {
+    setBusy(true); setErr('');
+    try {
+      const r = await fetch('/api/stima', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildBody(false, v)) });
+      const j = await r.json();
+      if (!r.ok || !j.html) { setErr(j.error || 'Variante non disponibile'); setBusy(false); return; }
+      setVariante(v); setHtml(j.html); setSnapMeta(j.snapshot ?? null);
+    } catch { setErr('Errore di rete'); }
+    setBusy(false);
+  }
+
   async function inviaAlReferente() {
     setBusy(true); setErr('');
     try {
@@ -110,9 +126,20 @@ export default function StimaPage() {
               <button onClick={stampa} disabled={!html} className="text-sm font-semibold text-gray-700 bg-gray-100 border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-200 disabled:opacity-50">🖨 Stampa</button>
               <button onClick={scaricaPdf} disabled={busy || !html} className="text-sm font-semibold text-white bg-green-600 px-4 py-2 rounded-xl hover:bg-green-700 disabled:opacity-50">{busy ? '…' : '⬇ Scarica PDF'}</button>
               <button onClick={inviaAlReferente} disabled={busy || !html} className="text-sm font-semibold text-white bg-gray-900 px-4 py-2 rounded-xl hover:bg-gray-700 disabled:opacity-50">✉️ Invia al referente</button>
+              {variantePacchetto && q.prodotto !== 'pacchetto_prevenzione' && (
+                <button onClick={() => mostraVariante(variante === 'programma' ? 'pacchetto' : 'programma')} disabled={busy}
+                  className="text-sm font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl hover:bg-blue-100 disabled:opacity-50">
+                  {variante === 'programma' ? 'Mostra anche il Pacchetto d\'ingresso' : '← Torna al programma completo'}
+                </button>
+              )}
             </div>
           </div>
-          {snapMeta && (() => {
+          {variante === 'pacchetto' && (
+            <div className="max-w-4xl mx-auto px-5 pb-2"><div className="text-xs px-3 py-1.5 rounded-lg border bg-blue-50 text-blue-800 border-blue-200">
+              Variante Pacchetto d&apos;ingresso: il prodotto dell&apos;azienda resta il programma completo. Lo cambi nel colloquio solo se il cliente sceglie il Pacchetto; la forbice del programma resta impegnata.
+            </div></div>
+          )}
+          {variante === 'programma' && snapMeta && (() => {
             const s = snapMeta;
             const fmt = s.at ? new Date(s.at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
             let text, cls, icon;

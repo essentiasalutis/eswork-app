@@ -54,7 +54,7 @@ export default function ComunicazioniPage() {
       <Head><title>Comunicazioni — ES Work</title></Head>
       <div className="min-h-screen bg-gray-50">
         <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-          <div className="max-w-4xl mx-auto px-5 py-3 flex items-center justify-between">
+          <div className="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Link href="/dashboard" className="text-gray-400 hover:text-gray-600 text-sm">←</Link>
               <h1 className="font-bold text-gray-900">Comunicazioni</h1>
@@ -64,7 +64,7 @@ export default function ComunicazioniPage() {
           </div>
         </header>
 
-        <main className="max-w-4xl mx-auto p-5 space-y-4">
+        <main className="max-w-6xl mx-auto p-5 space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-xs text-gray-500">Messaggi inviati dalle aziende dal link HR. L'HR vede solo lo <strong>stato</strong> che imposti qui (e la data, se programmata) — mai il testo.</p>
             <div className="flex gap-1 text-xs">

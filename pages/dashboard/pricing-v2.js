@@ -89,7 +89,7 @@ export default function PricingV2Page() {
       <Head><title>Listino v2 — ES Work</title></Head>
       <div className="min-h-screen bg-gray-50">
         <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-          <div className="max-w-4xl mx-auto px-5 py-3 flex items-center gap-3">
+          <div className="max-w-6xl mx-auto px-5 py-3 flex items-center gap-3">
             <Link href="/dashboard" className="text-gray-400 hover:text-gray-700">←</Link>
             <div className="flex-1">
               <h1 className="font-bold text-gray-900">⚙️ Listino v2 — parametri, servizi e argomentari</h1>
@@ -100,7 +100,7 @@ export default function PricingV2Page() {
           </div>
         </header>
 
-        <main className="max-w-4xl mx-auto px-5 py-6 space-y-5">
+        <main className="max-w-6xl mx-auto px-5 py-6 space-y-5">
           {err && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{err}</div>}
 
           {/* Fattori numerici */}

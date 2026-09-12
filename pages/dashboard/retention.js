@@ -26,7 +26,7 @@ export default function RetentionPage({ review }) {
       <Head><title>Conservazione dati — ES Work</title></Head>
       <div className="min-h-screen bg-gray-50">
         <header className="bg-white border-b border-gray-200">
-          <div className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-3">
+          <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-3">
             <Link href="/dashboard" className="text-gray-400 hover:text-gray-700">←</Link>
             <div>
               <h1 className="font-bold text-gray-900">🗄️ Conservazione dati (retention)</h1>
@@ -35,7 +35,7 @@ export default function RetentionPage({ review }) {
           </div>
         </header>
 
-        <main className="max-w-5xl mx-auto px-6 py-6 space-y-6">
+        <main className="max-w-6xl mx-auto px-6 py-6 space-y-6">
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 leading-relaxed">
             <strong>Cancellazione assistita (non automatica).</strong> Il sistema <em>segnala</em> qui i dati che hanno superato il termine di conservazione di {review.years} anni; la cancellazione è eseguita e validata dal titolare del trattamento (mai in automatico su dati sanitari). Le risposte riservate aggregate del check-up restano negli aggregati e non sono riconducibili alla persona.
           </div>

@@ -619,7 +619,7 @@ ${FIRMA}`,
   if (reportAssessment) {
     return (
       <div className="min-h-screen bg-white">
-        <div className="max-w-5xl mx-auto px-6 py-4 no-print flex gap-3 border-b border-gray-200 mb-2">
+        <div className="max-w-6xl mx-auto px-6 py-4 no-print flex gap-3 border-b border-gray-200 mb-2">
           <button onClick={() => setReportAssessment(null)} className="flex items-center gap-1 text-sm text-gray-600 border border-gray-300 px-3 py-2 rounded-xl">
             ← Indietro
           </button>
@@ -752,7 +752,7 @@ ${FIRMA}`,
       )}
 
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-6 py-3 flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center gap-3">
           <Link href="/dashboard" className="text-gray-400 hover:text-gray-600 p-1">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -787,7 +787,7 @@ ${FIRMA}`,
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-6 space-y-6">
+      <main className="max-w-6xl mx-auto px-6 py-6 space-y-6">
         {/* ── Avvio del programma (solo dopo la firma): kit di avvio per i dipendenti ── */}
         {isFirmato(client.pipeline_stage) && (
           <div className="bg-white rounded-2xl border border-green-200 p-5 flex items-center justify-between gap-3 flex-wrap">

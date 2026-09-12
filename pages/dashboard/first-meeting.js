@@ -263,7 +263,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-5 py-3 flex items-center gap-3">
+        <div className="max-w-4xl mx-auto px-5 py-3 flex items-center gap-3">
           <Link href={clientId ? `/dashboard/${clientId}` : '/dashboard'} className="text-gray-400 hover:text-gray-600 p-1">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           </Link>
@@ -273,13 +273,13 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
           </div>
           <NavMenu />
         </div>
-        <div className="max-w-2xl mx-auto px-5 pb-2 flex gap-1 text-xs">
+        <div className="max-w-4xl mx-auto px-5 pb-2 flex gap-1 text-xs">
           {[['rapido', '📞 Telefonata'], ['completo', '📋 Colloquio completo']].map(([v, l]) => (
             <button key={v} type="button" onClick={() => { setModo(v); if (v === 'completo') setStep(1); }}
               className={`px-3 py-1.5 rounded-lg font-semibold ${modo === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
           ))}
         </div>
-        <div className={`max-w-2xl mx-auto px-5 pb-3 flex gap-2 ${modo === 'rapido' ? 'hidden' : ''}`}>
+        <div className={`max-w-4xl mx-auto px-5 pb-3 flex gap-2 ${modo === 'rapido' ? 'hidden' : ''}`}>
           {STEPS.map((label, i) => (
             <button key={i} onClick={() => goStep(i + 1)} className={`flex-1 text-left ${step === i + 1 ? '' : 'opacity-60'}`}>
               <div className={`h-1.5 rounded-full mb-1 ${i + 1 <= step ? 'bg-green-500' : 'bg-gray-200'}`} />
@@ -289,7 +289,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-5 py-5 space-y-5">
+      <main className="max-w-4xl mx-auto px-5 py-5 space-y-5">
         {modo === 'rapido' && (
           <div className="space-y-5">
             <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">

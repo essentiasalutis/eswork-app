@@ -56,7 +56,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10 no-print">
-        <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
           <div>
             <span className="text-xl font-bold text-gray-900">ES </span>
             <span className="text-xl font-bold text-green-600">Work</span>
@@ -68,7 +68,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-6">
+      <main className="max-w-6xl mx-auto px-6 py-6">
         {agenda.length > 0 && (
           <div className="mb-5 bg-white rounded-2xl border border-gray-200 p-4">
             <h2 className="font-semibold text-gray-700 text-sm mb-2">📅 Questa settimana</h2>

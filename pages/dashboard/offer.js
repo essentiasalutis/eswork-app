@@ -493,10 +493,14 @@ ${FIRMA}`;
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3b82f6', flexShrink: 0, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
           {/* La frase sull'AI compare SOLO se il piano è davvero dell'AI: dichiararla
-              su un piano generato dalla piattaforma sarebbe falso (Enrico, 12/9). */}
+              su un piano generato dalla piattaforma sarebbe falso (Enrico, 12/9).
+              Niente "validato da un professionista osteopata": è vero nei fatti ma non
+              registrato da nulla, e in un documento che legge il cliente si dichiara
+              solo ciò che è dimostrabile (Enrico, 12/9). Se un giorno servirà, servirà
+              una spunta registrata: "validato da [nome], [data]". */}
           <span style={{ fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>
             {pianoAi
-              ? 'Piano elaborato sui dati della vostra azienda con il supporto di strumenti di intelligenza artificiale e validato da un professionista osteopata di Essentia Salutis'
+              ? 'Piano elaborato sui dati della vostra azienda secondo il protocollo ES Work, con il supporto di strumenti di intelligenza artificiale'
               : 'Piano elaborato sui dati della vostra azienda secondo il protocollo ES Work'}
             {pianoAi && <span className="no-print" style={{ marginLeft: 6, color: '#3b82f6', fontWeight: 600 }}>✦ AI</span>}
           </span>

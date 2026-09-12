@@ -215,7 +215,7 @@ function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining }) {
         <div style={{ fontSize: 12, opacity: .8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Il tuo programma ES Work</div>
         <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>Sei in monitoraggio preventivo.</div>
         <div style={{ fontSize: 13, opacity: .85, marginTop: 8, lineHeight: 1.6 }}>
-          Il tuo check-up indica una situazione che non richiede trattamento attivo al momento. Sei monitorato con i mini-check a 3 e 6 mesi.<br />
+          Il tuo check-up ha rilevato disturbi iniziali che non limitano ancora la tua attività. Il programma prevede per te 4 sedute di prevenzione con l'osteopata, in sede, e due controlli a 3 e 6 mesi dall'inizio del percorso.<br />
           Se il tuo stato cambia, puoi segnalarlo tramite il bottone qui sotto.
         </div>
       </div>

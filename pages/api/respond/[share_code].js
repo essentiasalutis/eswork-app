@@ -10,7 +10,6 @@ import {
 } from '../../../lib/store';
 import { computeLevel } from '../../../lib/scoring';
 import { checkRateLimit, getClientIp } from '../../../lib/rate-limit';
-import { tierFromEmployees } from '../../../lib/pricing/tier';
 
 // Anti-enumerazione del link questionario. Il limite vale SOLO sui tentativi
 // FALLITI (codice inesistente o questionario chiuso) e non tocca MAI una richiesta
@@ -73,10 +72,10 @@ export default async function handler(req, res) {
           if (patient) {
             const computed_level = computeLevel(answers);
 
-            // prevention_eligible: L2 da assessment solo nei tier Plus/Enterprise
-            const respClient = await getClientById(patient.client_id).catch(() => null);
-            const rtier = tierFromEmployees(respClient?.employees, respClient?.tier);
-            const prevention_eligible = computed_level === 'level2' && (rtier === 'plus' || rtier === 'enterprise');
+            // Prevenzione attiva: spetta a OGNI Livello 2 (Enrico, 12/9). Il listino v2
+            // la fa pagare a tutti, e in un'azienda dove stanno tutti bene è la prevenzione
+            // a dare un programma da erogare. La configurazione non c'entra più.
+            const prevention_eligible = computed_level === 'level2';
 
             await updatePatient(patient.id, {
               computed_level,

@@ -1,4 +1,4 @@
-import { getPatientByCareToken, insertReassessmentT12, updatePatient, getClientById } from '../../../lib/store';
+import { getPatientByCareToken, insertReassessmentT12, updatePatient } from '../../../lib/store';
 import { computeLevel } from '../../../lib/scoring';
 import { limiteAreaPersonale } from '../../../lib/employee-guard';
 
@@ -24,15 +24,12 @@ export default async function handler(req, res) {
   }).catch(() => null);
 
   // Il re-assessment ricolloca il paziente per l'ANNO SUCCESSIVO (regola opzione A):
-  // il livello di fine anno diventa il livello di inizio anno successivo e fissa
-  // il diritto alla prevenzione attiva (L2 nei tier Plus/Enterprise → eligible).
-  const rc = await getClientById(patient.client_id).catch(() => null);
-  const rn = parseInt(rc?.employees) || 0;
-  const rtier = rc?.tier || (rn <= 150 ? 'core' : rn <= 500 ? 'plus' : 'enterprise');
+  // il livello di fine anno diventa il livello di inizio anno successivo e fissa il
+  // diritto alla prevenzione attiva: ogni Livello 2 ce l'ha (12/9).
   await updatePatient(patient.id, {
     level: computed_level,
     computed_level,
-    prevention_eligible: computed_level === 'level2' && (rtier === 'plus' || rtier === 'enterprise'),
+    prevention_eligible: computed_level === 'level2',   // ogni L2, in ogni configurazione (12/9)
   }).catch(() => {});
 
   return res.json({ ok: true, computed_level });

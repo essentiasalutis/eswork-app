@@ -9,11 +9,7 @@ import {
   getPreValidationByPatient,
   getTreatmentCapacity,
 } from '../../../../../lib/store';
-import { tierFromEmployees } from '../../../../../lib/pricing/tier';
 
-function tierOf(client) {
-  return tierFromEmployees(client?.employees, client?.tier);
-}
 
 export default requireProAuth(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -36,10 +32,6 @@ export default requireProAuth(async function handler(req, res) {
     // dei tier Plus/Enterprise. Distinto dal ciclo di trattamento.
     if (patient.level !== 'level2') return res.status(400).json({ error: 'La prevenzione attiva è riservata ai pazienti Livello 2' });
     if (!patient.prevention_eligible) return res.status(400).json({ error: 'Prevenzione attiva non spettante quest\'anno (diritto fissato a inizio anno — regola opzione A)' });
-    const client = await getClientById(patient.client_id).catch(() => null);
-    if (!['plus', 'enterprise'].includes(tierOf(client))) {
-      return res.status(400).json({ error: 'La prevenzione attiva L2 è prevista solo nelle configurazioni Plus/Enterprise' });
-    }
     const prevCount = cycles.filter(c => c.cycle_type === 'prevention').length;
     if (prevCount >= 1) return res.status(400).json({ error: 'Ciclo di prevenzione annuale già erogato' });
 

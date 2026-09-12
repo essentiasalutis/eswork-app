@@ -90,11 +90,9 @@ export default async function handler(req, res) {
       const computed_level = answers ? computeLevel(answers) : 'level3';
       const now = new Date().toISOString();
 
-      // Diritto alla prevenzione attiva fissato a inizio anno (regola opzione A):
-      // spetta ai L2 dall'assessment SOLO nei tier Plus/Enterprise.
-      const n = parseInt(client.employees) || 0;
-      const tier = client.tier || (n <= 150 ? 'core' : n <= 500 ? 'plus' : 'enterprise');
-      const prevention_eligible = computed_level === 'level2' && (tier === 'plus' || tier === 'enterprise');
+      // Diritto alla prevenzione attiva, fissato al check-up (regola opzione A):
+      // spetta a OGNI Livello 2, in qualunque configurazione (Enrico, 12/9).
+      const prevention_eligible = computed_level === 'level2';
 
       // 3. Aggiorna livello sul paziente (non-fatale se fallisce)
       //    L1 dall'assessment è solo CANDIDATO: level_status='pending' finché non

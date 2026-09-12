@@ -128,6 +128,8 @@ export default requireAuth(async function handler(req, res) {
     // Sezione componenti SOLO per v2 (v1 resta byte-identico)
     // Quantità dalla forbice LIVE (sportello: tra lo scenario minimo e il massimo); mai euro accanto alle voci.
     v2Doc: pricingVersion === 'v2' ? { ergonomiaPostazioni: (ergonomia && ergonomia.nPostazioni) || 0, ergonomiaAddetti: (ergonomia && ergonomia.nAddetti) || 0, quantita: quantitaStima(forchetta) } : null,
+    // I numeri della legenda (sedute, durata, sessioni di prevenzione) vengono dal Listino.
+    v2Params,
   });
 
   // `forchetta`+`snapshot` in risposta: solo admin (requireAuth). Servono alla UI

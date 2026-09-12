@@ -490,12 +490,9 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
               <Field label="Fatturato" hint="Dirime i borderline del tier" nota="Ordine di grandezza del fatturato. Non entra nel prezzo: serve solo quando il numero di dipendenti lascia in dubbio la configurazione, per capire che azienda si ha davanti."><div className="flex gap-1">{FATTURATO.map(([v, l]) => seg(v, fatturato, setFatturato, l))}</div></Field>
               <Field label="Maturità HR"><div className="flex gap-1">{HR.map(([v, l]) => seg(v, hrMaturity, setHrMaturity, l))}</div></Field>
             </div>
-            <Field label="Tier interno (uso interno, non mostrato al cliente)" nota="Nome interno della configurazione: non compare in nessun documento che legge il cliente. Serve a te per sapere quali servizi stai dimensionando.">
-              <div className="flex items-center gap-2">{['core', 'plus', 'enterprise'].map(t => (
-                <button key={t} onClick={() => setTierOverride(t === suggestedTier ? null : t)} className="flex-1 py-2 rounded-xl border-2 text-sm font-semibold" style={{ borderColor: TIER_COLORS[t], background: tier === t ? TIER_COLORS[t] : '#fff', color: tier === t ? '#fff' : TIER_COLORS[t] }}>{TIER_LABELS[t]}</button>
-              ))}</div>
-              <div className="text-xs text-gray-400 mt-1">Suggerito: <strong>{TIER_LABELS[suggestedTier]}</strong>{tierOverride && ' · override attivo'} · Core ≤150 · Plus 151-500 · Enterprise &gt;500</div>
-            </Field>
+            {/* Il box "Tier" è stato tolto il 12/9: la configurazione non decide più né il
+                prezzo (listino v2) né cosa si può erogare (la prevenzione spetta a ogni
+                Livello 2). Resta un'etichetta derivata dai dipendenti, che non serve scegliere. */}
             <div className="flex gap-3">
               <button onClick={() => goStep(1)} className="py-3.5 px-5 rounded-2xl border border-gray-300 text-gray-600 font-semibold">←</button>
               <button onClick={() => goStep(3)} className="flex-1 py-3.5 rounded-2xl bg-green-600 text-white font-bold">Avanti →</button>
@@ -589,6 +586,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                 <div className="bg-white rounded-2xl border border-gray-200 p-4">
                   <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Dettaglio voci — Anno 1</div>
                   <table className="w-full text-sm"><tbody>
+                    {/* Cosa sono L1/L2/L3 e la pre-validazione: fonte unica lib/livelli.js */}
                     {calc.y1.items.map((it, i) => (<tr key={i} className="border-b border-gray-50"><td className="py-2 text-gray-600">{it.label}<span className="block text-[11px] text-gray-400">{it.detail}</span></td><td className="py-2 text-right font-medium text-gray-700">{fmt(it.sell)}</td></tr>))}
                     <tr className="border-b border-gray-50"><td className="py-2 text-gray-600">Buffer {Math.round(calc.y1.buffer_pct * 100)}%</td><td className="py-2 text-right font-medium text-gray-700">{fmt(calc.y1.buffer_sell)}</td></tr>
                     <tr className="border-t-2 border-gray-200"><td className="py-2 font-semibold text-gray-800">Totale Anno 1</td><td className="py-2 text-right font-bold text-green-700">{fmt(calc.y1.total_sell)}</td></tr>

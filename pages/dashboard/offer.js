@@ -15,6 +15,7 @@ import { normalizza } from '../../lib/pipeline';
 import { VOCI_PROGRAMMA, RIGA_CHIUSURA, quantitaPrimoAnno } from '../../lib/programma';
 import { vistaRiservata, K_ANON, SUPPRESSED } from '../../lib/kanon';
 import { pianoDeterministico } from '../../lib/piano';
+import { legendaLivelli } from '../../lib/livelli';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
 
 // ─── Firma standard ───────────────────────────────────────────────────────────
@@ -482,6 +483,19 @@ ${FIRMA}`;
                 </div>
               ))}
             </div>
+            {/* Legenda: nel documento si legge «Livello 1» senza che sia detto cosa sia.
+                Fonte unica in lib/livelli.js, la stessa della Stima. */}
+            {nuovoProgramma && (
+              <div style={{ marginTop: 12, border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.4, color: '#6b7280', textTransform: 'uppercase', marginBottom: 7 }}>Come si leggono i livelli</div>
+                {legendaLivelli().map((v, i) => (
+                  <div key={i} style={{ fontSize: 10, lineHeight: 1.5, marginBottom: 5 }}>
+                    <span style={{ fontWeight: 700, color: '#1e293b' }}>{v.titolo}.</span>
+                    <span style={{ color: '#4b5563' }}> {v.testo}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>}
       </Page>

@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { requireProAuthSsr } from '../../../lib/pro-auth';
+import { registraLettura, AZIONI } from '../../../lib/audit';
 import {
   getPatientById,
   getSessionsByPatient,
@@ -278,6 +279,9 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
 
   // Cartella clinica (Livello B): SOLO l'osteopata assegnato al paziente.
   if (!(await proCanAccessPatientClinical(proId, patient))) return { notFound: true };
+
+  // Registro: la cartella si apre da qui, non dall'API (che ha il suo log).
+  await registraLettura(ctx.req, { proId, azione: AZIONI.CARTELLA, patientId, dettaglio: 'Apertura cartella clinica' });
 
   const [sessions, cycles, preValidation, reassessmentT12, miniChecks] = await Promise.all([
     getSessionsByPatient(patientId).catch(() => []),

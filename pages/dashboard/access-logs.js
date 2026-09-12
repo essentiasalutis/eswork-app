@@ -7,6 +7,9 @@ const ACTION_LABEL = {
   login: 'Login',
   logout: 'Logout',
   view_patient: 'Apertura cartella',
+  view_session: 'Apertura seduta',
+  view_patient_list: 'Apertura elenco pazienti',
+  audit_failure: '⚠ Registro non scritto',
   view_documents: 'Lettura documenti',
   sign_document: 'Firma documento',
   sign_documents: 'Firma documenti',
@@ -16,7 +19,8 @@ const ACTION_LABEL = {
 };
 const ACTION_COLOR = {
   login: '#64748b', logout: '#94a3b8',
-  view_patient: '#2563eb', view_documents: '#0891b2',
+  view_patient: '#2563eb', view_session: '#2563eb', view_patient_list: '#0ea5e9', view_documents: '#0891b2',
+  audit_failure: '#dc2626',
   sign_document: '#7c3aed', sign_documents: '#7c3aed',
   close_session: '#16a34a', edit_session: '#ca8a04', reclassify: '#dc2626',
 };
@@ -77,7 +81,9 @@ export default function AccessLogsPage({ logs }) {
             </div>
           )}
           <p className="text-xs text-gray-400 mt-4">
-            L'IP è conservato solo in forma anonimizzata (hash non reversibile). Il registro è consultabile dal solo titolare del trattamento.
+            L&apos;IP è conservato solo in forma anonimizzata (hash non reversibile). Il registro è consultabile dal solo titolare del trattamento.
+            Si registra chi, quando e quale record: mai il contenuto. Conservazione dichiarata: 24 mesi.
+            Se una riga non riesce a essere scritta la pagina si apre lo stesso e resta la voce «Registro non scritto» (in rosso) più un errore nel log applicativo.
           </p>
         </main>
       </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireProAuthSsr } from '../../../../lib/pro-auth';
+import { registraLettura, AZIONI } from '../../../../lib/audit';
 import { vistaPazienteLista, vistaAziendaPerPro } from '../../../../lib/vista';
 import { getPatientsByClient, getClientById, getAssignmentsByProfessional } from '../../../../lib/store';
 
@@ -183,5 +184,6 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   // Proiezione (12/9): nelle props va ciò che la pagina disegna — mai la cartella
   // completa né il care_token, che finirebbero nel sorgente HTML della pagina.
   const patients = (allPatients || []).filter(p => p.assigned_professional_id === proId).map(vistaPazienteLista);
+  await registraLettura(ctx.req, { proId, azione: AZIONI.ELENCO, dettaglio: `Elenco pazienti — azienda ${clientId} (${patients.length})` });
   return { props: { proName, client: vistaAziendaPerPro(client), patients, proId } };
 });

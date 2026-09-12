@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireProAuthSsr } from '../../../lib/pro-auth';
+import { registraLettura, AZIONI } from '../../../lib/audit';
 import { getSessionById, getPatientById, proCanAccessPatientClinical } from '../../../lib/store';
 import { validaNrsChiusura } from '../../../lib/nrs';
 
@@ -232,5 +233,6 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   const patientId = session.patient_id || (session.patients && session.patients.id);
   const patient = patientId ? await getPatientById(patientId).catch(() => null) : null;
   if (!(await proCanAccessPatientClinical(proId, patient))) return { notFound: true };
+  await registraLettura(ctx.req, { proId, azione: AZIONI.SEDUTA, patientId, dettaglio: `Apertura seduta ${sessionId}` });
   return { props: { session } };
 });

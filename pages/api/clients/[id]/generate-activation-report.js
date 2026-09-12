@@ -11,7 +11,7 @@ import {
 } from '../../../../lib/store';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { calculatePricing, computeForchetta, realL1L2FromAssessment } from '../../../../lib/calculator';
-import { getPricingSettingsV2, getNotaValidazione } from '../../../../lib/pricing/settings';
+import { getPricingSettingsV2, getNoteReport } from '../../../../lib/pricing/settings';
 import { ergonomiaDaColloquio } from '../../../../lib/pricing/v2';
 import { isFirmato } from '../../../../lib/checkup-server';
 import { cosaComprendeMarkdown, inserisciCosaComprende, VOCI_PROGRAMMA, quantitaPrimoAnno } from '../../../../lib/programma';
@@ -117,9 +117,10 @@ export default requireAuth(async function handler(req, res) {
     : (v2Texts.naming_cliente_programma_completo || 'Programma ES Work');
   const testoEvoluzione = v2Texts.testo_evoluzione_pacchetto || '';
   const dataOggi = new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
-  // Nota di validazione deterministica in fondo a ogni report (mai generata dall'AI).
-  const notaValidazione = await getNotaValidazione();
-  const conNota = t => `${t}\n\n---\n\n*${notaValidazione}*`;
+  // Nota deterministica in fondo a ogni report (mai generata dall'AI). Due varianti:
+  // quella con l'AI si usa SOLO sul testo che l'AI ha scritto davvero.
+  const noteReport = await getNoteReport();
+  const conNota = (t, conAi = false) => `${t}\n\n---\n\n*${conAi ? noteReport.ai : noteReport.base}*`;
 
   // NRS data da sessioni
   const sessionsWithNrs = sessions.filter(s => s.nrs_pre != null || s.nrs_post != null);
@@ -254,7 +255,7 @@ Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole tota
 
     // Testo troncato (visto l'11/9: "Prossimi Passi" finiva a metà frase) → meglio il testo di riserva.
     if (message.stop_reason === 'max_tokens') throw new Error('testo dell\'AI troncato: troppo lungo');
-    const report = conNota(inserisciCosaComprende(message.content[0]?.text || '', sezioneComprende));
+    const report = conNota(inserisciCosaComprende(message.content[0]?.text || '', sezioneComprende), true);
     const pdfUrl = await tryGeneratePdf(client, 'activation', report, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', ai_status: 'ai', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report, source: 'ai', ai_status: 'ai', pdf_url: pdfUrl, report_id: rec?.id });

@@ -12,8 +12,10 @@ export default requireAuth(async function handler(req, res) {
   const zones = zoneAmmesse(req.body?.zones);
   if (!zones.length) return res.status(400).json({ error: 'Nessuna zona valida.' });
   const sector = Number(req.body?.sector) === 1 ? 1 : 2;
+  // Il Livello 1 è facoltativo: sotto la soglia di riservatezza non arriva, e allora
+  // dal prompt sparisce la riga (non si manda uno zero che non è vero).
   const n1 = Math.round(Number(req.body?.level1Count));
-  const level1Count = Number.isFinite(n1) && n1 > 0 ? n1 : 0;
+  const level1Count = Number.isFinite(n1) && n1 > 0 ? n1 : null;
 
   // Se manca la chiave API → piano della piattaforma, nessun dato esce
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -26,7 +28,7 @@ export default requireAuth(async function handler(req, res) {
 
   const prompt = `Sei un consulente di salute occupazionale. Genera un piano di intervento per un'azienda basandoti su questi dati NMQ:
 ${zoneText}
-Settore: ${sectorLabel}. Dipendenti di Livello 1: ${level1Count}
+Settore: ${sectorLabel}.${level1Count ? ` Dipendenti di Livello 1: ${level1Count}` : ''}
 
 Genera una tabella JSON con massimo 5 righe, formato:
 [{"criticita": "X% disturbi [zona]", "intervento": "descrizione intervento specifico", "risultato": "risultato atteso realistico"}]

@@ -11,7 +11,7 @@ import {
   insertGeneratedReport,
   insertDocument,
 } from '../../../../lib/store';
-import { getNotaValidazione, getAndamentoT12Texts } from '../../../../lib/pricing/settings';
+import { getNoteReport, getAndamentoT12Texts } from '../../../../lib/pricing/settings';
 import { CONFIG_V1 } from '../../../../lib/pricing/v1';
 import { stratificazioneOsservata } from '../../../../lib/scoring';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
@@ -208,11 +208,12 @@ CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fond
 Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
 
   const reportType = `checkpoint_${checkpoint}`;
-  // Nota di validazione deterministica in fondo al report (mai dall'AI).
-  const notaValidazione = await getNotaValidazione();
-  const conNota = t => `${t}\n\n---\n\n*${notaValidazione}*`;
+  // Nota deterministica in fondo al report (mai dall'AI). Due varianti: quella con
+  // l'AI si usa SOLO sul testo che l'AI ha scritto davvero.
+  const noteReport = await getNoteReport();
+  const conNota = (t, conAi = false) => `${t}\n\n---\n\n*${conAi ? noteReport.ai : noteReport.base}*`;
   // Inietta la sezione andamento (verbatim) PRIMA della nota; no-op se non annuale.
-  const finalize = t => conNota(injectAndamento(t, andamentoSection));
+  const finalize = (t, conAi = false) => conNota(injectAndamento(t, andamentoSection), conAi);
 
   // Manca la chiave: NESSUNA chiamata, nessun dato uscito (ai_status, v57).
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -230,7 +231,7 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
       max_tokens: 1500,
       messages: [{ role: 'user', content: prompt }],
     });
-    const report = finalize(message.content[0]?.text || '');
+    const report = finalize(message.content[0]?.text || '', true);
     const pdfUrl = await tryGeneratePdf(client, reportType, report, id, checkpoint).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: report, checkpoint, created_by: 'admin', ai_status: 'ai', pdf_url: pdfUrl }).catch(() => null);
     return res.json({ report, source: 'ai', ai_status: 'ai', pdf_url: pdfUrl, report_id: rec?.id });

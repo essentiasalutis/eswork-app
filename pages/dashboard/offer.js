@@ -137,7 +137,9 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
         body: JSON.stringify({
           zones: (r ? r.zone.filter(z => !z.soppressa) : nmq.zones).map(z => ({ zone: z.zone, pct12: z.pct12 })),
           sector: client?.sector ?? 2,
-          level1Count: nmq.level1.count,
+          // Il numero di persone in Livello 1 esce solo se è sopra la soglia di
+          // riservatezza: se non si mostra sul documento, non esce nemmeno (12/9).
+          level1Count: (!r || r.l1Visibile) ? nmq.level1.count : null,
         }),
       });
       const d = await res.json();

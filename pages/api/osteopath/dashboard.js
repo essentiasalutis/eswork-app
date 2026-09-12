@@ -6,6 +6,7 @@ import {
   getWaitlistByProfessional,
   getAllRestratAlerts,
 } from '../../../lib/store';
+import { vistaPazienteLista } from '../../../lib/vista';
 
 export default requireProAuth(async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
@@ -18,8 +19,10 @@ export default requireProAuth(async function handler(req, res) {
     getWaitlistByProfessional(proId).catch(() => []),
   ]);
 
+  // Stessa proiezione della pagina: mai care_token né cartella verso il browser.
+  const elenco = (patients || []).map(vistaPazienteLista);
   // L1 in trattamento attivo
-  const l1Patients = patients.filter(p => p.level === 'level1' && p.level_status === 'active');
+  const l1Patients = elenco.filter(p => p.level === 'level1' && p.level_status === 'active');
 
   // Cicli attivi per ogni L1
   const cyclesMap = {};
@@ -34,7 +37,7 @@ export default requireProAuth(async function handler(req, res) {
   // Già nelle restrat alerts - non duplichiamo
 
   return res.json({
-    patients,
+    patients: elenco,
     l1Patients,
     cyclesMap,
     acuteEvents,

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { requireAuthSsr } from '../../../lib/auth';
 import { getClientById, getWaitlistByClient } from '../../../lib/store';
+import { senzaCredenziali } from '../../../lib/vista';
 
 // Nota terminologia v4: i "turni di avvio" scaglionano l'inizio dei trattamenti L1
 // (capienza sportello). La colonna DB resta `cohort` (solo storage).
@@ -189,6 +190,8 @@ export const getServerSideProps = requireAuthSsr(async ({ params }) => {
   const { clientId } = params;
   const client = await getClientById(clientId).catch(() => null);
   if (!client) return { notFound: true };
-  const waitlist = await getWaitlistByClient(clientId).catch(() => []);
+  const waitlist = (await getWaitlistByClient(clientId).catch(() => []))
+    // Il join porta anche il care_token del paziente: qui non serve a nulla e non esce.
+    .map(w => (w && w.patients ? { ...w, patients: senzaCredenziali(w.patients) } : w));
   return { props: { client, waitlist } };
 });

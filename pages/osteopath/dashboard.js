@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { requireProAuthSsr } from '../../lib/pro-auth';
+import { vistaPazienteLista } from '../../lib/vista';
 import {
   getPatientsByProfessional,
   getAcuteEventsByProfessional,
@@ -145,7 +146,7 @@ export default function OsteopathDashboard({ proName, l1Patients, acuteEvents, w
                   <div key={p.id} className="bg-white rounded-2xl border border-gray-200 p-4 flex items-center justify-between gap-3">
                     <div>
                       <div className="font-semibold text-gray-900 text-sm">{p.first_name} {p.last_name}</div>
-                      <div className="text-xs text-gray-500">{p.clients?.name || '—'}</div>
+                      <div className="text-xs text-gray-500">{p.azienda || '—'}</div>
                       {p.level_status === 'opted_out' && (
                         <span className="text-xs text-gray-400 italic">Percorso completato</span>
                       )}
@@ -192,7 +193,12 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
     getWaitlistByProfessional(proId).catch(() => []),
   ]);
 
-  const l1Patients = patients.filter(p => p.level === 'level1');
+  // Proiezione (12/9): anche verso il curante escono solo i campi disegnati. Qui
+  // viaggiavano cartelle complete e soprattutto i care_token dei suoi pazienti —
+  // credenziali, non dati clinici: quelle non escono verso NESSUN browser, nemmeno
+  // verso chi ha titolo a vedere i dati che aprono (regola di Enrico).
+  const elenco = (patients || []).map(vistaPazienteLista);
+  const l1Patients = elenco.filter(p => p.level === 'level1');
 
   return {
     props: {
@@ -200,7 +206,7 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
       l1Patients,
       acuteEvents,
       waitlist,
-      allPatients: patients,
+      allPatients: elenco,
     },
   };
 });

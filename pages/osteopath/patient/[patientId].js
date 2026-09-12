@@ -2,6 +2,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { requireProAuthSsr } from '../../../lib/pro-auth';
 import { registraLettura, AZIONI } from '../../../lib/audit';
+import { senzaCredenziali } from '../../../lib/vista';
 import {
   getPatientById,
   getSessionsByPatient,
@@ -297,6 +298,8 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
     .map((s, i) => ({ session: i + 1, date: s.date || s.created_at, nrs_pre: s.nrs_pre, nrs_post: s.nrs_post }));
 
   return {
-    props: { patient, sessions, cycles, preValidation: preValidation || null, reassessmentT12: reassessmentT12 || null, miniChecks, nrsSeries },
+    // La cartella la disegna davvero (è il curante), ma il care_token no: questa pagina
+    // non consegna il link personale, quindi la credenziale non esce (12/9).
+    props: { patient: senzaCredenziali(patient), sessions, cycles, preValidation: preValidation || null, reassessmentT12: reassessmentT12 || null, miniChecks, nrsSeries },
   };
 });

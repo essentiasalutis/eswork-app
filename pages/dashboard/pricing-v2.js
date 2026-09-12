@@ -22,7 +22,6 @@ const PARAM_LABELS = {
   ergonomia_forfait_postazione: 'Ergonomia reparto: studio postazione tipo, € a forfait',
   ergonomia_minuti_postazione: 'Ergonomia reparto: tempo in sede per studio postazione (minuti — solo pianificazione e minimo ore, NON prezzo)',
   ergonomia_minimo_ore: 'Ergonomia: minimo fatturabile (ore)',
-  soglia_ingresso: 'Soglia pacchetto prevenzione (dipendenti max)',
   assessment_prezzo_per_dipendente: 'Check-up nel pacchetto: € per dipendente dichiarato',
 };
 

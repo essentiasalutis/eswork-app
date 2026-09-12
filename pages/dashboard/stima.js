@@ -141,7 +141,7 @@ export default function StimaPage() {
       <Head><title>Stima — ES Work</title></Head>
       <div className="min-h-screen bg-gray-100 flex flex-col">
         <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-          <div className="max-w-4xl mx-auto px-5 py-3 flex items-center justify-between gap-3">
+          <div className="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between gap-3">
             <Link href={q.clientId ? `/dashboard/${q.clientId}` : '/dashboard'} className="text-sm text-gray-500 hover:text-gray-800">← Indietro</Link>
             <div className="flex items-center gap-2">
               <button onClick={stampa} disabled={!html} className="text-sm font-semibold text-gray-700 bg-gray-100 border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-200 disabled:opacity-50">🖨 Stampa</button>
@@ -158,7 +158,7 @@ export default function StimaPage() {
             </div>
           </div>
           {variante === 'pacchetto' && (
-            <div className="max-w-4xl mx-auto px-5 pb-2"><div className="text-xs px-3 py-1.5 rounded-lg border bg-blue-50 text-blue-800 border-blue-200">
+            <div className="max-w-6xl mx-auto px-5 pb-2"><div className="text-xs px-3 py-1.5 rounded-lg border bg-blue-50 text-blue-800 border-blue-200">
               Variante Pacchetto d&apos;ingresso: il prodotto dell&apos;azienda resta il programma completo. Lo cambi nel colloquio solo se il cliente sceglie il Pacchetto; la forbice del programma resta impegnata.
             </div></div>
           )}
@@ -171,13 +171,13 @@ export default function StimaPage() {
             else if (s.preview && s.exists) { icon = '⚠'; text = `ANTEPRIMA — genera il PDF per aggiornare la forbice impegnata${fmt ? ` (attuale: del ${fmt})` : ''}.`; cls = 'bg-amber-50 text-amber-800 border-amber-200'; }
             else if (s.exists) { icon = '✓'; text = `Forbice impegnata${fmt ? ` — Stima del ${fmt}` : ''}: è la promessa fatta al prospect.`; cls = 'bg-green-50 text-green-700 border-green-200'; }
             else return null;
-            return <div className="max-w-4xl mx-auto px-5 pb-2"><div className={`text-xs px-3 py-1.5 rounded-lg border ${cls}`}>{icon} {text}</div></div>;
+            return <div className="max-w-6xl mx-auto px-5 pb-2"><div className={`text-xs px-3 py-1.5 rounded-lg border ${cls}`}>{icon} {text}</div></div>;
           })()}
-          {err && <div className="max-w-4xl mx-auto px-5 pb-2 text-xs text-amber-700">{err}</div>}
+          {err && <div className="max-w-6xl mx-auto px-5 pb-2 text-xs text-amber-700">{err}</div>}
         </header>
 
         {riepilogo && <MailRiepilogo clientId={q.clientId} forchetta={riepilogo.forchetta} urlStima={riepilogo.url} onClose={() => setRiepilogo(null)} />}
-        <main className="flex-1 max-w-4xl w-full mx-auto p-4">
+        <main className="flex-1 max-w-6xl w-full mx-auto p-4">
           <div className="mb-3"><ArgomentarioVoci /></div>
           {html ? (
             <iframe ref={iframeRef} srcDoc={html} title="Stima ES Work" className="w-full bg-white rounded-xl shadow" style={{ height: 'calc(100vh - 110px)', border: 'none' }} />

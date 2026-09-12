@@ -127,7 +127,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
   const [refOpRuolo, setRefOpRuolo] = useState(s3.refop_ruolo || '');
   const [refOpContatti, setRefOpContatti] = useState(s3.refop_contatti || '');
 
-  // PARAMS preventivo
+  // PARAMS della Stima
   const [rates, setRates] = useState(sp.rates || { ...CONFIG.rates_new });
   const [l2Mult, setL2Mult] = useState(sp.l2_mult ?? CONFIG.l2_multiplier_default);
   const [vatExempt, setVatExempt] = useState(sp.vat_exempt ?? CONFIG.vat_exempt);
@@ -168,8 +168,9 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
     return computeForchetta({ n, sector, tier, groups, rates, vatExempt, l2Mult, pricingVersion, v2Params, ergonomia });
   }, [n, sector, tier, groups, rates, vatExempt, l2Mult, pricingVersion, v2Params, nErgUfficio, nErgAddetti, nErgPostazioni, isV2]);
   // Pacchetto prevenzione (v2, sotto soglia): prezzo dal motore, regole dure lato server.
-  const sogliaIngresso = (v2Params && v2Params.soglia_ingresso) || 80;
-  const pacchettoDisponibile = isV2 && n > 0 && n <= sogliaIngresso;
+  // Nessun tetto di dipendenti (decisione Enrico, 12/9): il pacchetto è un prodotto
+  // diverso, non una versione ridotta per le piccole. Si può proporre a chiunque sia su listino v2.
+  const pacchettoDisponibile = isV2 && n > 0;
   const pacchetto = useMemo(() => {
     if (!isV2 || tipoProdotto !== 'pacchetto_prevenzione') return null;
     const ergonomia = { nUfficio: nErgUfficio, nAddetti: nErgAddetti, nPostazioni: nErgPostazioni };
@@ -524,7 +525,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
             </Field>
             <div className="flex gap-3">
               <button onClick={() => goStep(2)} className="py-3.5 px-5 rounded-2xl border border-gray-300 text-gray-600 font-semibold">←</button>
-              <button onClick={() => goStep(4)} className="flex-1 py-3.5 rounded-2xl bg-green-600 text-white font-bold">Vai al preventivo →</button>
+              <button onClick={() => goStep(4)} className="flex-1 py-3.5 rounded-2xl bg-green-600 text-white font-bold">Vai alla Stima di investimento →</button>
             </div>
           </div>
         )}
@@ -532,7 +533,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
         {modo === 'completo' && step === 4 && (
           <div className="space-y-4">
             {n <= 0 ? (
-              <div className="text-center text-gray-400 py-8 text-sm">Inserisci i dipendenti nello Step 2 per calcolare il preventivo.</div>
+              <div className="text-center text-gray-400 py-8 text-sm">Inserisci i dipendenti nello Step 2 per calcolare la Stima.</div>
             ) : (
               <>
                 {/* v2: scelta prodotto (binaria, al colloquio). L'opzione pacchetto
@@ -542,7 +543,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                     <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Prodotto</div>
                     <div className="flex gap-2">
                       {seg('programma_completo', tipoProdotto, scegliProdotto, 'Programma completo')}
-                      {seg('pacchetto_prevenzione', tipoProdotto, scegliProdotto, `Pacchetto prevenzione (≤${sogliaIngresso} dip)`)}
+                      {seg('pacchetto_prevenzione', tipoProdotto, scegliProdotto, 'Pacchetto prevenzione')}
                     </div>
                     {prodottoErr && <div className="text-xs text-red-600 mt-2">{prodottoErr}</div>}
                   </div>
@@ -614,7 +615,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                 )}
 
                 <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-                  <button onClick={() => setShowParams(v => !v)} className="w-full flex items-center justify-between px-4 py-3"><span className="text-sm font-semibold text-gray-700">⚙️ Parametri preventivo</span><span className="text-gray-400">{showParams ? '▲' : '▼'}</span></button>
+                  <button onClick={() => setShowParams(v => !v)} className="w-full flex items-center justify-between px-4 py-3"><span className="text-sm font-semibold text-gray-700">⚙️ Parametri della Stima</span><span className="text-gray-400">{showParams ? '▲' : '▼'}</span></button>
                   {showParams && (
                     <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-3">
                       <div className="text-[11px] text-gray-400">Tariffe cliente (modificabili liberamente per questo cliente).</div>
@@ -625,7 +626,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                         <div>
                           <label className="text-[11px] text-gray-500 mb-1 flex items-center gap-1">
                             Moltiplicatore L2 (da tarare)
-                            <span title="Stima dei Livello 2 attesi = L1 attesi × questo moltiplicatore. Incide sul preventivo SOLO per i tier Plus/Enterprise (dove i L2 ricevono prevenzione attiva); per i Core non cambia il prezzo. È un'ipotesi: il numero reale di L2 emerge dopo il check-up (questionario NMQ)."
+                            <span title="Stima dei Livello 2 attesi = L1 attesi × questo moltiplicatore. Nel listino v2 incide SEMPRE sul prezzo: i Livello 2 ricevono prevenzione attiva in ogni configurazione. È un'ipotesi: il numero reale di L2 emerge dopo il check-up (questionario NMQ)."
                               className="w-4 h-4 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold flex items-center justify-center cursor-help">?</span>
                           </label>
                           <input type="number" step="0.1" value={l2Mult} onChange={e => setL2Mult(parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" />

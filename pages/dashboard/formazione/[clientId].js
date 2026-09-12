@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../../lib/auth';
+import { storicoDipendente, TIPO_ERGONOMIA } from '../../../lib/org-regole.mjs';
 
 const fmt = d => d ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const eur = n => `€${Math.round(Number(n) || 0).toLocaleString('it-IT')}`;
@@ -27,6 +28,10 @@ export default function FormazionePage({ clientId }) {
   const [erogaFor, setErogaFor] = useState(null); // sessione in erogazione
   const [presenti, setPresenti] = useState({});
   const [invitoLinks, setInvitoLinks] = useState({}); // link /invito generati in-sessione (plaintext MAI persistito)
+  const [conErgonomia, setConErgonomia] = useState(true); // proposta spuntata: vedi modale presenti
+  const [apertoId, setApertoId] = useState(null);         // riga dell'anagrafica con lo storico aperto
+  const [cerca, setCerca] = useState('');
+  const [ergoFor, setErgoFor] = useState(null);           // { data, note, scelti:{} } intervento di ergonomia
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/org/${clientId}`);
@@ -48,6 +53,10 @@ export default function FormazionePage({ clientId }) {
   if (!st) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400 text-sm">{err || 'Caricamento…'}</div>;
 
   const { dipendenti, partecipazioni, sessioni, duplicati, coda, proposta, aggregati, ergonomiaCoda } = st;
+  const q = cerca.trim().toLowerCase();
+  const dipendentiMostrati = q ? dipendenti.filter(d => `${d.nome || ''} ${d.matricola || ''}`.toLowerCase().includes(q)) : dipendenti;
+  const sessioniFormative = sessioni.filter(s => s.tipo !== TIPO_ERGONOMIA);
+  const interventiErgonomia = sessioni.filter(s => s.tipo === TIPO_ERGONOMIA);
   const nomeById = Object.fromEntries(dipendenti.map(d => [d.id, d.nome]));
 
   async function addDip(e) {
@@ -66,9 +75,17 @@ export default function FormazionePage({ clientId }) {
   }
   async function eroga() {
     const ids = Object.keys(presenti).filter(k => presenti[k]);
-    await call('PUT', `/api/org/sessioni/${erogaFor.id}`, { azione: 'eroga', data_erogazione: new Date().toISOString().slice(0, 10), presenti: ids }, 'eroga');
-    setErogaFor(null); setPresenti({});
+    const j = await call('PUT', `/api/org/sessioni/${erogaFor.id}`, { azione: 'eroga', data_erogazione: new Date().toISOString().slice(0, 10), presenti: ids, ergonomia: conErgonomia }, 'eroga');
+    if (j && j.ergonomiaNonRegistrata) setErr('Sessione registrata, ma l\'ergonomia no: manca la migration v59.');
+    setErogaFor(null); setPresenti({}); setConErgonomia(true);
   }
+  async function salvaErgonomia() {
+    const ids = Object.keys(ergoFor.scelti || {}).filter(k => ergoFor.scelti[k]);
+    if (!ids.length) { setErr('Seleziona almeno un dipendente'); return; }
+    const j = await call('POST', `/api/org/${clientId}/ergonomia`, { data: ergoFor.data, note: ergoFor.note, dipendenti: ids }, 'ergo');
+    if (j) setErgoFor(null);
+  }
+
   // Invito clinico del neoassunto. Il token torna in chiaro UNA volta → lo tengo in
   // invitoLinks (non è persistito). Su guardia 409 (già completato/consumato) chiedo
   // conferma ESPLICITA per l'override (recupero-errore: nuova cartella scollegata).
@@ -204,6 +221,7 @@ export default function FormazionePage({ clientId }) {
                 <button onClick={() => call('POST', `/api/org/${clientId}/seed`, {}, 'seed')} disabled={busy === 'seed'} className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl disabled:opacity-50">Importa nomi dal check-up</button>
               </div>
             </div>
+            <input value={cerca} onChange={e => setCerca(e.target.value)} placeholder="Cerca per nome o matricola…" className={`${inputCls} w-full mb-3`} />
             <form onSubmit={addDip} className="flex gap-2 flex-wrap mb-3">
               <input placeholder="Nome e cognome *" value={nuovo.nome} onChange={e => setNuovo(n => ({ ...n, nome: e.target.value }))} className={inputCls} />
               <input type="date" value={nuovo.data_ingresso} onChange={e => setNuovo(n => ({ ...n, data_ingresso: e.target.value }))} className={inputCls} />
@@ -216,14 +234,20 @@ export default function FormazionePage({ clientId }) {
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[640px]">
                 <thead><tr className="text-left text-xs uppercase tracking-wide text-gray-400 border-b border-gray-100">
-                  <th className="py-2">Nome</th><th>Matricola</th><th>Ingresso</th><th>Area</th><th>Base</th><th>Origine</th><th>Invito</th><th></th>
+                  <th className="py-2">Nome</th><th>Matricola</th><th>Ingresso</th><th>Area</th><th>Base</th><th>Ergonomia</th><th>Origine</th><th>Invito</th><th></th>
                 </tr></thead>
                 <tbody>
-                  {dipendenti.map(d => {
+                  {dipendentiMostrati.map(d => {
                     const sb = statoBase(d.id, partecipazioni);
+                    const erg = partecipazioni.filter(p => p.dipendente_id === d.id && p.tipo === TIPO_ERGONOMIA && p.stato === 'svolta');
+                    const ultimaErg = erg.map(p => p.data_svolgimento).filter(Boolean).sort().pop();
+                    const aperto = apertoId === d.id;
                     return (
+                      <>
                       <tr key={d.id} className={`border-b border-gray-50 ${!d.attivo ? 'opacity-50' : ''}`}>
-                        <td className="py-2 font-medium text-gray-800">{d.nome}{d.straordinario && <span className="ml-1 text-[10px] bg-purple-100 text-purple-700 px-1.5 rounded">straordinario</span>}{!d.attivo && <span className="ml-1 text-[10px] bg-red-100 text-red-700 px-1.5 rounded">cessato</span>}</td>
+                        <td className="py-2 font-medium text-gray-800">
+                          <button onClick={() => setApertoId(aperto ? null : d.id)} title="Storico" className="text-gray-400 mr-1">{aperto ? '▾' : '▸'}</button>
+                          {d.nome}{d.straordinario && <span className="ml-1 text-[10px] bg-purple-100 text-purple-700 px-1.5 rounded">straordinario</span>}{!d.attivo && <span className="ml-1 text-[10px] bg-red-100 text-red-700 px-1.5 rounded">cessato</span>}</td>
                         <td className="text-gray-500">{d.matricola || '—'}</td>
                         <td className="text-gray-500">{fmt(d.data_ingresso)}</td>
                         <td>
@@ -232,6 +256,7 @@ export default function FormazionePage({ clientId }) {
                           </select>
                         </td>
                         <td className={sb.cls}>{sb.label}{sb.data ? ` · ${fmt(sb.data)}` : ''}</td>
+                        <td className={erg.length ? 'text-green-700' : 'text-gray-400'}>{erg.length ? `✓ ${fmt(ultimaErg)}` : '—'}</td>
                         <td className="text-gray-400 text-xs">{d.inserito_da}</td>
                         <td className="text-xs">
                           {invitoLinks[d.id] ? (
@@ -251,9 +276,36 @@ export default function FormazionePage({ clientId }) {
                           </>}
                         </td>
                       </tr>
+                      {aperto && (
+                        <tr key={`${d.id}_st`} className="bg-gray-50/60 border-b border-gray-100">
+                          <td colSpan={9} className="px-3 py-3">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Storico di {d.nome}</div>
+                            {(() => {
+                              const righe = storicoDipendente(d, partecipazioni, sessioni);
+                              if (!righe.length) return <p className="text-sm text-gray-400">Nessuna attività registrata.</p>;
+                              return (
+                                <ul className="space-y-1.5">
+                                  {righe.map((r, i) => (
+                                    <li key={i} className="text-sm flex flex-wrap items-baseline gap-x-2">
+                                      <span className="text-gray-500 w-28 shrink-0">{r.quando ? fmt(r.quando) : 'senza data'}</span>
+                                      <span className="text-gray-800 font-medium">{r.cosa}</span>
+                                      {r.stato && r.stato !== 'fatto' && <span className={r.stato === 'svolta' ? 'text-green-700 text-xs' : r.stato === 'pianificata' ? 'text-amber-700 text-xs' : 'text-red-600 text-xs'}>{r.stato}</span>}
+                                      {r.anno && <span className="text-gray-400 text-xs">anno {r.anno}</span>}
+                                      {r.dettaglio && <span className="text-gray-400 text-xs">{r.dettaglio}</span>}
+                                      {r.origine && <span className="text-[10px] text-gray-500 bg-white border border-gray-200 px-1.5 py-0.5 rounded">{r.origine}</span>}
+                                    </li>
+                                  ))}
+                                </ul>
+                              );
+                            })()}
+                            <p className="text-[11px] text-gray-400 mt-2">Solo attività organizzative: formazione ed ergonomia. Il percorso clinico non compare qui e non è collegabile a questa anagrafica.</p>
+                          </td>
+                        </tr>
+                      )}
+                      </>
                     );
                   })}
-                  {dipendenti.length === 0 && <tr><td colSpan={8} className="py-6 text-center text-gray-400">Nessun dipendente. Usa "Importa nomi dal check-up" o aggiungi sopra.</td></tr>}
+                  {dipendentiMostrati.length === 0 && <tr><td colSpan={9} className="py-6 text-center text-gray-400">{dipendenti.length ? 'Nessun dipendente trovato con questa ricerca.' : 'Nessun dipendente. Usa "Importa nomi dal check-up" o aggiungi sopra.'}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -264,10 +316,30 @@ export default function FormazionePage({ clientId }) {
             </details>
           </div>
 
+          {/* Interventi di ergonomia */}
+          <div className={box}>
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+              <h2 className="font-bold text-gray-900">🪑 Interventi di ergonomia ({interventiErgonomia.length})</h2>
+              <button onClick={() => setErgoFor({ data: new Date().toISOString().slice(0, 10), note: '', scelti: {} })}
+                className="text-xs font-semibold text-white bg-gray-800 px-3 py-1.5 rounded-xl hover:bg-gray-700">+ Registra intervento</button>
+            </div>
+            <p className="text-xs text-gray-400 mb-2">Chi ha ricevuto l&apos;ergonomia e quando. L&apos;ergonomia dei nuovi ingressi si registra da sola confermando i presenti della sessione di recupero.</p>
+            {interventiErgonomia.length === 0 ? <p className="text-sm text-gray-400">Nessun intervento registrato.</p> : interventiErgonomia.map(s => {
+              const quanti = partecipazioni.filter(p => p.sessione_formativa_id === s.id).length;
+              return (
+                <div key={s.id} className="py-2 border-b border-gray-100 text-sm">
+                  <span className="font-medium text-gray-800">{fmt(s.data_erogazione || s.data_pianificata)}</span>
+                  <span className="text-gray-500"> · {quanti} {quanti === 1 ? 'persona' : 'persone'}</span>
+                  {s.note && <span className="text-gray-400 text-xs"> · {s.note}</span>}
+                </div>
+              );
+            })}
+          </div>
+
           {/* Sessioni */}
           <div className={box}>
-            <h2 className="font-bold text-gray-900 mb-3">🗓 Sessioni formative ({sessioni.length})</h2>
-            {sessioni.length === 0 ? <p className="text-sm text-gray-400">Nessuna sessione.</p> : sessioni.map(s => (
+            <h2 className="font-bold text-gray-900 mb-3">🗓 Sessioni formative ({sessioniFormative.length})</h2>
+            {sessioniFormative.length === 0 ? <p className="text-sm text-gray-400">Nessuna sessione.</p> : sessioniFormative.map(s => (
               <div key={s.id} className="py-2 border-b border-gray-100 text-sm">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <span><strong>{s.tipo === 'base_concentrata' ? 'Base concentrata' : s.tipo === 'base' ? 'Base completa' : 'Aggiornamento'}</strong> · {s.origine.replace(/_/g, ' ')} · Anno {s.anno_programma} · <span className={s.stato === 'erogata' ? 'text-green-700' : s.stato === 'annullata' ? 'text-gray-400' : 'text-amber-700'}>{s.stato}</span>{s.a_consumo && s.importo_dovuto ? ` · ${eur(s.importo_dovuto)}` : ''}{s.importo_ergonomia ? ` · ergonomia ${eur(s.importo_ergonomia)}` : ''}</span>
@@ -295,9 +367,42 @@ export default function FormazionePage({ clientId }) {
                   </label>
                 ))}
               </div>
+              <label className="flex items-start gap-2 text-xs text-gray-600 mt-3 bg-gray-50 border border-gray-200 rounded-xl p-2.5">
+                <input type="checkbox" checked={conErgonomia} onChange={e => setConErgonomia(e.target.checked)} className="mt-0.5" />
+                <span>Registra anche l&apos;intervento ergonomico per i presenti — nella stessa visita ricevono i loro minuti di ergonomia. Nello storico resterà segnato che arriva da qui.</span>
+              </label>
               <div className="flex gap-2 mt-4">
-                <button onClick={() => setErogaFor(null)} className="flex-1 text-sm text-gray-500 border border-gray-200 rounded-xl py-2">Annulla</button>
+                <button onClick={() => { setErogaFor(null); setConErgonomia(true); }} className="flex-1 text-sm text-gray-500 border border-gray-200 rounded-xl py-2">Annulla</button>
                 <button onClick={eroga} disabled={busy === 'eroga'} className="flex-1 text-sm font-semibold text-white bg-green-600 rounded-xl py-2 disabled:opacity-50">Conferma erogata</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Modale intervento di ergonomia */}
+        {ergoFor && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-5 max-h-[85vh] overflow-y-auto">
+              <h3 className="font-semibold text-gray-800 mb-1">Registra intervento di ergonomia</h3>
+              <p className="text-xs text-gray-500 mb-3">Chi era presente e quando. Nessuna osservazione sulla persona: quelle sono cliniche e non stanno qui.</p>
+              <label className="block text-xs font-semibold text-gray-500 mb-2">Data
+                <input type="date" value={ergoFor.data} onChange={e => setErgoFor(f => ({ ...f, data: e.target.value }))} className={`${inputCls} w-full mt-1 font-normal`} />
+              </label>
+              <label className="block text-xs font-semibold text-gray-500 mb-2">Nota (facoltativa, riferita all&apos;intervento)
+                <input value={ergoFor.note} onChange={e => setErgoFor(f => ({ ...f, note: e.target.value }))} placeholder="es. campagna annuale reparto A" className={`${inputCls} w-full mt-1 font-normal`} />
+              </label>
+              <div className="text-xs font-semibold text-gray-500 mb-1">Presenti</div>
+              <div className="space-y-1.5 max-h-52 overflow-y-auto border border-gray-100 rounded-xl p-2">
+                {dipendenti.filter(d => d.attivo).map(d => (
+                  <label key={d.id} className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={!!(ergoFor.scelti || {})[d.id]} onChange={e => setErgoFor(f => ({ ...f, scelti: { ...f.scelti, [d.id]: e.target.checked } }))} />
+                    {d.nome}{d.area ? <span className="text-xs text-gray-400">· {d.area}</span> : null}
+                  </label>
+                ))}
+                {dipendenti.filter(d => d.attivo).length === 0 && <p className="text-xs text-gray-400">Nessun dipendente attivo.</p>}
+              </div>
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => setErgoFor(null)} className="flex-1 text-sm text-gray-500 border border-gray-200 rounded-xl py-2">Annulla</button>
+                <button onClick={salvaErgonomia} disabled={busy === 'ergo'} className="flex-1 text-sm font-semibold text-white bg-gray-800 rounded-xl py-2 disabled:opacity-50">Registra</button>
               </div>
             </div>
           </div>

@@ -1,6 +1,7 @@
 // PUT /api/org/sessioni/[id] → gestione sessione (solo admin).
-//  body { azione:'eroga', data_erogazione?, presenti:[dipendente_id] } → marca erogata,
-//        presenti → 'svolta', non presenti restano 'da_recuperare'.
+//  body { azione:'eroga', data_erogazione?, presenti:[dipendente_id], ergonomia? } → marca
+//        erogata, presenti → 'svolta', non presenti restano 'da_recuperare'; con
+//        ergonomia:true resta scritto anche l'intervento ergonomico dei presenti (v59).
 //  body { data_pianificata?|gruppo?|stato?|note? } → update semplice.
 import { requireAuth } from '../../../../lib/auth';
 import { markSessioneErogata, updateOrgSessione } from '../../../../lib/org';
@@ -11,7 +12,7 @@ export default requireAuth(async function handler(req, res) {
   const b = req.body || {};
   try {
     if (b.azione === 'eroga') {
-      return res.json(await markSessioneErogata(id, { data_erogazione: b.data_erogazione, presentiDipendentiIds: b.presenti || [] }));
+      return res.json(await markSessioneErogata(id, { data_erogazione: b.data_erogazione, presentiDipendentiIds: b.presenti || [], conErgonomia: b.ergonomia === true }));
     }
     const allowed = ['data_pianificata', 'gruppo', 'stato', 'note', 'anno_programma'];
     const patch = {};

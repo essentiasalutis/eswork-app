@@ -10,7 +10,10 @@ import {
   getResponsesByAssessment,
   insertGeneratedReport,
   insertDocument,
+  getAllCyclesByClient,
+  getSelfTriggersByClient,
 } from '../../../../lib/store';
+import { sezioneMovimento, inserisciMovimento } from '../../../../lib/movimento';
 import { getNoteReport, getAndamentoT12Texts } from '../../../../lib/pricing/settings';
 import { CONFIG_V1 } from '../../../../lib/pricing/v1';
 import { stratificazioneOsservata } from '../../../../lib/scoring';
@@ -67,6 +70,44 @@ export default requireAuth(async function handler(req, res) {
 
   const isAnnual = checkpoint === 't12';
   const checkLabel = checkpoint === 't3' ? '3 mesi' : checkpoint === 't6' ? '6 mesi' : '12 mesi (Annuale)';
+
+  // ── «Il movimento» (solo T3): cosa si è mosso, senza ri-somministrare il
+  // questionario a nessuno. Sezione deterministica, mai scritta dall'AI.
+  let movimentoSection = '';
+  if (checkpoint === 't3') {
+    try {
+      const [assessments, cicli, segnalazioni] = await Promise.all([
+        getAssessmentsByClient(id).catch(() => []),
+        getAllCyclesByClient(id).catch(() => []),
+        getSelfTriggersByClient(id).catch(() => []),
+      ]);
+      // Fotografia di partenza: le risposte CONGELATE del check-up iniziale (il più vecchio).
+      const t0Ass = (assessments || [])[assessments.length - 1];
+      const t0Answers = t0Ass ? await getResponsesByAssessment(t0Ass.id).catch(() => []) : [];
+      const t0 = stratificazioneOsservata(t0Answers);
+      // Nuovi ingressi = chi ha compilato il check-up DOPO la chiusura della raccolta
+      // iniziale (i neoassunti), non l'intera popolazione che ha risposto all'inizio.
+      const chiusuraIniziale = (t0Ass && (t0Ass.chiude_il || t0Ass.created_at)) || null;
+      const dopoLaRaccolta = (d) => !!chiusuraIniziale && !!d && String(d) > String(chiusuraIniziale);
+      const trattamento = (cicli || []).filter(c => (c.cycle_type || 'treatment') === 'treatment');
+      const prevenzione = (cicli || []).filter(c => c.cycle_type === 'prevention');
+      movimentoSection = sezioneMovimento({
+        inizio: { n: t0.n, l1pct: t0.l1pct, l2pct: t0.l2pct, l3pct: t0.l3pct },
+        attuale: { l1, l2, l3 },
+        movimenti: {
+          trattamentiAvviati: trattamento.length,
+          trattamentiChiusi: trattamento.filter(c => c.status === 'closed').length,
+          seduteErogate: completed,
+          prevenzioneAvviata: new Set(prevenzione.map(c => c.patient_id)).size,
+          segnalazioni: new Set((segnalazioni || []).map(x => x.patient_id)).size,
+          nuoviIngressi: (patients || []).filter(p => dopoLaRaccolta(p.assessment_completed_at)).length,
+        },
+        checkLabel: '3 mesi',
+      });
+    } catch (e) {
+      console.error('[checkpoint t3] sezione movimento non costruita:', e.message);
+    }
+  }
 
   // ── Mini-check del checkpoint (risposte REALI dei dipendenti a T3/T6) ─────────
   let mc = null;
@@ -203,7 +244,8 @@ STRUTTURA REPORT (markdown, ## per titoli):
 ## Prossimi Passi
 (3-4 azioni per i prossimi ${checkpoint === 't3' ? '3' : '6'} mesi)
 
-LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
+${checkpoint === 't3' ? `MOVIMENTO (tassativo): il racconto di cosa si è mosso in questi tre mesi — percorsi avviati e conclusi, sedute, prevenzione, segnalazioni, nuovi ingressi, distribuzione attuale — è già scritto dal sistema nella sezione «Il movimento dei primi 3 mesi». NON duplicarlo e NON riscriverne i numeri. In particolare NON affermare che la distribuzione attuale derivi da un nuovo questionario: a tre mesi nessuno ricompila nulla.
+` : ''}LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
 Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
 
@@ -213,7 +255,7 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
   const noteReport = await getNoteReport();
   const conNota = (t, conAi = false) => `${t}\n\n---\n\n*${conAi ? noteReport.ai : noteReport.base}*`;
   // Inietta la sezione andamento (verbatim) PRIMA della nota; no-op se non annuale.
-  const finalize = (t, conAi = false) => conNota(injectAndamento(t, andamentoSection), conAi);
+  const finalize = (t, conAi = false) => conNota(inserisciMovimento(injectAndamento(t, andamentoSection), movimentoSection), conAi);
 
   // Manca la chiave: NESSUNA chiamata, nessun dato uscito (ai_status, v57).
   if (!process.env.ANTHROPIC_API_KEY) {

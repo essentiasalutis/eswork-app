@@ -6,6 +6,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { token, nmq_data, pgic } = req.body;
+  // 't6' = ri-fotografia dei sei mesi; 't12' = rivalutazione annuale (default storico).
+  const checkpoint = req.body.checkpoint === 't6' ? 't6' : 't12';
   if (!token) return res.status(400).json({ error: 'Token mancante' });
   if (!limiteAreaPersonale(req, res, token)) return;
 
@@ -20,17 +22,22 @@ export default async function handler(req, res) {
     nmq_data: nmq_data || {},
     pgic: pgic ? parseInt(pgic, 10) : null,
     computed_level,
+    checkpoint,
     completed_at: new Date().toISOString(),
   }).catch(() => null);
 
-  // Il re-assessment ricolloca il paziente per l'ANNO SUCCESSIVO (regola opzione A):
-  // il livello di fine anno diventa il livello di inizio anno successivo e fissa il
-  // diritto alla prevenzione attiva: ogni Livello 2 ce l'ha (12/9).
-  await updatePatient(patient.id, {
-    level: computed_level,
-    computed_level,
-    prevention_eligible: computed_level === 'level2',   // ogni L2, in ogni configurazione (12/9)
-  }).catch(() => {});
+  // SOLO l'annuale ricolloca il paziente per l'anno successivo (regola opzione A):
+  // il livello di fine anno diventa quello di inizio anno e fissa il diritto alla
+  // prevenzione attiva (ogni Livello 2 ce l'ha, 12/9).
+  // La ri-fotografia dei sei mesi NON ricolloca nessuno: serve a fotografare la
+  // popolazione per il report, e il livello clinico resta in mano all'osteopata.
+  if (checkpoint === 't12') {
+    await updatePatient(patient.id, {
+      level: computed_level,
+      computed_level,
+      prevention_eligible: computed_level === 'level2',
+    }).catch(() => {});
+  }
 
-  return res.json({ ok: true, computed_level });
+  return res.json({ ok: true, computed_level, checkpoint });
 }

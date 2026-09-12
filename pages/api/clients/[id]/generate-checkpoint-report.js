@@ -14,6 +14,7 @@ import {
   getSelfTriggersByClient,
 } from '../../../../lib/store';
 import { sezioneMovimento, inserisciMovimento } from '../../../../lib/movimento';
+import { sezioneRifotografia, inserisciRifotografia } from '../../../../lib/rifotografia';
 import { getNoteReport, getAndamentoT12Texts } from '../../../../lib/pricing/settings';
 import { CONFIG_V1 } from '../../../../lib/pricing/v1';
 import { stratificazioneOsservata } from '../../../../lib/scoring';
@@ -106,6 +107,30 @@ export default requireAuth(async function handler(req, res) {
       });
     } catch (e) {
       console.error('[checkpoint t3] sezione movimento non costruita:', e.message);
+    }
+  }
+
+  // ── «La fotografia a sei mesi» (solo T6): il questionario è tornato a tutta la
+  // popolazione, quindi il confronto con la partenza si può fare davvero.
+  let rifotoSection = '';
+  if (checkpoint === 't6') {
+    try {
+      const [assessments, reass6] = await Promise.all([
+        getAssessmentsByClient(id).catch(() => []),
+        getReassessmentsT12ByClient(id, 't6').catch(() => []),
+      ]);
+      const t0Ass = (assessments || [])[assessments.length - 1];
+      const t0Answers = t0Ass ? await getResponsesByAssessment(t0Ass.id).catch(() => []) : [];
+      const t0 = stratificazioneOsservata(t0Answers);
+      const t6 = stratificazioneOsservata((reass6 || []).map(r => r.nmq_data).filter(Boolean));
+      const pgicVals = (reass6 || []).map(r => r.pgic).filter(v => v != null);
+      const migliorati = pgicVals.filter(v => v >= 4).length;
+      rifotoSection = sezioneRifotografia({
+        t0, t6,
+        pgic: pgicVals.length ? { n: pgicVals.length, migliorPct: Math.round((migliorati / pgicVals.length) * 100) } : null,
+      });
+    } catch (e) {
+      console.error('[checkpoint t6] sezione ri-fotografia non costruita:', e.message);
     }
   }
 
@@ -244,7 +269,8 @@ STRUTTURA REPORT (markdown, ## per titoli):
 ## Prossimi Passi
 (3-4 azioni per i prossimi ${checkpoint === 't3' ? '3' : '6'} mesi)
 
-${checkpoint === 't3' ? `MOVIMENTO (tassativo): il racconto di cosa si è mosso in questi tre mesi — percorsi avviati e conclusi, sedute, prevenzione, segnalazioni, nuovi ingressi, distribuzione attuale — è già scritto dal sistema nella sezione «Il movimento dei primi 3 mesi». NON duplicarlo e NON riscriverne i numeri. In particolare NON affermare che la distribuzione attuale derivi da un nuovo questionario: a tre mesi nessuno ricompila nulla.
+${checkpoint === 't6' ? `FOTOGRAFIA (tassativo): il confronto fra il check-up iniziale e quello dei sei mesi è già scritto dal sistema nella sezione «La fotografia a sei mesi», con le sue cautele sulla rappresentatività. NON duplicarlo, NON ricalcolare le percentuali e NON presentarlo come un risultato clinico dimostrato.
+` : ''}${checkpoint === 't3' ? `MOVIMENTO (tassativo): il racconto di cosa si è mosso in questi tre mesi — percorsi avviati e conclusi, sedute, prevenzione, segnalazioni, nuovi ingressi, distribuzione attuale — è già scritto dal sistema nella sezione «Il movimento dei primi 3 mesi». NON duplicarlo e NON riscriverne i numeri. In particolare NON affermare che la distribuzione attuale derivi da un nuovo questionario: a tre mesi nessuno ricompila nulla.
 ` : ''}LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
 Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
@@ -255,7 +281,7 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
   const noteReport = await getNoteReport();
   const conNota = (t, conAi = false) => `${t}\n\n---\n\n*${conAi ? noteReport.ai : noteReport.base}*`;
   // Inietta la sezione andamento (verbatim) PRIMA della nota; no-op se non annuale.
-  const finalize = (t, conAi = false) => conNota(inserisciMovimento(injectAndamento(t, andamentoSection), movimentoSection), conAi);
+  const finalize = (t, conAi = false) => conNota(inserisciRifotografia(inserisciMovimento(injectAndamento(t, andamentoSection), movimentoSection), rifotoSection), conAi);
 
   // Manca la chiave: NESSUNA chiamata, nessun dato uscito (ai_status, v57).
   if (!process.env.ANTHROPIC_API_KEY) {

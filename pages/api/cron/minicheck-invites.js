@@ -3,11 +3,12 @@
 
 import {
   getPatientsForMinicheckInvite,
+  getPatientsForRifotografiaInvite,
   getClientById,
   insertEmailLog,
 } from '../../../lib/store';
 import { sendEmail } from '../../../lib/email';
-import { minicheckInvite } from '../../../lib/email-templates';
+import { minicheckInvite, rifotografiaInvite } from '../../../lib/email-templates';
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://eswork-app.vercel.app';
 
@@ -20,7 +21,9 @@ export default async function handler(req, res) {
 
   let totalSent = 0, totalFailed = 0;
 
-  for (const checkpoint of ['t3', 't6']) {
+  // Solo T3: a sei mesi non si manda il mini-check ai soli pazienti in trattamento,
+  // ma la ri-fotografia a tutta la popolazione (Enrico, 12/9).
+  for (const checkpoint of ['t3']) {
     try {
       const patients = await getPatientsForMinicheckInvite(checkpoint);
       for (const patient of patients) {
@@ -63,5 +66,39 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.json({ ok: true, sent: totalSent, failed: totalFailed, ts: new Date().toISOString() });
+  // ── Ri-fotografia dei sei mesi: a TUTTA la popolazione che ha fatto il check-up
+  // (non ai soli pazienti in trattamento). Aggancio: 180 giorni dalla compilazione.
+  let rifotoInviate = 0, rifotoFallite = 0;
+  try {
+    const daInvitare = await getPatientsForRifotografiaInvite(180);
+    for (const patient of daInvitare) {
+      try {
+        const client = patient.clients || await getClientById(patient.client_id).catch(() => null);
+        const link = `${BASE_URL}/employee/reassessment?token=${patient.care_token}&type=t6`;
+        const html = rifotografiaInvite({
+          employee_name: `${patient.first_name || ''} ${patient.last_name || ''}`.trim(),
+          company_name: client?.name || 'la tua azienda',
+          link,
+        });
+        const result = await sendEmail({ to: patient.email, subject: 'Check-up a sei mesi — ES Work', html });
+        await insertEmailLog({
+          patient_id: patient.id, client_id: patient.client_id,
+          template: 'rifotografia_invite_t6', to_email: patient.email,
+          subject: 'Check-up a sei mesi', status: result.ok ? 'sent' : 'failed',
+          error_message: result.ok ? null : result.error,
+        }).catch(() => {});
+        if (result.ok) rifotoInviate++; else rifotoFallite++;
+        await new Promise(r => setTimeout(r, 100));
+      } catch (_) { rifotoFallite++; }
+    }
+  } catch (e) {
+    console.error('[cron/minicheck-invites] ri-fotografia t6:', e.message);
+  }
+
+  return res.json({
+    ok: true,
+    minicheck: { sent: totalSent, failed: totalFailed },
+    rifotografia_t6: { sent: rifotoInviate, failed: rifotoFallite },
+    ts: new Date().toISOString(),
+  });
 }

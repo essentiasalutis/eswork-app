@@ -567,43 +567,50 @@ ${FIRMA}`,
     setSavingContracted(false);
   }
 
-  // ── Monitoraggio T3/T6/T12 (v4) ──────────────────────────────────────────────
-  // T3/T6: ancorati al 1° ciclo del paziente (90/180 gg) — il cron invia le email,
-  // qui i link per l'invio manuale (HR/WhatsApp) finché il dominio email non è attivo.
-  // T12: re-assessment dell'intera popolazione (campagna annuale, invio manuale).
+  // ── Monitoraggio T3/T6/T12 ───────────────────────────────────────────────────
+  // T3: mini-check ancorato al 1° ciclo (90 gg) — solo per chi è in trattamento.
+  // T6: RI-FOTOGRAFIA a tutta la popolazione che ha fatto il check-up (180 gg dalla
+  //     compilazione), stesse domande dell'inizio: è il confronto del report a 6 mesi.
+  // T12: rivalutazione annuale dell'intera popolazione.
+  // Il cron invia le email; qui i link per l'invio manuale finché il dominio non è attivo.
   const monit = (() => {
     const m = monitoring || { cycles: [], checks: [], reassessments: [] };
     const now = Date.now();
     const checksBy = {};
     (m.checks || []).forEach(c => { (checksBy[c.patient_id] = checksBy[c.patient_id] || new Set()).add(c.check_type); });
-    const reassSet = new Set((m.reassessments || []).map(r => r.patient_id));
+    const reass6 = new Set((m.reassessments || []).filter(r => (r.checkpoint || 't12') === 't6').map(r => r.patient_id));
+    const reass12 = new Set((m.reassessments || []).filter(r => (r.checkpoint || 't12') === 't12').map(r => r.patient_id));
     const firstCycle = {};
     (m.cycles || []).forEach(c => {
       if (!firstCycle[c.patient_id] || new Date(c.started_at) < new Date(firstCycle[c.patient_id])) firstCycle[c.patient_id] = c.started_at;
     });
     const byId = Object.fromEntries((patientsNrs || []).map(p => [p.id, p]));
-    const dueT3 = [], dueT6 = [];
+    const dueT3 = [];
     Object.entries(firstCycle).forEach(([pid, started]) => {
       const p = byId[pid];
       if (!p || !p.care_token) return;
       const days = Math.floor((now - new Date(started)) / 86400000);
       const done = checksBy[pid] || new Set();
       if (days >= 90 && !done.has('t3')) dueT3.push({ ...p, days });
-      if (days >= 180 && !done.has('t6')) dueT6.push({ ...p, days });
     });
-    const dueT12 = (patientsNrs || []).filter(p => p.care_token && p.assessment_completed_at && !reassSet.has(p.id));
+    // A sei mesi tocca a tutti quelli che hanno compilato il check-up, non ai soli trattati.
+    const dueT6 = (patientsNrs || []).filter(p => p.care_token && p.assessment_completed_at
+      && Math.floor((now - new Date(p.assessment_completed_at)) / 86400000) >= 180 && !reass6.has(p.id));
+    const dueT12 = (patientsNrs || []).filter(p => p.care_token && p.assessment_completed_at && !reass12.has(p.id));
     return {
       dueT3, dueT6, dueT12,
       doneT3: (m.checks || []).filter(c => c.check_type === 't3').length,
-      doneT6: (m.checks || []).filter(c => c.check_type === 't6').length,
-      doneT12: (m.reassessments || []).length,
+      doneT6: reass6.size,
+      doneT12: reass12.size,
     };
   })();
 
   function copyMonitorLink(p, fase) {
     const url = fase === 't12'
       ? `${baseUrl}/employee/reassessment?token=${p.care_token}`
-      : `${baseUrl}/employee/minicheck?token=${p.care_token}&type=${fase}`;
+      : fase === 't6'
+        ? `${baseUrl}/employee/reassessment?token=${p.care_token}&type=t6`   // ri-fotografia
+        : `${baseUrl}/employee/minicheck?token=${p.care_token}&type=${fase}`;
     navigator.clipboard.writeText(url).catch(() => {});
     setCopiedMonitor(p.id + fase);
     setTimeout(() => setCopiedMonitor(null), 2000);
@@ -1296,13 +1303,14 @@ ${FIRMA}`,
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
           <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">📡 Monitoraggio T3 / T6 / T12</h2>
           <div className="text-xs text-gray-400 mt-0.5 mb-4">
-            T3/T6: mini-check ancorati al 1° ciclo del paziente — invio email automatico ogni mattina (richiede dominio email verificato).
-            T12: check-up annuale con PGIC di tutta la popolazione. Qui i link personali per l&apos;invio manuale (HR/WhatsApp).
+            T3: mini-check ancorato al 1° ciclo, solo per chi è in trattamento. T6: check-up a sei mesi per TUTTI quelli che hanno
+            compilato il check-up iniziale — stesse domande, è il confronto del report a sei mesi. T12: check-up annuale con PGIC.
+            Gli inviti partono da soli ogni mattina (serve il dominio email verificato); qui i link personali per l&apos;invio manuale.
           </div>
           <div className="grid sm:grid-cols-3 gap-3">
             {[
               { fase: 't3', label: 'Mini-check T3 (3 mesi)', done: monit.doneT3, due: monit.dueT3, color: 'blue' },
-              { fase: 't6', label: 'Mini-check T6 (6 mesi)', done: monit.doneT6, due: monit.dueT6, color: 'purple' },
+              { fase: 't6', label: 'Check-up a 6 mesi (tutti)', done: monit.doneT6, due: monit.dueT6, color: 'purple' },
               { fase: 't12', label: 'Check-up T12 + PGIC', done: monit.doneT12, due: monit.dueT12, color: 'amber' },
             ].map(({ fase, label, done, due, color }) => {
               const colorCls = { blue: 'text-blue-700 border-blue-200 bg-blue-50', purple: 'text-purple-700 border-purple-200 bg-purple-50', amber: 'text-amber-700 border-amber-200 bg-amber-50' }[color];

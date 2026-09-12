@@ -18,13 +18,13 @@ const NMQ_ZONES = [
 ];
 
 
-function Header() {
+function Header({ titolo }) {
   return (
     <div style={{ background: '#1e293b', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
       <div style={{ width: 32, height: 32, background: '#16a34a', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🌿</div>
       <div>
         <div style={{ color: '#fff', fontWeight: 800, fontSize: 16, lineHeight: 1 }}>ES Work</div>
-        <div style={{ color: '#94a3b8', fontSize: 11 }}>Check-up a 12 mesi</div>
+        <div style={{ color: '#94a3b8', fontSize: 11 }}>{titolo}</div>
       </div>
     </div>
   );
@@ -32,7 +32,12 @@ function Header() {
 
 export default function ReassessmentT12() {
   const router = useRouter();
-  const { token } = router.query;
+  const { token, type } = router.query;
+  // 't6' = ri-fotografia dei sei mesi (a tutta la popolazione), 't12' = rivalutazione
+  // annuale. Stesse domande: cambia il momento a cui si riferiscono (Enrico, 12/9).
+  const checkpoint = type === 't6' ? 't6' : 't12';
+  const mesi = checkpoint === 't6' ? 6 : 12;
+  const titolo = `Check-up a ${mesi} mesi`;
 
   const [phase, setPhase] = useState('nmq'); // nmq | pgic | done
   const [zoneIndex, setZoneIndex] = useState(0);
@@ -84,7 +89,7 @@ export default function ReassessmentT12() {
       await fetch('/api/employee/reassessment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, nmq_data: nmqData, pgic }),
+        body: JSON.stringify({ token, nmq_data: nmqData, pgic, checkpoint }),
       });
     } catch {}
     setSending(false);
@@ -96,16 +101,18 @@ export default function ReassessmentT12() {
 
   return (
     <>
-      <Head><title>Check-up a 12 mesi — ES Work</title></Head>
+      <Head><title>{titolo} — ES Work</title></Head>
       <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif', maxWidth: 520, margin: '0 auto' }}>
-        <Header />
+        <Header titolo={titolo} />
 
         {phase === 'done' ? (
           <div style={{ padding: '48px 20px', textAlign: 'center' }}>
             <div style={{ fontSize: 56, marginBottom: 20 }}>🎉</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>Check-up completato!</div>
             <div style={{ fontSize: 15, color: '#64748b', lineHeight: 1.7 }}>
-              Grazie per aver completato il tuo check-up annuale. I risultati saranno elaborati dal nostro team e ti verrà comunicato l&apos;aggiornamento del tuo percorso.
+              {checkpoint === 't6'
+                ? 'Grazie. Le tue risposte servono a vedere com\'è cambiata la situazione dall\'inizio del programma: l\'azienda riceverà solo numeri complessivi, mai le risposte di una singola persona.'
+                : 'Grazie per aver completato il tuo check-up annuale. I risultati saranno elaborati dal nostro team e ti verrà comunicato l\'aggiornamento del tuo percorso.'}
             </div>
           </div>
         ) : phase === 'pgic' ? (
@@ -113,7 +120,7 @@ export default function ReassessmentT12() {
             <div style={{ background: '#fff', borderRadius: 16, border: '1.5px solid #e2e8f0', padding: '20px', marginBottom: 20 }}>
               <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>Valutazione globale</div>
               <div style={{ fontSize: 14, color: '#64748b', lineHeight: 1.6 }}>
-                Dall&apos;inizio del programma (circa 12 mesi fa), come ti senti complessivamente riguardo al tuo apparato muscolo-scheletrico?
+                Dall&apos;inizio del programma (circa {mesi} mesi fa), come ti senti complessivamente riguardo al tuo apparato muscolo-scheletrico?
               </div>
             </div>
 

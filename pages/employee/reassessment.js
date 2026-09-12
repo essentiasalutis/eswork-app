@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+// Le parole della scala vivono in lib/pgic.js: il percorso del dipendente rimostra
+// esattamente quelle che ha scelto rispondendo (fonte unica).
+import { PGIC_MIGLIORATO as PGIC_OPTIONS } from '../../lib/pgic';
 
 const NMQ_ZONES = [
   { key: 'collo', label: 'Collo', icon: '🔝' },
@@ -14,13 +17,6 @@ const NMQ_ZONES = [
   { key: 'caviglie', label: 'Caviglie / Piedi', icon: '🦶' },
 ];
 
-const PGIC_OPTIONS = [
-  { value: 5, label: 'Molto migliorato', icon: '😄', color: '#16a34a' },
-  { value: 4, label: 'Migliorato', icon: '🙂', color: '#22c55e' },
-  { value: 3, label: 'Invariato', icon: '😐', color: '#ca8a04' },
-  { value: 2, label: 'Peggiorato', icon: '🙁', color: '#ea580c' },
-  { value: 1, label: 'Molto peggiorato', icon: '😢', color: '#dc2626' },
-];
 
 function Header() {
   return (

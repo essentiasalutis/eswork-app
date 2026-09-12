@@ -3,9 +3,10 @@ import {
   getCyclesByPatient,
   getSessionsByPatient,
   getMiniChecksByPatient,
+  getReassessmentT12ByPatient,
   getSelfTriggerBudget,
 } from '../../../lib/store';
-import { vistaPazienteAreaPersonale, vistaCicli, vistaMiniCheck, andamentoNrs } from '../../../lib/vista';
+import { vistaPazienteAreaPersonale, vistaCicli, andamentoNrs, vistaPercorso } from '../../../lib/vista';
 import { limiteAreaPersonale } from '../../../lib/employee-guard';
 
 // Area personale del dipendente. Al browser va SOLO ciò che la pagina disegna
@@ -21,10 +22,11 @@ export default async function handler(req, res) {
   const patient = await getPatientByCareToken(token).catch(() => null);
   if (!patient) return res.status(404).json({ error: 'Link non valido o scaduto' });
 
-  const [cycles, sessions, miniChecks, selfTriggerBudget] = await Promise.all([
+  const [cycles, sessions, miniChecks, reassessment, selfTriggerBudget] = await Promise.all([
     getCyclesByPatient(patient.id).catch(() => []),
     getSessionsByPatient(patient.id).catch(() => []),
     getMiniChecksByPatient(patient.id).catch(() => []),
+    getReassessmentT12ByPatient(patient.id).catch(() => null),
     getSelfTriggerBudget(patient.id).catch(() => ({ used: 0, max: 2, remaining: 2 })),
   ]);
 
@@ -33,7 +35,9 @@ export default async function handler(req, res) {
     cycles: vistaCicli(cycles),
     // Solo i due numeri mostrati: nessuna riga di seduta, nessuna nota.
     nrs: andamentoNrs(sessions),
-    miniChecks: vistaMiniCheck(miniChecks),
+    // «Il mio percorso»: righe già pronte (fonte unica anche per i mini-check, che
+    // prima viaggiavano come lista a sé).
+    percorso: vistaPercorso({ sessions, cycles, miniChecks, reassessment }),
     selfTriggerBudget: { remaining: selfTriggerBudget ? selfTriggerBudget.remaining : 2 },
   });
 }

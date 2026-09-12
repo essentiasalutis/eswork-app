@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+// Le parole della scala vivono in lib/pgic.js: il percorso del dipendente rimostra
+// esattamente quelle che ha scelto rispondendo (fonte unica).
+import { PGIC_MEGLIO as PGIC_OPTIONS } from '../../lib/pgic';
 
 function Header() {
   return (
@@ -15,13 +18,6 @@ function Header() {
 }
 
 // PGIC — Patient Global Impression of Change (scala 1-5, auto-riferito = corretto)
-const PGIC_OPTIONS = [
-  { value: 5, label: 'Molto meglio', icon: '😄', color: '#16a34a' },
-  { value: 4, label: 'Meglio', icon: '🙂', color: '#22c55e' },
-  { value: 3, label: 'Invariato', icon: '😐', color: '#ca8a04' },
-  { value: 2, label: 'Peggio', icon: '🙁', color: '#ea580c' },
-  { value: 1, label: 'Molto peggio', icon: '😢', color: '#dc2626' },
-];
 
 export default function MiniCheck() {
   const router = useRouter();

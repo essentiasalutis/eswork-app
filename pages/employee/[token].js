@@ -204,7 +204,11 @@ function DashboardL1({ patient, cycles, nrs, onSelfTrigger, remaining }) {
 }
 
 // ─── Dashboard L2 ─────────────────────────────────────────────────────────────
-function DashboardL2({ patient, miniChecks, onSelfTrigger, remaining }) {
+function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining }) {
+  // I mini-check non viaggiano più come lista a sé: vivono nel percorso (fonte unica).
+  // La resa resta quella di prima — "T3 · Molto meglio" e la data — e la parola del
+  // PGIC è quella scelta rispondendo (lib/pgic.js).
+  const miniChecks = percorso.filter(r => r.tipo === 'minicheck');
   return (
     <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #0369a1 100%)', borderRadius: 18, padding: '20px', color: '#fff' }}>
@@ -224,19 +228,54 @@ function DashboardL2({ patient, miniChecks, onSelfTrigger, remaining }) {
       {miniChecks.length > 0 && (
         <div style={{ background: '#fff', borderRadius: 14, border: '1.5px solid #e2e8f0', padding: '16px' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 10 }}>📋 Storico mini-check</div>
-          {miniChecks.slice(0, 3).map(mc => {
-            const PGIC_LABEL = { 1: 'Molto peggio', 2: 'Peggio', 3: 'Invariato', 4: 'Meglio', 5: 'Molto meglio' };
-            return (
-              <div key={mc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}>
-                <span style={{ color: '#374151' }}>{mc.check_type?.toUpperCase()} · {mc.pgic ? PGIC_LABEL[mc.pgic] : '—'}</span>
-                <span style={{ color: '#64748b', fontSize: 11 }}>{new Date(mc.created_at).toLocaleDateString('it-IT')}</span>
-              </div>
-            );
-          })}
+          {miniChecks.slice(0, 3).map((mc, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}>
+              <span style={{ color: '#374151' }}>{mc.momento?.toUpperCase()} · {mc.pgic || '—'}</span>
+              <span style={{ color: '#64748b', fontSize: 11 }}>{mc.data ? new Date(mc.data).toLocaleDateString('it-IT') : '—'}</span>
+            </div>
+          ))}
         </div>
       )}
 
       <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} />
+    </div>
+  );
+}
+
+// ─── Il mio percorso ──────────────────────────────────────────────────────────
+// Ciò che è avvenuto: sedute svolte, mini-check, rivalutazione annuale. Lo vede solo
+// il dipendente col suo link. Niente nome dell'osteopata, niente note di trattamento
+// (decisione Enrico, 12/9): quelle restano nella cartella del professionista.
+function MioPercorso({ percorso = [] }) {
+  if (!percorso.length) return null;
+  const data = d => (d ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+  return (
+    <div style={{ padding: '0 16px 20px' }}>
+      <div style={{ background: '#fff', borderRadius: 14, border: '1.5px solid #e2e8f0', padding: '16px' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 10 }}>🗂 Il mio percorso</div>
+        {percorso.map((r, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, padding: '9px 0', borderBottom: i === percorso.length - 1 ? 'none' : '1px solid #f1f5f9' }}>
+            <div>
+              <div style={{ fontSize: 13, color: '#374151', fontWeight: 600 }}>
+                {r.tipo === 'seduta'
+                  ? `Seduta${r.numero ? ` ${r.numero}` : ''}${r.su ? ` di ${r.su}` : ''}${r.ciclo ? ` · ciclo ${r.ciclo}` : ''}`
+                  : r.tipo === 'minicheck'
+                    ? `Mini-check ${String(r.momento || '').toUpperCase()}`
+                    : 'Rivalutazione annuale'}
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                {r.tipo === 'seduta'
+                  ? (r.nrsPre != null || r.nrsPost != null
+                      ? `Dolore ${r.nrsPre != null ? r.nrsPre : '—'} → ${r.nrsPost != null ? r.nrsPost : '—'}${r.nrsPre != null && r.nrsPost != null && r.nrsPre !== r.nrsPost ? ` (${r.nrsPost < r.nrsPre ? '−' : '+'}${Math.abs(r.nrsPre - r.nrsPost)})` : ''}`
+                      : 'Seduta svolta')
+                  : (r.pgic || '—')}
+              </div>
+            </div>
+            <span style={{ fontSize: 11, color: '#64748b', whiteSpace: 'nowrap', paddingTop: 2 }}>{data(r.data)}</span>
+          </div>
+        ))}
+        <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 10 }}>Queste informazioni sono tue e non sono visibili al datore di lavoro.</p>
+      </div>
     </div>
   );
 }
@@ -446,7 +485,7 @@ export default function EmployeeDashboard() {
         )}
 
         {!loading && data && !data.error && (() => {
-          const { patient, cycles, nrs, miniChecks } = data;
+          const { patient, cycles, nrs, percorso = [] } = data;
           const level = patient.level || 'level3';
           const isOptedOut = patient.level_status === 'opted_out';
 
@@ -468,9 +507,12 @@ export default function EmployeeDashboard() {
                 : level === 'level1'
                   ? <DashboardL1 patient={patient} cycles={cycles} nrs={nrs} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} />
                   : level === 'level2'
-                    ? <DashboardL2 patient={patient} miniChecks={miniChecks} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} />
+                    ? <DashboardL2 patient={patient} percorso={percorso} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} />
                     : <DashboardL3 patient={patient} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} />
               }
+
+              {/* Il mio percorso — per tutti i livelli, solo se c'è qualcosa da mostrare */}
+              {!isOptedOut && <MioPercorso percorso={percorso} />}
 
               {/* Diritti GDPR */}
               <RightsSection token={token} patient={patient} />

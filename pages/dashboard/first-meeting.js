@@ -36,8 +36,29 @@ const RUOLI_DECISORE = ['Titolare', 'Responsabile HR', 'Direzione', 'Altro'];
 // Binario commerciale: scelta MANUALE (decisione di Enrico, nessuna regola automatica).
 const BINARI = [['A', 'A — titolare, micro/piccola'], ['B', 'B — HR/board, media/grande'], ['', 'Da decidere']];
 
-function Field({ label, hint, children }) {
-  return <div><label className="block text-sm font-semibold text-gray-700 mb-1">{label}</label>{hint && <p className="text-xs text-gray-400 mb-1.5">{hint}</p>}{children}</div>;
+// Campo con etichetta, riga di aiuto breve e - quando la spiegazione e' lunga - una
+// nota che compare passando sopra la "i" (o toccandola dal telefono, dove il passaggio
+// del mouse non esiste). La riga breve resta il promemoria, la nota spiega.
+function Field({ label, hint, nota, children }) {
+  const [notaAperta, setNotaAperta] = useState(false);
+  return (
+    <div>
+      <div className="flex items-start gap-1.5 mb-1">
+        <label className="block text-sm font-semibold text-gray-700">{label}</label>
+        {nota && (
+          <span className="relative group shrink-0 leading-none">
+            <button type="button" onClick={() => setNotaAperta(v => !v)} aria-label={`Cosa si intende con ${label}`}
+              className="w-4 h-4 rounded-full border border-gray-300 text-[10px] font-bold text-gray-400 hover:text-gray-700 hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500">i</button>
+            <span className={`${notaAperta ? 'block' : 'hidden group-hover:block'} absolute left-0 top-6 z-30 w-72 max-w-[80vw] text-xs leading-relaxed text-gray-100 bg-gray-900 rounded-xl px-3 py-2.5 shadow-xl`}>
+              {nota}
+            </span>
+          </span>
+        )}
+      </div>
+      {hint && <p className="text-xs text-gray-400 mb-1.5">{hint}</p>}
+      {children}
+    </div>
+  );
 }
 function Toggle({ checked, onChange, label }) {
   return (
@@ -297,34 +318,39 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
             </p>
             <Field label="Nome azienda *"><input value={nome} onChange={e => setNome(e.target.value)} placeholder="Es. Acme S.p.A." className={inputCls} /></Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Dipendenti *">
+              <Field label="Dipendenti *" nota="Il totale dichiarato dall’azienda, tutte le sedi comprese. È il numero da cui discende tutto: fascia di prezzo, gruppi di formazione, ergonomia d’ufficio, dimensionamento dello sportello.">
                 <input type="number" min="1" value={n || ''} onChange={e => setSedi(dividiSedi(e.target.value, sedi.length, sedi))} className={inputCls} />
               </Field>
-              <Field label="Settore *">
+              <Field label="Settore *" nota="Come è fatta la popolazione: produzione, uffici o mista. Inquadra la lettura dei disturbi nei documenti e il linguaggio del colloquio; non cambia il prezzo.">
                 <select value={sector} onChange={e => setSector(e.target.value)} className={inputCls}>
                   {SECTORS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </Field>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <Field label="Di cui in reparto" hint={`in ufficio: ${nErgUfficio}`}>
+              <Field label="Di cui in reparto" hint={`in ufficio: ${nErgUfficio}`} nota="Quante persone lavorano in produzione, magazzino o officina invece che alla scrivania. Le altre contano come ufficio e ricevono l’ergonomia individuale alla loro postazione; chi sta in reparto viene invece formato sulla postazione tipo del suo lavoro.">
                 <input type="number" min="0" value={ergAddetti} onChange={e => setErgAddetti(e.target.value)} className={inputCls} />
               </Field>
-              <Field label="Sedi" hint="dipendenti divisi in parti uguali">
+              <Field label="Sedi" hint="dipendenti divisi in parti uguali" nota="Quante sedi operative diverse. Qui i dipendenti vengono divisi in parti uguali fra le sedi per avere subito un ordine di grandezza: i numeri veri per sede si sistemano nel colloquio completo. Più sedi significa più giornate in trasferta.">
                 <input type="number" min="1" value={sedi.length} onChange={e => setSedi(dividiSedi(n, e.target.value, sedi))} className={inputCls} />
               </Field>
-              <Field label="Postazioni tipo" hint="di reparto">
+              <Field label="Postazioni tipo" hint="quanti tipi di postazione, non quante scrivanie" nota="Quanti MODELLI di postazione esistono in reparto: la linea di assemblaggio, il banco di saldatura, il carrello del picking. Ogni modello si studia una volta sola, a forfait, e poi gli addetti vengono formati su quello. Venticinque persone su tre tipi di postazione fanno 3, non 25.">
                 <input type="number" min="0" value={ergPostazioni} onChange={e => setErgPostazioni(e.target.value)} className={inputCls} />
               </Field>
             </div>
-            <Field label="Giorni di malattia l'anno" hint="se li conoscono">
+            {nErgAddetti > 0 && (parseInt(ergPostazioni) || 0) === 0 && (
+              <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                Ci sono {nErgAddetti} persone in reparto ma nessuna postazione tipo: lo studio della postazione resta fuori dalla Stima, e gli addetti verrebbero formati su una postazione mai osservata. Se non sai quante sono, mettine una: il conteggio si chiude al sopralluogo.
+              </div>
+            )}
+            <Field label="Giorni di malattia l'anno" hint="se li conoscono" nota="Giornate di assenza per malattia in un anno, su tutta l’azienda. Se non lo sanno, lascia vuoto: la leva sul costo delle assenze non viene mostrata, invece di appoggiarsi a un numero inventato.">
               <input type="number" min="0" value={absenceDays} onChange={e => { setAbsenceDays(e.target.value); setAssenteismo(e.target.value !== '' && +e.target.value > 0); }} className={inputCls} />
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="di cui per disturbi muscolo-scheletrici" hint="se lo sanno">
                 <input type="number" min="0" value={absenceDaysMsk} onChange={e => setAbsenceDaysMsk(e.target.value)} className={inputCls} />
               </Field>
-              <Field label="Premio INAIL annuo (€)" hint="se lo sanno">
+              <Field label="Premio INAIL annuo (€)" hint="se lo sanno" nota="Quanto versano all’INAIL in un anno. Serve a tradurre lo sconto OT23 in euro: senza, resta solo la percentuale e la leva pesa molto meno.">
                 <input type="number" min="0" value={premioInail} onChange={e => setPremioInail(e.target.value)} className={inputCls} />
               </Field>
             </div>
@@ -337,7 +363,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                 </select>
               </Field>
             </div>
-            <Field label="Binario" hint="lo decidi tu, capendo chi hai di fronte">
+            <Field label="Binario" hint="lo decidi tu, capendo chi hai di fronte" nota="A: decide una persona sola, di solito il titolare - si firma prima del check-up e l’offerta ha una scadenza. B: la decisione passa da HR o direzione - prima il check-up, poi la proposta, con Lettera di incarico e offerta senza scadenza.">
                 <div className="flex gap-1">
                   {BINARI.map(([v, l]) => (
                     <button key={v || 'nd'} type="button" onClick={() => setBinario(v)}
@@ -428,7 +454,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
               <div className="text-xs text-gray-400 mt-1">Totale dipendenti: <strong className="text-gray-600">{n}</strong> · gruppi formazione: <strong className="text-gray-600">{groups}</strong></div>
             </Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Capienza aula/sala"><input type="number" value={capienza} onChange={e => setCapienza(e.target.value)} className={inputCls} /></Field>
+              <Field label="Capienza aula/sala" nota="Quante persone entrano nello spazio che l’azienda mette a disposizione per la formazione. Decide in quanti gruppi si spezza il corso: una sala da 15 con 40 dipendenti significa tre sessioni, non una."><input type="number" value={capienza} onChange={e => setCapienza(e.target.value)} className={inputCls} /></Field>
               <Field label="Formazione"><div className="flex gap-1">{seg('per_sede', trainingMode, setTrainingMode, 'Per sede')}{seg('accorpa', trainingMode, setTrainingMode, 'Accorpa')}</div></Field>
             </div>
             {isV2 && (
@@ -460,10 +486,10 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
               </div>
             )}
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Fatturato" hint="Dirime i borderline del tier"><div className="flex gap-1">{FATTURATO.map(([v, l]) => seg(v, fatturato, setFatturato, l))}</div></Field>
+              <Field label="Fatturato" hint="Dirime i borderline del tier" nota="Ordine di grandezza del fatturato. Non entra nel prezzo: serve solo quando il numero di dipendenti lascia in dubbio la configurazione, per capire che azienda si ha davanti."><div className="flex gap-1">{FATTURATO.map(([v, l]) => seg(v, fatturato, setFatturato, l))}</div></Field>
               <Field label="Maturità HR"><div className="flex gap-1">{HR.map(([v, l]) => seg(v, hrMaturity, setHrMaturity, l))}</div></Field>
             </div>
-            <Field label="Tier interno (uso interno, non mostrato al cliente)">
+            <Field label="Tier interno (uso interno, non mostrato al cliente)" nota="Nome interno della configurazione: non compare in nessun documento che legge il cliente. Serve a te per sapere quali servizi stai dimensionando.">
               <div className="flex items-center gap-2">{['core', 'plus', 'enterprise'].map(t => (
                 <button key={t} onClick={() => setTierOverride(t === suggestedTier ? null : t)} className="flex-1 py-2 rounded-xl border-2 text-sm font-semibold" style={{ borderColor: TIER_COLORS[t], background: tier === t ? TIER_COLORS[t] : '#fff', color: tier === t ? '#fff' : TIER_COLORS[t] }}>{TIER_LABELS[t]}</button>
               ))}</div>
@@ -478,7 +504,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
 
         {modo === 'completo' && step === 3 && (
           <div className="space-y-5">
-            <Field label="Avete uno spazio in sede per lo sportello? *">
+            <Field label="Avete uno spazio in sede per lo sportello? *" nota="Serve una stanza chiusa dove lavorare in privato, con spazio per un lettino. Senza, lo sportello in sede non è erogabile e il programma va ripensato: è la domanda che può far saltare tutto il resto.">
               <div className="flex flex-col gap-2">{[['dedicata', 'Sì, stanza dedicata'], ['condivisa', 'Sì, sala condivisa'], ['da_trovare', 'No, da trovare']].map(([v, l]) => (
                 <button key={v} type="button" onClick={() => setSpazio(v)} className={`py-2.5 px-4 rounded-xl border-2 text-sm font-semibold text-left ${spazio === v ? 'border-green-500 bg-green-50 text-green-800' : 'border-gray-200 text-gray-600'}`}>{l}</button>
               ))}</div>
@@ -487,7 +513,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
             <Field label="Fasce orarie preferite"><div className="flex flex-wrap gap-2">{FASCE.map(f => (
               <button key={f} type="button" onClick={() => toggleArr(fasce, setFasce, f)} className={`px-3 py-1.5 rounded-full border text-sm ${fasce.includes(f) ? 'bg-green-600 border-green-600 text-white' : 'border-gray-300 text-gray-600'}`}>{f}</button>
             ))}</div></Field>
-            <Field label="Avete un Medico Competente attivo?">
+            <Field label="Avete un Medico Competente attivo?" nota="Se c’è, è l’interlocutore tecnico da coinvolgere presto: il programma è volontario e complementare alla sorveglianza sanitaria, non la sostituisce. Un medico competente informato è un alleato; scoperto all’ultimo, è un ostacolo.">
               <div className="flex gap-2">{[['si', 'Sì'], ['no', 'No'], ['nonso', 'Non so']].map(([v, l]) => seg(v, mc, setMc, l))}</div>
               {mc === 'si' && <div className="grid grid-cols-2 gap-3 mt-2"><input value={mcNome} onChange={e => setMcNome(e.target.value)} placeholder="Nome MC" className={inputCls} /><input value={mcContatti} onChange={e => setMcContatti(e.target.value)} placeholder="Contatti" className={inputCls} /></div>}
             </Field>

@@ -5,6 +5,7 @@ import { aggiungiGiorni, oggiRoma, etichettaData, ilGiorno, giorniAllaChiusura, 
 import { testoKit, testoKitCheckupDopoFirma, firmaKit, bloccoKit } from '../../lib/riepilogo';
 import { isFirmato } from '../../lib/pipeline';
 import MailAvvio from '../../components/MailAvvio';
+import { isValidato, rigaValidazione, testoConValidazione } from '../../lib/validazione';
 import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getDocumentsByClient, getProfessionals, getMonitoringByClient, getTreatmentCapacity } from '../../lib/store';
 import { TYPE_LABELS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
@@ -269,7 +270,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
       const data = await res.json();
       if (data.report) {
         const title = type === 'activation' ? 'Report di Attivazione' : type === 't12' ? 'Report Annuale (12 mesi)' : `Report Intermedio ${type.toUpperCase()}`;
-        setReportModal({ title, content: data.report, source: data.source, ai_status: data.ai_status, pdf_url: data.pdf_url, dateStr: new Date().toLocaleDateString('it-IT') });
+        setReportModal({ id: data.report_id, title, content: data.report, source: data.source, ai_status: data.ai_status, pdf_url: data.pdf_url, dateStr: new Date().toLocaleDateString('it-IT') });
         setGeneratedReports(prev => [{ id: data.report_id || Date.now(), report_type: type === 'activation' ? 'activation' : `checkpoint_${type}`, created_at: new Date().toISOString(), pdf_url: data.pdf_url, content_text: data.report, ai_status: data.ai_status }, ...prev]);
       }
     } catch {}
@@ -304,12 +305,33 @@ export default function ClientPage({ client: initialClient, assessments: initial
   // Riapre un report già generato (dal testo salvato), senza rigenerarlo
   function openSavedReport(r) {
     if (r.content_text) {
-      setReportModal({ title: reportTitleFromType(r.report_type), content: r.content_text, source: 'salvato', ai_status: r.ai_status, pdf_url: r.pdf_url, dateStr: r.created_at ? new Date(r.created_at).toLocaleDateString('it-IT') : null });
+      setReportModal({ id: r.id, title: reportTitleFromType(r.report_type), content: r.content_text, source: 'salvato', ai_status: r.ai_status, pdf_url: r.pdf_url, dateStr: r.created_at ? new Date(r.created_at).toLocaleDateString('it-IT') : null, validato_da: r.validato_da, validato_il: r.validato_il });
     } else if (r.pdf_url) {
       window.open(r.pdf_url, '_blank');
     } else {
       alert('Contenuto del report non disponibile.');
     }
+  }
+
+  // Validazione registrata del report (v60): un fatto, non una dichiarazione.
+  // Rigenerando il report NON si eredita nulla: la rigenerazione crea un documento
+  // nuovo, e un testo nuovo non è quello che è stato validato.
+  const [validando, setValidando] = useState(false);
+  async function validaReport(azione) {
+    if (!reportModal?.id) { alert('Riapri il report dall\'elenco per validarlo.'); return; }
+    if (azione === 'revoca' && !confirm('Togliere la validazione? Il PDF viene rigenerato senza la riga.')) return;
+    setValidando(true);
+    try {
+      const res = await fetch(`/api/clients/${client.id}/reports/${reportModal.id}/valida`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ azione }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(d.error || 'Non riuscito'); setValidando(false); return; }
+      setReportModal(m => ({ ...m, validato_da: d.validato_da, validato_il: d.validato_il, pdf_url: d.pdf_url || m.pdf_url }));
+      setGeneratedReports(prev => prev.map(r => r.id === reportModal.id ? { ...r, validato_da: d.validato_da, validato_il: d.validato_il, pdf_url: d.pdf_url || r.pdf_url } : r));
+      if (d.pdfNonRigenerato) alert('Validazione registrata, ma il PDF non è stato rigenerato: scaricalo di nuovo più tardi.');
+    } catch { alert('Errore di rete'); }
+    setValidando(false);
   }
 
   // Stampa / salva PDF dal browser (funziona per qualsiasi report, anche riaperto)
@@ -320,7 +342,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
     w.document.write(reportPrintHtml({
       title: reportModal.title,
       company: client.name,
-      content: reportModal.content,
+      content: testoConValidazione(reportModal.content, reportModal),
       dateStr: reportModal.dateStr,
       source: reportModal.source,
     }));
@@ -1354,6 +1376,7 @@ ${FIRMA}`,
                   <span>{r.report_type === 'activation' ? '📋 Attivazione' : r.report_type === 'checkpoint_t12' ? '🏆 Annuale' : `📊 ${r.report_type?.replace('checkpoint_', '').toUpperCase()}`}</span>
                   <span className="flex items-center gap-2">
                     {badgeAiStatus(r.ai_status)}
+                    {isValidato(r) && <span title={rigaValidazione(r)} className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-700">✓ validato</span>}
                     {r.report_type === 'activation' && r.quote_compliance && r.quote_compliance.in_range != null && (
                       <span title={`Forbice colloquio €${Math.round(r.quote_compliance.min || 0).toLocaleString('it-IT')}–€${Math.round(r.quote_compliance.max || 0).toLocaleString('it-IT')} · prezzo definitivo €${Math.round(r.quote_compliance.real_price || 0).toLocaleString('it-IT')} (uso interno)`}
                         className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.quote_compliance.in_range ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -1515,8 +1538,20 @@ ${FIRMA}`,
       <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[92vh] flex flex-col shadow-2xl">
           <div className="flex items-center justify-end gap-2 px-4 py-2.5 border-b border-gray-100">
-            {/* Prima di presentarlo a un cliente: che cosa ho in mano (v57). */}
-            <span className="mr-auto flex items-center gap-2">{badgeAiStatus(reportModal.ai_status, { conAi: true })}</span>
+            {/* Prima di presentarlo a un cliente: che cosa ho in mano (v57 + v60). */}
+            <span className="mr-auto flex items-center gap-2 flex-wrap">
+              {badgeAiStatus(reportModal.ai_status, { conAi: true })}
+              {isValidato(reportModal)
+                ? <span title={rigaValidazione(reportModal)} className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-700">✓ validato</span>
+                : <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">non ancora validato</span>}
+              {reportModal.id && (isValidato(reportModal)
+                ? <button onClick={() => validaReport('revoca')} disabled={validando} className="text-[11px] text-gray-500 underline disabled:opacity-50">togli</button>
+                : <button onClick={() => validaReport('valida')} disabled={validando}
+                    title="Registra che l'hai letto e validato: chi e quando. La riga compare nel documento e il PDF si rigenera."
+                    className="text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-2.5 py-1 rounded-lg disabled:opacity-50">
+                    {validando ? '…' : '✅ Valido questo report'}
+                  </button>)}
+            </span>
             {reportModal.pdf_url && (
               <a href={reportModal.pdf_url} target="_blank" rel="noreferrer"
                 className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-100">
@@ -1533,9 +1568,14 @@ ${FIRMA}`,
             </button>
             <button onClick={() => setReportModal(null)} className="text-gray-400 hover:text-gray-600 text-xl px-2">✕</button>
           </div>
+          {isValidato(reportModal) && (
+            <div className="px-5 pt-3 text-[11px] text-gray-500">
+              {rigaValidazione(reportModal)} — se rigeneri il report la validazione <strong>non si trasferisce</strong>: il testo nuovo è un documento nuovo, da validare di nuovo.
+            </div>
+          )}
           <div className="overflow-y-auto px-5 py-5 flex-1 bg-gray-50/60">
             <ReportDoc
-              content={reportModal.content}
+              content={testoConValidazione(reportModal.content, reportModal)}
               title={reportModal.title}
               company={client.name}
               dateStr={reportModal.dateStr}

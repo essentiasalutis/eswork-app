@@ -29,6 +29,7 @@ const PARAM_LABELS = {
 const TEXT_LABELS = {
   nota_report: 'Nota in fondo al report — testo scritto dalla piattaforma (senza AI)',
   nota_report_ai: 'Nota in fondo al report — testo generato con l\'AI',
+  validatore_nome: 'Nome nella riga di validazione dei report (es. «Dott. … (osteopata)»)',
   naming_cliente_programma_completo: 'Nome cliente-facing: programma completo',
   naming_cliente_pacchetto_prevenzione: 'Nome cliente-facing: pacchetto prevenzione',
   testo_evoluzione_pacchetto: 'Report pacchetto: testo "evoluzione verso il programma completo"',

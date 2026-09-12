@@ -1,63 +1,32 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { requireAuth } from '../../../lib/auth';
+import { pianoDeterministico, zoneCritiche, zoneAmmesse } from '../../../lib/piano';
 
-// ─── Fallback deterministico ──────────────────────────────────────────────────
-
-function fallbackPlan(zones, level1Count) {
-  const INTERVENTIONS = {
-    'Collo': 'Sportello osteopatico — protocollo cervicale + ergonomia postazione',
-    'Spalle': 'Sportello osteopatico — protocollo spalle + formazione postura',
-    'Schiena alta (dorsale)': 'Sportello osteopatico — rachide dorsale + ergonomia workstation',
-    'Schiena bassa (lombare)': 'Sportello osteopatico — lombare + formazione movimentazione carichi',
-    'Gomiti': 'Sportello osteopatico — arto superiore + analisi postura lavoro',
-    'Polsi / Mani': 'Sportello osteopatico — polso/mano + ergonomia strumenti lavoro',
-    'Anche / Cosce': 'Sportello osteopatico — arto inferiore + formazione stazione eretta',
-    'Ginocchia': 'Sportello osteopatico — protocollo ginocchio + analisi del passo',
-    'Caviglie / Piedi': 'Sportello osteopatico — arto inferiore distale + calzature professionali',
-  };
-
-  // Prendi le zone >= 30%, o le top-2 se nessuna supera la soglia
-  let critical = zones.filter(z => z.pct12 >= 30).sort((a, b) => b.pct12 - a.pct12);
-  if (critical.length === 0) {
-    critical = [...zones].sort((a, b) => b.pct12 - a.pct12).slice(0, 2);
-  }
-  critical = critical.slice(0, 5);
-
-  return critical.map(z => ({
-    criticita: `${z.pct12}% disturbi ${z.zone.toLowerCase()}`,
-    intervento: INTERVENTIONS[z.zone] || 'Sportello osteopatico + formazione mirata',
-    risultato: 'Riduzione sintomi 20-30% in 12 mesi',
-  }));
-}
-
-// ─── Handler ──────────────────────────────────────────────────────────────────
-
+// Piano di intervento con l'AI. Si arriva qui SOLO da un gesto esplicito (il pulsante
+// sull'Offerta): l'apertura della pagina non chiama più nulla. Il payload NON è quello
+// del browser: il server lo ricostruisce dalla whitelist di lib/piano.js — zone note e
+// percentuali, niente nome dell'azienda, niente campi estranei.
 export default requireAuth(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { zones, clientName, sector, level1Count } = req.body;
+  const zones = zoneAmmesse(req.body?.zones);
+  if (!zones.length) return res.status(400).json({ error: 'Nessuna zona valida.' });
+  const sector = Number(req.body?.sector) === 1 ? 1 : 2;
+  const n1 = Math.round(Number(req.body?.level1Count));
+  const level1Count = Number.isFinite(n1) && n1 > 0 ? n1 : 0;
 
-  if (!zones || !Array.isArray(zones)) {
-    return res.status(400).json({ error: 'zones richiesto' });
-  }
-
-  // Se manca la chiave API → fallback diretto
+  // Se manca la chiave API → piano della piattaforma, nessun dato esce
   if (!process.env.ANTHROPIC_API_KEY) {
-    return res.json({ plan: fallbackPlan(zones, level1Count), source: 'fallback_no_key' });
+    return res.json({ plan: pianoDeterministico(zones), source: 'fallback_no_key' });
   }
 
-  // Zone con prevalenza >= 30% (o top-2 se nessuna)
-  let criticalZones = zones.filter(z => z.pct12 >= 30).sort((a, b) => b.pct12 - a.pct12);
-  if (criticalZones.length === 0) {
-    criticalZones = [...zones].sort((a, b) => b.pct12 - a.pct12).slice(0, 2);
-  }
-
+  const criticalZones = zoneCritiche(zones);
   const zoneText = criticalZones.map(z => `- ${z.zone}: ${z.pct12}%`).join('\n');
   const sectorLabel = sector === 1 ? 'manifattura/produzione' : 'ufficio/servizi';
 
   const prompt = `Sei un consulente di salute occupazionale. Genera un piano di intervento per un'azienda basandoti su questi dati NMQ:
 ${zoneText}
-Azienda: ${clientName}, settore: ${sectorLabel}, dipendenti Livello 1: ${level1Count}
+Settore: ${sectorLabel}. Dipendenti di Livello 1: ${level1Count}
 
 Genera una tabella JSON con massimo 5 righe, formato:
 [{"criticita": "X% disturbi [zona]", "intervento": "descrizione intervento specifico", "risultato": "risultato atteso realistico"}]
@@ -97,6 +66,6 @@ Rispondi SOLO con il JSON, senza altro testo.`;
 
   } catch (e) {
     console.error('[AI intervention-plan] fallback:', e.message);
-    return res.json({ plan: fallbackPlan(zones, level1Count), source: 'fallback', error: e.message });
+    return res.json({ plan: pianoDeterministico(zones), source: 'fallback', error: e.message });
   }
 });

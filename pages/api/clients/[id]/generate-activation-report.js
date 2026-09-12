@@ -199,12 +199,13 @@ DIVIETI ASSOLUTI — valgono su TUTTO il testo, incluse le PARAFRASI che aggiran
 5. MAPPA CLINICA = fotografia NEUTRA del questionario: descrivi i livelli con i soli dati osservati (dolore riportato, impatto funzionale). MAI come bisogni clinici da soddisfare, MAI tono di allarme, MAI "non trattati", "non presi in carico", "sintomatologia non gestita", "richiedono trattamento/protocollo".
 PRINCIPIO GUIDA: la stratificazione è la fotografia dello stato della popolazione, NON un elenco di bisogni da colmare. Il pacchetto si esaurisce nelle sue tre attività.` : '';
 
-  // Fallback se manca la chiave
+  // Fallback se manca la chiave: NESSUNA chiamata, nessun dato uscito. La distinzione si
+  // conosce qui, prima di chiamare, e resta scritta sul record (ai_status, v57).
   if (!process.env.ANTHROPIC_API_KEY) {
     const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { sezioneComprende, isPacchetto, nomeProdotto, testoEvoluzione, firmato }));
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
-    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
-    return res.json({ report: fallback, source: 'fallback', pdf_url: pdfUrl, report_id: rec?.id });
+    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', ai_status: 'fallback_no_key', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
+    return res.json({ report: fallback, source: 'fallback', ai_status: 'fallback_no_key', pdf_url: pdfUrl, report_id: rec?.id });
   }
 
   try {
@@ -255,13 +256,15 @@ Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole tota
     if (message.stop_reason === 'max_tokens') throw new Error('testo dell\'AI troncato: troppo lungo');
     const report = conNota(inserisciCosaComprende(message.content[0]?.text || '', sezioneComprende));
     const pdfUrl = await tryGeneratePdf(client, 'activation', report, id).catch(() => null);
-    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
-    return res.json({ report, source: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
+    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', ai_status: 'ai', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
+    return res.json({ report, source: 'ai', ai_status: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
+    // Qui la chiamata è stata fatta: i dati SONO usciti, la risposta non è stata usata.
+    // Si salva solo la classe, mai il messaggio d'errore (può contenere il payload).
     const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { sezioneComprende, isPacchetto, nomeProdotto, testoEvoluzione, firmato }));
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
-    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
-    return res.json({ report: fallback, source: 'fallback', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
+    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', ai_status: 'fallback_errore', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
+    return res.json({ report: fallback, source: 'fallback', ai_status: 'fallback_errore', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
   }
 });
 

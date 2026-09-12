@@ -214,12 +214,13 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
   // Inietta la sezione andamento (verbatim) PRIMA della nota; no-op se non annuale.
   const finalize = t => conNota(injectAndamento(t, andamentoSection));
 
+  // Manca la chiave: NESSUNA chiamata, nessun dato uscito (ai_status, v57).
   if (!process.env.ANTHROPIC_API_KEY) {
     const fallback = finalize(generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc));
     // PDF prima dell'insert: così pdf_url resta sul record e il report è riapribile col PDF
     const pdfUrl = await tryGeneratePdf(client, reportType, fallback, id, checkpoint).catch(() => null);
-    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system', pdf_url: pdfUrl }).catch(() => null);
-    return res.json({ report: fallback, source: 'fallback', pdf_url: pdfUrl, report_id: rec?.id });
+    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system', ai_status: 'fallback_no_key', pdf_url: pdfUrl }).catch(() => null);
+    return res.json({ report: fallback, source: 'fallback', ai_status: 'fallback_no_key', pdf_url: pdfUrl, report_id: rec?.id });
   }
 
   try {
@@ -231,13 +232,14 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
     });
     const report = finalize(message.content[0]?.text || '');
     const pdfUrl = await tryGeneratePdf(client, reportType, report, id, checkpoint).catch(() => null);
-    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: report, checkpoint, created_by: 'admin', pdf_url: pdfUrl }).catch(() => null);
-    return res.json({ report, source: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
+    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: report, checkpoint, created_by: 'admin', ai_status: 'ai', pdf_url: pdfUrl }).catch(() => null);
+    return res.json({ report, source: 'ai', ai_status: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
+    // Chiamata fatta: i dati sono usciti, la risposta non è stata usata. Solo la classe.
     const fallback = finalize(generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc));
     const pdfUrl = await tryGeneratePdf(client, reportType, fallback, id, checkpoint).catch(() => null);
-    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system', pdf_url: pdfUrl }).catch(() => null);
-    return res.json({ report: fallback, source: 'fallback', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
+    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system', ai_status: 'fallback_errore', pdf_url: pdfUrl }).catch(() => null);
+    return res.json({ report: fallback, source: 'fallback', ai_status: 'fallback_errore', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
   }
 });
 

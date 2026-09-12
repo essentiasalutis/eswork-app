@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Head from 'next/head';
 import { requireAuthSsr } from '../../lib/auth';
 import { getClientById } from '../../lib/store';
@@ -14,6 +14,7 @@ import { finoAl, fraseValidita, scartoLivello2, testoScartoLivello2 } from '../.
 import { normalizza } from '../../lib/pipeline';
 import { VOCI_PROGRAMMA, RIGA_CHIUSURA, quantitaPrimoAnno } from '../../lib/programma';
 import { vistaRiservata, K_ANON, SUPPRESSED } from '../../lib/kanon';
+import { pianoDeterministico } from '../../lib/piano';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
 
 // ─── Firma standard ───────────────────────────────────────────────────────────
@@ -112,34 +113,41 @@ function Page({ children, className = '' }) {
 
 // ─── Offer Document ───────────────────────────────────────────────────────────
 
-export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, date, offertaGiorniA = 10, scartoL2 = null }) {
+export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, date, offertaGiorniA = 10, scartoL2 = null, pianoBase = [] }) {
   const [emailModal, setEmailModal] = useState(null);
   const [scadenza, setScadenza] = useState(() => scadenzaIniziale(client, offertaGiorniA));
   const [esitoInvio, setEsitoInvio] = useState(null); // { ok, testo }
-  const [aiPlan, setAiPlan] = useState(null);       // null = caricamento, [] = pronto
-  const [aiSource, setAiSource] = useState(null);   // 'ai' | 'fallback' | 'fallback_no_key'
+  // Il piano c'è già all'apertura: è quello della piattaforma, calcolato lato server.
+  // L'AI entra SOLO con il pulsante qui sotto (nessuna chiamata al montaggio, 12/9).
+  const [piano, setPiano] = useState(pianoBase);
+  const [pianoAi, setPianoAi] = useState(false);
+  const [aiStato, setAiStato] = useState(null); // null | 'attesa' | 'non_riuscito'
 
-  useEffect(() => {
-    if (!nmq) return;
-    // Riservatezza: con meno di k risposte niente piano per zone; le zone sotto soglia
-    // non entrano nel piano (sarebbero stampate con la loro percentuale).
+  async function generaPianoAi() {
+    if (!nmq || aiStato === 'attesa') return;
+    // Riservatezza: le zone sotto soglia non escono (sarebbero stampate con la loro
+    // percentuale). Il preventivo dal colloquio non ha risposte reali: niente soglie.
     const r = assessment && !assessment.estimate ? vistaRiservata(nmq) : null;
-    if (r && !r.pubblicabile) { setAiPlan([]); setAiSource('non_pubblicabile'); return; }
-    fetch('/api/ai/intervention-plan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        zones: r ? r.zone.filter(z => !z.soppressa) : nmq.zones,
-        clientName: client?.name || 'Azienda',
-        sector: client?.sector ?? 2,
-        level1Count: nmq.level1.count,
-      }),
-    })
-      .then(r => r.json())
-      .then(d => { setAiPlan(d.plan || []); setAiSource(d.source); })
-      .catch(() => { setAiPlan([]); setAiSource('fallback'); });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (r && !r.pubblicabile) return;
+    setAiStato('attesa');
+    try {
+      const res = await fetch('/api/ai/intervention-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          zones: (r ? r.zone.filter(z => !z.soppressa) : nmq.zones).map(z => ({ zone: z.zone, pct12: z.pct12 })),
+          sector: client?.sector ?? 2,
+          level1Count: nmq.level1.count,
+        }),
+      });
+      const d = await res.json();
+      // Solo un piano davvero dell'AI sostituisce la tabella: il testo di riserva
+      // dell'API è lo stesso che è già a video.
+      if (d.source === 'ai' && Array.isArray(d.plan) && d.plan.length) {
+        setPiano(d.plan); setPianoAi(true); setAiStato(null);
+      } else setAiStato('non_riuscito');
+    } catch { setAiStato('non_riuscito'); }
+  }
 
   if (!client || !assessment) {
     return (
@@ -484,24 +492,35 @@ ${FIRMA}`;
         <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 4 }}>Piano di intervento proposto</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3b82f6', flexShrink: 0, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
+          {/* La frase sull'AI compare SOLO se il piano è davvero dell'AI: dichiararla
+              su un piano generato dalla piattaforma sarebbe falso (Enrico, 12/9). */}
           <span style={{ fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>
-            Piano elaborato sui dati della vostra azienda con il supporto di strumenti di intelligenza artificiale e validato da un professionista osteopata di Essentia Salutis
-            {aiSource === 'ai' && <span className="no-print" style={{ marginLeft: 6, color: '#3b82f6', fontWeight: 600 }}>✦ AI</span>}
+            {pianoAi
+              ? 'Piano elaborato sui dati della vostra azienda con il supporto di strumenti di intelligenza artificiale e validato da un professionista osteopata di Essentia Salutis'
+              : 'Piano elaborato sui dati della vostra azienda secondo il protocollo ES Work'}
+            {pianoAi && <span className="no-print" style={{ marginLeft: 6, color: '#3b82f6', fontWeight: 600 }}>✦ AI</span>}
           </span>
         </div>
         <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 12 }}>
           Zone con prevalenza ≥ 30% — interventi e risultati attesi
         </div>
 
-        {aiPlan === null ? (
-          /* Caricamento AI */
-          <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20, textAlign: 'center' }}>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>
-              <span style={{ display: 'inline-block', marginRight: 8 }}>⏳</span>
-              Elaborazione del piano in corso…
-            </div>
+        {/* Solo per Enrico, mai in stampa: l'invio dei dati all'AI è un gesto esplicito. */}
+        {piano.length > 0 && !pianoAi && (
+          <div className="no-print" style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: 10, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <button onClick={generaPianoAi} disabled={aiStato === 'attesa'}
+              style={{ background: aiStato === 'attesa' ? '#cbd5e1' : '#1e293b', color: '#fff', border: 0, borderRadius: 10, padding: '7px 12px', fontSize: 12, fontWeight: 700, cursor: aiStato === 'attesa' ? 'default' : 'pointer' }}>
+              {aiStato === 'attesa' ? '⏳ Elaborazione…' : '✦ Genera il piano con l\'AI'}
+            </button>
+            <span style={{ fontSize: 11, color: '#6b7280' }}>
+              {aiStato === 'non_riuscito'
+                ? 'L\'AI non ha risposto: resta il piano della piattaforma qui sotto.'
+                : 'Premendo il pulsante, le percentuali per zona vengono inviate ad Anthropic (Stati Uniti). Senza premere, non esce nulla.'}
+            </span>
           </div>
-        ) : (
+        )}
+
+        {(
           <>
             <table className="offer-table">
               <thead>
@@ -512,7 +531,7 @@ ${FIRMA}`;
                 </tr>
               </thead>
               <tbody>
-                {aiPlan.map((row, i) => (
+                {piano.map((row, i) => (
                   <tr key={i}>
                     <td style={{ color: '#dc2626', fontWeight: 600 }}>{row.criticita}</td>
                     <td style={{ color: '#374151' }}>{row.intervento}</td>
@@ -822,15 +841,18 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       const pricingVersion = client.pricing_version || 'v1';
       const v2Params = pricingVersion === 'v2' ? (await getPricingSettingsV2()).params : null;
       const calc = calculatePricing({ n: totalN, l1: l1v, l2: l2v, pricingVersion, v2Params, ...(custom || {}) });
+      const nmqStimato = syntheticNmq(totalN, l1v, l2v);
       return {
         props: {
           client,
           assessment: { type: 'initial', n: totalN, client_id: clientId, estimate: true },
-          nmq: syntheticNmq(totalN, l1v, l2v),
+          nmq: nmqStimato,
           calc,
           roi: null,
           date: today(),
           offertaGiorniA,
+          // Numeri stimati dal colloquio (nessuna risposta reale): niente soglie k-anon.
+          pianoBase: pianoDeterministico(nmqStimato.zones || []),
         },
       };
     } catch (e) { console.error(e); return { notFound: true }; }
@@ -847,6 +869,10 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     const { client, assessment, nmq, calc, forchetta } = d;
     const scartoL2 = scartoLivello2({ nmq, calc, dipendenti: client && client.employees, l2Mult: d.l2Mult, soglia: scartoL2Soglia });
     const roi = null; // ROI only from calculator (requires absence days input)
+    // Piano della piattaforma, calcolato qui: la tabella c'è già all'apertura e nessun
+    // dato esce. Stesse soglie di riservatezza del resto della pagina (lib/kanon.js).
+    const vista = vistaRiservata(nmq);
+    const pianoBase = vista.pubblicabile ? pianoDeterministico(vista.zone.filter(z => !z.soppressa)) : [];
 
     return {
       props: {
@@ -859,6 +885,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         date: today(),
         offertaGiorniA,
         scartoL2,
+        pianoBase,
       },
     };
   } catch (e) {

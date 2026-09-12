@@ -269,11 +269,29 @@ export default function ClientPage({ client: initialClient, assessments: initial
       const data = await res.json();
       if (data.report) {
         const title = type === 'activation' ? 'Report di Attivazione' : type === 't12' ? 'Report Annuale (12 mesi)' : `Report Intermedio ${type.toUpperCase()}`;
-        setReportModal({ title, content: data.report, source: data.source, pdf_url: data.pdf_url, dateStr: new Date().toLocaleDateString('it-IT') });
-        setGeneratedReports(prev => [{ id: data.report_id || Date.now(), report_type: type === 'activation' ? 'activation' : `checkpoint_${type}`, created_at: new Date().toISOString(), pdf_url: data.pdf_url, content_text: data.report }, ...prev]);
+        setReportModal({ title, content: data.report, source: data.source, ai_status: data.ai_status, pdf_url: data.pdf_url, dateStr: new Date().toLocaleDateString('it-IT') });
+        setGeneratedReports(prev => [{ id: data.report_id || Date.now(), report_type: type === 'activation' ? 'activation' : `checkpoint_${type}`, created_at: new Date().toISOString(), pdf_url: data.pdf_url, content_text: data.report, ai_status: data.ai_status }, ...prev]);
       }
     } catch {}
     setGeneratingReport(null);
+  }
+
+  // Perché un report ha il testo di riserva (v57). I record vecchi non hanno il valore:
+  // in quel caso non si mostra nulla, non si indovina.
+  function badgeAiStatus(stato, { conAi = false } = {}) {
+    if (stato === 'ai') {
+      return conAi ? <span title="Testo generato dall'AI: i dati sono usciti verso Anthropic (Stati Uniti)." className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">✦ AI</span> : null;
+    }
+    if (stato !== 'fallback_no_key' && stato !== 'fallback_errore') return null;
+    const chiaveAssente = stato === 'fallback_no_key';
+    return (
+      <span title={chiaveAssente
+        ? 'Testo di riserva della piattaforma: la chiave API non c\'era, nessuna chiamata è partita e nessun dato è uscito.'
+        : 'Testo di riserva della piattaforma: la chiamata è partita (i dati sono usciti verso Anthropic) ma la risposta non è stata usata.'}
+        className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${chiaveAssente ? 'bg-gray-100 text-gray-600' : 'bg-amber-100 text-amber-700'}`}>
+        {chiaveAssente ? 'riserva · chiave assente' : 'riserva · chiamata fallita'}
+      </span>
+    );
   }
 
   function reportTitleFromType(t) {
@@ -286,7 +304,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
   // Riapre un report già generato (dal testo salvato), senza rigenerarlo
   function openSavedReport(r) {
     if (r.content_text) {
-      setReportModal({ title: reportTitleFromType(r.report_type), content: r.content_text, source: 'salvato', pdf_url: r.pdf_url, dateStr: r.created_at ? new Date(r.created_at).toLocaleDateString('it-IT') : null });
+      setReportModal({ title: reportTitleFromType(r.report_type), content: r.content_text, source: 'salvato', ai_status: r.ai_status, pdf_url: r.pdf_url, dateStr: r.created_at ? new Date(r.created_at).toLocaleDateString('it-IT') : null });
     } else if (r.pdf_url) {
       window.open(r.pdf_url, '_blank');
     } else {
@@ -1335,6 +1353,7 @@ ${FIRMA}`,
                   className="w-full flex items-center justify-between py-1.5 px-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded transition-colors">
                   <span>{r.report_type === 'activation' ? '📋 Attivazione' : r.report_type === 'checkpoint_t12' ? '🏆 Annuale' : `📊 ${r.report_type?.replace('checkpoint_', '').toUpperCase()}`}</span>
                   <span className="flex items-center gap-2">
+                    {badgeAiStatus(r.ai_status)}
                     {r.report_type === 'activation' && r.quote_compliance && r.quote_compliance.in_range != null && (
                       <span title={`Forbice colloquio €${Math.round(r.quote_compliance.min || 0).toLocaleString('it-IT')}–€${Math.round(r.quote_compliance.max || 0).toLocaleString('it-IT')} · prezzo definitivo €${Math.round(r.quote_compliance.real_price || 0).toLocaleString('it-IT')} (uso interno)`}
                         className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.quote_compliance.in_range ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -1496,6 +1515,8 @@ ${FIRMA}`,
       <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[92vh] flex flex-col shadow-2xl">
           <div className="flex items-center justify-end gap-2 px-4 py-2.5 border-b border-gray-100">
+            {/* Prima di presentarlo a un cliente: che cosa ho in mano (v57). */}
+            <span className="mr-auto flex items-center gap-2">{badgeAiStatus(reportModal.ai_status, { conAi: true })}</span>
             {reportModal.pdf_url && (
               <a href={reportModal.pdf_url} target="_blank" rel="noreferrer"
                 className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-100">

@@ -9,6 +9,7 @@ import {
   updateTreatmentCycle,
   updatePatient,
 } from '../../../lib/store';
+import { limiteAreaPersonale } from '../../../lib/employee-guard';
 
 // Esito derivato dal PGIC (1-5): 4-5 → migliorato · 1-3 → nessun miglioramento
 function outcomeFromPgic(pgic) {
@@ -18,6 +19,7 @@ function outcomeFromPgic(pgic) {
 export default async function handler(req, res) {
   const token = req.method === 'GET' ? req.query.token : req.body?.token;
   if (!token) return res.status(400).json({ error: 'Token mancante' });
+  if (!limiteAreaPersonale(req, res, token)) return;
 
   const patient = await getPatientByCareToken(token).catch(() => null);
   if (!patient) return res.status(404).json({ error: 'Link non valido' });

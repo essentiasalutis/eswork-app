@@ -127,13 +127,15 @@ function SelfTriggerModal({ token, onClose, onSent }) {
 }
 
 // ─── Dashboard L1 ─────────────────────────────────────────────────────────────
-function DashboardL1({ patient, cycles, sessions, onSelfTrigger, remaining }) {
+function DashboardL1({ patient, cycles, nrs, onSelfTrigger, remaining }) {
   const activeCycle = cycles.find(c => c.status === 'active' || c.status === 'pending_pgic');
   const closedCycles = cycles.filter(c => c.status === 'closed');
   // Self-trigger per L1 solo a fine ciclo (per richiedere il 2° ciclo), non durante
   const canSelfTrigger = !activeCycle && closedCycles.length > 0 && closedCycles.length < 2;
-  const nrsInitial = sessions[sessions.length - 1]?.nrs_pre;
-  const nrsLast = sessions.find(s => s.nrs_post != null)?.nrs_post;
+  // Iniziale = prima seduta, attuale = ultima. Li calcola il server (lib/vista.js):
+  // fino al 12/9 erano invertiti e chi migliorava leggeva che peggiorava.
+  const nrsInitial = nrs?.iniziale ?? null;
+  const nrsLast = nrs?.attuale ?? null;
   const isCandidate = !activeCycle && cycles.length === 0;
 
   return (
@@ -444,7 +446,7 @@ export default function EmployeeDashboard() {
         )}
 
         {!loading && data && !data.error && (() => {
-          const { patient, cycles, sessions, miniChecks } = data;
+          const { patient, cycles, nrs, miniChecks } = data;
           const level = patient.level || 'level3';
           const isOptedOut = patient.level_status === 'opted_out';
 
@@ -454,7 +456,7 @@ export default function EmployeeDashboard() {
               <div style={{ padding: '20px 16px 4px', borderBottom: '1px solid #e2e8f0', background: '#fff' }}>
                 <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>Ciao{patient.first_name && !['Anonimo', 'Nome non indicato'].includes(patient.first_name) ? `, ${patient.first_name}` : ''}! 👋</div>
                 <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
-                  {patient.clients?.name && <span>{patient.clients.name} · </span>}
+                  {patient.azienda && <span>{patient.azienda} · </span>}
                   <span style={{ fontWeight: 600, color: level === 'level1' ? '#1d4ed8' : level === 'level2' ? '#92400e' : '#166534' }}>
                     {level === 'level1' ? 'Livello 1 — Trattamento attivo' : level === 'level2' ? 'Livello 2 — Monitoraggio' : 'Livello 3 — Prevenzione'}
                   </span>
@@ -464,7 +466,7 @@ export default function EmployeeDashboard() {
               {isOptedOut
                 ? <OptedOutScreen patient={patient} />
                 : level === 'level1'
-                  ? <DashboardL1 patient={patient} cycles={cycles} sessions={sessions} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} />
+                  ? <DashboardL1 patient={patient} cycles={cycles} nrs={nrs} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} />
                   : level === 'level2'
                     ? <DashboardL2 patient={patient} miniChecks={miniChecks} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} />
                     : <DashboardL3 patient={patient} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} />

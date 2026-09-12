@@ -1,4 +1,5 @@
 import { requireProAuth } from '../../../../../lib/pro-auth';
+import { vistaPazienteLista } from '../../../../../lib/vista';
 import {
   getAssignmentsByProfessional,
   getPatientsByClient,
@@ -16,8 +17,12 @@ export default requireProAuth(async function handler(req, res) {
   if (!allowed) return res.status(403).json({ error: 'Accesso negato' });
 
   if (req.method === 'GET') {
+    // Livello B: l'essere assegnati all'AZIENDA non dà la cartella dei suoi dipendenti.
+    // Escono solo i propri pazienti, e solo i campi dell'elenco: mai anamnesi, mai note,
+    // mai il care_token (che è la chiave dell'area personale del dipendente).
     const patients = await getPatientsByClient(clientId);
-    return res.json(patients);
+    const miei = (patients || []).filter(p => p.assigned_professional_id === proId);
+    return res.json(miei.map(vistaPazienteLista));
   }
 
   if (req.method === 'POST') {
@@ -35,7 +40,7 @@ export default requireProAuth(async function handler(req, res) {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
-      return res.status(201).json(patient);
+      return res.status(201).json(vistaPazienteLista(patient));
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }

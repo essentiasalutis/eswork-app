@@ -3,7 +3,8 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireProAuthSsr } from '../../../lib/pro-auth';
-import { getPatientById, proCanAccessClient } from '../../../lib/store';
+import { getPatientById, getClientById, proCanAccessClient } from '../../../lib/store';
+import { vistaPazienteMinima } from '../../../lib/vista';
 
 const PAIN_ZONES = [
   'Collo', 'Spalle', 'Braccia/gomiti', 'Polsi/mani',
@@ -111,7 +112,7 @@ export default function PrevalidationForm({ patient }) {
             </Link>
             <div>
               <div className="font-semibold text-gray-900">Pre-validazione clinica</div>
-              <div className="text-xs text-gray-500">{patient?.first_name} {patient?.last_name} · {patient?.clients?.name}</div>
+              <div className="text-xs text-gray-500">{patient?.first_name} {patient?.last_name} · {patient?.azienda}</div>
             </div>
           </div>
         </header>
@@ -213,5 +214,9 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   // Livello A: la pre-validazione è accessibile solo agli osteopati assegnati
   // all'AZIENDA del candidato (vedono contatto+priorità, non la cartella clinica).
   if (!(await proCanAccessClient(proId, patient.client_id))) return { notFound: true };
-  return { props: { patient } };
+  // Proiezione (12/9): il gate qui è di Livello A (azienda), quindi nelle props va solo
+  // chi è e per quale azienda — come dice il commento sopra. Prima passava la cartella
+  // clinica intera, che la pagina non mostra ma che viaggiava nel sorgente.
+  const azienda = await getClientById(patient.client_id).catch(() => null);
+  return { props: { patient: vistaPazienteMinima(patient, azienda ? azienda.name : null) } };
 });

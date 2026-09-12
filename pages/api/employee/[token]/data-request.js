@@ -8,6 +8,7 @@ import {
   createDataRequest,
   setConsentWithdrawn,
 } from '../../../../lib/store';
+import { limiteAreaPersonale } from '../../../../lib/employee-guard';
 
 const TYPES = ['access', 'rectification', 'erasure', 'consent_withdrawal'];
 
@@ -17,6 +18,8 @@ export default async function handler(req, res) {
   const { type, note } = req.body || {};
 
   if (!token) return res.status(400).json({ error: 'Token mancante' });
+
+  if (!limiteAreaPersonale(req, res, token)) return;
   if (!TYPES.includes(type)) return res.status(400).json({ error: 'Tipo di richiesta non valido' });
 
   const patient = await getPatientByCareToken(token).catch(() => null);

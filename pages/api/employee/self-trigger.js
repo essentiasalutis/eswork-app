@@ -15,12 +15,14 @@ import {
 import { sendEmail } from '../../../lib/email';
 import { selfTriggerOsteopath } from '../../../lib/email-templates';
 import supabase from '../../../lib/db';
+import { limiteAreaPersonale } from '../../../lib/employee-guard';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { token, disturbance, functional_impact, duration, urgent, note } = req.body || {};
   if (!token) return res.status(400).json({ error: 'Token mancante' });
+  if (!limiteAreaPersonale(req, res, token)) return;
   if (!disturbance) return res.status(400).json({ error: 'Descrivi il disturbo' });
 
   const patient = await getPatientByCareToken(token).catch(() => null);

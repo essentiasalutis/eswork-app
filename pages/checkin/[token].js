@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Head from 'next/head';
+import { vistaPazienteMinima } from '../../lib/vista';
 import { getPatientByCareToken } from '../../lib/store';
 
 const PAIN_ZONES = [
@@ -304,7 +305,7 @@ function CheckpointForm({ token, patient, type }) {
 
 // ─── Pagina principale ────────────────────────────────────────────────────────
 
-export default function CarePage({ patient, mode, checkpointType }) {
+export default function CarePage({ patient, token, mode, checkpointType }) {
   return (
     <>
       <Head>
@@ -316,13 +317,13 @@ export default function CarePage({ patient, mode, checkpointType }) {
           <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-2">
             <span className="text-lg font-bold text-gray-900">ES </span>
             <span className="text-lg font-bold text-green-600">Work</span>
-            <span className="text-xs text-gray-400 ml-1">· {patient.clients?.name}</span>
+            <span className="text-xs text-gray-400 ml-1">· {patient.azienda}</span>
           </div>
         </header>
         <main className="max-w-lg mx-auto px-4 py-6">
           {mode === 'checkpoint'
-            ? <CheckpointForm token={patient.care_token} patient={patient} type={checkpointType || 't3'} />
-            : <SelfTriggerForm token={patient.care_token} patient={patient} />
+            ? <CheckpointForm token={token} patient={patient} type={checkpointType || 't3'} />
+            : <SelfTriggerForm token={token} patient={patient} />
           }
         </main>
       </div>
@@ -337,9 +338,13 @@ export async function getServerSideProps(ctx) {
   const patient = await getPatientByCareToken(token);
   if (!patient) return { notFound: true };
 
+  // Proiezione (12/9): questa è una pagina pubblica a token. Nelle props va il minimo
+  // che disegna — nome e azienda — mai la cartella intera, che finiva nel sorgente HTML.
+  // Il token per le chiamate è quello dell'indirizzo, non quello del record.
   return {
     props: {
-      patient,
+      patient: vistaPazienteMinima(patient),
+      token,
       mode: mode === 'checkpoint' ? 'checkpoint' : 'self',
       checkpointType: type === 't6' ? 't6' : 't3',
     },

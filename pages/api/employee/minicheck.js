@@ -4,12 +4,14 @@ import {
   createRestratAlert,
   generateId,
 } from '../../../lib/store';
+import { limiteAreaPersonale } from '../../../lib/employee-guard';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { token, pgic, has_limitations, wants_contact, free_text, check_type } = req.body;
   if (!token) return res.status(400).json({ error: 'Token mancante' });
+  if (!limiteAreaPersonale(req, res, token)) return;
 
   const patient = await getPatientByCareToken(token).catch(() => null);
   if (!patient) return res.status(404).json({ error: 'Link non valido' });

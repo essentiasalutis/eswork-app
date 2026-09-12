@@ -3,11 +3,14 @@ import {
   createRestratAlert,
   insertCheckpoint,
 } from '../../../lib/store';
+import { limiteAreaPersonale } from '../../../lib/employee-guard';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { token } = req.query;
+
+  if (!limiteAreaPersonale(req, res, token)) return;
   const patient = await getPatientByCareToken(token);
   if (!patient) return res.status(404).json({ error: 'Token non valido' });
 

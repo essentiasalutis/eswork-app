@@ -3,7 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireProAuthSsr } from '../../../lib/pro-auth';
-import { getSessionById } from '../../../lib/store';
+import { getSessionById, getPatientById, proCanAccessPatientClinical } from '../../../lib/store';
 import { validaNrsChiusura } from '../../../lib/nrs';
 
 export default function SessionForm({ session }) {
@@ -223,5 +223,14 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   const { sessionId } = ctx.params;
   const session = await getSessionById(sessionId).catch(() => null);
   if (!session) return { notFound: true };
+  // Livello B, come nell'API gemella (/api/osteopath/session/[sessionId]): la seduta è
+  // cartella clinica e la legge SOLO l'osteopata assegnato al paziente. Fino al 12/9 qui
+  // mancava: bastava essere un professionista autenticato per aprire la seduta di
+  // chiunque — nome, azienda, livello e note di trattamento — con identificativi
+  // tentabili. Stessa risposta di "non esiste": non si rivela l'esistenza della seduta.
+  const proId = ctx.req.proSession.proId;
+  const patientId = session.patient_id || (session.patients && session.patients.id);
+  const patient = patientId ? await getPatientById(patientId).catch(() => null) : null;
+  if (!(await proCanAccessPatientClinical(proId, patient))) return { notFound: true };
   return { props: { session } };
 });

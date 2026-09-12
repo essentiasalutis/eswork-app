@@ -1,11 +1,13 @@
 import { getPatientByCareToken, insertReassessmentT12, updatePatient, getClientById } from '../../../lib/store';
 import { computeLevel } from '../../../lib/scoring';
+import { limiteAreaPersonale } from '../../../lib/employee-guard';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { token, nmq_data, pgic } = req.body;
   if (!token) return res.status(400).json({ error: 'Token mancante' });
+  if (!limiteAreaPersonale(req, res, token)) return;
 
   const patient = await getPatientByCareToken(token).catch(() => null);
   if (!patient) return res.status(404).json({ error: 'Link non valido' });

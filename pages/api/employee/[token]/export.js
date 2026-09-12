@@ -11,11 +11,13 @@ import {
   getConsentByPatient,
   getDataRequestsByPatient,
 } from '../../../../lib/store';
+import { limiteAreaPersonale } from '../../../../lib/employee-guard';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
   const { token } = req.query;
   if (!token) return res.status(400).json({ error: 'Token mancante' });
+  if (!limiteAreaPersonale(req, res, token)) return;
 
   const patient = await getPatientByCareToken(token).catch(() => null);
   if (!patient) return res.status(404).json({ error: 'Link non valido o scaduto' });

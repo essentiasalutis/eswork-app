@@ -8,6 +8,7 @@ import {
 } from '../../../../../lib/store';
 import { hashIp, hashContent } from '../../../../../lib/crypto-utils';
 import { getClientIp } from '../../../../../lib/rate-limit';
+import { vistaDocumentoPaziente } from '../../../../../lib/vista';
 
 // GET  /api/pro/patients/documents?patientId=xxx
 // POST /api/pro/patients/documents — firma o compila documento
@@ -27,7 +28,10 @@ export default requireProAuth(async function handler(req, res) {
     try {
       const docs = await getPatientDocuments(patientId);
       await logAccess({ professional_id: proId, action: 'view_documents', patient_id: patientId, ip: getClientIp(req), user_agent: req.headers['user-agent'], details: 'Lettura documenti clinici' }).catch(() => {});
-      return res.json(docs);
+      // Proiezione (12/9): tipo, stato, data e impronta. Mai l'immagine della firma
+      // autografa né il contenuto del modulo: la pagina mostra solo se esistono e se
+      // sono validi (la pagina gemella SSR la firma la toglieva già).
+      return res.json((docs || []).map(vistaDocumentoPaziente));
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
@@ -56,7 +60,7 @@ export default requireProAuth(async function handler(req, res) {
 
       const doc = await upsertPatientDocument(patientId, client_id, type, fields);
       await logAccess({ professional_id: proId, action: 'sign_document', patient_id: patientId, ip, user_agent: req.headers['user-agent'], details: `Documento ${type} ${isAnamnesi ? 'compilato' : 'firmato'}` }).catch(() => {});
-      return res.json(doc);
+      return res.json(vistaDocumentoPaziente(doc));
     } catch (e) {
       console.error('[patient-docs] save error:', e.message);
       return res.status(500).json({ error: e.message });

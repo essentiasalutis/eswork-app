@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireProAuthSsr } from '../../../../lib/pro-auth';
+import { vistaPazienteLista, vistaAziendaPerPro } from '../../../../lib/vista';
 import { getPatientsByClient, getClientById, getAssignmentsByProfessional } from '../../../../lib/store';
 
 const LEVEL_LABEL = { level1: 'Livello 1', level2: 'Livello 2', level3: 'Livello 3' };
@@ -178,7 +179,9 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   ]);
 
   if (!client) return { notFound: true };
-  // v4: solo i pazienti assegnati a questo professionista
-  const patients = (allPatients || []).filter(p => p.assigned_professional_id === proId);
-  return { props: { proName, client, patients, proId } };
+  // v4: solo i pazienti assegnati a questo professionista.
+  // Proiezione (12/9): nelle props va ciò che la pagina disegna — mai la cartella
+  // completa né il care_token, che finirebbero nel sorgente HTML della pagina.
+  const patients = (allPatients || []).filter(p => p.assigned_professional_id === proId).map(vistaPazienteLista);
+  return { props: { proName, client: vistaAziendaPerPro(client), patients, proId } };
 });

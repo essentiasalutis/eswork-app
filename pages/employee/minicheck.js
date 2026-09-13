@@ -8,7 +8,11 @@ import { PGIC_MEGLIO as PGIC_OPTIONS } from '../../lib/pgic';
 function Header() {
   return (
     <div style={{ background: '#1e293b', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
-      <div style={{ width: 32, height: 32, background: '#16a34a', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🌿</div>
+      {/* Il marchio, non un'emoji. Logo scuro su trasparente: su header scuro va
+          appoggiato su una pastiglia chiara, altrimenti sparisce. */}
+      <div style={{ width: 38, height: 38, background: '#fff', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4, boxSizing: 'border-box' }}>
+        <img src="/logo-es.png" alt="Essentia Salutis" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+      </div>
       <div>
         <div style={{ color: '#fff', fontWeight: 800, fontSize: 16, lineHeight: 1 }}>ES Work</div>
         <div style={{ color: '#94a3b8', fontSize: 11 }}>Mini-check periodico</div>

@@ -20,7 +20,7 @@ function Header({ proName }) {
     <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
       <div className="max-w-4xl mx-auto px-5 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white text-sm font-bold">🌿</div>
+          <img src="/logo-es.png" alt="Essentia Salutis" className="w-8 h-8 object-contain" />
           <div>
             <span className="font-bold text-gray-900">ES Work</span>
             <span className="text-xs text-gray-400 ml-2">area osteopata</span>

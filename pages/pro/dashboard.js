@@ -129,7 +129,7 @@ export default function ProDashboard({ proName, clients, leads }) {
         {/* Link area osteopata */}
         <Link href="/osteopath/dashboard"
           className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-2xl p-3 mb-5 hover:bg-green-100 transition-colors">
-          <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white text-sm">🌿</div>
+          <img src="/logo-es.png" alt="" className="w-8 h-8 object-contain" />
           <div className="flex-1">
             <div className="font-semibold text-green-800 text-sm">Area Osteopata</div>
             <div className="text-xs text-green-600">Pre-validazioni, sessioni, schede pazienti</div>

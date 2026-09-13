@@ -21,7 +21,11 @@ const NMQ_ZONES = [
 function Header({ titolo }) {
   return (
     <div style={{ background: '#1e293b', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
-      <div style={{ width: 32, height: 32, background: '#16a34a', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🌿</div>
+      {/* Il marchio, non un'emoji. Logo scuro su trasparente: su header scuro va
+          appoggiato su una pastiglia chiara, altrimenti sparisce. */}
+      <div style={{ width: 38, height: 38, background: '#fff', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4, boxSizing: 'border-box' }}>
+        <img src="/logo-es.png" alt="Essentia Salutis" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+      </div>
       <div>
         <div style={{ color: '#fff', fontWeight: 800, fontSize: 16, lineHeight: 1 }}>ES Work</div>
         <div style={{ color: '#94a3b8', fontSize: 11 }}>{titolo}</div>
@@ -37,7 +41,9 @@ export default function ReassessmentT12() {
   // annuale. Stesse domande: cambia il momento a cui si riferiscono (Enrico, 12/9).
   const checkpoint = type === 't6' ? 't6' : 't12';
   const mesi = checkpoint === 't6' ? 6 : 12;
-  const titolo = `Check-up a ${mesi} mesi`;
+  // Al primo render router.query è vuota: senza questa attesa il titolo della scheda
+  // mostra «12 mesi» per un istante anche quando si apre la ri-fotografia dei sei.
+  const titolo = router.isReady ? `Check-up a ${mesi} mesi` : 'Check-up';
 
   const [phase, setPhase] = useState('nmq'); // nmq | pgic | done
   const [zoneIndex, setZoneIndex] = useState(0);

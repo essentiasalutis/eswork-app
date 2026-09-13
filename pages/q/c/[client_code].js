@@ -13,6 +13,7 @@ import { useState, useRef, useEffect } from 'react';
 import Head from 'next/head';
 import { BODY_ZONES } from '../../../lib/scoring';
 import { ConsentScreen } from '../../../components/ConsentScreen';
+import { INFORMATIVA_QUESTIONARIO } from '../../../lib/legal-texts';
 import { NmqQuestionnaire } from '../../../components/NmqQuestionnaire';
 
 // ─── Logo ES Work ─────────────────────────────────────────────────────────────
@@ -31,29 +32,44 @@ function ESLogo({ size = 56 }) {
 // ─── Fase 0: Welcome screen ───────────────────────────────────────────────────
 
 function WelcomeScreen({ clientName, chiudeFrase, firmato, onIdentified }) {
+  const [informativa, setInformativa] = useState(false);
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 max-w-lg mx-auto w-full">
-        <ESLogo size={64} />
-        <div className="text-2xl font-bold text-gray-900 mt-4 mb-1 text-center">ES Work</div>
-        {clientName && <div className={`text-sm text-gray-500 text-center ${chiudeFrase ? 'mb-2' : 'mb-6'}`}>per {clientName}</div>}
+        {/* Logo grande e azienda in evidenza: chi apre il link deve capire in un colpo
+            d'occhio da chi arriva e per quale azienda (Enrico, 13/9). */}
+        <ESLogo size={180} />
+        <div className="text-3xl font-bold text-gray-900 mt-5 mb-2 text-center">ES Work</div>
+        {clientName && (
+          <div className={`text-center ${chiudeFrase ? 'mb-3' : 'mb-6'}`}>
+            <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">per l&apos;azienda</div>
+            <div className="text-xl font-bold text-gray-800">{clientName}</div>
+          </div>
+        )}
         {chiudeFrase && (
           <div className="text-xs font-semibold text-green-800 bg-green-100 rounded-full px-3 py-1 mb-6">Aperto fino {chiudeFrase}</div>
         )}
 
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6 w-full">
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-5 w-full">
           <p className="text-sm text-gray-700 leading-relaxed mb-3">
             {firmato
-              ? <><strong>La tua azienda ha attivato ES Work</strong>, il programma di prevenzione e cura dell'apparato muscolo-scheletrico.</>
-              : <><strong>La tua azienda sta valutando ES Work</strong>, un programma di prevenzione e cura dell'apparato muscolo-scheletrico, e ti chiede di partecipare a un breve check-up.</>}
+              ? <><strong>La tua azienda ha attivato ES Work</strong>, un programma di prevenzione e trattamento dei disturbi muscolo-scheletrici, e ti chiede di partecipare a un breve check-up.</>
+              : <><strong>La tua azienda sta valutando la possibilità di attivare ES Work</strong>, un programma di prevenzione e trattamento dei disturbi muscolo-scheletrici, e ti chiede di partecipare a un breve check-up.</>}
           </p>
           <p className="text-sm text-gray-700 leading-relaxed mb-3">
-            Questo questionario raccoglie informazioni sugli eventuali disturbi fisici nelle varie zone del corpo. Si compila in circa 5 minuti.
+            Il questionario che segue raccoglie informazioni sugli eventuali disturbi fisici nelle varie zone del corpo. Si compila in circa 5 minuti.
           </p>
           <p className="text-sm text-gray-700 leading-relaxed">
-            I tuoi dati sono trattati in modo <strong>riservato</strong> da Essentia Salutis, nel rispetto del segreto professionale: la tua azienda non vedrà mai le tue risposte individuali, solo risultati aggregati.
+            I tuoi dati sono trattati in modo riservato da Essentia Salutis, nel rispetto del segreto professionale: <strong>la tua azienda non vedrà mai le tue risposte individuali</strong>, solo risultati aggregati.
           </p>
         </div>
+
+        <p className="text-xs text-gray-500 leading-relaxed text-center mb-4 px-1">
+          La partecipazione è volontaria e non comporta alcuna conseguenza per chi sceglie di non aderire.{' '}
+          <button type="button" onClick={() => setInformativa(true)} className="text-green-700 underline font-medium">
+            Informativa completa sul trattamento dei dati
+          </button>
+        </p>
 
         <div className="w-full space-y-3">
           <button
@@ -67,6 +83,33 @@ function WelcomeScreen({ clientName, chiudeFrase, firmato, onIdentified }) {
           </p>
         </div>
       </div>
+
+      {/* L'informativa completa è la stessa che si accetta alla schermata dopo:
+          qui si può leggere prima di decidere se proseguire. */}
+      {informativa && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setInformativa(false)}>
+          <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b border-gray-100">
+              <div>
+                <div className="font-bold text-gray-900">{INFORMATIVA_QUESTIONARIO.titolo}</div>
+                <div className="text-xs text-gray-500 mt-0.5">{INFORMATIVA_QUESTIONARIO.sottotitolo}</div>
+              </div>
+              <button onClick={() => setInformativa(false)} className="text-gray-400 text-xl leading-none px-1">✕</button>
+            </div>
+            <div className="overflow-y-auto px-5 py-4">
+              {INFORMATIVA_QUESTIONARIO.sezioni.map(sez => (
+                <div key={sez.id} className="mb-4">
+                  <div className="font-semibold text-gray-800 text-sm mb-1">{sez.titolo}</div>
+                  <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">{sez.testo}</p>
+                </div>
+              ))}
+            </div>
+            <div className="px-5 py-3 border-t border-gray-100">
+              <button onClick={() => setInformativa(false)} className="w-full py-3 rounded-xl bg-gray-900 text-white text-sm font-semibold">Chiudi</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

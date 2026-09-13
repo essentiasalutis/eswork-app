@@ -858,10 +858,11 @@ ${FIRMA}`,
         {/* ── Gestione Dipendenti & Campagna Assessment ──────────── */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">👥 Dipendenti &amp; Check-up</h2>
+            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">🩺 Check-up</h2>
             <Link href={`/dashboard/${client.id}/waitlist`}
+              title="Chi è uscito dal check-up come candidato Livello 1 e aspetta la pre-validazione con l'osteopata"
               className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-100">
-              📋 Waitlist L1
+              📋 Candidati Livello 1
             </Link>
           </div>
 
@@ -913,8 +914,8 @@ ${FIRMA}`,
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                 Check-up iniziale
                 <span className={`ml-2 normal-case tracking-normal font-medium ${checkupAperti.aziende.length >= checkupAperti.limite ? 'text-red-600' : 'text-gray-400'}`}
-                  title={checkupAperti.aziende.map(x => x.name).join(', ') || 'nessuno'}>
-                  · check-up non convertiti {checkupAperti.aziende.length}/{checkupAperti.limite}
+                  title={`Quante aziende, in tutto, hanno un check-up aperto che non si è ancora chiuso con una firma. Il check-up è a nostro carico: oltre ${checkupAperti.limite} conviene fermarsi.\nOggi: ${checkupAperti.aziende.map(x => x.name).join(', ') || 'nessuna'}`}>
+                  · {checkupAperti.aziende.length} di {checkupAperti.limite} check-up aperti non ancora firmati
                 </span>
               </div>
               <button

@@ -13,6 +13,7 @@ import ReportDoc, { reportPrintHtml } from '../../components/ReportDoc';
 import { CONFIG } from '../../lib/config';
 import NavMenu from '../../components/NavMenu';
 import { tierFromEmployees } from '../../lib/pricing/tier';
+import { nomeLivello } from '../../lib/livelli';
 
 function getTierFromEmployees(employees) {
   return tierFromEmployees(employees); // fonte unica: lib/pricing/tier.js
@@ -1209,7 +1210,7 @@ ${FIRMA}`,
             <div className="grid grid-cols-4 gap-3 mb-3">
               {[
                 { label: 'L1 — Trattamento', value: patientsNrs.filter(p => p.level === 'level1').length, color: '#dc2626' },
-                { label: 'L2 — Monitoraggio', value: patientsNrs.filter(p => p.level === 'level2').length, color: '#ca8a04' },
+                { label: `L2 — ${nomeLivello('level2')}`, value: patientsNrs.filter(p => p.level === 'level2').length, color: '#ca8a04' },
                 { label: 'L3 — Formazione', value: patientsNrs.filter(p => p.level === 'level3').length, color: '#16a34a' },
                 { label: 'Totale', value: patientsNrs.length, color: '#374151' },
               ].map(k => (

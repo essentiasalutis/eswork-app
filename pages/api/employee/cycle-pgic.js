@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     }).catch(() => {});
 
     // Esito → livello paziente:
-    //  migliorato  → passa in monitoraggio (Livello 2)
+    //  migliorato  → passa in prevenzione (Livello 2)
     //  nessun migl. → esce dal programma (lettera clinica + referral medico competente)
     if (outcome === 'improved') {
       await updatePatient(patient.id, {

@@ -6,6 +6,7 @@ import {
 } from '../lib/scoring';
 import { CONFIG } from '../lib/config';
 import { kAnonPartition, maskCount, tooSmall, K_ANON, SUPPRESSED } from '../lib/kanon';
+import { nomeLivello } from '../lib/livelli';
 
 // ─── Commento clinico AI (parte discorsiva integrata nel report dati) ──────────
 // Un solo report di attivazione: cruscotti/dati + commento discorsivo AI.
@@ -187,10 +188,13 @@ function LegendBox({ children }) {
 
 // ─── Livelli box ─────────────────────────────────────────────────────────────
 
+// I nomi vengono dalla fonte unica (lib/livelli). «Prevenzione — Anno 2» era un
+// residuo del vecchio modello: dalla v61 la prevenzione dei Livello 2 parte
+// dall'Anno 1, e il riferimento all'anno qui contraddiceva il resto del documento.
 const LEVEL_META = {
-  l1: { label: 'Trattamento — Anno 1', subtitle: 'Problemi che impattano le attività', bg: '#FFEBEE', border: '#E74C3C', color: '#E74C3C' },
-  l2: { label: 'Prevenzione — Anno 2', subtitle: 'Segnali da monitorare', bg: '#FFF8E1', border: '#F39C12', color: '#F39C12' },
-  l3: { label: 'Solo formazione', subtitle: 'Postura ed ergonomia per tutti', bg: '#E8F5E9', border: '#16a34a', color: '#16a34a' },
+  l1: { label: nomeLivello('level1'), subtitle: 'Problemi che impattano le attività', bg: '#FFEBEE', border: '#E74C3C', color: '#E74C3C' },
+  l2: { label: nomeLivello('level2'), subtitle: 'Segnali senza impatto funzionale', bg: '#FFF8E1', border: '#F39C12', color: '#F39C12' },
+  l3: { label: nomeLivello('level3'), subtitle: 'Postura ed ergonomia per tutti', bg: '#E8F5E9', border: '#16a34a', color: '#16a34a' },
 };
 
 function LevelBoxes({ nmq }) {
@@ -424,17 +428,17 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
       <SectionTitle>Cruscotto sintetico</SectionTitle>
       <div className="grid gap-3 mb-2 grid-cols-3">
         {L.l1.suppressed
-          ? <div className="rounded-2xl p-3 text-center bg-gray-50 border border-gray-200"><div className="text-xs text-gray-600 mb-0.5">Livello 1</div><div className="text-xl font-bold text-gray-400">{SUPPRESSED}</div><div className="text-xs text-gray-400 mt-0.5">Trattamento</div></div>
-          : <Semaphore type="nmq" score={L.l1.pct} value={`${L.l1.pct}%`} label="Livello 1" subtitle="Trattamento" />}
+          ? <div className="rounded-2xl p-3 text-center bg-gray-50 border border-gray-200"><div className="text-xs text-gray-600 mb-0.5">Livello 1</div><div className="text-xl font-bold text-gray-400">{SUPPRESSED}</div><div className="text-xs text-gray-400 mt-0.5">{nomeLivello('level1')}</div></div>
+          : <Semaphore type="nmq" score={L.l1.pct} value={`${L.l1.pct}%`} label="Livello 1" subtitle={nomeLivello('level1')} />}
         <div className="rounded-2xl p-3 text-center bg-yellow-50 border border-yellow-100">
           <div className="text-xs text-gray-600 mb-0.5">Livello 2</div>
           <div className="text-xl font-bold text-yellow-600">{L.l2.suppressed ? SUPPRESSED : `${L.l2.pct}%`}</div>
-          <div className="text-xs text-gray-400 mt-0.5">Monitoraggio</div>
+          <div className="text-xs text-gray-400 mt-0.5">{nomeLivello('level2')}</div>
         </div>
         <div className="rounded-2xl p-3 text-center bg-green-50 border border-green-100">
           <div className="text-xs text-gray-600 mb-0.5">Livello 3</div>
           <div className="text-xl font-bold text-green-600">{L.l3.suppressed ? SUPPRESSED : `${L.l3.pct}%`}</div>
-          <div className="text-xs text-gray-400 mt-0.5">Formazione</div>
+          <div className="text-xs text-gray-400 mt-0.5">{nomeLivello('level3')}</div>
         </div>
       </div>
 
@@ -448,7 +452,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         </div>
         <div className="mt-1.5 text-gray-400">
           Livello 1: % dipendenti con disturbi che impattano le attività (candidati al trattamento) ·
-          Livello 2: dolore presente senza impatto funzionale (monitoraggio) ·
+          Livello 2: dolore presente senza impatto funzionale (prevenzione) ·
           Livello 3: nessun disturbo in atto (formazione).
         </div>
       </LegendBox>
@@ -556,7 +560,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
       <LegendBox>
         <div className="font-semibold text-gray-600 mb-1">Come si determinano i livelli:</div>
         <div className="mb-0.5"><strong className="text-red-600">Livello 1 (Trattamento):</strong> dipendenti con dolore in atto (ultimi 7 giorni) che ha limitato o impedito le normali attività. Necessitano di trattamento osteopatico individuale.</div>
-        <div className="mb-0.5"><strong className="text-yellow-600">Livello 2 (Monitoraggio):</strong> dipendenti con dolore in atto ma senza impatto funzionale. Candidati alla prevenzione attiva e al self-trigger.</div>
+        <div className="mb-0.5"><strong className="text-yellow-600">Livello 2 ({nomeLivello('level2')}):</strong> dipendenti con dolore in atto ma senza impatto funzionale. Seguiti con la prevenzione attiva e con la segnalazione spontanea.</div>
         <div><strong className="text-green-600">Livello 3 (Formazione):</strong> dipendenti senza dolore in atto. Partecipano alla formazione collettiva su postura ed ergonomia insieme a tutti gli altri.</div>
       </LegendBox>
 
@@ -585,7 +589,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
                 <Delta before={baseNmq.level1.pct} after={nmq.level1.pct} inverse />
               </div>
               <div>
-                L2 (monitoraggio): <strong>{baseNmq.level2.pct}%</strong> → <strong>{nmq.level2.pct}%</strong>
+                L2 (prevenzione): <strong>{baseNmq.level2.pct}%</strong> → <strong>{nmq.level2.pct}%</strong>
                 <Delta before={baseNmq.level2.pct} after={nmq.level2.pct} inverse />
               </div>
               <div>

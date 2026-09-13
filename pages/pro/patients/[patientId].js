@@ -14,6 +14,7 @@ import {
 } from '../../../lib/store';
 import PatientDocuments from '../../../components/PatientDocuments';
 import { validaNrsChiusura } from '../../../lib/nrs';
+import { nomeLivello } from '../../../lib/livelli';
 
 // ─── NRS Slider ───────────────────────────────────────────────────────────────
 
@@ -690,7 +691,7 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
   const [reclassifyLoading, setReclassifyLoading] = useState(false);
 
   async function reclassify(level) {
-    const labels = { level1: 'Livello 1 (trattamento)', level2: 'Livello 2 (monitoraggio)', level3: 'Livello 3 (formazione)' };
+    const labels = Object.fromEntries(['level1', 'level2', 'level3'].map((l, i) => [l, `Livello ${i + 1} (${nomeLivello(l).toLowerCase()})`]));
     const hasOpenCycle = cycles.some(c => c.status === 'active' || c.status === 'pending_pgic');
     let warn = '';
     if (level !== 'level1' && hasOpenCycle) warn = '\n\nIl ciclo aperto verrà annullato (nessun PGIC).';
@@ -880,7 +881,7 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
               <div className="mt-3 flex gap-2">
                 {[
                   { lv: 'level1', l: 'L1 — Trattamento', c: '#dc2626' },
-                  { lv: 'level2', l: 'L2 — Monitoraggio', c: '#ca8a04' },
+                  { lv: 'level2', l: `L2 — ${nomeLivello('level2')}`, c: '#ca8a04' },
                   { lv: 'level3', l: 'L3 — Formazione', c: '#16a34a' },
                 ].map(o => (
                   <button key={o.lv} onClick={() => reclassify(o.lv)} disabled={reclassifyLoading || patient.level === o.lv}

@@ -2,12 +2,17 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { RIGA_AREA_NON_ATTIVA } from '../../lib/attivazione';
+import { etichettaLivello } from '../../lib/livelli';
 
 // ─── Header ────────────────────────────────────────────────────────────────────
 function Header() {
   return (
     <div style={{ background: '#1e293b', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
-      <div style={{ width: 32, height: 32, background: '#16a34a', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🌿</div>
+      {/* Il marchio, non un'emoji. Il logo è scuro su trasparente: su questo header
+          scuro va appoggiato su una pastiglia chiara, altrimenti sparisce. */}
+      <div style={{ width: 38, height: 38, background: '#fff', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4, boxSizing: 'border-box' }}>
+        <img src="/logo-es.png" alt="Essentia Salutis" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+      </div>
       <div>
         <div style={{ color: '#fff', fontWeight: 800, fontSize: 16, lineHeight: 1 }}>ES Work</div>
         <div style={{ color: '#94a3b8', fontSize: 11 }}>by Essentia Salutis</div>
@@ -200,6 +205,8 @@ function DashboardL1({ patient, cycles, nrs, onSelfTrigger, remaining, attivo = 
         </div>
       )}
 
+      <CheckPeriodici attivo={attivo} />
+
       {/* Self-trigger — solo a fine ciclo per richiedere il 2° ciclo */}
       {canSelfTrigger && <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} label="Richiedi un nuovo ciclo" attivo={attivo} />}
     </div>
@@ -216,14 +223,14 @@ function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining, attivo 
     <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #0369a1 100%)', borderRadius: 18, padding: '20px', color: '#fff' }}>
         <div style={{ fontSize: 12, opacity: .8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Il tuo programma ES Work</div>
-        <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>Sei in monitoraggio preventivo.</div>
+        <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>Sei nella prevenzione attiva.</div>
         <div style={{ fontSize: 13, opacity: .85, marginTop: 8, lineHeight: 1.6 }}>
           Il tuo check-up ha rilevato disturbi iniziali che non limitano ancora la tua attività.{' '}
           {attivo ? (
-            <>Il programma prevede per te 4 sessioni di prevenzione con l&apos;osteopata, in sede, e due controlli a 3 e 6 mesi dall&apos;inizio del percorso.<br />
+            <>Il programma prevede per te 4 sessioni di prevenzione con l&apos;osteopata, in sede.<br />
             Se il tuo stato cambia, puoi segnalarlo tramite il bottone qui sotto.</>
           ) : (
-            <>Se il programma verrà attivato, prevede per te 4 sessioni di prevenzione con l&apos;osteopata, in sede, e due controlli a 3 e 6 mesi dall&apos;inizio del percorso.</>
+            <>Se il programma verrà attivato, prevede per te 4 sessioni di prevenzione con l&apos;osteopata, in sede.</>
           )}
         </div>
       </div>
@@ -247,6 +254,7 @@ function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining, attivo 
         </div>
       )}
 
+      <CheckPeriodici attivo={attivo} />
       <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} attivo={attivo} />
     </div>
   );
@@ -300,7 +308,7 @@ function DashboardL3({ patient, onSelfTrigger, remaining, attivo = true }) {
         <div style={{ fontSize: 13, opacity: .85, marginTop: 8, lineHeight: 1.6 }}>
           Il tuo check-up indica una buona condizione fisica.{' '}
           {attivo
-            ? 'Parteciperai alla formazione collettiva per mantenere e migliorare il tuo stato. Il programma resta a tua disposizione tramite i mini-check periodici.'
+            ? 'Parteciperai alla formazione collettiva per mantenere e migliorare il tuo stato.'
             : 'Se il programma verrà attivato, parteciperai alla formazione collettiva per mantenere e migliorare il tuo stato.'}
         </div>
       </div>
@@ -312,7 +320,29 @@ function DashboardL3({ patient, onSelfTrigger, remaining, attivo = true }) {
           : 'Se il programma verrà attivato, le sessioni di formazione ergonomica saranno incluse: riceverai le date via mail dalla tua azienda.'}</div>
       </div>
 
+      <CheckPeriodici attivo={attivo} />
       <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} attivo={attivo} />
+    </div>
+  );
+}
+
+// ─── I check periodici — una frase sola, uguale per tutti i livelli ──────────
+// Chi riceve cosa (verificato sul codice degli inviti, 13/9):
+//  · mini-check a 3 mesi → solo chi ha un percorso aperto con l'osteopata, e parte
+//    dall'inizio del ciclo, non dal check-up;
+//  · ri-fotografia a 6 mesi → TUTTA la popolazione, Livello 3 compreso, a 180 giorni
+//    dalla compilazione del check-up.
+// Prima il Livello 2 se li prendeva entrambi come cosa sua e il Livello 3 leggeva di
+// «mini-check periodici» che non riceve mai: promesse che gli inviti non mantengono.
+function CheckPeriodici({ attivo = true }) {
+  return (
+    <div style={{ background: '#fff', borderRadius: 14, border: '1.5px solid #e2e8f0', padding: '16px' }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>🗓 I check periodici</div>
+      <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
+        {attivo ? 'A sei mesi' : 'Se il programma verrà attivato, a sei mesi'} ti chiederemo di ripetere il check-up: stesse domande, cinque minuti.
+        Serve a vedere com&apos;è cambiata la situazione complessiva. Se stai seguendo un percorso con l&apos;osteopata,
+        a tre mesi c&apos;è anche un breve mini-check sul tuo andamento.
+      </div>
     </div>
   );
 }
@@ -525,7 +555,10 @@ export default function EmployeeDashboard() {
                 <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
                   {patient.azienda && <span>{patient.azienda} · </span>}
                   <span style={{ fontWeight: 600, color: level === 'level1' ? '#1d4ed8' : level === 'level2' ? '#92400e' : '#166534' }}>
-                    {level === 'level1' ? 'Livello 1 — Trattamento attivo' : level === 'level2' ? 'Livello 2 — Monitoraggio' : 'Livello 3 — Prevenzione'}
+                    {/* Nomi dalla fonte unica (lib/livelli): Trattamento · Prevenzione ·
+                        Formazione. «Trattamento ATTIVO» contraddiceva il riquadro sotto,
+                        che prima della firma dice «se il programma verrà attivato». */}
+                    {etichettaLivello(level)}
                   </span>
                 </div>
               </div>

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { nomeLivello } from '../../../../lib/livelli';
 import { requireAuth } from '../../../../lib/auth';
 import {
   getClientById,
@@ -238,9 +239,9 @@ CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fond
 Tono: clinico, orientato ai risultati e alla direzione. Italiano. Max 650 parole.` : `Sei un consulente clinico ES Work. Genera un Report Intermedio professionale a ${checkLabel} per il cliente ${client.name}.
 
 DATI CLINICI (i valori "n.d." sono soppressi per anonimato/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
-- Pazienti L1 (trattamento): ${l1d}
-- Pazienti L2 (monitoraggio): ${l2d}
-- Pazienti L3 (prevenzione): ${l3d}
+- Pazienti L1 (${nomeLivello('level1').toLowerCase()}): ${l1d}
+- Pazienti L2 (${nomeLivello('level2').toLowerCase()}): ${l2d}
+- Pazienti L3 (${nomeLivello('level3').toLowerCase()}): ${l3d}
 - Sessioni completate/pianificate: ${completed}/${planned}
 - Riduzione media NRS per sessione: ${avgDelta} punti
 - Settore: ${client.sector === 1 ? 'Manifattura' : 'Servizi'}
@@ -430,7 +431,7 @@ Il programma ES Work per **${client.name}** ha raggiunto il checkpoint a ${check
 
 - ${completed} sessioni completate su ${planned} pianificate (${planned > 0 ? Math.round(completed/planned*100) : 0}% completamento)
 - Riduzione media NRS: **${avgDelta} punti** per sessione
-- ${l1d} pazienti in protocollo L1 attivo, ${l2d} in monitoraggio L2
+- ${l1d} pazienti in protocollo L1 attivo, ${l2d} in prevenzione L2
 
 ## KPI Clinici
 
@@ -447,7 +448,7 @@ Il programma ES Work per **${client.name}** ha raggiunto il checkpoint a ${check
 
 ## Trend e Analisi
 
-Il trend di riduzione NRS è positivo. I pazienti L1 mostrano risposta al protocollo di trattamento individuale. I pazienti L2 sono correttamente in monitoraggio con i mini-check periodici.
+Il trend di riduzione NRS è positivo. I pazienti L1 mostrano risposta al protocollo di trattamento individuale. I pazienti L2 proseguono nella prevenzione attiva.
 
 ## Problematiche Emerse
 

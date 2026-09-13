@@ -14,6 +14,7 @@ import { calculatePricing, computeForchetta, realL1L2FromAssessment } from '../.
 import { getPricingSettingsV2, getNoteReport } from '../../../../lib/pricing/settings';
 import { ergonomiaDaColloquio } from '../../../../lib/pricing/v2';
 import { isFirmato } from '../../../../lib/checkup-server';
+import { nomeLivello } from '../../../../lib/livelli';
 import { cosaComprendeMarkdown, inserisciCosaComprende, VOCI_PROGRAMMA, quantitaPrimoAnno } from '../../../../lib/programma';
 import { getForchettaSnapshot, freezeStimaSnapshot } from '../../../../lib/pricing/snapshot';
 import { aggregateNMQ } from '../../../../lib/scoring';
@@ -31,7 +32,11 @@ function stratLines(l1, l2, l3, total) {
     { key: 'l1', count: l1 }, { key: 'l2', count: l2 }, { key: 'l3', count: l3 },
   ], total).map(c => [c.key, c]));
   const cell = c => c.suppressed ? `n.d. (gruppo < ${K_ANON}, soppresso per anonimato)` : `${c.count} (${c.pct}%)`;
-  return `- Livello 1 (trattamento): ${cell(P.l1)}\n- Livello 2 (monitoraggio): ${cell(P.l2)}\n- Livello 3 (prevenzione): ${cell(P.l3)}`;
+  // I nomi vengono dalla fonte unica (lib/livelli): se l'AI li riceve sfalsati li
+  // scrive nel report, qualunque cosa dica l'interfaccia. Fino al 13/9 qui passavano
+  // «Livello 2 (monitoraggio)» e «Livello 3 (prevenzione)».
+  const n = l => nomeLivello(l).toLowerCase();
+  return `- Livello 1 (${n('level1')}): ${cell(P.l1)}\n- Livello 2 (${n('level2')}): ${cell(P.l2)}\n- Livello 3 (${n('level3')}): ${cell(P.l3)}`;
 }
 
 export default requireAuth(async function handler(req, res) {
@@ -150,7 +155,7 @@ ${stratLines(l1Count, l2Count, l3Count, stratTotal)}
 
 DEFINIZIONE DEI LIVELLI (tassativa — NON invertirla, NON reinterpretarla):
 - Livello 1 = dolore in atto CON impatto funzionale. È il gruppo più critico, quello che necessita trattamento osteopatico individuale.
-- Livello 2 = dolore in atto SENZA impatto funzionale. Monitoraggio e prevenzione.
+- Livello 2 = dolore in atto SENZA impatto funzionale. Prevenzione attiva.
 - Livello 3 = nessun dolore in atto. Formazione collettiva su postura ed ergonomia.
 NON esiste una scala "rischio basso/medio/alto": non usarla e non invertire l'ordine. Se citi una priorità, la priorità clinica è il Livello 1.
 
@@ -286,9 +291,9 @@ function generateFallbackReport(client, l1, l2, l3, total, sessioni, settore, qu
       ? `- **Livello 1:** ${dip(P.l1)} — dolore con impatto funzionale riportato nel questionario
 - **Livello 2:** ${dip(P.l2)} — sintomatologia presente, senza impatto funzionale rilevante
 - **Livello 3:** ${dip(P.l3)} — nessuna sintomatologia rilevante`
-      : `- **Livello 1 (Trattamento attivo):** ${dip(P.l1)} — dolore con impatto funzionale, richiedono protocollo individuale
-- **Livello 2 (Monitoraggio):** ${dip(P.l2)} — sintomatologia presente, seguiti con mini-check periodici
-- **Livello 3 (Prevenzione):** ${dip(P.l3)} — nessuna sintomatologia rilevante, inclusi nella formazione collettiva`;
+      : `- **Livello 1 (Trattamento):** ${dip(P.l1)} — dolore con impatto funzionale, richiedono protocollo individuale
+- **Livello 2 (Prevenzione):** ${dip(P.l2)} — sintomatologia presente, seguiti con la prevenzione attiva
+- **Livello 3 (Formazione):** ${dip(P.l3)} — nessuna sintomatologia rilevante, inclusi nella formazione collettiva`;
   return `## Executive Summary
 
 ${isPacchetto
@@ -300,12 +305,12 @@ ${firmato ? 'Il percorso prosegue con le attività previste' : 'Il percorso prop
   : firmato
   ? `Il programma ES Work per **${client.name}** (${settore}, ${client.employees || 'n.d.'} dipendenti) ha completato il check-up iniziale con ${total} dipendenti valutati.
 
-La distribuzione clinica evidenzia una quota in Livello 1 (trattamento attivo) pari a ${pctL1txt}, profilo di rischio ${riskTxt}.${sessioni > 0 ? ` Sono state erogate ${sessioni} sessioni osteopatiche ad oggi.` : ''}
+La distribuzione clinica evidenzia una quota in Livello 1 (trattamento) pari a ${pctL1txt}, profilo di rischio ${riskTxt}.${sessioni > 0 ? ` Sono state erogate ${sessioni} sessioni osteopatiche ad oggi.` : ''}
 
 Il programma è attivo: il piano operativo è riportato di seguito.`
   : `Il check-up per **${client.name}** (${settore}, ${client.employees || 'n.d.'} dipendenti) ha coinvolto ${total} dipendenti.
 
-La distribuzione clinica evidenzia una quota in Livello 1 (trattamento attivo) pari a ${pctL1txt}, profilo di rischio ${riskTxt}.
+La distribuzione clinica evidenzia una quota in Livello 1 (trattamento) pari a ${pctL1txt}, profilo di rischio ${riskTxt}.
 
 Il programma proposto è dimensionato su questi dati: il piano operativo e l'investimento sono riportati di seguito.`}
 
@@ -341,7 +346,7 @@ ${isPacchetto ? `## Raccomandazioni
 5. **Mese 11**: Valutazione dell'evoluzione del percorso (prosecuzione o chiusura)` : `## Raccomandazioni Cliniche
 
 1. Priorità ai pazienti L1 con NRS > 6 e impatto funzionale documentato
-2. Monitoraggio trimestrale L2 tramite mini-check digitale
+2. Prevenzione attiva per il Livello 2, con verifica dell'andamento nel corso dell'anno
 3. Formazione ergonomia focalizzata sulle zone di rischio prevalenti
 4. Review clinica a 3 mesi per valutare adeguamento del protocollo
 

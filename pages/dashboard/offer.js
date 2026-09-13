@@ -9,6 +9,7 @@ import {
 } from '../../lib/scoring';
 import { calculatePricing, fmt } from '../../lib/calculator';
 import { CONFIG } from '../../lib/config';
+import { nomeLivello } from '../../lib/livelli';
 import { oggiRoma, aggiungiGiorni } from '../../lib/checkup';
 import { finoAl, fraseValidita, scartoLivello2, testoScartoLivello2 } from '../../lib/offerta';
 import { normalizza } from '../../lib/pipeline';
@@ -238,9 +239,9 @@ ${FIRMA}`;
 
   const semaforo = (key, base) => { const c = cella(key); return c.suppressed ? { ...base, value: SUPPRESSED, color: 'gray', sub: `gruppo < ${K_ANON}` } : { ...base, score: c.pct, value: `${c.pct}%` }; };
   const semaphoreData = [
-    semaforo('l1', { type: 'nmq', label: 'Livello 1', sub: 'Trattamento' }),
-    semaforo('l2', { type: 'plain', label: 'Livello 2', sub: 'Monitoraggio', color: 'yellow' }),
-    semaforo('l3', { type: 'plain', label: 'Livello 3', sub: 'Formazione', color: 'green' }),
+    semaforo('l1', { type: 'nmq', label: 'Livello 1', sub: nomeLivello('level1') }),
+    semaforo('l2', { type: 'plain', label: 'Livello 2', sub: nomeLivello('level2'), color: 'yellow' }),
+    semaforo('l3', { type: 'plain', label: 'Livello 3', sub: nomeLivello('level3'), color: 'green' }),
   ];
 
   return (
@@ -476,7 +477,7 @@ ${FIRMA}`;
               {[
                 { ...cella('l1'), label: 'Trattamento — Anno 1', sub: 'Impatto funzionale', bg: '#FFEBEE', border: '#E74C3C', color: '#E74C3C' },
                 // Listino v2: la prevenzione del Livello 2 parte dal primo anno (voce 5 di Enrico).
-                { ...cella('l2'), label: nuovoProgramma ? 'Prevenzione — dal primo anno' : 'Prevenzione — Anno 2', sub: 'Segnali da monitorare', bg: '#FFF8E1', border: '#F39C12', color: '#F39C12' },
+                { ...cella('l2'), label: nuovoProgramma ? `${nomeLivello('level2')} — dal primo anno` : `${nomeLivello('level2')} — Anno 2`, sub: 'Segnali senza impatto funzionale', bg: '#FFF8E1', border: '#F39C12', color: '#F39C12' },
                 { ...cella('l3'), label: 'Solo formazione', sub: 'Postura ed ergonomia', bg: '#E8F5E9', border: '#16a34a', color: '#16a34a' },
               ].map((l, i) => (
                 <div key={i} style={{ background: l.bg, border: `1px solid ${l.border}`, borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>

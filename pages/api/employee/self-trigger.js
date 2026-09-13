@@ -16,6 +16,7 @@ import { sendEmail } from '../../../lib/email';
 import { selfTriggerOsteopath } from '../../../lib/email-templates';
 import supabase from '../../../lib/db';
 import { limiteAreaPersonale } from '../../../lib/employee-guard';
+import { programmaAttivo, MSG_NON_ATTIVO } from '../../../lib/attivazione';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -27,6 +28,14 @@ export default async function handler(req, res) {
 
   const patient = await getPatientByCareToken(token).catch(() => null);
   if (!patient) return res.status(404).json({ error: 'Link non valido' });
+
+  // Programma attivo? (lib/attivazione) — il gate sta QUI, sul server: prima della
+  // firma una segnalazione farebbe partire una presa in carico fuori contratto.
+  // Il messaggio è neutro: non dice al dipendente che la sua azienda non ha firmato.
+  const client = await getClientById(patient.client_id).catch(() => null);
+  if (!programmaAttivo(client)) {
+    return res.status(403).json({ error: MSG_NON_ATTIVO, programma_non_attivo: true });
+  }
 
   // Budget personale: massimo 2 attivazioni l'anno
   const budget = await getSelfTriggerBudget(patient.id);

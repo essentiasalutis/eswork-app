@@ -199,7 +199,13 @@ function ContactForm({ onSubmit, sedi = [] }) {
           {/* Sede di lavoro: a testo libero arrivavano venti scritture della stessa sede e
               l'aggregato per sede diventava inutile. Ora è una scelta fra quelle dichiarate
               dall'azienda al colloquio; «Altra sede» resta per i casi non previsti.
-              Una sola sede → campo nascosto e compilato in automatico. */}
+              Una sola sede → campo nascosto e compilato in automatico.
+              NESSUNA sede dichiarata (colloquio non compilato) → si torna al campo
+              libero: senza questo ripiego il campo spariva del tutto e la sede non
+              veniva più raccolta, in silenzio. */}
+          {sedi.length === 0 && (
+            <ContactField name="location" label="Sede di lavoro" placeholder="Es. Milano, via Torino 12" value={form.location} error={errors.location} onChange={handleChange('location')} />
+          )}
           {sedi.length === 1 && (
             <p className="text-xs text-gray-500">Sede di lavoro: <strong className="text-gray-700">{sedi[0]}</strong></p>
           )}
@@ -252,12 +258,11 @@ function ContactForm({ onSubmit, sedi = [] }) {
 
 // ─── Schermata completamento ──────────────────────────────────────────────────
 
-function CompletionScreen({ level, wantsContact, tier, careToken }) {
+function CompletionScreen({ level, wantsContact, careToken, firmato = false, emailAttiva = false }) {
   const isL1 = level === 'level1';
   const isL2 = level === 'level2';
-  // Plus/Enterprise: i Livello 2 ricevono prevenzione attiva (4 sessioni/anno)
-  const tierSupportsL2Prevention = tier === 'plus' || tier === 'enterprise';
   const [copiedLink, setCopiedLink] = useState(false);
+  const [invio, setInvio] = useState(null); // null | 'invio' | 'ok' | 'errore'
   const personalUrl = careToken && typeof window !== 'undefined'
     ? `${window.location.origin}/employee/${careToken}` : null;
 
@@ -268,53 +273,86 @@ function CompletionScreen({ level, wantsContact, tier, careToken }) {
     setTimeout(() => setCopiedLink(false), 2000);
   }
 
+  // «Inviamelo per email»: compare SOLO quando l'invio è davvero attivo (il dominio
+  // mittente non è ancora verificato). Finché è spento, il link resta da salvare a mano.
+  async function inviaPerEmail() {
+    if (!careToken || invio === 'invio') return;
+    setInvio('invio');
+    try {
+      const r = await fetch('/api/employee/send-link', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: careToken }),
+      });
+      setInvio(r.ok ? 'ok' : 'errore');
+    } catch { setInvio('errore'); }
+  }
+
   return (
-      <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col items-center justify-center px-6 text-center">
-        <ESLogo size={72} />
+      <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col items-center justify-center px-6 py-10 text-center">
+        <ESLogo size={180} />
         <div className="mt-4 mb-1 text-lg font-bold text-gray-900">ES Work</div>
         <h2 className="text-2xl font-bold text-gray-900 mb-3 mt-4">Grazie!</h2>
 
-        {/* L1 — ogni livello di servizio */}
-        {isL1 && (
+        {/* I testi dipendono dallo STATO DEL CONTRATTO: prima della firma il programma
+            è un'ipotesi, e prometterlo sarebbe una promessa che non possiamo mantenere.
+            Stessa leva già usata per la schermata di benvenuto e per i kit. */}
+
+        {/* Livello 1 — un disturbo che limita l'attività */}
+        {isL1 && (firmato ? (
           <>
             <p className="text-gray-600 mb-2">Dalle tue risposte emerge un quadro che può beneficiare di un supporto osteopatico.</p>
-            <p className="text-gray-600">Sarai contattato dall'osteopata per una <strong>pre-validazione clinica</strong> (videochiamata di circa 15 minuti) che confermerà il percorso più adatto a te.</p>
+            <p className="text-gray-600">Sarai contattato dall&apos;osteopata per una <strong>pre-validazione clinica</strong> (videochiamata di circa 15 minuti) che confermerà il percorso più adatto a te.</p>
           </>
-        )}
+        ) : (
+          <>
+            <p className="text-gray-600 mb-2">Dalle tue risposte emerge un quadro che può beneficiare di un supporto osteopatico.</p>
+            <p className="text-gray-600">La tua azienda sta valutando l&apos;attivazione del programma: <strong>se il programma verrà attivato</strong>, sarai contattato dall&apos;osteopata per una <strong>pre-validazione clinica</strong> (videochiamata di circa 15 minuti) che confermerà il percorso più adatto a te.</p>
+          </>
+        ))}
 
-        {/* L2 — Plus/Enterprise: prevenzione attiva */}
-        {isL2 && tierSupportsL2Prevention && (
+        {/* Livello 2 — fastidi senza impatto. La prevenzione attiva spetta a OGNI
+            Livello 2: dalla v61 non dipende più dalla configurazione dell'azienda. */}
+        {isL2 && (firmato ? (
           <>
             <p className="text-gray-600 mb-2">Hai riportato alcuni fastidi, senza un impatto sulle tue attività.</p>
-            <p className="text-gray-600">Sei incluso nel programma di <strong>prevenzione attiva</strong> (4 sessioni dedicate durante l'anno) e nella formazione collettiva. Se la situazione peggiora, potrai <strong>segnalarlo</strong> (fino a 2 volte l'anno) per essere ricontattato dall'osteopata.</p>
+            <p className="text-gray-600">Sei incluso nella <strong>prevenzione attiva</strong>: 4 sessioni di prevenzione con l&apos;osteopata durante l&apos;anno, più la formazione collettiva. Se la situazione peggiora, puoi <strong>segnalarlo</strong> dalla tua area personale (fino a 2 volte l&apos;anno) per essere ricontattato dall&apos;osteopata.</p>
           </>
-        )}
-
-        {/* L2 — Core: formazione + self-trigger */}
-        {isL2 && !tierSupportsL2Prevention && (
+        ) : (
           <>
             <p className="text-gray-600 mb-2">Hai riportato alcuni fastidi, senza un impatto sulle tue attività.</p>
-            <p className="text-gray-600">Parteciperai alla <strong>formazione collettiva</strong> su postura ed ergonomia. Se la situazione peggiora, potrai <strong>segnalarlo</strong> (fino a 2 volte l'anno) per essere ricontattato dall'osteopata.</p>
+            <p className="text-gray-600">La tua azienda sta valutando l&apos;attivazione del programma: <strong>se verrà attivato</strong>, sarai incluso nella <strong>prevenzione attiva</strong> — 4 sessioni di prevenzione con l&apos;osteopata durante l&apos;anno — e nella formazione collettiva su postura ed ergonomia.</p>
           </>
-        )}
+        ))}
 
-        {/* L3 — ogni livello di servizio */}
-        {!isL1 && !isL2 && (
+        {/* Livello 3 — nessun disturbo in atto. Va detto perché NON riceve una presa
+            in carico individuale: chi sta bene, altrimenti, si chiede perché nessuno
+            lo cerca (decisione di Enrico, 13/9). */}
+        {!isL1 && !isL2 && (firmato ? (
           <>
-            <p className="text-gray-600 mb-2">Non hai riportato disturbi in atto. Ottimo!</p>
-            <p className="text-gray-600">Parteciperai alla <strong>formazione collettiva</strong> su postura ed ergonomia. Se inizi ad avvertire un disturbo, potrai <strong>segnalarlo</strong> (fino a 2 volte l'anno) per essere ricontattato dall'osteopata.</p>
+            <p className="text-gray-600 mb-2">Non hai riportato disturbi in atto: è la risposta migliore.</p>
+            <p className="text-gray-600">Per te il programma è la <strong>prevenzione</strong>: formazione collettiva su postura ed ergonomia e sistemazione della postazione. <strong>Non riceverai una chiamata dall&apos;osteopata, ed è un buon segno</strong>: le sedute individuali vanno a chi ha un disturbo in corso. Se inizi ad avvertirne uno, puoi <strong>segnalarlo</strong> dalla tua area personale in qualsiasi momento (fino a 2 volte l&apos;anno).</p>
           </>
-        )}
+        ) : (
+          <>
+            <p className="text-gray-600 mb-2">Non hai riportato disturbi in atto: è la risposta migliore.</p>
+            <p className="text-gray-600"><strong>Chi sta bene non ha bisogno di una presa in carico individuale</strong> — per te il programma è la <strong>prevenzione</strong>: formazione collettiva su postura ed ergonomia e sistemazione della postazione di lavoro. La tua azienda sta valutando l&apos;attivazione: se verrà attivato, sarai coinvolto in queste attività.</p>
+          </>
+        ))}
 
-        {/* Area personale: da qui il dipendente segnala disturbi (self-trigger),
-            fa i mini-check e il re-assessment. Va salvata ORA: è l'unico momento
-            in cui il link gli viene mostrato. */}
+        {/* Area personale: è l'unico momento in cui il link viene mostrato, quindi va
+            salvato ORA. Prima della firma le funzioni del percorso non sono attive
+            (il blocco vero sta sul server, lib/attivazione) e il testo lo dice. */}
         {personalUrl && (
           <div className="mt-6 bg-green-50 border-2 border-green-300 rounded-2xl p-4 text-left w-full max-w-sm">
             <div className="text-sm font-bold text-green-800 mb-1">📌 La tua area personale ES Work</div>
             <p className="text-xs text-green-700 leading-relaxed mb-3">
-              <strong>Salva questo link</strong> (aggiungilo ai preferiti o invialo a te stesso):
-              da qui potrai <strong>segnalare un disturbo</strong> per essere ricontattato dall&apos;osteopata e completare i check periodici.
+              {firmato ? (
+                <><strong>Salva questo link</strong> (aggiungilo ai preferiti o invialo a te stesso):
+                da qui potrai <strong>segnalare un disturbo</strong> per essere ricontattato dall&apos;osteopata e completare i check periodici.</>
+              ) : (
+                <><strong>Salva questo link</strong>: è la tua area personale riservata.
+                Se il programma verrà attivato, da qui potrai segnalare un disturbo e completare i check periodici.</>
+              )}
             </p>
             <div className="flex items-center gap-2">
               <div className="flex-1 text-xs text-gray-600 font-mono bg-white border border-green-200 rounded-lg px-2 py-2 truncate">{personalUrl}</div>
@@ -323,12 +361,21 @@ function CompletionScreen({ level, wantsContact, tier, careToken }) {
                 {copiedLink ? '✓ Copiato' : 'Copia'}
               </button>
             </div>
+            {emailAttiva && (
+              <button onClick={inviaPerEmail} disabled={invio === 'invio' || invio === 'ok'}
+                className="w-full mt-2 text-xs font-semibold px-3 py-2 rounded-lg border border-green-300 text-green-700 bg-white disabled:opacity-60">
+                {invio === 'ok' ? '✓ Inviato al tuo indirizzo' : invio === 'invio' ? 'Invio…' : '✉️ Inviamelo per email'}
+              </button>
+            )}
+            {invio === 'errore' && (
+              <p className="text-xs text-amber-700 mt-2">Invio non riuscito: salva il link qui sopra.</p>
+            )}
             <a href={personalUrl} className="block text-center mt-3 text-sm font-semibold text-green-700 underline">Apri ora la tua area personale →</a>
           </div>
         )}
 
         <div className="mt-6 bg-white rounded-2xl border border-gray-200 p-4 text-sm text-gray-500 text-left w-full max-w-sm">
-          <p>🔒 I tuoi dati sono al sicuro con Essentia Salutis, trattati nel rispetto del segreto professionale. Puoi richiedere modifica o cancellazione in qualsiasi momento scrivendo a info@essentiasalutis.it</p>
+          <p>🔒 I tuoi dati sono al sicuro con Essentia Salutis, trattati nel rispetto del segreto professionale. Puoi richiedere modifica, cancellazione o revocare il consenso in qualsiasi momento scrivendo a info@essentiasalutis.it.</p>
         </div>
       </div>
     );
@@ -344,7 +391,7 @@ const PHASES = {
   DONE: 'done',
 };
 
-export default function SelfDeclarePage({ client, error: serverError, checkup, sedi = [] }) {
+export default function SelfDeclarePage({ client, error: serverError, checkup, sedi = [], emailAttiva = false }) {
   const [phase, setPhase] = useState(PHASES.WELCOME);
   const [wantsContact, setWantsContact] = useState(true);
   const [contactData, setContactData] = useState(null);
@@ -500,7 +547,7 @@ export default function SelfDeclarePage({ client, error: serverError, checkup, s
       )}
 
       {phase === PHASES.DONE && (
-        <CompletionScreen level={level} wantsContact={wantsContact} tier={client.tier} careToken={careToken} />
+        <CompletionScreen level={level} wantsContact={wantsContact} careToken={careToken} firmato={!!checkup?.firmato} emailAttiva={!!emailAttiva} />
       )}
     </>
   );
@@ -542,7 +589,11 @@ export async function getServerSideProps({ params }) {
       });
       sedi = [...new Set(sedi)];
     } catch (_) { sedi = []; }
-    return { props: { client: { id: client.id, name: client.name, share_code: client_code, tier }, checkup, sedi } };
+    // «Inviamelo per email» si mostra solo se l'invio è davvero attivo (lib/email):
+    // il dominio mittente non è ancora verificato, e un pulsante che promette un invio
+    // che non parte è peggio di un pulsante assente.
+    const { invioEmailAttivo } = await import('../../../lib/email');
+    return { props: { client: { id: client.id, name: client.name, share_code: client_code, tier }, checkup, sedi, emailAttiva: invioEmailAttivo() } };
   } catch (e) {
     return { props: { client: null, error: 'Errore interno: ' + e.message } };
   }

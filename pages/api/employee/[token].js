@@ -5,9 +5,11 @@ import {
   getMiniChecksByPatient,
   getReassessmentT12ByPatient,
   getSelfTriggerBudget,
+  getClientById,
 } from '../../../lib/store';
 import { vistaPazienteAreaPersonale, vistaCicli, andamentoNrs, vistaPercorso } from '../../../lib/vista';
 import { limiteAreaPersonale } from '../../../lib/employee-guard';
+import { programmaAttivo } from '../../../lib/attivazione';
 
 // Area personale del dipendente. Al browser va SOLO ciò che la pagina disegna
 // (lib/vista.js): fino al 12/9 partivano anche anamnesi, red flag, note interne,
@@ -22,12 +24,13 @@ export default async function handler(req, res) {
   const patient = await getPatientByCareToken(token).catch(() => null);
   if (!patient) return res.status(404).json({ error: 'Link non valido o scaduto' });
 
-  const [cycles, sessions, miniChecks, reassessment, selfTriggerBudget] = await Promise.all([
+  const [cycles, sessions, miniChecks, reassessment, selfTriggerBudget, client] = await Promise.all([
     getCyclesByPatient(patient.id).catch(() => []),
     getSessionsByPatient(patient.id).catch(() => []),
     getMiniChecksByPatient(patient.id).catch(() => []),
     getReassessmentT12ByPatient(patient.id).catch(() => null),
     getSelfTriggerBudget(patient.id).catch(() => ({ used: 0, max: 2, remaining: 2 })),
+    getClientById(patient.client_id).catch(() => null),
   ]);
 
   return res.json({
@@ -39,5 +42,8 @@ export default async function handler(req, res) {
     // prima viaggiavano come lista a sé).
     percorso: vistaPercorso({ sessions, cycles, miniChecks, reassessment }),
     selfTriggerBudget: { remaining: selfTriggerBudget ? selfTriggerBudget.remaining : 2 },
+    // Solo il sì/no: la pagina spegne i pulsanti del percorso finché il programma
+    // non è attivo. Il gate vero resta sul server (lib/attivazione + self-trigger).
+    programmaAttivo: programmaAttivo(client),
   });
 }

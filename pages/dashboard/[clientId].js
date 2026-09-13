@@ -189,6 +189,11 @@ export default function ClientPage({ client: initialClient, assessments: initial
   const [reportAssessment, setReportAssessment] = useState(null);
   const [emailModal, setEmailModal] = useState(null); // { to, subject, body }
   const [kitAvvio, setKitAvvio] = useState(false); // finestra "Kit di avvio" (punto 12)
+  // Attivazione del programma (13/9): un gesto solo — la firma accende il percorso
+  // e prepara la comunicazione ai dipendenti (la data di avvio va nel kit).
+  const [attivazione, setAttivazione] = useState(false);
+  const [dataAvvioNuova, setDataAvvioNuova] = useState('');
+  const [attivaBusy, setAttivaBusy] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editSaving, setEditSaving] = useState(false);
@@ -796,6 +801,52 @@ ${FIRMA}`,
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-6 space-y-6">
+        {/* ── Attivazione del programma (prima della firma) ──────────────────────
+            Finché l'azienda non è attiva, la piattaforma NON prende in carico nessuno:
+            niente auto-segnalazioni, niente inviti ai check periodici, nessuna
+            pre-validazione avviata (il blocco vive sul server, lib/attivazione.js).
+            Qui c'è il momento esplicito in cui tutto questo si accende. */}
+        {!isFirmato(client.pipeline_stage) && (
+          <div className="bg-white rounded-2xl border border-blue-200 p-5 space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">▶ Attiva il programma</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  Programma <strong>non ancora attivo</strong>: chi ha compilato il check-up vede il proprio esito, ma non può segnalare un disturbo e non riceve i check periodici. L&apos;attivazione porta l&apos;azienda in «Accettato» e accende il percorso.
+                </p>
+              </div>
+              {!attivazione && (
+                <button onClick={() => { setDataAvvioNuova(client.data_avvio_programma || ''); setAttivazione(true); }}
+                  className="text-sm font-semibold text-white bg-blue-600 px-4 py-2 rounded-xl hover:bg-blue-700 whitespace-nowrap">▶ Attiva il programma</button>
+              )}
+            </div>
+            {attivazione && (
+              <div className="border-t border-gray-100 pt-3 space-y-3">
+                <label className="block text-xs font-semibold text-gray-500">Data di avvio in sede
+                  <input type="date" value={dataAvvioNuova} onChange={e => setDataAvvioNuova(e.target.value)}
+                    className="mt-1 block w-full md:w-56 px-3 py-2 border border-gray-300 rounded-xl text-sm font-normal" />
+                </label>
+                <div className="text-xs text-gray-500 leading-relaxed">
+                  Con l&apos;attivazione si accendono: <strong>auto-segnalazione</strong> dall&apos;area personale, <strong>inviti ai check periodici</strong> (mini-check a 3 mesi, ri-fotografia a 6) e la <strong>presa in carico</strong> dei candidati in coda di pre-validazione. La data di avvio finisce nel kit che annuncia la partenza ai dipendenti.
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <button disabled={!dataAvvioNuova || attivaBusy}
+                    onClick={async () => {
+                      setAttivaBusy(true);
+                      await aggiornaAzienda({ pipeline_stage: 'signed', data_avvio_programma: dataAvvioNuova });
+                      setAttivaBusy(false); setAttivazione(false); setKitAvvio(true);
+                    }}
+                    className="text-sm font-semibold text-white bg-green-600 px-4 py-2 rounded-xl disabled:opacity-40">
+                    {attivaBusy ? '…' : 'Attiva e prepara il kit di avvio'}
+                  </button>
+                  <button onClick={() => setAttivazione(false)} className="text-sm px-4 py-2 rounded-xl border border-gray-300 text-gray-600">Annulla</button>
+                </div>
+                {!dataAvvioNuova && <div className="text-xs text-amber-700">Serve la data di avvio: è quella che il kit comunica ai dipendenti.</div>}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Avvio del programma (solo dopo la firma): kit di avvio per i dipendenti ── */}
         {isFirmato(client.pipeline_stage) && (
           <div className="bg-white rounded-2xl border border-green-200 p-5 flex items-center justify-between gap-3 flex-wrap">

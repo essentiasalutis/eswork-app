@@ -28,8 +28,9 @@ export default requireProAuth(async function handler(req, res) {
   if (activeCycle) return res.status(409).json({ error: 'Ciclo già aperto per questo paziente' });
 
   if (cycleType === 'prevention') {
-    // Ciclo di PREVENZIONE — riservato ai L2 idonei (livello fissato a inizio anno)
-    // dei tier Plus/Enterprise. Distinto dal ciclo di trattamento.
+    // Ciclo di PREVENZIONE — riservato ai L2 idonei (livello fissato a inizio anno).
+    // Dalla v61 il diritto NON dipende più dalla configurazione dell'azienda: spetta a
+    // ogni Livello 2. Distinto dal ciclo di trattamento.
     if (patient.level !== 'level2') return res.status(400).json({ error: 'La prevenzione attiva è riservata ai pazienti Livello 2' });
     if (!patient.prevention_eligible) return res.status(400).json({ error: 'Prevenzione attiva non spettante quest\'anno (diritto fissato a inizio anno — regola opzione A)' });
     const prevCount = cycles.filter(c => c.cycle_type === 'prevention').length;

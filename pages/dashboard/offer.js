@@ -201,7 +201,10 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
   // ─── Blocco B — Servizi di piattaforma e gestione (differenziato per tier) ────
   // I nomi dei tier NON compaiono nel PDF: cambia solo il contenuto mostrato.
   const offerTier = calc?.tier || 'core';
-  const withPrevention = offerTier === 'plus' || offerTier === 'enterprise';
+  // La prevenzione attiva dei Livello 2 in v2 è di TUTTI (v61): il PDF la elencava
+  // solo a Plus/Enterprise, e un'azienda v2 «Core» leggeva un'offerta senza una voce
+  // che sta comunque nel prezzo. Per i contratti v1 la regola resta quella firmata.
+  const withPrevention = (client.pricing_version || 'v1') === 'v2' || offerTier === 'plus' || offerTier === 'enterprise';
   const mgmtServices = (CONFIG.management_services && CONFIG.management_services[offerTier])
     || (CONFIG.management_services && CONFIG.management_services.core) || [];
 

@@ -7,7 +7,9 @@ import {
   getPatientsByProfessional,
   getAcuteEventsByProfessional,
   getWaitlistByProfessional,
+  getClientById,
 } from '../../lib/store';
+import { programmaAttivo, ETICHETTA_CODA_NON_ATTIVA } from '../../lib/attivazione';
 
 function Header({ proName }) {
   async function logout() {
@@ -113,7 +115,7 @@ export default function OsteopathDashboard({ proName, l1Patients, acuteEvents, w
               <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">📋 Pre-validazioni da fare</div>
               <div className="space-y-2">
                 {pendingWaitlist.map(w => (
-                  <div key={w.id} className="bg-white rounded-2xl border border-amber-200 p-4 flex items-center justify-between gap-3">
+                  <div key={w.id} className={`bg-white rounded-2xl border p-4 flex items-center justify-between gap-3 ${w.programma_non_attivo ? 'border-gray-200' : 'border-amber-200'}`}>
                     <div>
                       <div className="font-semibold text-gray-900 text-sm">
                         {w.patients?.first_name} {w.patients?.last_name}
@@ -122,11 +124,20 @@ export default function OsteopathDashboard({ proName, l1Patients, acuteEvents, w
                         {w.patients?.clients?.name || '—'} · {w.source === 'restratification' ? 'Ri-stratificazione' : 'Check-up'}
                       </div>
                       {w.notes && <div className="text-xs text-gray-400 italic mt-1">{w.notes}</div>}
+                      {w.programma_non_attivo && (
+                        <div className="text-xs text-gray-600 bg-gray-100 border border-gray-200 rounded-lg px-2 py-1 mt-2 inline-block">
+                          ⏳ {ETICHETTA_CODA_NON_ATTIVA} — la presa in carico parte quando il programma viene avviato
+                        </div>
+                      )}
                     </div>
-                    <Link href={`/osteopath/prevalidation/${w.patient_id}`}
-                      className="text-xs font-semibold text-white bg-amber-500 border border-amber-400 px-3 py-2 rounded-xl hover:bg-amber-600 whitespace-nowrap">
-                      Avvia →
-                    </Link>
+                    {w.programma_non_attivo ? (
+                      <span className="text-xs font-semibold text-gray-400 bg-gray-100 border border-gray-200 px-3 py-2 rounded-xl whitespace-nowrap">In attesa</span>
+                    ) : (
+                      <Link href={`/osteopath/prevalidation/${w.patient_id}`}
+                        className="text-xs font-semibold text-white bg-amber-500 border border-amber-400 px-3 py-2 rounded-xl hover:bg-amber-600 whitespace-nowrap">
+                        Avvia →
+                      </Link>
+                    )}
                   </div>
                 ))}
               </div>
@@ -200,12 +211,24 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   const elenco = (patients || []).map(vistaPazienteLista);
   const l1Patients = elenco.filter(p => p.level === 'level1');
 
+  // Coda di pre-validazione: le segnalazioni di aziende NON ancora attive non si
+  // cancellano — restano dove sono, etichettate, così l'osteopata vede PERCHÉ sono
+  // ferme e non chiama nessuno prima che il programma parta (Enrico, 13/9).
+  const stati = new Map();
+  for (const cid of new Set((waitlist || []).map(w => w.client_id).filter(Boolean))) {
+    stati.set(cid, programmaAttivo(await getClientById(cid).catch(() => null)));
+  }
+  const codaEtichettata = (waitlist || []).map(w => ({
+    ...w,
+    programma_non_attivo: w.client_id ? !stati.get(w.client_id) : false,
+  }));
+
   return {
     props: {
       proName,
       l1Patients,
       acuteEvents,
-      waitlist,
+      waitlist: codaEtichettata,
       allPatients: elenco,
     },
   };

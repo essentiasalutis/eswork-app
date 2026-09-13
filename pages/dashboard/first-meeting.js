@@ -155,6 +155,10 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
   const ergAssegnati = nErgUfficio + nErgAddetti;
   const suggestedTier = useMemo(() => getTier(n, { fatturato: fatturatoNum(fatturato), hrMaturity }), [n, fatturato, hrMaturity]);
   const tier = tierOverride || suggestedTier;
+  // Prevenzione attiva ai Livello 2: in v2 spetta a TUTTI (decisione del ridisegno,
+  // v61) — il tier non c'entra più. Resta legata al tier solo per i contratti v1,
+  // dove il modello economico è congelato e non si tocca.
+  const prevenzioneL2 = isV2 || tierIncludesL2Prevention(tier);
   const groups = useMemo(() => {
     const cap = Math.max(1, parseInt(capienza) || 25);
     if (trainingMode === 'accorpa') return Math.max(1, Math.ceil(n / cap));
@@ -593,7 +597,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                 <div className="bg-green-600 rounded-2xl p-5 text-white">
                   <div className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-1">Investimento Anno 1 — scenario {scenario === 'avg' ? 'medio' : scenario}</div>
                   <div className="text-4xl font-bold mb-1">{fmt(calc.price_y1)}</div>
-                  <div className="text-sm opacity-90">{fmt(calc.price_monthly_y1)}/mese · {fmt(calc.price_per_employee_y1)}/dip · {sel.l1} L1{tierIncludesL2Prevention(tier) ? ` · ${sel.l2} L2 prevenzione` : ''}</div>
+                  <div className="text-sm opacity-90">{fmt(calc.price_monthly_y1)}/mese · {fmt(calc.price_per_employee_y1)}/dip · {sel.l1} L1{prevenzioneL2 ? ` · ${sel.l2} L2 prevenzione` : ''}</div>
                   <div className="text-xs opacity-80 mt-1">{vatExempt ? 'Esente IVA (forfettario)' : `+ IVA 22% = ${fmt(calc.y1.total_with_vat)}`}</div>
                 </div>
 
@@ -611,7 +615,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                 <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
                   <div className="text-xs font-semibold text-blue-600 uppercase tracking-widest mb-1">Anno 2 e successivi (indicativo)</div>
                   <div className="text-2xl font-bold text-blue-700">{fmt(calc.price_y2)}</div>
-                  <div className="text-xs text-blue-500 mt-1">Formazione 1 modulo · nuovi L1 trattati{tierIncludesL2Prevention(tier) ? ' · L2 in prevenzione' : ''}</div>
+                  <div className="text-xs text-blue-500 mt-1">Formazione 1 modulo · nuovi L1 trattati{prevenzioneL2 ? ' · L2 in prevenzione' : ''}</div>
                 </div>
 
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 leading-relaxed">

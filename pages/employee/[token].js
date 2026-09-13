@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { RIGA_AREA_NON_ATTIVA } from '../../lib/attivazione';
 
 // ─── Header ────────────────────────────────────────────────────────────────────
 function Header() {
@@ -127,7 +128,7 @@ function SelfTriggerModal({ token, onClose, onSent }) {
 }
 
 // ─── Dashboard L1 ─────────────────────────────────────────────────────────────
-function DashboardL1({ patient, cycles, nrs, onSelfTrigger, remaining }) {
+function DashboardL1({ patient, cycles, nrs, onSelfTrigger, remaining, attivo = true }) {
   const activeCycle = cycles.find(c => c.status === 'active' || c.status === 'pending_pgic');
   const closedCycles = cycles.filter(c => c.status === 'closed');
   // Self-trigger per L1 solo a fine ciclo (per richiedere il 2° ciclo), non durante
@@ -146,7 +147,9 @@ function DashboardL1({ patient, cycles, nrs, onSelfTrigger, remaining }) {
         {isCandidate ? (
           <>
             <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>Sei stato identificato come candidato al protocollo di trattamento.</div>
-            <div style={{ fontSize: 13, opacity: .85, marginTop: 8, lineHeight: 1.5 }}>Sarai contattato dal nostro coordinatore per fissare la pre-validazione clinica (videocall di 15 minuti).</div>
+            <div style={{ fontSize: 13, opacity: .85, marginTop: 8, lineHeight: 1.5 }}>{attivo
+              ? 'Sarai contattato dal nostro coordinatore per fissare la pre-validazione clinica (videocall di 15 minuti).'
+              : 'Se il programma verrà attivato, sarai contattato dal nostro coordinatore per fissare la pre-validazione clinica (videochiamata di circa 15 minuti).'}</div>
           </>
         ) : (
           <>
@@ -198,13 +201,13 @@ function DashboardL1({ patient, cycles, nrs, onSelfTrigger, remaining }) {
       )}
 
       {/* Self-trigger — solo a fine ciclo per richiedere il 2° ciclo */}
-      {canSelfTrigger && <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} label="Richiedi un nuovo ciclo" />}
+      {canSelfTrigger && <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} label="Richiedi un nuovo ciclo" attivo={attivo} />}
     </div>
   );
 }
 
 // ─── Dashboard L2 ─────────────────────────────────────────────────────────────
-function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining }) {
+function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining, attivo = true }) {
   // I mini-check non viaggiano più come lista a sé: vivono nel percorso (fonte unica).
   // La resa resta quella di prima — "T3 · Molto meglio" e la data — e la parola del
   // PGIC è quella scelta rispondendo (lib/pgic.js).
@@ -215,14 +218,21 @@ function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining }) {
         <div style={{ fontSize: 12, opacity: .8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Il tuo programma ES Work</div>
         <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>Sei in monitoraggio preventivo.</div>
         <div style={{ fontSize: 13, opacity: .85, marginTop: 8, lineHeight: 1.6 }}>
-          Il tuo check-up ha rilevato disturbi iniziali che non limitano ancora la tua attività. Il programma prevede per te 4 sedute di prevenzione con l'osteopata, in sede, e due controlli a 3 e 6 mesi dall'inizio del percorso.<br />
-          Se il tuo stato cambia, puoi segnalarlo tramite il bottone qui sotto.
+          Il tuo check-up ha rilevato disturbi iniziali che non limitano ancora la tua attività.{' '}
+          {attivo ? (
+            <>Il programma prevede per te 4 sessioni di prevenzione con l&apos;osteopata, in sede, e due controlli a 3 e 6 mesi dall&apos;inizio del percorso.<br />
+            Se il tuo stato cambia, puoi segnalarlo tramite il bottone qui sotto.</>
+          ) : (
+            <>Se il programma verrà attivato, prevede per te 4 sessioni di prevenzione con l&apos;osteopata, in sede, e due controlli a 3 e 6 mesi dall&apos;inizio del percorso.</>
+          )}
         </div>
       </div>
 
       <div style={{ background: '#fff', borderRadius: 14, border: '1.5px solid #e2e8f0', padding: '16px' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>📚 Formazione collettiva</div>
-        <div style={{ fontSize: 13, color: '#64748b' }}>Le prossime sessioni di formazione ergonomica e posturale saranno comunicate dalla tua azienda via mail.</div>
+        <div style={{ fontSize: 13, color: '#64748b' }}>{attivo
+          ? 'Le prossime sessioni di formazione ergonomica e posturale saranno comunicate dalla tua azienda via mail.'
+          : 'Se il programma verrà attivato, le sessioni di formazione ergonomica e posturale saranno comunicate dalla tua azienda via mail.'}</div>
       </div>
 
       {miniChecks.length > 0 && (
@@ -237,7 +247,7 @@ function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining }) {
         </div>
       )}
 
-      <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} />
+      <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} attivo={attivo} />
     </div>
   );
 }
@@ -281,29 +291,45 @@ function MioPercorso({ percorso = [] }) {
 }
 
 // ─── Dashboard L3 ─────────────────────────────────────────────────────────────
-function DashboardL3({ patient, onSelfTrigger, remaining }) {
+function DashboardL3({ patient, onSelfTrigger, remaining, attivo = true }) {
   return (
     <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ background: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)', borderRadius: 18, padding: '20px', color: '#fff' }}>
         <div style={{ fontSize: 12, opacity: .8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Il tuo programma ES Work</div>
         <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>Ottima salute dell'apparato muscolo-scheletrico! 🎉</div>
         <div style={{ fontSize: 13, opacity: .85, marginTop: 8, lineHeight: 1.6 }}>
-          Il tuo check-up indica una buona condizione fisica. Parteciperai alla formazione collettiva per mantenere e migliorare il tuo stato. Il programma resta a tua disposizione tramite i mini-check periodici.
+          Il tuo check-up indica una buona condizione fisica.{' '}
+          {attivo
+            ? 'Parteciperai alla formazione collettiva per mantenere e migliorare il tuo stato. Il programma resta a tua disposizione tramite i mini-check periodici.'
+            : 'Se il programma verrà attivato, parteciperai alla formazione collettiva per mantenere e migliorare il tuo stato.'}
         </div>
       </div>
 
       <div style={{ background: '#fff', borderRadius: 14, border: '1.5px solid #e2e8f0', padding: '16px' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8 }}>📚 Formazione collettiva</div>
-        <div style={{ fontSize: 13, color: '#64748b' }}>Le sessioni di formazione ergonomica sono incluse nel tuo programma. Riceverai le date via mail dalla tua azienda.</div>
+        <div style={{ fontSize: 13, color: '#64748b' }}>{attivo
+          ? 'Le sessioni di formazione ergonomica sono incluse nel tuo programma. Riceverai le date via mail dalla tua azienda.'
+          : 'Se il programma verrà attivato, le sessioni di formazione ergonomica saranno incluse: riceverai le date via mail dalla tua azienda.'}</div>
       </div>
 
-      <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} />
+      <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} attivo={attivo} />
     </div>
   );
 }
 
 // ─── Bottone self-trigger (auto-segnalazione, max 2/anno) ──────────────────────
-function SelfTriggerButton({ onPress, remaining = 2, label = 'Ho iniziato ad avere un disturbo' }) {
+// Prima che il programma sia attivo il pulsante NON c'è: al suo posto una riga che
+// spiega perché. Premerlo avvierebbe una presa in carico fuori contratto — il
+// rifiuto vero sta comunque sul server (lib/attivazione).
+function SelfTriggerButton({ onPress, remaining = 2, label = 'Ho iniziato ad avere un disturbo', attivo = true }) {
+  if (!attivo) {
+    return (
+      <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 14, padding: '16px' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>⏳ Programma non ancora attivo</div>
+        <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>{RIGA_AREA_NON_ATTIVA}</div>
+      </div>
+    );
+  }
   const exhausted = remaining <= 0;
   return (
     <div style={{ background: exhausted ? '#f8fafc' : '#eff6ff', border: `1.5px solid ${exhausted ? '#e2e8f0' : '#bfdbfe'}`, borderRadius: 14, padding: '16px' }}>
@@ -486,6 +512,8 @@ export default function EmployeeDashboard() {
 
         {!loading && data && !data.error && (() => {
           const { patient, cycles, nrs, percorso = [] } = data;
+          // Fail-closed: se il dato non arriva, i pulsanti del percorso restano spenti.
+          const attivo = !!data.programmaAttivo;
           const level = patient.level || 'level3';
           const isOptedOut = patient.level_status === 'opted_out';
 
@@ -505,10 +533,10 @@ export default function EmployeeDashboard() {
               {isOptedOut
                 ? <OptedOutScreen patient={patient} />
                 : level === 'level1'
-                  ? <DashboardL1 patient={patient} cycles={cycles} nrs={nrs} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} />
+                  ? <DashboardL1 patient={patient} cycles={cycles} nrs={nrs} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} attivo={attivo} />
                   : level === 'level2'
-                    ? <DashboardL2 patient={patient} percorso={percorso} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} />
-                    : <DashboardL3 patient={patient} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} />
+                    ? <DashboardL2 patient={patient} percorso={percorso} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} attivo={attivo} />
+                    : <DashboardL3 patient={patient} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} attivo={attivo} />
               }
 
               {/* Il mio percorso — per tutti i livelli, solo se c'è qualcosa da mostrare */}

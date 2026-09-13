@@ -8,7 +8,7 @@ import { testoScartoLivello2 } from '../../../lib/offerta';
 
 // Presentazione del Report di Attivazione (punto 7) — a schermo, nell'ordine di Enrico:
 // fotografia → stratificazione → piano → preventivo dentro la forbice → leve (prima
-// l'impatto, poi l'economia; sostenibilità solo per il binario B). Prima di iniziare, un
+// l'impatto, poi l'economia; sostenibilità con la spunta). Prima di iniziare, un
 // controllo che vede solo Enrico. Numeri: stessa fonte dell'Offerta (lib/presentazione-server).
 const eur = (x) => `€${Math.round(Number(x) || 0).toLocaleString('it-IT', { useGrouping: 'always' })}`;
 
@@ -167,6 +167,11 @@ function Leve({ k, titolo, voci }) {
 
 export default function PresentazionePage({ d }) {
   const [i, setI] = useState(-1); // -1 = controllo per Enrico, poi le schermate
+  // «Standard e sostenibilità»: si decide caso per caso, qui, prima di presentare
+  // (default spento). Prima usciva per le aziende del binario B, che è caduto: a un
+  // titolare di micro-impresa quel blocco non dice nulla, ma non è un attributo
+  // dell'azienda a doverlo sapere — è una scelta di chi presenta (Enrico, 13/9).
+  const [conSostenibilita, setConSostenibilita] = useState(false);
   const schermate = d && !d.errore ? [
     { id: 'fotografia', el: <Fotografia d={d} /> },
     { id: 'stratificazione', el: <Stratificazione d={d} /> },
@@ -174,7 +179,7 @@ export default function PresentazionePage({ d }) {
     { id: 'preventivo', el: <Preventivo d={d} /> },
     { id: 'impatto', el: <Leve k="5 · Perché riguarda l'azienda" titolo="Non è solo un problema del dipendente" voci={d.leve.impatto} /> },
     { id: 'economia', el: <Leve k="6 · Quanto vale" titolo="Le leve economiche" voci={d.leve.economiche} /> },
-    ...(d.leve.sostenibilita ? [{ id: 'sostenibilita', el: <Leve k="7 · Standard e sostenibilità" titolo="Dati utilizzabili per la rendicontazione" voci={[d.leve.sostenibilita]} /> }] : []),
+    ...(conSostenibilita && d.leve.sostenibilita ? [{ id: 'sostenibilita', el: <Leve k="7 · Standard e sostenibilità" titolo="Dati utilizzabili per la rendicontazione" voci={[d.leve.sostenibilita]} /> }] : []),
   ] : [];
   const tot = schermate.length;
   const vai = useCallback((n) => setI(x => Math.max(-1, Math.min(tot - 1, n(x)))), [tot]);
@@ -205,10 +210,10 @@ export default function PresentazionePage({ d }) {
     if (d.inRange === true) righe.push(['ok', `Prezzo dentro la forbice presentata al colloquio (${eur(d.forchetta.min)} – ${eur(d.forchetta.max)}).`]);
     else if (d.inRange === false) righe.push(['warn', `Fuori forbice: ${eur(d.prezzo.y1)} contro ${eur(d.forchetta.min)} – ${eur(d.forchetta.max)}. Prepara la motivazione: la schermata del preventivo lo mostra.`]);
     else righe.push(['info', 'Nessuna Stima di riferimento: la schermata del preventivo mostra solo il prezzo.']);
-    righe.push(d.vista.pubblicabile ? ['ok', `${d.checkup.risposte} risposte al check-up.`] : ['warn', 'Meno di 5 risposte: fotografia e stratificazione non mostrano dati.']);
+    righe.push(d.vista.pubblicabile ? ['ok', `${d.checkup.risposte} risposte al check-up.`] : ['warn', `Meno di ${K_ANON} risposte: fotografia e stratificazione non mostrano dati.`]);
     if (d.scartoL2) righe.push([d.scartoL2.sopra ? 'warn' : 'info', testoScartoLivello2(d.scartoL2)]);
     if (d.checkup.stato === 'aperto') righe.push(['warn', `Il check-up è ancora aperto${d.checkup.chiude_il ? ` (chiude il ${etichettaData(d.checkup.chiude_il)})` : ''}: i numeri possono ancora cambiare.`]);
-    righe.push(['info', d.leve.sostenibilita ? 'Binario B: inclusa la schermata «Standard e sostenibilità».' : 'La schermata «Standard e sostenibilità» è esclusa (solo per il binario B).']);
+
     const icona = { ok: '✓', warn: '⚠', info: 'ℹ' };
     const colore = { ok: 'text-green-700', warn: 'text-amber-700', info: 'text-gray-600' };
     return (
@@ -227,7 +232,14 @@ export default function PresentazionePage({ d }) {
               <div className="text-xs font-bold uppercase tracking-widest text-amber-800 mb-2">Note per te sulle leve</div>
               <ul className="space-y-1.5">{d.noteEnrico.map(n => <li key={n} className="text-sm text-amber-900">• {n}</li>)}</ul>
             </div>
-            <div className="text-sm text-gray-500">{tot} schermate: fotografia, stratificazione, piano, preventivo, perché riguarda l&apos;azienda, quanto vale{d.leve.sostenibilita ? ', standard e sostenibilità' : ''}. Frecce ← → per muoverti, Esc per tornare qui.</div>
+            <label className="flex items-start gap-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-2xl p-3 cursor-pointer">
+              <input type="checkbox" checked={conSostenibilita} onChange={e => setConSostenibilita(e.target.checked)} className="mt-0.5" />
+              <span>
+                Aggiungi la schermata <strong>«Standard e sostenibilità»</strong> (GRI 403, ESRS S1, ISO 45001, B Corp).
+                <span className="block text-xs text-gray-500">Serve a chi redige la rendicontazione di sostenibilità. A un titolare di micro-impresa non dice nulla: lascia spento.</span>
+              </span>
+            </label>
+            <div className="text-sm text-gray-500">{tot} schermate: fotografia, stratificazione, piano, preventivo, perché riguarda l&apos;azienda, quanto vale{conSostenibilita ? ', standard e sostenibilità' : ''}. Frecce ← → per muoverti, Esc per tornare qui.</div>
             <div className="flex gap-3 flex-wrap">
               <button onClick={() => { schermoIntero(); setI(0); }} className="text-base font-semibold text-white bg-green-600 px-5 py-3 rounded-2xl hover:bg-green-700">▶ Inizia la presentazione</button>
               <Link href={`/dashboard/sintesi/${d.clientId}`} className="text-base font-semibold text-gray-700 border border-gray-300 px-5 py-3 rounded-2xl hover:bg-gray-50">📄 Sintesi</Link>

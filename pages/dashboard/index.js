@@ -84,7 +84,6 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
                       <span className={`text-xs ${v.scaduto ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>{v.scaduto ? t.scaduto : t.testo}</span>
                       <span className="font-medium text-gray-800 truncate">{v.cliente}</span>
                       {v.is_demo && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-500">DEMO</span>}
-                      {v.binario && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-900 text-white">{v.binario}</span>}
                     </span>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${v.scaduto ? 'bg-red-100 text-red-700' : v.data === oggi ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>
                       {quando}
@@ -190,8 +189,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
                       <div className="font-semibold text-gray-900 text-base truncate">
                         {c.name}
                         {c.is_demo && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-500 align-middle">DEMO</span>}
-                        {c.binario && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-900 text-white align-middle">{c.binario}</span>}
-                        {c.binario === 'B' && !['inviata', 'firmata'].includes(c.lettera_stato) && <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 align-middle">Lettera da inviare</span>}
+                        {c.lettera_stato === 'da_inviare' && <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 align-middle">Lettera da inviare</span>}
                       </div>
                       <div className="text-sm text-gray-500 mt-0.5">
                         {c.employees} dipendenti · {c.sector === 1 ? 'Manifattura' : 'Ufficio/IT'}

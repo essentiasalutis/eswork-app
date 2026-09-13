@@ -28,7 +28,9 @@ export default function MailRiepilogo({ clientId, forchetta, urlStima, onClose }
       setTo(j.referente.email || '');
       setContesto(j.contesto || '');
       setSecondo(j.secondo_incontro_il || '');
-      setVariante(j.binario === 'A' ? 'A' : 'B');
+      // Tono: sempre istituzionale di default — non stona mai. Si cambia qui sotto,
+      // per questo invio: non è più un attributo dell'azienda (binario A/B, caduto 13/9).
+      setVariante('B');
       setChiudeIl(aggiungiGiorni(oggiRoma(), j.checkupGiorni || 10));
     }
   }
@@ -43,14 +45,14 @@ export default function MailRiepilogo({ clientId, forchetta, urlStima, onClose }
       referente: dati.referente.nome, contesto, forchetta, urlStima,
       link: aperto ? link : '[il link compare quando avvii il check-up]',
       scadenza: aperto ? dati.checkup.chiude_il : null,
-      secondoIncontro: secondo, binario: dati.binario, kit,
+      secondoIncontro: secondo, conLettera: !!dati.lettera_stato, kit,
     });
   }, [dati, aperto, link, variante, contesto, secondo, forchetta, urlStima]);
   // Cambiando un campo il testo si rigenera (le correzioni fatte a mano nel testo si perdono).
   useEffect(() => { if (generato) setCorpo(generato.corpo); }, [generato]);
 
   async function avviaCheckup() {
-    for (const avviso of avvisiAvvioCheckup({ client: { binario: dati.binario, lettera_stato: dati.lettera_stato, is_demo: dati.is_demo }, altriAperti: dati.checkupAperti.aziende, limite: dati.checkupAperti.limite })) {
+    for (const avviso of avvisiAvvioCheckup({ client: { lettera_stato: dati.lettera_stato, is_demo: dati.is_demo }, altriAperti: dati.checkupAperti.aziende, limite: dati.checkupAperti.limite })) {
       if (!confirm(avviso)) return;
     }
     setAvvio(true); setErr('');

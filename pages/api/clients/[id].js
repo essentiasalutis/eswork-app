@@ -48,6 +48,8 @@ export default requireAuth(async function handler(req, res) {
       delete body.lettera_file_path; // il file della Lettera passa solo da /api/clients/[id]/lettera-incarico
 
       // Binario commerciale: scelta MANUALE di Enrico (A/B) o non deciso (null).
+      // Il binario A/B è uscito dall'interfaccia il 13/9 (funnel unico) e non viene più
+      // scritto. La guardia resta: se qualcosa provasse a scrivere un valore, va rifiutato.
       if ('binario' in body && body.binario !== null && !['A', 'B'].includes(body.binario)) {
         return res.status(422).json({ error: 'binario non valido (A, B o vuoto)' });
       }
@@ -74,12 +76,13 @@ export default requireAuth(async function handler(req, res) {
         }
         if (body.ricontatto_il && body.ricontatto_il < oggiRoma()) return res.status(422).json({ error: 'La data di ricontatto deve essere oggi o un giorno futuro.' });
       }
-      // Offerta aperta: binario A scade dopo i giorni del Listino; B (e non deciso) non
-      // scade — può essere un sì in attesa del nuovo budget. Una data esplicita vince.
+      // Offerta aperta: la scadenza si PROPONE sempre (giorni dal Listino) e si può
+      // cancellare. Un'offerta senza data muore in silenzio, e il «ci risentiamo» senza
+      // scadenza è il modo più comune di perdere un cliente (Enrico, 13/9).
+      // Una data esplicita nel body vince sempre, anche se vuota.
       if (finale === 'offer_open' && attuale !== 'offer_open') {
         if (!('offerta_scade_il' in body)) {
-          const binario = 'binario' in body ? body.binario : client.binario;
-          body.offerta_scade_il = binario === 'A' ? aggiungiGiorni(oggiRoma(), (await getOrgParams()).offertaGiorniA) : null;
+          body.offerta_scade_il = aggiungiGiorni(oggiRoma(), (await getOrgParams()).offertaGiorni);
         }
         // Da qui si conta la metà validità per il promemoria (v55).
         body.offerta_aperta_il = oggiRoma();

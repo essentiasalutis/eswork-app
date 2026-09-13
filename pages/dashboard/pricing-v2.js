@@ -170,14 +170,14 @@ export default function PricingV2Page() {
             <p className="text-[11px] text-gray-400 mt-2">Compaiono sempre in chiaro nella frase («ipotizzando un&apos;incidenza del 10%», «un costo stimato di €160 per giornata»). Solo risparmio lordo, mai al netto del prezzo. Senza i giorni di malattia dal colloquio la leva non si mostra.</p>
           </div>
 
-          {/* Offerta: validità per il binario A (il B non scade) */}
+          {/* Offerta: validità proposta per tutte le offerte, cancellabile */}
           <div className={box}>
             <h2 className="font-semibold text-gray-800 mb-3">Offerta</h2>
-            <label className="block text-xs text-gray-500 max-w-xs">Validità dell'offerta — binario A (giorni, 1–90)
+            <label className="block text-xs text-gray-500 max-w-xs">Validità dell'offerta (giorni, 1–90)
               <input type="number" min="1" max="90" step="1" defaultValue={texts.offerta_giorni_a ?? ''} placeholder="10" className={`${inputCls} mt-1`}
                 onBlur={e => { const v = e.target.value; if ((texts.offerta_giorni_a ?? '') !== v && /^\d+$/.test(v) && +v >= 1 && +v <= 90) put({ tipo: 'setting', key: 'offerta_giorni_a', value: v }, 'validità dell\'offerta salvata'); }} />
             </label>
-            <p className="text-[11px] text-gray-400 mt-2">Quando in Pipeline sposti un&apos;azienda del binario A in &laquo;Offerta aperta&raquo; la scadenza parte da oggi + questi giorni (modificabile). Binario B e non deciso: nessuna scadenza, la data si mette a mano solo se serve.</p>
+            <p className="text-[11px] text-gray-400 mt-2">Quando sposti un&apos;azienda in &laquo;Offerta aperta&raquo; la scadenza viene proposta a oggi + questi giorni: puoi modificarla o cancellarla caso per caso. Per un&apos;azienda strutturata si alza (30 giorni).</p>
           </div>
 
           {/* Argomentario delle 12 voci (testi di Enrico, sola lettura: stessi di Stima e Offerta) */}

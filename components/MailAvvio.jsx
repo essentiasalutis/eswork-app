@@ -9,7 +9,8 @@ export default function MailAvvio({ client, onClose, onDataSalvata }) {
   const [to, setTo] = useState(client.contact_email || '');
   const [dataAvvio, setDataAvvio] = useState(client.data_avvio_programma || '');
   const [prenotazione, setPrenotazione] = useState('');
-  const [variante, setVariante] = useState(client.binario === 'A' ? 'A' : 'B');
+  // Tono di QUESTO invio, non attributo dell'azienda: default istituzionale.
+  const [variante, setVariante] = useState('B');
   const [contatto, setContatto] = useState([client.contact_name, client.contact_email ? `(${client.contact_email})` : ''].filter(Boolean).join(' '));
   const [corpo, setCorpo] = useState('');
   const [msg, setMsg] = useState('');

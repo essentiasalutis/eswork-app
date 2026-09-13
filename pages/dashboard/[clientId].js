@@ -184,6 +184,11 @@ export default function ClientPage({ dipInForza = 0, client: initialClient, asse
   const [reportAssessment, setReportAssessment] = useState(null);
   const [emailModal, setEmailModal] = useState(null); // { to, subject, body }
   const [kitAvvio, setKitAvvio] = useState(false); // finestra "Kit di avvio" (punto 12)
+  // Tono e momento del kit del check-up: scelte DI QUESTO INVIO, non attributi
+  // dell'azienda (il binario A/B è caduto il 13/9). Il tono è istituzionale per
+  // default — non stona mai; il momento lo deduce il contratto e si può forzare.
+  const [tonoKit, setTonoKit] = useState('B');          // 'A' diretto · 'B' istituzionale
+  const [momentoKit, setMomentoKit] = useState(null);   // null = dedotto · 'valutazione' · 'avvio'
   // Attivazione del programma (13/9): un gesto solo — la firma accende il percorso
   // e prepara la comunicazione ai dipendenti (la data di avvio va nel kit).
   const [attivazione, setAttivazione] = useState(false);
@@ -205,7 +210,7 @@ export default function ClientPage({ dipInForza = 0, client: initialClient, asse
   const [dataProroga, setDataProroga] = useState({}); // id → 'YYYY-MM-DD'
   const [conteggiLive, setConteggiLive] = useState({}); // id → n questionari
   const [checkupErr, setCheckupErr] = useState('');
-  // Binario commerciale (scelta manuale) e Lettera di incarico (binario B)
+  // Lettera di incarico: documento opzionale, si accende a mano sulla scheda
   const [aziendaErr, setAziendaErr] = useState('');
   const [dataLettera, setDataLettera] = useState(() => oggiRoma());
   const [letteraBusy, setLetteraBusy] = useState(false);
@@ -454,15 +459,15 @@ export default function ClientPage({ dipInForza = 0, client: initialClient, asse
     const aperto = assessments.find(a => a.status === 'active');
     const scadenzaCorrente = aperto && aperto.chiude_il ? aperto.chiude_il : null;
     const referente = client.contact_name || 'referente';
-    // Testi di Enrico per i dipendenti: prima della firma il kit del punto 5 ("stiamo
-    // valutando"); dopo la firma l'invito post-firma (A diretto, B istituzionale; binario non
-    // deciso → B, il tono più prudente).
+    // Testi di Enrico per i dipendenti. Due scelte indipendenti:
+    //  · il MOMENTO (valutazione «stiamo valutando» / avvio «l'azienda ha attivato»),
+    //    dedotto dal contratto e forzabile a mano;
+    //  · il TONO (diretto / istituzionale), scelto qui, non legato all'azienda.
     if (!scadenzaCorrente) { alert('Avvia prima il check-up: il testo per i dipendenti ha bisogno della data di chiusura.'); return; }
     const firmaAz = firmaKit({ referente: client.contact_name, azienda: client.name });
-    const variante = client.binario === 'A' ? 'A' : 'B';
-    const kit = isFirmato(client.pipeline_stage)
-      ? testoKitCheckupDopoFirma({ variante, link: url, scadenza: scadenzaCorrente, firma: firmaAz })
-      : testoKit({ variante, link: url, scadenza: scadenzaCorrente, firma: firmaAz });
+    const kit = momentoEffettivo === 'avvio'
+      ? testoKitCheckupDopoFirma({ variante: tonoKit, link: url, scadenza: scadenzaCorrente, firma: firmaAz })
+      : testoKit({ variante: tonoKit, link: url, scadenza: scadenzaCorrente, firma: firmaAz });
     setEmailModal({
       to: client.contact_email || '',
       subject: `Check-up ES Work — ${client.name}`,
@@ -648,6 +653,12 @@ ${FIRMA}`,
   const sortedAssessments = [...assessments].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   const reportDopo = a => generatedReports.some(r => r.report_type === 'activation' && r.created_at >= a.created_at);
   const idAperto = (sortedAssessments.find(a => a.status === 'active') || {}).id;
+  // Momento del check-up: lo dice il contratto. Se l'ho forzato a mano resta SCRITTO
+  // a schermo, perché fra un mese non si scopra che i testi partono sbagliati per una
+  // forzatura dimenticata (richiesta esplicita di Enrico, 13/9).
+  const momentoDedotto = isFirmato(client.pipeline_stage) ? 'avvio' : 'valutazione';
+  const momentoEffettivo = momentoKit || momentoDedotto;
+  const momentoForzato = !!momentoKit && momentoKit !== momentoDedotto;
   // Denominatore congruo: i dipendenti dichiarati qui sono il denominatore di tutto
   // ciò che l'azienda legge (tasso di adesione, prezzo, gruppi di formazione). Se i
   // questionari arrivati o i nomi in anagrafica lo superano, il dato è falso.
@@ -780,7 +791,6 @@ ${FIRMA}`,
                   erano solo una parola in più da decifrare. Il tier resta nel dato,
                   dove serve ancora a Finance. */}
               <span>{client.employees} dip. · {client.sector === 1 ? 'Manifattura' : 'Ufficio/IT'}</span>
-              {client.binario && <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-gray-900 text-white">Binario {client.binario}</span>}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -887,24 +897,28 @@ ${FIRMA}`,
         )}
         {kitAvvio && <MailAvvio client={client} onClose={() => setKitAvvio(false)} onDataSalvata={d => setClient(prev => ({ ...prev, data_avvio_programma: d }))} />}
 
-        {/* ── Binario commerciale (scelta manuale) + Lettera di incarico (solo B) ── */}
+        {/* ── Appuntamenti + Lettera di incarico (documento OPZIONALE) ──────────
+            Il binario commerciale A/B è caduto il 13/9: il funnel è uno solo e i
+            testi non dipendono più da un attributo dell'azienda. La Lettera non è
+            più un passaggio obbligato: si accende qui solo se un'azienda chiede una
+            base scritta prima di far compilare il check-up ai dipendenti. */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-3">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">🧭 Binario commerciale</h2>
-            <div className="flex gap-1 flex-wrap">
-              {[['A', 'A — titolare, micro/piccola'], ['B', 'B — HR/board, media/grande'], ['', 'Da decidere']].map(([v, l]) => (
-                <button key={v || 'nd'} onClick={() => aggiornaAzienda({ binario: v || null })}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${(client.binario || '') === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
-              ))}
-            </div>
-          </div>
           <div className="flex items-center gap-2 flex-wrap text-sm">
             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">📊 Secondo incontro (Report)</span>
             <input type="date" value={client.secondo_incontro_il || ''} onChange={e => aggiornaAzienda({ secondo_incontro_il: e.target.value || null })}
               className="text-xs border border-gray-300 rounded-lg px-2 py-1" />
             <span className="text-[11px] text-gray-400">compare in dashboard nella settimana della data</span>
           </div>
-          {client.binario === 'B' && (
+          {!client.lettera_stato && (
+            <div className="border-t border-gray-100 pt-3 flex items-center justify-between gap-2 flex-wrap">
+              <p className="text-[11px] text-gray-400 max-w-xl">
+                <strong className="text-gray-600">📄 Lettera di incarico</strong> — documento opzionale, fuori dal percorso standard. Si usa solo se l&apos;azienda chiede una base scritta <strong>prima</strong> di far compilare il check-up ai dipendenti: la forbice deve impegnare prima che esca il prezzo reale.
+              </p>
+              <button onClick={() => aggiornaAzienda({ lettera_stato: 'da_inviare' })}
+                className="shrink-0 text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-200">Usa la Lettera di incarico</button>
+            </div>
+          )}
+          {client.lettera_stato && (
             <div className="border-t border-gray-100 pt-3">
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">📄 Lettera di incarico</div>
               <div className="flex items-center gap-2 flex-wrap text-sm">
@@ -927,7 +941,12 @@ ${FIRMA}`,
                 </label>
                 {client.lettera_file_path && <button onClick={apriLettera} className="text-xs font-semibold text-gray-700 underline">Apri la lettera firmata</button>}
               </div>
-              <p className="text-[11px] text-gray-400 mt-2">Il testo della Lettera è quello dell&apos;avvocato: qui si tiene traccia dello stato e si conserva il file firmato, in un archivio privato (si apre solo con un link a scadenza).</p>
+              <p className="text-[11px] text-gray-400 mt-2">
+                Il testo della Lettera è quello dell&apos;avvocato: qui si tiene traccia dello stato e si conserva il file firmato, in un archivio privato (si apre solo con un link a scadenza).
+                {client.lettera_stato === 'da_inviare' && (
+                  <> · <button onClick={() => aggiornaAzienda({ lettera_stato: null })} className="underline text-gray-500">non serve, togli la Lettera</button></>
+                )}
+              </p>
             </div>
           )}
           {aziendaErr && <div className="text-xs text-red-600">{aziendaErr}</div>}
@@ -1004,13 +1023,39 @@ ${FIRMA}`,
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                 Check-up iniziale
               </div>
-              <button
-                onClick={emailGenericLink}
-                className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100"
-              >
-                ✉️ Invia link al referente HR
-              </button>
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                {/* Momento e tono si scelgono QUI, al momento dell'invio. */}
+                <div className="flex items-center gap-1 text-[11px] text-gray-500">
+                  <span className="font-semibold uppercase tracking-wide">Testo:</span>
+                  {[['valutazione', 'in valutazione'], ['avvio', 'programma attivato']].map(([v, l]) => (
+                    <button key={v} onClick={() => setMomentoKit(v === momentoDedotto ? null : v)}
+                      className={`px-2 py-1 rounded-lg font-semibold ${momentoEffettivo === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1 text-[11px] text-gray-500">
+                  <span className="font-semibold uppercase tracking-wide">Tono:</span>
+                  {[['B', 'istituzionale'], ['A', 'diretto']].map(([v, l]) => (
+                    <button key={v} onClick={() => setTonoKit(v)}
+                      className={`px-2 py-1 rounded-lg font-semibold ${tonoKit === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
+                  ))}
+                </div>
+                <button
+                  onClick={emailGenericLink}
+                  className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100"
+                >
+                  ✉️ Invia link al referente HR
+                </button>
+              </div>
             </div>
+            {momentoForzato && (
+              <div className="mb-2 text-xs bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-amber-900 flex items-center justify-between gap-2 flex-wrap">
+                <span>
+                  ⚠️ Testo forzato su <strong>{momentoEffettivo === 'avvio' ? '«programma attivato»' : '«in valutazione»'}</strong>:
+                  {' '}dal contratto risulterebbe <strong>{momentoDedotto === 'avvio' ? '«programma attivato»' : '«in valutazione»'}</strong>.
+                </span>
+                <button onClick={() => setMomentoKit(null)} className="shrink-0 font-semibold text-amber-900 bg-white border border-amber-300 px-2.5 py-1 rounded-lg hover:bg-amber-100">Torna al contratto</button>
+              </div>
+            )}
 
             {sortedAssessments.length === 0 ? (
               <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 rounded-xl px-4 py-3">

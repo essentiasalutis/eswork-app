@@ -52,7 +52,6 @@ function ClientCard({ client, onMove }) {
         <Link href={`/dashboard/${client.id}`} className="font-semibold text-gray-900 text-sm leading-tight hover:text-green-700 flex-1 min-w-0 truncate">
           {client.name}
           {client.is_demo && <span className="ml-1.5 text-[9px] font-bold px-1 py-0.5 rounded bg-gray-200 text-gray-500 align-middle">DEMO</span>}
-          {client.binario && <span className="ml-1 text-[9px] font-bold px-1 py-0.5 rounded bg-gray-900 text-white align-middle">{client.binario}</span>}
         </Link>
         <span className="text-xs text-gray-400 whitespace-nowrap">{client.employees} dip.</span>
       </div>
@@ -133,9 +132,7 @@ function ModaleData({ richiesta, onConferma, onAnnulla }) {
           </>
         ) : (
           <p className="text-sm text-gray-600">
-            {client.binario === 'A'
-              ? 'Binario A: l\'offerta scade in questa data (dal Listino). Puoi cambiarla.'
-              : 'Binario B (o non deciso): nessuna scadenza — può essere un sì in attesa del nuovo budget. Metti una data solo se ti serve.'}
+            L&apos;offerta scade in questa data, proposta dal Listino. Puoi cambiarla — o cancellarla, se questa offerta non deve scadere.
           </p>
         )}
         <input type="date" value={data} min={oggi} onChange={e => setData(e.target.value)}
@@ -188,7 +185,7 @@ function Colonna({ stage, clienti, onMove, onNote }) {
 
 // ─── Pagina principale ────────────────────────────────────────────────────────
 
-export default function PipelinePage({ clients: initialClients, offertaGiorniA = 10, checkupMaxAperti = 3 }) {
+export default function PipelinePage({ clients: initialClients, offertaGiorni = 10, checkupMaxAperti = 3 }) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
   const [filterSource, setFilterSource] = useState('all');
@@ -199,7 +196,8 @@ export default function PipelinePage({ clients: initialClients, offertaGiorniA =
   // "Non ora" e "Offerta aperta" chiedono prima una data; gli altri stati si spostano subito.
   function onMove(client, target) {
     if (target === 'not_now') return setRichiestaData({ client, target, proposta: '' });
-    if (target === 'offer_open') return setRichiestaData({ client, target, proposta: client.binario === 'A' ? aggiungiGiorni(oggiRoma(), offertaGiorniA) : '' });
+    // La scadenza si propone a tutti (un'offerta senza data muore in silenzio) e resta cancellabile.
+    if (target === 'offer_open') return setRichiestaData({ client, target, proposta: aggiungiGiorni(oggiRoma(), offertaGiorni) });
     moveClient(client, target, {});
   }
 
@@ -378,12 +376,12 @@ export default function PipelinePage({ clients: initialClients, offertaGiorniA =
 export const getServerSideProps = requireAuthSsr(async () => {
   const { getClients } = require('../../lib/store');
   const clients = await getClients();
-  let offertaGiorniA = 10;
+  let offertaGiorni = 10;
   let checkupMaxAperti = 3;
-  try { ({ offertaGiorniA, checkupMaxAperti } = await (await import('../../lib/org')).getOrgParams()); } catch (_) {}
+  try { ({ offertaGiorni, checkupMaxAperti } = await (await import('../../lib/org')).getOrgParams()); } catch (_) {}
   return {
     props: {
-      offertaGiorniA,
+      offertaGiorni,
       checkupMaxAperti,
       clients: clients.map(c => ({
         ...c,

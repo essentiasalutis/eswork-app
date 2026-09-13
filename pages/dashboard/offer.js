@@ -29,11 +29,11 @@ ${CONFIG.contact_email}`;
 // ─── Modale email ─────────────────────────────────────────────────────────────
 
 // Scadenza proposta sulla pagina: quella già salvata se l'offerta è aperta, altrimenti
-// binario A = oggi + giorni del Listino, B e non deciso = nessuna (decisione Enrico).
+// la scadenza si PROPONE sempre (oggi + giorni del Listino) e si può cancellare.
 function scadenzaIniziale(client, giorniA) {
   if (!client) return '';
   if (normalizza(client.pipeline_stage) === 'offer_open') return client.offerta_scade_il || '';
-  return client.binario === 'A' ? aggiungiGiorni(oggiRoma(), giorniA) : '';
+  return aggiungiGiorni(oggiRoma(), giorniA);
 }
 
 function EmailModal({ modal, onClose, onInvia }) {
@@ -115,9 +115,9 @@ function Page({ children, className = '' }) {
 
 // ─── Offer Document ───────────────────────────────────────────────────────────
 
-export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, date, offertaGiorniA = 10, scartoL2 = null, pianoBase = [] }) {
+export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, date, offertaGiorni = 10, scartoL2 = null, pianoBase = [] }) {
   const [emailModal, setEmailModal] = useState(null);
-  const [scadenza, setScadenza] = useState(() => scadenzaIniziale(client, offertaGiorniA));
+  const [scadenza, setScadenza] = useState(() => scadenzaIniziale(client, offertaGiorni));
   const [esitoInvio, setEsitoInvio] = useState(null); // { ok, testo }
   // Il piano c'è già all'apertura: è quello della piattaforma, calcolato lato server.
   // L'AI entra SOLO con il pulsante qui sotto (nessuna chiamata al montaggio, 12/9).
@@ -331,7 +331,7 @@ ${FIRMA}`;
               ? <button onClick={() => setScadenza('')} className="text-gray-500 underline">togli la scadenza</button>
               : <span className="font-semibold text-gray-600">senza scadenza</span>}
             <span className="text-gray-500">
-              {client.binario === 'A' ? `Binario A: proposta dal Listino (${offertaGiorniA} giorni).` : 'Binario B o non deciso: senza scadenza, metti una data solo se ti serve.'}
+              {`Scadenza proposta dal Listino (${offertaGiorni} giorni): cancellala se questa offerta non deve scadere.`}
               {' '}Con «Invia offerta via email» l&apos;azienda passa in «Offerta aperta» con questa data.
             </span>
             {esitoInvio && <span className={`font-semibold ${esitoInvio.ok ? 'text-green-700' : 'text-red-600'}`}>{esitoInvio.testo}</span>}
@@ -849,9 +849,9 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
   const q = ctx.query;
   const { assessmentId, clientId, n, l1, l2 } = q;
   const custom = readPricingParams(q);
-  let offertaGiorniA = 10;
+  let offertaGiorni = 10;
   let scartoL2Soglia = 15;
-  try { ({ offertaGiorniA, scartoL2Soglia } = await (await import('../../lib/org')).getOrgParams()); } catch (_) {}
+  try { ({ offertaGiorni, scartoL2Soglia } = await (await import('../../lib/org')).getOrgParams()); } catch (_) {}
 
   // MODALITÀ PREVENTIVO da scheda colloquio: clientId + numeri stimati, nessun assessment
   if (!assessmentId && clientId) {
@@ -874,7 +874,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
           calc,
           roi: null,
           date: today(),
-          offertaGiorniA,
+          offertaGiorni,
           // Numeri stimati dal colloquio (nessuna risposta reale): niente soglie k-anon.
           pianoBase: pianoDeterministico(nmqStimato.zones || []),
         },
@@ -907,7 +907,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         roi,
         forchetta,
         date: today(),
-        offertaGiorniA,
+        offertaGiorni,
         scartoL2,
         pianoBase,
       },

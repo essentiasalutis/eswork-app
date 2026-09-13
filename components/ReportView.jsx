@@ -5,7 +5,8 @@ import {
   TYPE_LABELS, generateSummaryText,
 } from '../lib/scoring';
 import { CONFIG } from '../lib/config';
-import { kAnonPartition, maskCount, tooSmall, K_ANON, SUPPRESSED } from '../lib/kanon';
+import { kAnonPartition, maskCount, tooSmall, K_ANON, K_ANON_INCROCIO, SUPPRESSED } from '../lib/kanon';
+import { convieneAggregare, NOTA_DISTRETTI } from '../lib/distretti';
 import { nomeLivello } from '../lib/livelli';
 
 // ─── Commento clinico AI (parte discorsiva integrata nel report dati) ──────────
@@ -457,11 +458,25 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         </div>
       </LegendBox>
 
-      {/* NMQ */}
-      <SectionTitle>Disturbi muscolo-scheletrici per zona — 12 mesi</SectionTitle>
+      {/* NMQ — per zona, oppure per DISTRETTO quando la popolazione è piccola.
+          In un'azienda da poche persone nove zone fanno gruppi da 1-3 e il grafico
+          diventa una colonna di «n.d.»: si chiede meno dettaglio (tre distretti)
+          invece di abbassare la tutela. Decisione di Enrico, 13/9. */}
+      {(() => {
+        const zoneViste = nmq.zones.map(z => ({ ...z, soppressa: maskCount(z.count12) == null }));
+        const aggrega = convieneAggregare(zoneViste);
+        const righe = aggrega
+          ? (nmq.districts || []).map(d => ({ ...d, soppressa: maskCount(d.count12) == null }))
+          : zoneViste;
+        return (
+      <>
+      <SectionTitle>{aggrega ? 'Disturbi muscolo-scheletrici per distretto — 12 mesi' : 'Disturbi muscolo-scheletrici per zona — 12 mesi'}</SectionTitle>
       <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3 print-page">
-        {nmq.zones.map((z, i) => (
-          maskCount(z.count12) == null ? (
+        {aggrega && (
+          <p className="text-xs text-gray-500 mb-3">{NOTA_DISTRETTI}</p>
+        )}
+        {righe.map((z, i) => (
+          z.soppressa ? (
             <div key={i} className="flex items-center gap-2 mb-1.5">
               <div className="w-36 text-xs text-gray-600 text-right flex-shrink-0 truncate">{z.zone}</div>
               <div className="flex-1 text-xs text-gray-400 italic">{SUPPRESSED} (gruppo &lt; {K_ANON})</div>
@@ -476,6 +491,9 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
             : <>Prevalenza: <strong>{nmq.prevalence.count}</strong> dip. ({nmq.prevalence.pct}%) con almeno 1 disturbo negli ultimi 12 mesi</>}
         </div>
       </div>
+      </>
+        );
+      })()}
 
       {/* Suddivisione per ruolo. Due livelli di tutela:
           1) il blocco esce solo se ENTRAMBI i gruppi ≥ k (altrimenti il totale noto
@@ -483,17 +501,17 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
           2) DENTRO ogni gruppo, zone e livelli possono comunque finire sotto soglia:
              in quel caso non si stampa una griglia di "n.d." e "0%" — che si legge
              come un report rotto — ma si dice esplicitamente perché il dato manca. */}
-      {(nmq.byRole.production.n >= K_ANON && nmq.byRole.office.n >= K_ANON) && (() => {
+      {(nmq.byRole.production.n >= K_ANON_INCROCIO && nmq.byRole.office.n >= K_ANON_INCROCIO) && (() => {
         const gruppi = [
           { label: '🏭 In produzione', data: nmq.byRole.production },
           { label: '💻 In ufficio', data: nmq.byRole.office },
         ].map(g => {
-          const zones = g.data.zones.filter(z => maskCount(z.count12) != null && z.pct12 > 0).slice(0, 5);
+          const zones = g.data.zones.filter(z => maskCount(z.count12, K_ANON_INCROCIO) != null && z.pct12 > 0).slice(0, 5);
           const RL = Object.fromEntries(kAnonPartition([
             { key: 'l1', count: g.data.level1.count },
             { key: 'l2', count: g.data.level2.count },
             { key: 'l3', count: g.data.level3.count },
-          ], g.data.n).map(c => [c.key, c]));
+          ], g.data.n, { k: K_ANON_INCROCIO }).map(c => [c.key, c]));
           return { ...g, zones, RL, livelliVisibili: !RL.l1.suppressed || !RL.l2.suppressed };
         });
         const nullaDaMostrare = gruppi.every(g => g.zones.length === 0 && !g.livelliVisibili);
@@ -503,7 +521,8 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
             <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Suddivisione per tipologia di lavoro</div>
             <p className="text-xs text-gray-500">
               Il dettaglio per tipologia di lavoro non è pubblicabile: i sottogruppi sono sotto la soglia minima
-              di {K_ANON} persone prevista per la tutela della riservatezza. I dati complessivi riportati sopra restano validi.
+              di {K_ANON_INCROCIO} persone prevista per la tutela della riservatezza — incrociando due informazioni
+              il gruppo si restringe, e la soglia è più alta di quella dei dati complessivi. I dati riportati sopra restano validi.
             </p>
           </div>
         );

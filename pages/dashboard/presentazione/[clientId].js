@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { K_ANON } from '../../../lib/kanon';
 import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../../lib/auth';
@@ -32,7 +33,7 @@ function Fotografia({ d }) {
     <>
       <Titolo k="1 · La fotografia">Il check-up di {d.azienda}</Titolo>
       {!v.pubblicabile ? (
-        <p className="text-2xl text-gray-600">Risultati aggregati non pubblicabili: meno di 5 risposte. A tutela della riservatezza i risultati si mostrano solo con almeno 5 risposte.</p>
+        <p className="text-2xl text-gray-600">Risultati aggregati non pubblicabili: meno di {K_ANON} risposte. A tutela della riservatezza i risultati si mostrano solo con almeno {K_ANON} risposte.</p>
       ) : (
         <div className="space-y-8">
           <div className="text-3xl text-gray-800">
@@ -67,7 +68,7 @@ function Stratificazione({ d }) {
     <>
       <Titolo k="2 · La stratificazione">Tre livelli, tre risposte diverse</Titolo>
       {!v.pubblicabile ? (
-        <p className="text-2xl text-gray-600">Non pubblicabile: meno di 5 risposte.</p>
+        <p className="text-2xl text-gray-600">Non pubblicabile: meno di {K_ANON} risposte.</p>
       ) : (
         <>
           <div className="grid md:grid-cols-3 gap-6">
@@ -86,7 +87,7 @@ function Stratificazione({ d }) {
               );
             })}
           </div>
-          {v.livelli.some(c => c.suppressed) && <p className="text-lg text-gray-500 mt-6">Alcuni gruppi contano meno di 5 persone e non sono mostrati, a tutela della riservatezza.</p>}
+          {v.livelli.some(c => c.suppressed) && <p className="text-lg text-gray-500 mt-6">Alcuni gruppi contano meno di {K_ANON} persone e non sono mostrati, a tutela della riservatezza.</p>}
         </>
       )}
     </>

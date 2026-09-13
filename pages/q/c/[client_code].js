@@ -258,7 +258,7 @@ function ContactForm({ onSubmit, sedi = [] }) {
 
 // ─── Schermata completamento ──────────────────────────────────────────────────
 
-function CompletionScreen({ level, wantsContact, careToken, firmato = false, emailAttiva = false }) {
+function CompletionScreen({ level, wantsContact, careToken, firmato = false, emailAttiva = false, email = '' }) {
   const isL1 = level === 'level1';
   const isL2 = level === 'level2';
   const [copiedLink, setCopiedLink] = useState(false);
@@ -273,8 +273,15 @@ function CompletionScreen({ level, wantsContact, careToken, firmato = false, ema
     setTimeout(() => setCopiedLink(false), 2000);
   }
 
-  // «Inviamelo per email»: compare SOLO quando l'invio è davvero attivo (il dominio
-  // mittente non è ancora verificato). Finché è spento, il link resta da salvare a mano.
+  // Mandarsi il link da soli: apre l'app di posta DELLA PERSONA con oggetto e testo
+  // già scritti, con il suo indirizzo come destinatario. Non passa dai nostri server,
+  // quindi funziona da subito — non dipende dalla verifica del dominio mittente.
+  const mailtoLink = personalUrl
+    ? `mailto:${encodeURIComponent(email || '')}?subject=${encodeURIComponent('La mia area personale ES Work')}&body=${encodeURIComponent(`Questo è il link alla mia area personale riservata del programma ES Work:\n\n${personalUrl}\n\nÈ personale: meglio non condividerlo.`)}`
+    : null;
+
+  // «Inviamelo per email» dal nostro server: compare SOLO quando l'invio è davvero
+  // attivo (il dominio mittente non è ancora verificato).
   async function inviaPerEmail() {
     if (!careToken || invio === 'invio') return;
     setInvio('invio');
@@ -361,11 +368,19 @@ function CompletionScreen({ level, wantsContact, careToken, firmato = false, ema
                 {copiedLink ? '✓ Copiato' : 'Copia'}
               </button>
             </div>
-            {emailAttiva && (
+            {emailAttiva ? (
               <button onClick={inviaPerEmail} disabled={invio === 'invio' || invio === 'ok'}
                 className="w-full mt-2 text-xs font-semibold px-3 py-2 rounded-lg border border-green-300 text-green-700 bg-white disabled:opacity-60">
                 {invio === 'ok' ? '✓ Inviato al tuo indirizzo' : invio === 'invio' ? 'Invio…' : '✉️ Inviamelo per email'}
               </button>
+            ) : mailtoLink && (
+              <>
+                <a href={mailtoLink}
+                  className="block w-full mt-2 text-center text-xs font-semibold px-3 py-2 rounded-lg border border-green-300 text-green-700 bg-white">
+                  ✉️ Apri la mia posta con il link
+                </a>
+                <p className="text-[11px] text-green-700 mt-1">Si apre la tua app di posta con il messaggio già scritto: devi solo premere invia.</p>
+              </>
             )}
             {invio === 'errore' && (
               <p className="text-xs text-amber-700 mt-2">Invio non riuscito: salva il link qui sopra.</p>
@@ -547,7 +562,7 @@ export default function SelfDeclarePage({ client, error: serverError, checkup, s
       )}
 
       {phase === PHASES.DONE && (
-        <CompletionScreen level={level} wantsContact={wantsContact} careToken={careToken} firmato={!!checkup?.firmato} emailAttiva={!!emailAttiva} />
+        <CompletionScreen level={level} wantsContact={wantsContact} careToken={careToken} firmato={!!checkup?.firmato} emailAttiva={!!emailAttiva} email={contactData?.email || ''} />
       )}
     </>
   );

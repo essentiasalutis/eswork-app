@@ -13,7 +13,6 @@ export default function MailRiepilogo({ clientId, forchetta, urlStima, onClose }
   const [to, setTo] = useState('');
   const [contesto, setContesto] = useState('');
   const [secondo, setSecondo] = useState('');
-  const [variante, setVariante] = useState('B');
   const [chiudeIl, setChiudeIl] = useState('');
   const [avvio, setAvvio] = useState(false);
   const [corpo, setCorpo] = useState('');
@@ -28,9 +27,6 @@ export default function MailRiepilogo({ clientId, forchetta, urlStima, onClose }
       setTo(j.referente.email || '');
       setContesto(j.contesto || '');
       setSecondo(j.secondo_incontro_il || '');
-      // Tono: sempre istituzionale di default — non stona mai. Si cambia qui sotto,
-      // per questo invio: non è più un attributo dell'azienda (binario A/B, caduto 13/9).
-      setVariante('B');
       setChiudeIl(aggiungiGiorni(oggiRoma(), j.checkupGiorni || 10));
     }
   }
@@ -40,14 +36,14 @@ export default function MailRiepilogo({ clientId, forchetta, urlStima, onClose }
   const link = dati && typeof window !== 'undefined' ? `${window.location.origin}/q/c/${dati.shareCode}` : '';
   const generato = useMemo(() => {
     if (!dati) return null;
-    const kit = aperto ? testoKit({ variante, link, scadenza: dati.checkup.chiude_il, firma: firmaKit({ referente: dati.referente.nome, azienda: dati.azienda }) }) : null;
+    const kit = aperto ? testoKit({ link, scadenza: dati.checkup.chiude_il, firma: firmaKit({ referente: dati.referente.nome, azienda: dati.azienda }) }) : null;
     return testoRiepilogo({
       referente: dati.referente.nome, contesto, forchetta, urlStima,
       link: aperto ? link : '[il link compare quando avvii il check-up]',
       scadenza: aperto ? dati.checkup.chiude_il : null,
       secondoIncontro: secondo, conLettera: !!dati.lettera_stato, kit,
     });
-  }, [dati, aperto, link, variante, contesto, secondo, forchetta, urlStima]);
+  }, [dati, aperto, link, contesto, secondo, forchetta, urlStima]);
   // Cambiando un campo il testo si rigenera (le correzioni fatte a mano nel testo si perdono).
   useEffect(() => { if (generato) setCorpo(generato.corpo); }, [generato]);
 
@@ -122,13 +118,6 @@ export default function MailRiepilogo({ clientId, forchetta, urlStima, onClose }
             <label className="block text-xs font-semibold text-gray-500">Il punto di partenza (dai dati del colloquio: aggiungi la tua osservazione)
               <textarea value={contesto} onChange={e => setContesto(e.target.value)} rows={2} className={`${inputCls} mt-1 font-normal resize-none`} />
             </label>
-            <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
-              <span className="font-semibold">Testo per i dipendenti:</span>
-              {[['A', 'diretto (A — micro/familiare)'], ['B', 'istituzionale (B — strutturata)']].map(([v, l]) => (
-                <button key={v} onClick={() => setVariante(v)} className={`px-2.5 py-1 rounded-lg font-semibold ${variante === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'}`}>{l}</button>
-              ))}
-            </div>
-
             <div>
               <div className="text-xs font-semibold text-gray-500 mb-1">Oggetto: <span className="font-normal text-gray-700">{generato && generato.oggetto}</span></div>
               <textarea value={corpo} onChange={e => setCorpo(e.target.value)} rows={14} className={`${inputCls} font-mono text-xs resize-y`} />

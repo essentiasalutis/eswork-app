@@ -184,10 +184,9 @@ export default function ClientPage({ dipInForza = 0, client: initialClient, asse
   const [reportAssessment, setReportAssessment] = useState(null);
   const [emailModal, setEmailModal] = useState(null); // { to, subject, body }
   const [kitAvvio, setKitAvvio] = useState(false); // finestra "Kit di avvio" (punto 12)
-  // Tono e momento del kit del check-up: scelte DI QUESTO INVIO, non attributi
-  // dell'azienda (il binario A/B è caduto il 13/9). Il tono è istituzionale per
-  // default — non stona mai; il momento lo deduce il contratto e si può forzare.
-  const [tonoKit, setTonoKit] = useState('B');          // 'A' diretto · 'B' istituzionale
+  // Momento del kit del check-up: scelta DI QUESTO INVIO, dedotta dal contratto e
+  // forzabile. Il registro invece è uno solo (istituzionale): distinguere due toni
+  // era una scelta in più a ogni invio per un vantaggio marginale.
   const [momentoKit, setMomentoKit] = useState(null);   // null = dedotto · 'valutazione' · 'avvio'
   // Attivazione del programma (13/9): un gesto solo — la firma accende il percorso
   // e prepara la comunicazione ai dipendenti (la data di avvio va nel kit).
@@ -459,15 +458,13 @@ export default function ClientPage({ dipInForza = 0, client: initialClient, asse
     const aperto = assessments.find(a => a.status === 'active');
     const scadenzaCorrente = aperto && aperto.chiude_il ? aperto.chiude_il : null;
     const referente = client.contact_name || 'referente';
-    // Testi di Enrico per i dipendenti. Due scelte indipendenti:
-    //  · il MOMENTO (valutazione «stiamo valutando» / avvio «l'azienda ha attivato»),
-    //    dedotto dal contratto e forzabile a mano;
-    //  · il TONO (diretto / istituzionale), scelto qui, non legato all'azienda.
+    // Testi di Enrico per i dipendenti. Cambia solo il MOMENTO: «stiamo valutando»
+    // oppure «l'azienda ha attivato» — dedotto dal contratto e forzabile a mano.
     if (!scadenzaCorrente) { alert('Avvia prima il check-up: il testo per i dipendenti ha bisogno della data di chiusura.'); return; }
     const firmaAz = firmaKit({ referente: client.contact_name, azienda: client.name });
     const kit = momentoEffettivo === 'avvio'
-      ? testoKitCheckupDopoFirma({ variante: tonoKit, link: url, scadenza: scadenzaCorrente, firma: firmaAz })
-      : testoKit({ variante: tonoKit, link: url, scadenza: scadenzaCorrente, firma: firmaAz });
+      ? testoKitCheckupDopoFirma({ link: url, scadenza: scadenzaCorrente, firma: firmaAz })
+      : testoKit({ link: url, scadenza: scadenzaCorrente, firma: firmaAz });
     setEmailModal({
       to: client.contact_email || '',
       subject: `Check-up ES Work — ${client.name}`,
@@ -1030,13 +1027,6 @@ ${FIRMA}`,
                   {[['valutazione', 'in valutazione'], ['avvio', 'programma attivato']].map(([v, l]) => (
                     <button key={v} onClick={() => setMomentoKit(v === momentoDedotto ? null : v)}
                       className={`px-2 py-1 rounded-lg font-semibold ${momentoEffettivo === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
-                  ))}
-                </div>
-                <div className="flex items-center gap-1 text-[11px] text-gray-500">
-                  <span className="font-semibold uppercase tracking-wide">Tono:</span>
-                  {[['B', 'istituzionale'], ['A', 'diretto']].map(([v, l]) => (
-                    <button key={v} onClick={() => setTonoKit(v)}
-                      className={`px-2 py-1 rounded-lg font-semibold ${tonoKit === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
                   ))}
                 </div>
                 <button

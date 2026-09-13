@@ -141,14 +141,17 @@ function ContactField({ name, label, type, placeholder, required, value, error, 
 function ContactForm({ onSubmit, sedi = [] }) {
   // Una sola sede (o nessuna dichiarata): il campo non si chiede — si compila da sé
   // con quella dichiarata dall'azienda, che è l'unica possibile.
-  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', location: sedi.length === 1 ? sedi[0] : '' });
+  // Un campo solo: si scrive «Mario Rossi» come viene. Alla consegna si divide —
+  // prima parola nome, il resto cognome — perché il saluto dell'area personale usa
+  // il nome («Ciao Mario») e la cartella vuole i due campi separati.
+  const [form, setForm] = useState({ nome_completo: '', email: '', phone: '', location: sedi.length === 1 ? sedi[0] : '' });
   const [errors, setErrors] = useState({});
   const [altraSede, setAltraSede] = useState(false);
 
   function validate() {
     const e = {};
-    if (!form.first_name.trim() || form.first_name.trim().length < 2) e.first_name = 'Inserisci il nome (min. 2 caratteri)';
-    if (!form.last_name.trim() || form.last_name.trim().length < 2) e.last_name = 'Inserisci il cognome (min. 2 caratteri)';
+    const parti = form.nome_completo.trim().split(/\s+/).filter(Boolean);
+    if (parti.length < 2 || parti.join('').length < 4) e.nome_completo = 'Scrivi nome e cognome (es. Mario Rossi)';
     if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Email non valida';
     if (!form.phone.trim()) {
       e.phone = 'Obbligatorio';
@@ -163,7 +166,14 @@ function ContactForm({ onSubmit, sedi = [] }) {
     ev.preventDefault();
     const e = validate();
     if (Object.keys(e).length > 0) { setErrors(e); return; }
-    onSubmit(form);
+    const parti = form.nome_completo.trim().split(/\s+/).filter(Boolean);
+    onSubmit({
+      first_name: parti[0],
+      last_name: parti.slice(1).join(' '),
+      email: form.email,
+      phone: form.phone,
+      location: form.location,
+    });
   }
 
   function handleChange(name) {
@@ -183,10 +193,7 @@ function ContactForm({ onSubmit, sedi = [] }) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <ContactField name="first_name" label="Nome" placeholder="Mario" required value={form.first_name} error={errors.first_name} onChange={handleChange('first_name')} />
-            <ContactField name="last_name" label="Cognome" placeholder="Rossi" required value={form.last_name} error={errors.last_name} onChange={handleChange('last_name')} />
-          </div>
+          <ContactField name="nome_completo" label="Nome e cognome" placeholder="Mario Rossi" required value={form.nome_completo} error={errors.nome_completo} onChange={handleChange('nome_completo')} />
           <ContactField name="email" label="Email" type="email" placeholder="mario.rossi@email.com" required value={form.email} error={errors.email} onChange={handleChange('email')} />
           <ContactField name="phone" label="Telefono" type="tel" placeholder="3331234567" required value={form.phone} error={errors.phone} onChange={handleChange('phone')} />
           {/* Sede di lavoro: a testo libero arrivavano venti scritture della stessa sede e

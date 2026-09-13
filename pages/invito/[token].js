@@ -51,24 +51,25 @@ function Welcome({ onContinue }) {
 }
 
 function ContactForm({ onSubmit }) {
-  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', location: '' });
+  // Un campo solo per nome e cognome, come nel check-up: si divide alla consegna
+  // (prima parola nome, il resto cognome).
+  const [form, setForm] = useState({ nome_completo: '', email: '', phone: '', location: '' });
   const [errors, setErrors] = useState({});
   const set = (k) => (e) => { setForm(p => ({ ...p, [k]: e.target.value })); setErrors(p => ({ ...p, [k]: '' })); };
   function submit(e) {
     e.preventDefault();
     const er = {};
-    if (form.first_name.trim().length < 2) er.first_name = 'Inserisci il nome (min. 2 caratteri)';
-    if (form.last_name.trim().length < 2) er.last_name = 'Inserisci il cognome (min. 2 caratteri)';
+    const parti = form.nome_completo.trim().split(/\s+/).filter(Boolean);
+    if (parti.length < 2 || parti.join('').length < 4) er.nome_completo = 'Scrivi nome e cognome (es. Mario Rossi)';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) er.email = 'Email non valida';
     if (!/^(\+39)?\s?[0-9]{9,10}$/.test(form.phone.replace(/\s/g, ''))) er.phone = 'Telefono non valido';
     if (!form.location.trim()) er.location = 'Obbligatorio';
     if (Object.keys(er).length) { setErrors(er); return; }
-    onSubmit(form);
+    onSubmit({ first_name: parti[0], last_name: parti.slice(1).join(' '), email: form.email, phone: form.phone, location: form.location });
   }
   // Campi inline (NON un componente ricreato ogni render → niente remount degli input).
   const FIELDS = [
-    ['first_name', 'Nome', 'text', 'Mario'],
-    ['last_name', 'Cognome', 'text', 'Rossi'],
+    ['nome_completo', 'Nome e cognome', 'text', 'Mario Rossi'],
     ['email', 'Email', 'email', 'mario.rossi@email.com'],
     ['phone', 'Telefono', 'tel', '3331234567'],
     ['location', 'Sede di lavoro', 'text', 'Es. Milano'],

@@ -443,15 +443,24 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
 
         {modo === 'completo' && step === 2 && (
           <div className="space-y-5">
-            <Field label="Sedi operative" hint="Numero dipendenti per sede (il totale alimenta tier e calcolo)">
+            <Field label="Sedi operative" hint="Nome della sede e quanti dipendenti ci lavorano"
+              nota="Il nome che scrivi qui è quello che i dipendenti vedranno nel menu «Sede di lavoro» quando compilano il check-up: scrivilo come lo chiamano loro (es. «Milano — Stabilimento Nord»), non «Sede 2». Il totale dei dipendenti alimenta fascia di prezzo e calcolo.">
+              <div className="flex gap-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide px-1">
+                <span className="flex-1">Nome della sede</span><span className="w-24">Dipendenti</span>{sedi.length > 1 && <span className="w-5" />}
+              </div>
               <div className="space-y-2">{sedi.map((s, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <input value={s.nome} onChange={e => setSede(i, 'nome', e.target.value)} placeholder={`Sede ${i + 1}`} className={inputCls + ' flex-1'} />
+                  <input value={s.nome} onChange={e => setSede(i, 'nome', e.target.value)} placeholder={`Nome della sede ${i + 1}`} className={inputCls + ' flex-1'} />
                   <input type="number" value={s.employees} onChange={e => setSede(i, 'employees', e.target.value)} placeholder="dip." className={inputCls + ' w-24'} />
                   {sedi.length > 1 && <button onClick={() => setSedi(sedi.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 px-1 text-lg">×</button>}
                 </div>
               ))}</div>
               <button onClick={() => setSedi([...sedi, { nome: '', employees: 0 }])} className="mt-2 text-xs font-semibold text-green-700">+ Aggiungi sede</button>
+              {sedi.length > 1 && sedi.some(s => !String(s.nome || '').trim()) && (
+                <div className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                  Una sede è senza nome: nel check-up il dipendente la vedrà come «Sede {sedi.findIndex(s => !String(s.nome || '').trim()) + 1}». Scrivi il nome che usano loro.
+                </div>
+              )}
               <div className="text-xs text-gray-400 mt-1">Totale dipendenti: <strong className="text-gray-600">{n}</strong> · gruppi formazione: <strong className="text-gray-600">{groups}</strong></div>
             </Field>
             <div className="grid grid-cols-2 gap-3">

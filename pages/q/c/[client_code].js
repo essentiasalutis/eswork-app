@@ -525,7 +525,12 @@ export async function getServerSideProps({ params }) {
       const { getFirstMeeting } = await import('../../../lib/store');
       const fm = await getFirstMeeting(client.id);
       const elenco = (fm && fm.data && fm.data.step2 && fm.data.step2.sedi) || [];
-      sedi = elenco.map(x => (x && typeof x.nome === 'string' ? x.nome.trim() : '')).filter(Boolean);
+      // Una sede senza nome NON sparisce dal menu (sparirebbe in silenzio e il
+      // dipendente non troverebbe la sua): prende il nome posizionale «Sede N».
+      sedi = elenco.map((x, i) => {
+        const nome = x && typeof x.nome === 'string' ? x.nome.trim() : '';
+        return nome || `Sede ${i + 1}`;
+      });
       sedi = [...new Set(sedi)];
     } catch (_) { sedi = []; }
     return { props: { client: { id: client.id, name: client.name, share_code: client_code, tier }, checkup, sedi } };

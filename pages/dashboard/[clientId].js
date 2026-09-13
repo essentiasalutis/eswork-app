@@ -470,7 +470,7 @@ export default function ClientPage({ dipInForza = 0, client: initialClient, asse
       subject: `Check-up ES Work — ${client.name}`,
       body: `Gentile ${referente},
 
-come concordato, ecco il testo già pronto da inoltrare ai dipendenti per il check-up: non dovete scrivere nulla.
+come concordato, ecco a lei una bozza di testo da inoltrare ai dipendenti per il check-up: può usarla così com'è o adattarla alle vostre abitudini.
 
 ${bloccoKit(kit)}
 

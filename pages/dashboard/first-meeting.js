@@ -445,14 +445,19 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
           <div className="space-y-5">
             <Field label="Sedi operative" hint="Nome della sede e quanti dipendenti ci lavorano"
               nota="Il nome che scrivi qui è quello che i dipendenti vedranno nel menu «Sede di lavoro» quando compilano il check-up: scrivilo come lo chiamano loro (es. «Milano — Stabilimento Nord»), non «Sede 2». Il totale dei dipendenti alimenta fascia di prezzo e calcolo.">
-              <div className="flex gap-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide px-1">
-                <span className="flex-1">Nome della sede</span><span className="w-24">Dipendenti</span>{sedi.length > 1 && <span className="w-5" />}
+              {/* Griglia a colonne fisse: prima il NOME (largo), poi i dipendenti. Con flex
+                  la larghezza del campo numerico vinceva e il nome si schiacciava a zero. */}
+              <div className="grid items-center gap-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wide px-1"
+                style={{ gridTemplateColumns: `1fr 7rem ${sedi.length > 1 ? '1.5rem' : '0rem'}` }}>
+                <span>Nome della sede</span><span>Dipendenti</span><span />
               </div>
               <div className="space-y-2">{sedi.map((s, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input value={s.nome} onChange={e => setSede(i, 'nome', e.target.value)} placeholder={`Nome della sede ${i + 1}`} className={inputCls + ' flex-1'} />
-                  <input type="number" value={s.employees} onChange={e => setSede(i, 'employees', e.target.value)} placeholder="dip." className={inputCls + ' w-24'} />
-                  {sedi.length > 1 && <button onClick={() => setSedi(sedi.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500 px-1 text-lg">×</button>}
+                <div key={i} className="grid items-center gap-2"
+                  style={{ gridTemplateColumns: `1fr 7rem ${sedi.length > 1 ? '1.5rem' : '0rem'}` }}>
+                  <input value={s.nome} onChange={e => setSede(i, 'nome', e.target.value)}
+                    placeholder={i === 0 ? 'Es. Torino — via Salbertrand 9' : 'Es. Milano — Stabilimento Nord'} className={inputCls} />
+                  <input type="number" value={s.employees} onChange={e => setSede(i, 'employees', e.target.value)} placeholder="dip." className={inputCls} />
+                  {sedi.length > 1 && <button onClick={() => setSedi(sedi.filter((_, j) => j !== i))} title="Togli questa sede" className="text-gray-400 hover:text-red-500 text-lg leading-none">×</button>}
                 </div>
               ))}</div>
               <button onClick={() => setSedi([...sedi, { nome: '', employees: 0 }])} className="mt-2 text-xs font-semibold text-green-700">+ Aggiungi sede</button>

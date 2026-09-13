@@ -183,8 +183,10 @@ function ContactForm({ onSubmit, sedi = [] }) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <ContactField name="first_name" label="Nome" placeholder="Mario" required value={form.first_name} error={errors.first_name} onChange={handleChange('first_name')} />
-          <ContactField name="last_name" label="Cognome" placeholder="Rossi" required value={form.last_name} error={errors.last_name} onChange={handleChange('last_name')} />
+          <div className="grid grid-cols-2 gap-3">
+            <ContactField name="first_name" label="Nome" placeholder="Mario" required value={form.first_name} error={errors.first_name} onChange={handleChange('first_name')} />
+            <ContactField name="last_name" label="Cognome" placeholder="Rossi" required value={form.last_name} error={errors.last_name} onChange={handleChange('last_name')} />
+          </div>
           <ContactField name="email" label="Email" type="email" placeholder="mario.rossi@email.com" required value={form.email} error={errors.email} onChange={handleChange('email')} />
           <ContactField name="phone" label="Telefono" type="tel" placeholder="3331234567" required value={form.phone} error={errors.phone} onChange={handleChange('phone')} />
           {/* Sede di lavoro: a testo libero arrivavano venti scritture della stessa sede e

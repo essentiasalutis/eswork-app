@@ -26,12 +26,12 @@ export const config = { maxDuration: 60 };
 // Stratificazione L1/L2/L3 con soppressione k-anon (gruppi < k → "n.d.").
 function stratLines(l1, l2, l3, total) {
   if (tooSmall(total)) {
-    return `- Popolazione totale < ${K_ANON}: distribuzione per livello NON pubblicabile (tutela anonimato, k-anonymity)`;
+    return `- Popolazione totale < ${K_ANON}: distribuzione per livello NON pubblicabile (tutela della riservatezza, k-anonymity)`;
   }
   const P = Object.fromEntries(kAnonPartition([
     { key: 'l1', count: l1 }, { key: 'l2', count: l2 }, { key: 'l3', count: l3 },
   ], total).map(c => [c.key, c]));
-  const cell = c => c.suppressed ? `n.d. (gruppo < ${K_ANON}, soppresso per anonimato)` : `${c.count} (${c.pct}%)`;
+  const cell = c => c.suppressed ? `n.d. (gruppo < ${K_ANON}, soppresso per riservatezza)` : `${c.count} (${c.pct}%)`;
   // I nomi vengono dalla fonte unica (lib/livelli): se l'AI li riceve sfalsati li
   // scrive nel report, qualunque cosa dica l'interfaccia. Fino al 13/9 qui passavano
   // «Livello 2 (monitoraggio)» e «Livello 3 (prevenzione)».
@@ -159,7 +159,7 @@ DEFINIZIONE DEI LIVELLI (tassativa — NON invertirla, NON reinterpretarla):
 - Livello 3 = nessun dolore in atto. Formazione collettiva su postura ed ergonomia.
 NON esiste una scala "rischio basso/medio/alto": non usarla e non invertire l'ordine. Se citi una priorità, la priorità clinica è il Livello 1.
 
-NOTA PRIVACY: dove un gruppo è "n.d." è stato soppresso per anonimato (k-anonymity). NON dedurre, stimare o ricostruire i valori soppressi. ATTENZIONE: un gruppo può risultare soppresso ANCHE se conta ${K_ANON} persone o più — è la soppressione secondaria, che impedisce di ricavarlo per differenza dagli altri. Quindi NON affermare che i gruppi soppressi siano "inferiori a ${K_ANON}": di' solo che non sono pubblicabili per tutela dell'anonimato.
+NOTA PRIVACY: dove un gruppo è "n.d." è stato soppresso per riservatezza (k-anonymity). NON dedurre, stimare o ricostruire i valori soppressi. ATTENZIONE: un gruppo può risultare soppresso ANCHE se conta ${K_ANON} persone o più — è la soppressione secondaria, che impedisce di ricavarlo per differenza dagli altri. Quindi NON affermare che i gruppi soppressi siano "inferiori a ${K_ANON}": di' solo che non sono pubblicabili per tutela della riservatezza. I dati dei dipendenti si dicono RISERVATI, mai «anonimi»: il dato individuale esiste ed è protetto.
 ${clinicoBlock}
 CHECK-UP: ${stratTotal > 0 ? `${stratTotal} questionari raccolti` : 'nessun questionario ancora raccolto'}
 ${isPacchetto ? '' : quoteBlock}
@@ -281,10 +281,10 @@ function generateFallbackReport(client, l1, l2, l3, total, sessioni, settore, qu
     { key: 'l1', count: l1 }, { key: 'l2', count: l2 }, { key: 'l3', count: l3 },
   ], total).map(c => [c.key, c]));
   const dip = c => c.suppressed ? `n.d. (gruppo < ${K_ANON})` : `${c.count} dipendenti (${c.pct}%)`;
-  const pctL1txt = small || P.l1.suppressed ? 'non pubblicata per anonimato' : `${P.l1.pct}%`;
+  const pctL1txt = small || P.l1.suppressed ? 'non pubblicata per riservatezza' : `${P.l1.pct}%`;
   const riskTxt = small || P.l1.suppressed ? 'non determinabile nel rispetto della riservatezza' : (P.l1.pct > 20 ? 'elevato' : P.l1.pct > 10 ? 'moderato' : 'contenuto');
   const mappa = small
-    ? `La popolazione valutata è inferiore alla soglia minima di aggregazione (${K_ANON}): la distribuzione per livello non viene pubblicata a tutela dell'anonimato dei dipendenti (k-anonymity).`
+    ? `La popolazione valutata è inferiore alla soglia minima di aggregazione (${K_ANON}): la distribuzione per livello non viene pubblicata a tutela della riservatezza dei dipendenti (k-anonymity).`
     : isPacchetto
       // Pacchetto: FOTOGRAFIA NEUTRA del questionario — niente "richiedono
       // protocollo", niente riferimenti a mini-check/prese in carico (non incluse).

@@ -207,7 +207,7 @@ export default requireAuth(async function handler(req, res) {
 
   const prompt = isAnnual ? `Sei un consulente clinico ES Work. Genera il REPORT ANNUALE (12 mesi) per ${client.name}, da consegnare alla direzione e utilizzabile per il bilancio di sostenibilità.
 
-DATI ANNO 1 (i valori "n.d." sono soppressi per anonimato/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
+DATI ANNO 1 (i valori "n.d." sono soppressi per riservatezza/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
 - Prevalenza osservata all'intake (${t12.t0N} risposte T0): ${t12.t0Strat}
 - Sessioni completate/pianificate: ${completed}/${planned}
 - Check-up a 12 mesi completati: ${t12.count}
@@ -238,7 +238,7 @@ LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
 Tono: clinico, orientato ai risultati e alla direzione. Italiano. Max 650 parole.` : `Sei un consulente clinico ES Work. Genera un Report Intermedio professionale a ${checkLabel} per il cliente ${client.name}.
 
-DATI CLINICI (i valori "n.d." sono soppressi per anonimato/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
+DATI CLINICI (i valori "n.d." sono soppressi per riservatezza/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
 - Pazienti L1 (${nomeLivello('level1').toLowerCase()}): ${l1d}
 - Pazienti L2 (${nomeLivello('level2').toLowerCase()}): ${l2d}
 - Pazienti L3 (${nomeLivello('level3').toLowerCase()}): ${l3d}
@@ -247,7 +247,7 @@ DATI CLINICI (i valori "n.d." sono soppressi per anonimato/k-anonymity, < ${K_AN
 - Settore: ${client.sector === 1 ? 'Manifattura' : 'Servizi'}
 
 MINI-CHECK ${checkpoint.toUpperCase()} (questionari compilati dai dipendenti a ${checkLabel}):
-${mc.smallGroup ? `- Spaccato mini-check non pubblicabile: meno di ${K_ANON} compilati (tutela anonimato).` : `- Compilati: ${mc.count}
+${mc.smallGroup ? `- Spaccato mini-check non pubblicabile: meno di ${K_ANON} compilati (tutela della riservatezza).` : `- Compilati: ${mc.count}
 - NRS medio dichiarato: ${mc.avgNrs}
 ${mc.limitationsPct != null ? `- Con limitazioni funzionali: ${mc.limitationsPct}%` : ''}
 - Richiedono contatto: ${mc.wantsContact} (triage: ${mc.needsContact} da ricontattare)`}

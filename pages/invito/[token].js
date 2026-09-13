@@ -40,8 +40,8 @@ function Welcome({ onContinue }) {
           <div className="text-sm text-gray-500 mt-1">Registrazione al programma</div>
         </div>
         <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-3">
-          <p className="text-sm text-gray-700 leading-relaxed"><strong>Benvenuto in ES Work</strong>, il programma di prevenzione e cura dell&apos;apparato muscolo-scheletrico.</p>
-          <p className="text-sm text-gray-600 leading-relaxed">Questo questionario raccoglie informazioni sugli eventuali disturbi fisici nelle varie zone del corpo. Si compila in circa 5 minuti.</p>
+          <p className="text-sm text-gray-700 leading-relaxed"><strong>Benvenuto in ES Work</strong>, il programma di prevenzione e trattamento dell&apos;apparato muscolo-scheletrico.</p>
+          <p className="text-sm text-gray-600 leading-relaxed">Questo check-up raccoglie informazioni sugli eventuali disturbi fisici nelle varie zone del corpo. Si compila in circa 5 minuti.</p>
           <p className="text-sm text-gray-600 leading-relaxed">I tuoi dati sono trattati in modo <strong>riservato</strong> da Essentia Salutis, nel rispetto del segreto professionale.</p>
           <button onClick={onContinue} className="w-full py-3.5 rounded-2xl bg-green-600 text-white font-bold mt-2">Inizia →</button>
         </div>
@@ -94,7 +94,7 @@ function ContactForm({ onSubmit }) {
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
             <p className="text-xs text-blue-700">🔒 I tuoi dati sono trattati da Essentia Salutis come titolare autonomo del trattamento, nel rispetto del segreto professionale.</p>
           </div>
-          <button type="submit" className="w-full py-4 rounded-2xl bg-green-600 text-white font-semibold text-base mt-2">Procedi al questionario →</button>
+          <button type="submit" className="w-full py-4 rounded-2xl bg-green-600 text-white font-semibold text-base mt-2">Procedi al check-up →</button>
         </form>
       </div>
     </div>
@@ -108,7 +108,7 @@ function Done({ careToken }) {
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col items-center justify-center px-6 text-center">
       <div className="text-2xl font-bold text-gray-900">ES <span className="text-green-600">Work</span></div>
       <h2 className="text-2xl font-bold text-gray-900 mb-3 mt-4">Grazie!</h2>
-      <p className="text-sm text-gray-600 max-w-md">Il tuo questionario è stato registrato. Qui sotto trovi il link alla tua area personale, dove seguirai il tuo percorso.</p>
+      <p className="text-sm text-gray-600 max-w-md">Il tuo check-up è stato registrato. Qui sotto trovi il link alla tua area personale, dove seguirai il tuo percorso.</p>
       {url && (
         <div className="mt-5 w-full max-w-md">
           <div className="flex items-center gap-2">

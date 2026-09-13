@@ -298,7 +298,7 @@ function ReportFooter() {
           </div>
         </div>
         <div className="text-right">
-          <div className="text-xs text-gray-400 italic mb-1">Piattaforma digitale ES Work · prevenzione e cura dell'apparato muscolo-scheletrico</div>
+          <div className="text-xs text-gray-400 italic mb-1">Piattaforma digitale ES Work · prevenzione e trattamento dell'apparato muscolo-scheletrico</div>
           <div className="text-xs text-gray-400">
             Documento riservato e confidenziale.<br/>
             Riproduzione vietata senza autorizzazione scritta.
@@ -331,7 +331,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         <div className="text-4xl mb-3">🔒</div>
         <div className="text-lg font-semibold text-gray-800 mb-1">Report aggregato non disponibile</div>
         <p className="text-sm text-gray-500 max-w-md mx-auto">
-          Le risposte raccolte sono meno di {K_ANON}. Per tutelare l&apos;anonimato dei dipendenti
+          Le risposte raccolte sono meno di {K_ANON}. Per tutelare la riservatezza dei dipendenti
           (k-anonymity), i risultati aziendali vengono mostrati solo con almeno {K_ANON} risposte.
         </p>
       </div>
@@ -419,7 +419,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         </div>
         <p className="text-sm text-gray-700 leading-relaxed">
           {anyLevelSuppressed
-            ? `Su ${n} risposte raccolte, la distribuzione di dettaglio per livello non è mostrata: uno o più gruppi contano meno di ${K_ANON} persone e vengono soppressi a tutela dell'anonimato (k-anonymity).`
+            ? `Su ${n} risposte raccolte, la distribuzione di dettaglio per livello non è mostrata: uno o più gruppi contano meno di ${K_ANON} persone e vengono soppressi a tutela della riservatezza (k-anonymity).`
             : generateSummaryText(nmq)}
         </p>
       </div>
@@ -503,7 +503,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
             <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-2">Suddivisione per tipologia di lavoro</div>
             <p className="text-xs text-gray-500">
               Il dettaglio per tipologia di lavoro non è pubblicabile: i sottogruppi sono sotto la soglia minima
-              di {K_ANON} persone prevista per la tutela dell&apos;anonimato. I dati complessivi riportati sopra restano validi.
+              di {K_ANON} persone prevista per la tutela della riservatezza. I dati complessivi riportati sopra restano validi.
             </p>
           </div>
         );
@@ -533,7 +533,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
                       <div className="text-xs text-gray-500 w-8 flex-shrink-0">{z.pct12}%</div>
                     </div>
                   )) : (
-                    <div className="text-xs text-gray-400 italic">Nessuna zona con valori pubblicabili: i conteggi per zona di questo gruppo sono sotto la soglia di anonimato.</div>
+                    <div className="text-xs text-gray-400 italic">Nessuna zona con valori pubblicabili: i conteggi per zona di questo gruppo sono sotto la soglia di riservatezza.</div>
                   )}
                   <div className="mt-2 pt-2 border-t border-gray-100 text-xs">
                     {livelliVisibili ? (
@@ -542,7 +542,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
                         {!RL.l2.suppressed && <><span className="text-yellow-600 font-semibold ml-2">L2: {RL.l2.count}</span><span className="text-gray-400 ml-1">({RL.l2.pct}%)</span></>}
                       </>
                     ) : (
-                      <span className="text-gray-400 italic">Distribuzione per livello non pubblicabile a questo dettaglio (tutela anonimato).</span>
+                      <span className="text-gray-400 italic">Distribuzione per livello non pubblicabile a questo dettaglio (tutela della riservatezza).</span>
                     )}
                   </div>
                 </div>

@@ -956,7 +956,7 @@ ${FIRMA}`,
           {notaCandidati && (
             <div className="text-xs text-gray-600 leading-relaxed bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
               <strong className="text-gray-800">Candidati Livello 1.</strong> Chi è uscito dal check-up con un disturbo che limita l&apos;attività:
-              non è ancora un paziente in cura, è in attesa della <strong>pre-validazione</strong> — il colloquio di 15 minuti con l&apos;osteopata
+              non è ancora un paziente in trattamento, è in attesa della <strong>pre-validazione</strong> — il colloquio di 15 minuti con l&apos;osteopata
               che conferma se il percorso di trattamento serve davvero. Da lì l&apos;osteopata prende le persone per la videochiamata; se la
               pre-validazione non conferma il Livello 1, il percorso non parte.
               <button onClick={() => setNotaCandidati(false)} className="ml-2 text-gray-400 underline">chiudi</button>

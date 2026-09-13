@@ -18,14 +18,11 @@ import { NmqQuestionnaire } from '../../../components/NmqQuestionnaire';
 
 // ─── Logo ES Work ─────────────────────────────────────────────────────────────
 
+// Senza cornice né fondo bianco: il marchio appoggia sulla pagina (Enrico, 13/9).
 function ESLogo({ size = 56 }) {
   return (
-    <div
-      className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm flex-shrink-0 bg-white"
-      style={{ width: size, height: size }}
-    >
-      <img src="/logo-es.png" alt="Essentia Salutis" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} />
-    </div>
+    <img src="/logo-es.png" alt="Essentia Salutis"
+      style={{ width: size, height: size, objectFit: 'contain', flexShrink: 0 }} />
   );
 }
 
@@ -43,7 +40,7 @@ function WelcomeScreen({ clientName, chiudeFrase, firmato, onIdentified }) {
         {clientName && (
           <div className={`text-center ${chiudeFrase ? 'mb-3' : 'mb-6'}`}>
             <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">per l&apos;azienda</div>
-            <div className="text-xl font-bold text-gray-800">{clientName}</div>
+            <div className="text-4xl font-extrabold" style={{ color: '#1e3a5f' }}>{clientName}</div>
           </div>
         )}
         {chiudeFrase && (

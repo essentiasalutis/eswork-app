@@ -317,6 +317,7 @@ export default function ClientPage({ client: initialClient, assessments: initial
   // Rigenerando il report NON si eredita nulla: la rigenerazione crea un documento
   // nuovo, e un testo nuovo non è quello che è stato validato.
   const [validando, setValidando] = useState(false);
+  const [notaCandidati, setNotaCandidati] = useState(false);
   async function validaReport(azione) {
     if (!reportModal?.id) { alert('Riapri il report dall\'elenco per validarlo.'); return; }
     if (azione === 'revoca' && !confirm('Togliere la validazione? Il PDF viene rigenerato senza la riga.')) return;
@@ -859,12 +860,24 @@ ${FIRMA}`,
         <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">🩺 Check-up</h2>
-            <Link href={`/dashboard/${client.id}/waitlist`}
-              title="Chi è uscito dal check-up come candidato Livello 1 e aspetta la pre-validazione con l'osteopata"
-              className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-100">
-              📋 Candidati Livello 1
-            </Link>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setNotaCandidati(v => !v)} aria-label="Cosa sono i candidati Livello 1"
+                className="w-5 h-5 rounded-full border border-gray-300 text-[11px] font-bold text-gray-400 hover:text-gray-700 hover:border-gray-500">i</button>
+              <Link href={`/dashboard/${client.id}/waitlist`}
+                className="text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-100">
+                📋 Candidati Livello 1
+              </Link>
+            </div>
           </div>
+          {notaCandidati && (
+            <div className="text-xs text-gray-600 leading-relaxed bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
+              <strong className="text-gray-800">Candidati Livello 1.</strong> Chi è uscito dal check-up con un disturbo che limita l&apos;attività:
+              non è ancora un paziente in cura, è in attesa della <strong>pre-validazione</strong> — il colloquio di 15 minuti con l&apos;osteopata
+              che conferma se il percorso di trattamento serve davvero. Da lì l&apos;osteopata prende le persone per la videochiamata; se la
+              pre-validazione non conferma il Livello 1, il percorso non parte.
+              <button onClick={() => setNotaCandidati(false)} className="ml-2 text-gray-400 underline">chiudi</button>
+            </div>
+          )}
 
           {/* 🔗 Link assessment generico (nuovo modello auto-dichiarazione) */}
           {client.assessment_share_code && (() => {
@@ -913,10 +926,6 @@ ${FIRMA}`,
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                 Check-up iniziale
-                <span className={`ml-2 normal-case tracking-normal font-medium ${checkupAperti.aziende.length >= checkupAperti.limite ? 'text-red-600' : 'text-gray-400'}`}
-                  title={`Quante aziende, in tutto, hanno un check-up aperto che non si è ancora chiuso con una firma. Il check-up è a nostro carico: oltre ${checkupAperti.limite} conviene fermarsi.\nOggi: ${checkupAperti.aziende.map(x => x.name).join(', ') || 'nessuna'}`}>
-                  · {checkupAperti.aziende.length} di {checkupAperti.limite} check-up aperti non ancora firmati
-                </span>
               </div>
               <button
                 onClick={emailGenericLink}

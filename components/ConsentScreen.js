@@ -19,9 +19,10 @@ export function ConsentScreen({ onComplete }) {
         <div className="mb-5">
           <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Fase 1 di 2</div>
           <h2 className="text-xl font-bold text-gray-900">Informativa e consensi</h2>
+          <p className="text-xs text-gray-500 mt-1">Entrambe le caselle sono obbligatorie per proseguire.</p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-4 max-h-64 overflow-y-auto">
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-4 max-h-80 overflow-y-auto">
           {INFORMATIVA_QUESTIONARIO.sezioni.map(s => (
             <div key={s.id} className="mb-4">
               <div className="font-semibold text-gray-800 text-sm mb-1">{s.titolo}</div>
@@ -39,7 +40,7 @@ export function ConsentScreen({ onComplete }) {
               className="mt-0.5 w-5 h-5 accent-green-600 flex-shrink-0"
             />
             <span className="text-sm text-gray-700 leading-relaxed">
-              Ho letto l'informativa sul trattamento dei dati personali e presto il consenso al trattamento dei dati forniti.
+              {INFORMATIVA_QUESTIONARIO.consensi.privacy}
             </span>
           </label>
 
@@ -51,7 +52,7 @@ export function ConsentScreen({ onComplete }) {
               className="mt-0.5 w-5 h-5 accent-green-600 flex-shrink-0"
             />
             <span className="text-sm text-gray-700 leading-relaxed">
-              Presto il consenso al trattamento dei dati relativi alla salute (art. 9 GDPR) per le finalità di prevenzione del programma ES Work.
+              {INFORMATIVA_QUESTIONARIO.consensi.salute}
             </span>
           </label>
         </div>

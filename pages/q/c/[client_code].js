@@ -138,9 +138,12 @@ function ContactField({ name, label, type, placeholder, required, value, error, 
 
 // ─── Fase 3: Raccolta dati contatto ──────────────────────────────────────────
 
-function ContactForm({ onSubmit }) {
-  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', location: '' });
+function ContactForm({ onSubmit, sedi = [] }) {
+  // Una sola sede (o nessuna dichiarata): il campo non si chiede — si compila da sé
+  // con quella dichiarata dall'azienda, che è l'unica possibile.
+  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', location: sedi.length === 1 ? sedi[0] : '' });
   const [errors, setErrors] = useState({});
+  const [altraSede, setAltraSede] = useState(false);
 
   function validate() {
     const e = {};
@@ -152,7 +155,7 @@ function ContactForm({ onSubmit }) {
     } else if (!/^(\+39)?\s?[0-9]{9,10}$/.test(form.phone.replace(/\s/g, ''))) {
       e.phone = 'Formato non valido (es. 3331234567)';
     }
-    if (!form.location.trim()) e.location = 'Obbligatorio';
+    if (sedi.length > 1 && !form.location.trim()) e.location = 'Obbligatorio';
     return e;
   }
 
@@ -184,11 +187,45 @@ function ContactForm({ onSubmit }) {
           <ContactField name="last_name" label="Cognome" placeholder="Rossi" required value={form.last_name} error={errors.last_name} onChange={handleChange('last_name')} />
           <ContactField name="email" label="Email" type="email" placeholder="mario.rossi@email.com" required value={form.email} error={errors.email} onChange={handleChange('email')} />
           <ContactField name="phone" label="Telefono" type="tel" placeholder="3331234567" required value={form.phone} error={errors.phone} onChange={handleChange('phone')} />
-          <ContactField name="location" label="Sede di lavoro" placeholder="Es. Milano, Stabilimento Nord…" required value={form.location} error={errors.location} onChange={handleChange('location')} />
+          {/* Sede di lavoro: a testo libero arrivavano venti scritture della stessa sede e
+              l'aggregato per sede diventava inutile. Ora è una scelta fra quelle dichiarate
+              dall'azienda al colloquio; «Altra sede» resta per i casi non previsti.
+              Una sola sede → campo nascosto e compilato in automatico. */}
+          {sedi.length === 1 && (
+            <p className="text-xs text-gray-500">Sede di lavoro: <strong className="text-gray-700">{sedi[0]}</strong></p>
+          )}
+          {sedi.length > 1 && (
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Sede di lavoro</label>
+              <select
+                value={altraSede ? '__altra__' : form.location}
+                onChange={e => {
+                  const v = e.target.value;
+                  if (v === '__altra__') { setAltraSede(true); handleChange('location')({ target: { value: '' } }); }
+                  else { setAltraSede(false); handleChange('location')({ target: { value: v } }); }
+                }}
+                className={`w-full px-4 py-3 rounded-xl border text-base bg-white ${errors.location ? 'border-red-400' : 'border-gray-300'}`}
+              >
+                <option value="">Seleziona…</option>
+                {sedi.map(nome => <option key={nome} value={nome}>{nome}</option>)}
+                <option value="__altra__">Altra sede…</option>
+              </select>
+              {altraSede && (
+                <input
+                  autoFocus
+                  value={form.location}
+                  onChange={handleChange('location')}
+                  placeholder="Scrivi la tua sede"
+                  className={`w-full mt-2 px-4 py-3 rounded-xl border text-base ${errors.location ? 'border-red-400' : 'border-gray-300'}`}
+                />
+              )}
+              {errors.location && <p className="text-xs text-red-500 mt-1">{errors.location}</p>}
+            </div>
+          )}
 
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
             <p className="text-xs text-blue-700">
-              🔒 I tuoi dati sono trattati da Essentia Salutis come titolare autonomo del trattamento, nel rispetto del segreto professionale. L'azienda non ha accesso ai tuoi dati personali.
+              🔒 I tuoi dati di contatto servono al professionista osteopata per contattarti e prenderti in carico. Sono trattati da Essentia Salutis come titolare autonomo, nel rispetto del segreto professionale: la tua azienda non vi ha accesso.
             </p>
           </div>
 
@@ -196,7 +233,7 @@ function ContactForm({ onSubmit }) {
             type="submit"
             className="w-full py-4 rounded-2xl bg-green-600 text-white font-semibold text-base mt-2"
           >
-            Procedi al questionario →
+            Procedi al check-up →
           </button>
         </form>
       </div>
@@ -298,7 +335,7 @@ const PHASES = {
   DONE: 'done',
 };
 
-export default function SelfDeclarePage({ client, error: serverError, checkup }) {
+export default function SelfDeclarePage({ client, error: serverError, checkup, sedi = [] }) {
   const [phase, setPhase] = useState(PHASES.WELCOME);
   const [wantsContact, setWantsContact] = useState(true);
   const [contactData, setContactData] = useState(null);
@@ -424,6 +461,7 @@ export default function SelfDeclarePage({ client, error: serverError, checkup })
 
       {phase === PHASES.CONTACT && (
         <ContactForm
+          sedi={sedi}
           onSubmit={data => {
             setContactData(data);
             setWantsContact(true);
@@ -480,7 +518,17 @@ export async function getServerSideProps({ params }) {
       chiusoFrase: st.stato === 'chiuso' && (st.chiusoAlle || st.chiudeIl)
         ? ilGiorno(st.chiusoAlle ? oggiRoma(new Date(st.chiusoAlle)) : st.chiudeIl) : null,  // "l'11 settembre"
     } : null;
-    return { props: { client: { id: client.id, name: client.name, share_code: client_code, tier }, checkup } };
+    // Sedi dichiarate dall'azienda al colloquio: SOLO i nomi, per il menu a tendina
+    // della sede di lavoro. A testo libero arrivavano venti scritture della stessa sede.
+    let sedi = [];
+    try {
+      const { getFirstMeeting } = await import('../../../lib/store');
+      const fm = await getFirstMeeting(client.id);
+      const elenco = (fm && fm.data && fm.data.step2 && fm.data.step2.sedi) || [];
+      sedi = elenco.map(x => (x && typeof x.nome === 'string' ? x.nome.trim() : '')).filter(Boolean);
+      sedi = [...new Set(sedi)];
+    } catch (_) { sedi = []; }
+    return { props: { client: { id: client.id, name: client.name, share_code: client_code, tier }, checkup, sedi } };
   } catch (e) {
     return { props: { client: null, error: 'Errore interno: ' + e.message } };
   }

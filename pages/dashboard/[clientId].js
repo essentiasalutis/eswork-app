@@ -12,15 +12,9 @@ import ReportView from '../../components/ReportView';
 import ReportDoc, { reportPrintHtml } from '../../components/ReportDoc';
 import { CONFIG } from '../../lib/config';
 import NavMenu from '../../components/NavMenu';
-import { tierFromEmployees } from '../../lib/pricing/tier';
 import { nomeLivello } from '../../lib/livelli';
 
-function getTierFromEmployees(employees) {
-  return tierFromEmployees(employees); // fonte unica: lib/pricing/tier.js
-}
 
-const TIER_LABELS = { core: 'Core', plus: 'Plus', enterprise: 'Enterprise' };
-const TIER_COLORS = { core: '#6b7280', plus: '#2563eb', enterprise: '#7c3aed' };
 
 // ─── Email Modal ──────────────────────────────────────────────────────────────
 
@@ -263,7 +257,6 @@ export default function ClientPage({ dipInForza = 0, client: initialClient, asse
   );
   const [savingContracted, setSavingContracted] = useState(false);
 
-  const tier = client.tier || getTierFromEmployees(client.employees);
 
   async function generateReport(type) {
     setGeneratingReport(type);
@@ -782,11 +775,11 @@ ${FIRMA}`,
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-gray-900 truncate">{client.name}</div>
             <div className="text-xs text-gray-500 flex items-center gap-2">
+              {/* Niente badge del tier: i nomi Core/Plus/Enterprise non servono più a
+                  niente (non cambiano né prezzo né erogazione) e in testa alla scheda
+                  erano solo una parola in più da decifrare. Il tier resta nel dato,
+                  dove serve ancora a Finance. */}
               <span>{client.employees} dip. · {client.sector === 1 ? 'Manifattura' : 'Ufficio/IT'}</span>
-              <span className="text-xs font-semibold px-1.5 py-0.5 rounded"
-                style={{ background: TIER_COLORS[tier] + '18', color: TIER_COLORS[tier] }}>
-                {TIER_LABELS[tier]}
-              </span>
               {client.binario && <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-gray-900 text-white">Binario {client.binario}</span>}
             </div>
           </div>

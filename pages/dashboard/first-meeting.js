@@ -14,8 +14,6 @@ const DISTURBI = ['Mal di schiena', 'Cervicale', 'Spalle', 'Tunnel carpale', 'Do
 const FATTURATO = [['low', '< 2 M€'], ['mid', '2–10 M€'], ['high', '> 10 M€']];
 const HR = [['low', 'Bassa'], ['medium', 'Media'], ['high', 'Alta']];
 const FASCE = ['Mattina', 'Pausa pranzo', 'Pomeriggio', 'Prima/dopo turno'];
-const TIER_LABELS = { core: 'Core', plus: 'Plus', enterprise: 'Enterprise' };
-const TIER_COLORS = { core: '#6b7280', plus: '#2563eb', enterprise: '#7c3aed' };
 const fatturatoNum = b => (b === 'high' ? 11e6 : b === 'mid' ? 5e6 : 1e6);
 const inputCls = 'w-full px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500 bg-white';
 const seg = (val, cur, set, label) => (

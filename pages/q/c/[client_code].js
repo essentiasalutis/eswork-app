@@ -30,6 +30,7 @@ function ESLogo({ size = 56 }) {
 
 function WelcomeScreen({ clientName, chiudeFrase, firmato, onIdentified }) {
   const [informativa, setInformativa] = useState(false);
+  const [altroSotto, setAltroSotto] = useState(true);   // il testo è lungo: all'apertura c'è sempre altro sotto
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 max-w-lg mx-auto w-full">
@@ -93,7 +94,10 @@ function WelcomeScreen({ clientName, chiudeFrase, firmato, onIdentified }) {
               </div>
               <button onClick={() => setInformativa(false)} className="text-gray-400 text-xl leading-none px-1">✕</button>
             </div>
-            <div className="overflow-y-auto px-5 py-4">
+            <div className="overflow-y-auto px-5 py-4" onScroll={e => {
+              const el = e.currentTarget;
+              setAltroSotto(el.scrollHeight - el.scrollTop - el.clientHeight > 12);
+            }}>
               {INFORMATIVA_QUESTIONARIO.sezioni.map(sez => (
                 <div key={sez.id} className="mb-4">
                   <div className="font-semibold text-gray-800 text-sm mb-1">{sez.titolo}</div>
@@ -102,6 +106,7 @@ function WelcomeScreen({ clientName, chiudeFrase, firmato, onIdentified }) {
               ))}
             </div>
             <div className="px-5 py-3 border-t border-gray-100">
+              {altroSotto && <div className="text-[11px] text-gray-500 text-center mb-2">↓ scorri per leggere tutta l&apos;informativa</div>}
               <button onClick={() => setInformativa(false)} className="w-full py-3 rounded-xl bg-gray-900 text-white text-sm font-semibold">Chiudi</button>
             </div>
           </div>

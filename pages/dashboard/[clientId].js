@@ -103,7 +103,7 @@ function NrsBar({ value, max = 10 }) {
   );
 }
 
-export default function ClientPage({ client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist, generatedReports: initialReports, allProfessionals, monitoring, capacity: initialCapacity, checkupGiorni = 10, checkupAperti = { limite: 3, aziende: [] } }) {
+export default function ClientPage({ dipInForza = 0, client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist, generatedReports: initialReports, allProfessionals, monitoring, capacity: initialCapacity, checkupGiorni = 10, checkupAperti = { limite: 3, aziende: [] } }) {
   const router = useRouter();
   const [client, setClient] = useState(initialClient);
   const [assessments, setAssessments] = useState(initial);
@@ -246,11 +246,11 @@ export default function ClientPage({ client: initialClient, assessments: initial
   useEffect(() => {
     const aperto = (assessments || []).find(a => a.status === 'active');
     if (!aperto) return;
-    const t = setInterval(() => {
-      fetch(`/api/assessments/${aperto.id}?solo=conteggio`).then(r => (r.ok ? r.json() : null))
-        .then(j => { if (j && Number.isFinite(j.risposte)) setConteggiLive(prev => ({ ...prev, [aperto.id]: j.risposte })); })
-        .catch(() => {});
-    }, 60000);
+    const leggi = () => fetch(`/api/assessments/${aperto.id}?solo=conteggio`).then(r => (r.ok ? r.json() : null))
+      .then(j => { if (j && Number.isFinite(j.risposte)) setConteggiLive(prev => ({ ...prev, [aperto.id]: j.risposte })); })
+      .catch(() => {});
+    leggi();                       // subito: la riga non deve aprirsi con un numero vecchio
+    const t = setInterval(leggi, 60000);
     return () => clearInterval(t);
   }, [assessments]);
   const [copiedMonitor, setCopiedMonitor] = useState(null); // patient_id+fase copiato
@@ -654,6 +654,13 @@ ${FIRMA}`,
   const sortedAssessments = [...assessments].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   const reportDopo = a => generatedReports.some(r => r.report_type === 'activation' && r.created_at >= a.created_at);
   const idAperto = (sortedAssessments.find(a => a.status === 'active') || {}).id;
+  // Denominatore congruo: i dipendenti dichiarati qui sono il denominatore di tutto
+  // ciò che l'azienda legge (tasso di adesione, prezzo, gruppi di formazione). Se i
+  // questionari arrivati o i nomi in anagrafica lo superano, il dato è falso.
+  const nQuestionari = idAperto ? (conteggiLive[idAperto] ?? (responses[idAperto] || []).length) : 0;
+  const dichiarati = parseInt(client.employees) || 0;
+  const proponiEmployees = Math.max(nQuestionari, dipInForza || 0);
+  const daAnagrafica = (dipInForza || 0) > nQuestionari;
 
   return (
     <>
@@ -790,6 +797,12 @@ ${FIRMA}`,
               Colloquio
             </Link>
             <Link
+              href={`/dashboard/dipendenti/${client.id}`}
+              className="text-sm text-blue-700 border border-blue-200 bg-blue-50 px-3 py-2 rounded-xl whitespace-nowrap"
+            >
+              👥 Dipendenti
+            </Link>
+            <Link
               href={`/dashboard/formazione/${client.id}`}
               className="text-sm text-green-700 border border-green-200 bg-green-50 px-3 py-2 rounded-xl whitespace-nowrap"
             >
@@ -801,6 +814,25 @@ ${FIRMA}`,
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-6 space-y-6">
+        {/* ── Denominatore congruo ────────────────────────────────────────────────
+            L'allineamento è un CLIC, non automatico: il numero di dipendenti entra nel
+            prezzo (fasce, gruppi di formazione, ergonomia) e non deve cambiare da solo
+            sotto un'offerta già mandata. */}
+        {dichiarati > 0 && proponiEmployees > dichiarati && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-900 flex items-center justify-between gap-3 flex-wrap">
+            <span>
+              {daAnagrafica
+                ? <>In anagrafica risultano <strong>{dipInForza}</strong> dipendenti in forza, ma qui ne sono dichiarati <strong>{dichiarati}</strong>.</>
+                : <>Sono arrivati <strong>{nQuestionari}</strong> questionari, ma i dipendenti dichiarati sono <strong>{dichiarati}</strong>.</>}
+              {' '}È il denominatore di tutto ciò che l&apos;azienda legge.
+            </span>
+            <button onClick={() => { if (confirm(`Portare i dipendenti dichiarati da ${dichiarati} a ${proponiEmployees}?\n\nIl numero entra nel prezzo: fasce, gruppi di formazione ed ergonomia si ricalcolano.`)) aggiornaAzienda({ employees: proponiEmployees }); }}
+              className="shrink-0 text-sm font-semibold text-amber-900 bg-white border border-amber-300 px-3 py-1.5 rounded-xl hover:bg-amber-100">
+              Aggiorna a {proponiEmployees}
+            </button>
+          </div>
+        )}
+
         {/* ── Attivazione del programma (prima della firma) ──────────────────────
             Finché l'azienda non è attiva, la piattaforma NON prende in carico nessuno:
             niente auto-segnalazioni, niente inviti ai check periodici, nessuna
@@ -1002,7 +1034,10 @@ ${FIRMA}`,
             ) : (
               <div className="space-y-2">
                 {sortedAssessments.map(a => {
-                  const rCount = (responses[a.id] || []).length;
+                  // Un solo dato: l'intestazione e la barra leggono lo stesso numero.
+                  // Prima «N risposte» restava ferma al caricamento mentre la barra si
+                  // aggiornava da sola: due numeri diversi sulla stessa riga.
+                  const rCount = conteggiLive[a.id] ?? (responses[a.id] || []).length;
                   return (
                     <div key={a.id} className="rounded-xl border border-gray-200 px-4 py-3">
                       <div className="flex flex-wrap items-center gap-2">
@@ -1739,5 +1774,13 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     checkupAperti.aziende = checkupNonConvertiti(await getClients()).map(c => ({ id: c.id, name: c.name }));
   } catch (_) {}
 
-  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist, generatedReports, allProfessionals, monitoring, capacity, checkupGiorni, checkupAperti } };
+  // Quante persone risultano in forza nell'anagrafica organizzativa: serve solo a
+  // confrontarla con i dipendenti dichiarati (denominatore). Nessun nome esce di qui.
+  let dipInForza = 0;
+  try {
+    const { getOrgDipendenti } = await import('../../lib/org');
+    dipInForza = (await getOrgDipendenti(clientId)).filter(d => d.attivo).length;
+  } catch (_) { dipInForza = 0; }
+
+  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist, generatedReports, allProfessionals, monitoring, capacity, checkupGiorni, checkupAperti, dipInForza } };
 });

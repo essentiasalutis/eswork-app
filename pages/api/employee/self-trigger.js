@@ -112,7 +112,7 @@ async function notifyOsteopath(patient, triage) {
     });
     await sendEmail({
       to: professional.email,
-      subject: `${triage.urgent ? '🚨 ' : ''}Self-trigger — ${patient.first_name} ${patient.last_name}`,
+      subject: `${triage.urgent ? 'URGENTE — ' : ''}Segnalazione — ${patient.first_name} ${patient.last_name}`,
       html,
     });
   } catch (e) {

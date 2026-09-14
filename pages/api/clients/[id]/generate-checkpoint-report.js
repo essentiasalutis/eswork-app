@@ -205,7 +205,7 @@ export default requireAuth(async function handler(req, res) {
     andamentoSection = buildAndamentoSection(t12, client, andamentoTexts);
   }
 
-  const prompt = isAnnual ? `Sei un consulente clinico ES Work. Genera il REPORT ANNUALE (12 mesi) per ${client.name}, da consegnare alla direzione e utilizzabile per il bilancio di sostenibilità.
+  const prompt = isAnnual ? `Sei un consulente clinico ES Work. Genera il REPORT ANNUALE (12 mesi) per un'azienda cliente, da consegnare alla sua direzione e utilizzabile per il bilancio di sostenibilità.
 
 DATI ANNO 1 (i valori "n.d." sono soppressi per riservatezza/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
 - Prevalenza osservata all'intake (${t12.t0N} risposte T0): ${t12.t0Strat}
@@ -236,7 +236,7 @@ IMPORTANTE: riporta le percentuali di prevalenza ESATTAMENTE come indicate sopra
 ${t12.count === 0 ? 'NOTA: nessun check-up a 12 mesi ancora registrato — segnala che i KPI di esito saranno disponibili al completamento dei check-up.' : ''}
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
-Tono: clinico, orientato ai risultati e alla direzione. Italiano. Max 650 parole.` : `Sei un consulente clinico ES Work. Genera un Report Intermedio professionale a ${checkLabel} per il cliente ${client.name}.
+Tono: clinico, orientato ai risultati e alla direzione. Italiano. Max 650 parole.` : `Sei un consulente clinico ES Work. Genera un Report Intermedio professionale a ${checkLabel} per un'azienda cliente.
 
 DATI CLINICI (i valori "n.d." sono soppressi per riservatezza/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
 - Pazienti L1 (${nomeLivello('level1').toLowerCase()}): ${l1d}

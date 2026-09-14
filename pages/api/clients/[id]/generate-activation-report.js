@@ -145,8 +145,10 @@ NRS medio pre-sessione: ${avgNrsPre.toFixed(1)}/10
 NRS medio post-sessione: ${avgNrsPost.toFixed(1)}/10
 Riduzione media NRS: ${(avgNrsPre - avgNrsPost).toFixed(1)} punti
 `;
+  // Verso il modello NON esce alcun identificativo dell'azienda (Enrico, 14/9):
+  // il nome non gli serve — scrive di «l'azienda» — e il sistema lo rimette nel
+  // documento finale. Stessa regola già applicata al piano di intervento il 12/9.
   const dataBlock = `
-CLIENTE: ${client.name}
 Settore: ${sectorLabel}
 Dipendenti totali: ${client.employees || 'n.d.'}
 STATO DEL PROGRAMMA: ${firmato ? 'attivo (contratto firmato)' : 'PROPOSTO (contratto non ancora firmato)'}

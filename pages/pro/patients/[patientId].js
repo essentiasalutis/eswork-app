@@ -14,6 +14,7 @@ import {
 } from '../../../lib/store';
 import PatientDocuments from '../../../components/PatientDocuments';
 import { validaNrsChiusura } from '../../../lib/nrs';
+import { vistaCartellaCurante } from '../../../lib/vista';
 import { nomeLivello } from '../../../lib/livelli';
 
 // ─── NRS Slider ───────────────────────────────────────────────────────────────
@@ -1174,7 +1175,10 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   return {
     props: {
       proName,
-      patient,
+      // Proiezione: dal record escono solo i campi che questa pagina disegna
+      // (lib/vista.js). Il care_token resta — è la pagina da cui il curante
+      // consegna il link — ma email, telefono e i campi di servizio no.
+      patient: vistaCartellaCurante(patient),
       sessions: sessions.map(s => ({ ...s, professionals: undefined })),
       client,
       documents: documents.map(d => ({ ...d, signature_image: undefined })), // non passare la firma al client per default

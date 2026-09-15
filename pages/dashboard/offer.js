@@ -192,10 +192,10 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
   })();
   const dettaglioVoce = n => (!calc ? '' : n === 3 && calc.days_osteo_y1 ? ` (${calc.days_osteo_y1} giornate nel primo anno)` : n === 6 && calc.training_sessions_y1 ? ` (${calc.training_sessions_y1} sessioni nel primo anno)` : '');
 
-  // Emissione dell'offerta. Il server ricalcola il prezzo con gli stessi override
-  // di questa pagina: se supera il massimo promesso risponde 409 e chiede una
-  // conferma con motivazione. Il blocco è suo, non di questa schermata.
-  async function registraInvio(sforamentoMotivo = null) {
+  // Emissione dell'offerta. Il prezzo è già capato al massimo promesso: emettere
+  // non chiede nulla. Il server registra la traccia dello scostamento, e per
+  // superare il massimo serve prima l'autorizzazione (pulsante nel riquadro).
+  async function registraInvio() {
     const r = await fetch(`/api/clients/${client.id}/offerta`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -206,17 +206,34 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
         ...(query?.n ? { n: query.n } : {}),
         ...(query?.l1 ? { l1: query.l1 } : {}),
         ...(query?.l2 ? { l2: query.l2 } : {}),
-        ...(sforamentoMotivo ? { sforamento_motivo: sforamentoMotivo } : {}),
       }),
     }).catch(() => null);
     const j = r ? await r.json().catch(() => ({})) : {};
-    if (r && r.status === 409 && j.richiede_conferma) { setSforamento(j); return; }
     if (!r || !r.ok) setEsitoInvio({ ok: false, testo: j.error || 'Offerta non registrata in Pipeline: riprova.' });
     else {
-      setSforamento(null);
       if (j.spostata) setEsitoInvio({ ok: true, testo: 'Azienda spostata in «Offerta aperta».' });
       else if (j.stage === 'offer_open') setEsitoInvio({ ok: true, testo: 'Scadenza dell\'offerta aggiornata in Pipeline.' });
     }
+  }
+
+  // Superare il massimo promesso è un atto separato dall'invio: si autorizza qui,
+  // con una motivazione che resta sulla scheda. Revocabile.
+  async function autorizzaSforamento(motivo) {
+    const r = await fetch(`/api/clients/${client.id}/offerta`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ azione: 'autorizza_sforamento', motivo }),
+    }).catch(() => null);
+    const j = r ? await r.json().catch(() => ({})) : {};
+    if (!r || !r.ok) { setEsitoInvio({ ok: false, testo: j.error || 'Autorizzazione non registrata.' }); return; }
+    setSforamento(null); setMotivoSforamento('');
+    window.location.reload();   // il documento deve ricalcolarsi col prezzo pieno
+  }
+  async function revocaSforamento() {
+    await fetch(`/api/clients/${client.id}/offerta`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ azione: 'revoca_sforamento' }),
+    }).catch(() => null);
+    window.location.reload();
   }
 
   // ─── Blocco B — Servizi di piattaforma e gestione (differenziato per tier) ────
@@ -380,8 +397,11 @@ ${FIRMA}`;
               ) : (
                 <>📐 <strong>Forbice della Stima</strong>: {fmt(tetto.min)} – {fmt(tetto.max)}{forchetta?.avg ? ` (medio ${fmt(forchetta.avg)})` : ''} ·{' '}
                 {st === 'dentro' && <><strong>preventivo dai dati reali {fmt(calc.price_y1)}</strong> ✓ dentro la forbice, nessun tetto applicato.</>}
-                {st === 'capato' && <><strong>tetto applicato</strong>: il dimensionamento reale vale {fmt(tetto.calcolato)}, si propone il massimo promesso <strong>{fmt(tetto.max)}</strong> ({fmt(tetto.scostamento)} assorbiti). Per uscire dal tetto serve una conferma con motivazione al momento dell&apos;invio.</>}
-                {st === 'sopra_autorizzato' && <><strong>⚠ sopra il massimo, autorizzato</strong>: proposto {fmt(tetto.calcolato)} contro un massimo promesso di {fmt(tetto.max)} ({fmt(tetto.scostamento)} oltre). Motivazione registrata il {client?.sforamento_forbice_at ? new Date(client.sforamento_forbice_at).toLocaleDateString('it-IT') : '—'}.</>}
+                {st === 'capato' && <><strong>tetto applicato</strong>: il dimensionamento reale vale {fmt(tetto.calcolato)}, si propone il massimo promesso <strong>{fmt(tetto.max)}</strong> ({fmt(tetto.scostamento)} assorbiti). L&apos;offerta si invia così com&apos;è; lo scostamento resta registrato per la trattativa dell&apos;Anno 2.{' '}
+                  <button onClick={() => setSforamento({ calcolato: tetto.calcolato, massimo: tetto.max, scostamento: tetto.scostamento })}
+                    className="underline font-semibold">Superare il massimo promesso…</button></>}
+                {st === 'sopra_autorizzato' && <><strong>⚠ sopra il massimo, autorizzato</strong>: proposto {fmt(tetto.calcolato)} contro un massimo promesso di {fmt(tetto.max)} ({fmt(tetto.scostamento)} oltre). Motivazione registrata il {client?.sforamento_forbice_at ? new Date(client.sforamento_forbice_at).toLocaleDateString('it-IT') : '—'}.{' '}
+                  <button onClick={revocaSforamento} className="underline font-semibold">Torna al massimo promesso</button></>}
                 </>
               )}
             </div>
@@ -400,7 +420,7 @@ ${FIRMA}`;
             <h3 className="font-semibold text-gray-900">Questa offerta supera il massimo promesso</h3>
             <p className="text-sm text-gray-600 leading-relaxed">
               Nella Stima avete indicato un massimo di <strong>{fmt(sforamento.massimo)}</strong>. Il dimensionamento reale vale <strong>{fmt(sforamento.calcolato)}</strong>: <strong>{fmt(sforamento.scostamento)}</strong> oltre.
-              Puoi procedere lo stesso, ma la motivazione resta registrata — è interna, non compare in nessun documento del cliente.
+              Puoi proporre lo stesso il prezzo pieno, ma la motivazione resta registrata sulla scheda — è interna, non compare in nessun documento del cliente. Finché non autorizzi, l&apos;offerta resta al massimo promesso.
             </p>
             <label className="block text-xs font-semibold text-gray-500">Perché superi il massimo promesso (obbligatorio)
               <textarea value={motivoSforamento} onChange={e => setMotivoSforamento(e.target.value)} rows={3}
@@ -411,9 +431,9 @@ ${FIRMA}`;
               <button onClick={() => { setSforamento(null); setMotivoSforamento(''); }} className="flex-1 py-2.5 rounded-xl border border-gray-300 text-gray-600 text-sm font-semibold">
                 Annulla — resto al massimo promesso
               </button>
-              <button disabled={motivoSforamento.trim().length < 15} onClick={() => registraInvio(motivoSforamento.trim())}
+              <button disabled={motivoSforamento.trim().length < 15} onClick={() => autorizzaSforamento(motivoSforamento.trim())}
                 className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold disabled:opacity-40">
-                Procedo sopra il massimo
+                Autorizzo: proponi il prezzo pieno
               </button>
             </div>
             {motivoSforamento.trim().length < 15 && <p className="text-xs text-gray-400">Scrivi la motivazione (almeno 15 caratteri) per poter procedere.</p>}

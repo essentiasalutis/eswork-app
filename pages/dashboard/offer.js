@@ -115,10 +115,14 @@ function Page({ children, className = '' }) {
 
 // ─── Offer Document ───────────────────────────────────────────────────────────
 
-export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, date, offertaGiorni = 10, scartoL2 = null, pianoBase = [] }) {
+export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, tetto = null, query = null, date, offertaGiorni = 10, scartoL2 = null, pianoBase = [] }) {
   const [emailModal, setEmailModal] = useState(null);
   const [scadenza, setScadenza] = useState(() => scadenzaIniziale(client, offertaGiorni));
   const [esitoInvio, setEsitoInvio] = useState(null); // { ok, testo }
+  // Sforamento del massimo promesso: il server risponde 409 e qui si chiede la
+  // conferma consapevole + la motivazione (interna, mai nel documento).
+  const [sforamento, setSforamento] = useState(null); // { calcolato, massimo, scostamento }
+  const [motivoSforamento, setMotivoSforamento] = useState('');
   // Il piano c'è già all'apertura: è quello della piattaforma, calcolato lato server.
   // L'AI entra SOLO con il pulsante qui sotto (nessuna chiamata al montaggio, 12/9).
   const [piano, setPiano] = useState(pianoBase);
@@ -188,15 +192,31 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
   })();
   const dettaglioVoce = n => (!calc ? '' : n === 3 && calc.days_osteo_y1 ? ` (${calc.days_osteo_y1} giornate nel primo anno)` : n === 6 && calc.training_sessions_y1 ? ` (${calc.training_sessions_y1} sessioni nel primo anno)` : '');
 
-  async function registraInvio() {
+  // Emissione dell'offerta. Il server ricalcola il prezzo con gli stessi override
+  // di questa pagina: se supera il massimo promesso risponde 409 e chiede una
+  // conferma con motivazione. Il blocco è suo, non di questa schermata.
+  async function registraInvio(sforamentoMotivo = null) {
     const r = await fetch(`/api/clients/${client.id}/offerta`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ azione: 'inviata', scade_il: scadenza || null }),
+      body: JSON.stringify({
+        azione: 'inviata', scade_il: scadenza || null,
+        assessment_id: query?.assessmentId || null,
+        // Solo gli override VALORIZZATI: passare null significherebbe «nessun valore»
+        // e il server lo tratta come assente — ma qui non lo mandiamo proprio.
+        ...(query?.n ? { n: query.n } : {}),
+        ...(query?.l1 ? { l1: query.l1 } : {}),
+        ...(query?.l2 ? { l2: query.l2 } : {}),
+        ...(sforamentoMotivo ? { sforamento_motivo: sforamentoMotivo } : {}),
+      }),
     }).catch(() => null);
     const j = r ? await r.json().catch(() => ({})) : {};
+    if (r && r.status === 409 && j.richiede_conferma) { setSforamento(j); return; }
     if (!r || !r.ok) setEsitoInvio({ ok: false, testo: j.error || 'Offerta non registrata in Pipeline: riprova.' });
-    else if (j.spostata) setEsitoInvio({ ok: true, testo: 'Azienda spostata in «Offerta aperta».' });
-    else if (j.stage === 'offer_open') setEsitoInvio({ ok: true, testo: 'Scadenza dell\'offerta aggiornata in Pipeline.' });
+    else {
+      setSforamento(null);
+      if (j.spostata) setEsitoInvio({ ok: true, testo: 'Azienda spostata in «Offerta aperta».' });
+      else if (j.stage === 'offer_open') setEsitoInvio({ ok: true, testo: 'Scadenza dell\'offerta aggiornata in Pipeline.' });
+    }
   }
 
   // ─── Blocco B — Servizi di piattaforma e gestione (differenziato per tier) ────
@@ -343,21 +363,63 @@ ${FIRMA}`;
         )}
         <div className="mt-2"><ArgomentarioVoci /></div>
 
-        {/* Confronto con la stima del colloquio — SOLO vista admin, mai nel PDF */}
-        {forchetta && calc && (() => {
-          const inRange = calc.price_y1 >= forchetta.min && calc.price_y1 <= forchetta.max;
+        {/* Forbice della Stima — SOLO vista admin, mai nel PDF. Tre situazioni da
+            distinguere: dentro il tetto, tetto applicato, nessuna forbice promessa.
+            «Nessun tetto» e «prezzo dentro il tetto» non sono la stessa cosa quando
+            si rilegge un'offerta a settimane di distanza (Enrico, 14/9). */}
+        {calc && (() => {
+          const st = tetto?.stato;
+          const stile = st === 'capato' ? 'bg-amber-50 border-amber-300 text-amber-900'
+            : st === 'sopra_autorizzato' ? 'bg-red-50 border-red-200 text-red-800'
+            : st === 'dentro' ? 'bg-green-50 border-green-200 text-green-800'
+            : 'bg-gray-50 border-gray-300 text-gray-700';
           return (
-            <div className={`mt-2 rounded-xl px-4 py-2.5 text-xs border ${inRange ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-              📐 <strong>Forchetta colloquio</strong> (scenari min–max, stessi parametri): {fmt(forchetta.min)} – {fmt(forchetta.max)} (medio {fmt(forchetta.avg)}) ·
-              <strong> Questo preventivo (dati reali): {fmt(calc.price_y1)}</strong> {inRange
-                ? '✓ dentro la forchetta presentata al colloquio'
-                : '⚠ FUORI forchetta — rivedi i parametri o prepara la motivazione col cliente'}
+            <div className={`mt-2 rounded-xl px-4 py-2.5 text-xs border ${stile}`}>
+              {st === 'nessuna_forbice' ? (
+                <>📐 <strong>Nessuna forbice di riferimento</strong>: per questa azienda non è stata emessa una Stima, quindi nessuna promessa economica e <strong>nessun tetto applicato</strong>. Prezzo dai dati reali: <strong>{fmt(calc.price_y1)}</strong>.</>
+              ) : (
+                <>📐 <strong>Forbice della Stima</strong>: {fmt(tetto.min)} – {fmt(tetto.max)}{forchetta?.avg ? ` (medio ${fmt(forchetta.avg)})` : ''} ·{' '}
+                {st === 'dentro' && <><strong>preventivo dai dati reali {fmt(calc.price_y1)}</strong> ✓ dentro la forbice, nessun tetto applicato.</>}
+                {st === 'capato' && <><strong>tetto applicato</strong>: il dimensionamento reale vale {fmt(tetto.calcolato)}, si propone il massimo promesso <strong>{fmt(tetto.max)}</strong> ({fmt(tetto.scostamento)} assorbiti). Per uscire dal tetto serve una conferma con motivazione al momento dell&apos;invio.</>}
+                {st === 'sopra_autorizzato' && <><strong>⚠ sopra il massimo, autorizzato</strong>: proposto {fmt(tetto.calcolato)} contro un massimo promesso di {fmt(tetto.max)} ({fmt(tetto.scostamento)} oltre). Motivazione registrata il {client?.sforamento_forbice_at ? new Date(client.sforamento_forbice_at).toLocaleDateString('it-IT') : '—'}.</>}
+                </>
+              )}
             </div>
           );
         })()}
       </div>
 
-      {emailModal && <EmailModal modal={emailModal} onClose={() => setEmailModal(null)} onInvia={offertaVera ? registraInvio : null} />}
+      {emailModal && <EmailModal modal={emailModal} onClose={() => setEmailModal(null)} onInvia={offertaVera ? (() => registraInvio()) : null} />}
+
+      {/* Conferma consapevole dello sforamento. Non è una spunta sola: senza una
+          motivazione scritta l'offerta non parte — l'eccezione deve lasciare
+          traccia, e non deve poter accadere per distrazione (Enrico, 14/9). */}
+      {sforamento && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" style={{ WebkitPrintColorAdjust: 'exact' }}>
+          <div className="bg-white rounded-2xl w-full max-w-lg p-5 space-y-3 shadow-2xl">
+            <h3 className="font-semibold text-gray-900">Questa offerta supera il massimo promesso</h3>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              Nella Stima avete indicato un massimo di <strong>{fmt(sforamento.massimo)}</strong>. Il dimensionamento reale vale <strong>{fmt(sforamento.calcolato)}</strong>: <strong>{fmt(sforamento.scostamento)}</strong> oltre.
+              Puoi procedere lo stesso, ma la motivazione resta registrata — è interna, non compare in nessun documento del cliente.
+            </p>
+            <label className="block text-xs font-semibold text-gray-500">Perché superi il massimo promesso (obbligatorio)
+              <textarea value={motivoSforamento} onChange={e => setMotivoSforamento(e.target.value)} rows={3}
+                placeholder="Es. la popolazione è cresciuta da 80 a 140 dipendenti dopo il colloquio, concordato con il referente il…"
+                className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-xl text-sm font-normal" />
+            </label>
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={() => { setSforamento(null); setMotivoSforamento(''); }} className="flex-1 py-2.5 rounded-xl border border-gray-300 text-gray-600 text-sm font-semibold">
+                Annulla — resto al massimo promesso
+              </button>
+              <button disabled={motivoSforamento.trim().length < 15} onClick={() => registraInvio(motivoSforamento.trim())}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold disabled:opacity-40">
+                Procedo sopra il massimo
+              </button>
+            </div>
+            {motivoSforamento.trim().length < 15 && <p className="text-xs text-gray-400">Scrivi la motivazione (almeno 15 caratteri) per poter procedere.</p>}
+          </div>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════════════════════
           PAG 1 — Copertina
@@ -890,7 +952,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     // Numeri dalla fonte unica (lib/offerta-server.js), condivisa con Presentazione e Sintesi.
     const d = await datiOffertaDaCheckup({ assessmentId, n, l1, l2, custom });
     if (!d) return { notFound: true };
-    const { client, assessment, nmq, calc, forchetta } = d;
+    const { client, assessment, nmq, calc, forchetta, tetto } = d;
     const scartoL2 = scartoLivello2({ nmq, calc, dipendenti: client && client.employees, l2Mult: d.l2Mult, soglia: scartoL2Soglia });
     const roi = null; // ROI only from calculator (requires absence days input)
     // Piano della piattaforma, calcolato qui: la tabella c'è già all'apertura e nessun
@@ -906,6 +968,10 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         calc,
         roi,
         forchetta,
+        tetto: tetto || null,
+        // Gli override usati QUI vanno passati al server quando si emette l'offerta:
+        // il gate deve valutare esattamente il prezzo che sta per essere inviato.
+        query: { assessmentId, n: n ?? null, l1: l1 ?? null, l2: l2 ?? null },
         date: today(),
         offertaGiorni,
         scartoL2,

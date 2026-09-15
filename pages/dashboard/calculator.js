@@ -313,7 +313,7 @@ export default function CalculatorPage({ client, prefill }) {
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 leading-relaxed">
               <strong>Clausola di adeguamento (asimmetrica):</strong> il corrispettivo è confermato dopo il check-up.
               Se i L1 reali sono ≤ scenario medio ({scen.avg.l1}) → resta al valore medio ({fmt(calcAvg.price_y1)}).
-              Se superiori → sale fino al tetto massimo ({fmt(calcMax.price_y1)}); le sedute eccedenti il tetto sono gestite tramite il canale B2C/welfare.
+              In nessun caso si supera il massimo della forbice ({fmt(calcMax.price_y1)}): è la promessa fatta con la Stima.
             </div>
 
             {/* ROI */}

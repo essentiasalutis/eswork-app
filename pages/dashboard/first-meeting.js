@@ -599,7 +599,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                 </div>
 
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 leading-relaxed">
-                  <strong>Clausola di adeguamento:</strong> il corrispettivo è confermato dopo il check-up. Se i L1 reali sono ≤ scenario medio ({scen.avg.l1}) → resta al valore medio ({fmt(calcAvg.price_y1)}); se superiori → sale fino al tetto massimo ({fmt(calcMax.price_y1)}), eccedenza al canale B2C/welfare.
+                  <strong>Clausola di adeguamento:</strong> il corrispettivo è confermato dopo il check-up, sui dati reali. Se il bisogno è inferiore si paga meno; <strong>in nessun caso si supera il massimo della forbice</strong> ({fmt(calcMax.price_y1)}), che è la promessa fatta con la Stima. Se il dimensionamento reale lo supera, la piattaforma propone il massimo e lo scostamento resta registrato per te.
                 </div>
 
                 {roi && (

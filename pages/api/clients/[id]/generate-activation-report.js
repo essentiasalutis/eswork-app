@@ -15,6 +15,7 @@ import { getPricingSettingsV2, getNoteReport } from '../../../../lib/pricing/set
 import { ergonomiaDaColloquio } from '../../../../lib/pricing/v2';
 import { isFirmato } from '../../../../lib/checkup-server';
 import { nomeLivello } from '../../../../lib/livelli';
+import { prezzoConTetto, applicaTettoAlCalcolo, STATI } from '../../../../lib/forbice.mjs';
 import { cosaComprendeMarkdown, inserisciCosaComprende, VOCI_PROGRAMMA, quantitaPrimoAnno } from '../../../../lib/programma';
 import { getForchettaSnapshot, freezeStimaSnapshot } from '../../../../lib/pricing/snapshot';
 import { aggregateNMQ } from '../../../../lib/scoring';
@@ -411,11 +412,23 @@ export async function buildQuoteBlock(client_id, client, answers) {
     const calc = calculatePricing({ n: nEmp, l1: real.l1, l2: real.l2, ...conditions });
     if (!calc) return { block: '', compliance: null };
 
-    const realPrice = calc.price_y1;
+    // IL MASSIMO PROMESSO È IL MASSIMO (Enrico, 14/9): nel documento il prezzo
+    // dell'Anno 1 non supera il massimo della forbice. Si esce dal tetto solo con
+    // la motivazione già registrata al momento dell'emissione dell'offerta.
+    const autorizzato = !!(client && client.sforamento_forbice_motivo);
+    const tetto = prezzoConTetto({ calcolato: calc.price_y1, min, max, autorizzato });
+    const calcFinale = applicaTettoAlCalcolo(calc, tetto);
+    const realPrice = calcFinale.price_y1;
     const inRange = (min != null && max != null) ? (realPrice >= min && realPrice <= max) : null;
     // source: 'snapshot' = confronto contro la forbice promessa; 'live' = ricalcolata
     // (nessuna Stima emessa). pricing_version: mai confronti incrociati tra versioni.
-    const compliance = { in_range: inRange, min, avg, max, real_price: realPrice, pricing_version: pricingVersion, source };
+    // `tetto`: traccia INTERNA dello scostamento — quanto vale il dimensionamento
+    // reale rispetto al prezzo applicato. Serve al rinnovo, non al cliente.
+    const compliance = {
+      in_range: inRange, min, avg, max, real_price: realPrice,
+      pricing_version: pricingVersion, source,
+      tetto: { stato: tetto.stato, calcolato: tetto.calcolato, massimo: tetto.max, scostamento: tetto.scostamento },
+    };
     // NB: nessun side-effect qui (buildQuoteBlock è usata anche dall'endpoint
     // read-only di regressione). Il freeze avviene nel handler del Report.
 
@@ -454,7 +467,9 @@ export async function buildQuoteBlock(client_id, client, answers) {
       : '';
 
     const block = `\nPROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):\n- Programma Anno 1: €${eur(realPrice)}${inLinea} (${calc.days_osteo_y1} giornate sportello, ${calc.training_sessions_y1} sessioni formative)\n- Anno 2 e successivi (indicativo): €${eur(calc.price_y2)}${rigaDimensionamento}${rigaErgonomia}`;
-    return { block, compliance, calc };
+    // `calc` con il tetto già applicato: la sezione «Cosa comprende» stampa
+    // l'investimento e deve dire il prezzo proposto, non il calcolato.
+    return { block, compliance, calc: calcFinale };
   } catch {
     return { block: '', compliance: null };
   }

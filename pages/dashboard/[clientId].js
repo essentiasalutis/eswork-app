@@ -98,7 +98,7 @@ function NrsBar({ value, max = 10 }) {
   );
 }
 
-export default function ClientPage({ dipInForza = 0, client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist, generatedReports: initialReports, allProfessionals, monitoring, capacity: initialCapacity, checkupGiorni = 10, checkupAperti = { limite: 3, aziende: [] } }) {
+export default function ClientPage({ dipInForza = 0, client: initialClient, assessments: initial, responses: initialResponses, assignments: initialAssignments, patientsNrs, referralCodes: initialReferralCodes, waitlist: initialWaitlist, generatedReports: initialReports, allProfessionals, monitoring, capacity: initialCapacity, checkupGiorni = 10, checkupAperti = { limite: 3, aziende: [] }, indirizzoSito = '' }) {
   const router = useRouter();
   const [client, setClient] = useState(initialClient);
   const [assessments, setAssessments] = useState(initial);
@@ -382,9 +382,11 @@ export default function ClientPage({ dipInForza = 0, client: initialClient, asse
     setEditSaving(false);
   }
 
-  const baseUrl = typeof window !== 'undefined'
-    ? window.location.origin
-    : process.env.NEXT_PUBLIC_BASE_URL || '';
+  // Indirizzo dei link: quello della richiesta, calcolato dal server e identico nel
+  // browser (lib/indirizzo-sito.mjs). Prima il server usava NEXT_PUBLIC_BASE_URL e il
+  // browser window.location: con la variabile sbagliata React scartava la pagina
+  // (errori 418/423/425) e la ridisegnava da capo a ogni apertura.
+  const baseUrl = indirizzoSito;
 
   const FIRMA = `Cordiali saluti,\nDott. Enrico Maiolo — founder @ Essentia Salutis\nTel: ${CONFIG.contact_phone}\n${CONFIG.contact_email}`;
 
@@ -1811,5 +1813,7 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     dipInForza = (await getOrgDipendenti(clientId)).filter(d => d.attivo).length;
   } catch (_) { dipInForza = 0; }
 
-  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist, generatedReports, allProfessionals, monitoring, capacity, checkupGiorni, checkupAperti, dipInForza } };
+  const { indirizzoDallaRichiesta } = await import('../../lib/indirizzo-sito.mjs');
+  const indirizzoSito = indirizzoDallaRichiesta(ctx.req.headers || {});
+  return { props: { client, assessments: assessmentsWithConsents, responses, assignments, patientsNrs, referralCodes, waitlist, generatedReports, allProfessionals, monitoring, capacity, checkupGiorni, checkupAperti, dipInForza, indirizzoSito } };
 });

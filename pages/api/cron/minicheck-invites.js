@@ -10,8 +10,7 @@ import {
 import { sendEmail } from '../../../lib/email';
 import { minicheckInvite, rifotografiaInvite } from '../../../lib/email-templates';
 import { programmaAttivo } from '../../../lib/attivazione';
-
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://eswork-app.vercel.app';
+import { indirizzoPerEmail } from '../../../lib/indirizzo-sito.mjs';
 
 export default async function handler(req, res) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -19,6 +18,16 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Non autorizzato' });
     }
   }
+
+  // Indirizzo dei link: se il valore è palesemente sbagliato, oggi non parte nessun
+  // invito — meglio nessuna email che email con link rotti — e la risposta del cron
+  // (visibile nei log di Vercel) dice quale valore ha trovato e quale si aspettava.
+  const base = indirizzoPerEmail({ NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL, VERCEL_ENV: process.env.VERCEL_ENV });
+  if (!base.ok) {
+    console.error('[cron minicheck]', base.errore);
+    return res.status(500).json({ error: base.errore, inviti_bloccati: true });
+  }
+  const BASE_URL = base.indirizzo;
 
   let totalSent = 0, totalFailed = 0, totalSaltati = 0;
 

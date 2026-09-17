@@ -10,8 +10,7 @@ import { getPatientByCareToken, getClientById, insertEmailLog } from '../../../l
 import { sendEmail, invioEmailAttivo } from '../../../lib/email';
 import { linkAreaPersonale } from '../../../lib/email-templates';
 import { limiteAreaPersonale } from '../../../lib/employee-guard';
-
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://eswork-app.vercel.app';
+import { indirizzoPerEmail } from '../../../lib/indirizzo-sito.mjs';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -31,7 +30,19 @@ export default async function handler(req, res) {
   if (!patient.email) return res.status(400).json({ error: 'Nessun indirizzo email registrato' });
 
   const client = await getClientById(patient.client_id).catch(() => null);
-  const link = `${BASE_URL}/employee/${patient.care_token}`;
+  // Indirizzo verificato: con un valore sbagliato non parte un link rotto. Il motivo
+  // completo (valore trovato e atteso) va nel log e nel registro email; alla persona
+  // si dice solo di salvare il link dalla pagina.
+  const base = indirizzoPerEmail({ NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL, VERCEL_ENV: process.env.VERCEL_ENV });
+  if (!base.ok) {
+    console.error('[send-link]', base.errore);
+    await insertEmailLog({
+      patient_id: patient.id, client_id: patient.client_id, template: 'link_area_personale',
+      to_email: patient.email, subject: 'La tua area personale', status: 'failed', error_message: base.errore,
+    }).catch(() => {});
+    return res.status(503).json({ error: 'Invio non disponibile in questo momento: salva il link dalla pagina.' });
+  }
+  const link = `${base.indirizzo}/employee/${patient.care_token}`;
   const html = linkAreaPersonale({
     employee_name: patient.first_name || '',
     company_name: client?.name || '',

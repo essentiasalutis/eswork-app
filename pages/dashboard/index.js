@@ -17,7 +17,7 @@ const AGENDA = {
   checkup: { icona: '📋', testo: 'Check-up in chiusura', scaduto: '' },
 };
 
-export default function Dashboard({ clients: initialClients, assessmentCounts, pendingAcuteCount, formazioneAlerts = [], solleciti: sollecitiIniziali = [], sollecitiOfferta: sollecitiOffertaIniziali = [], agenda = [], oggi = '' }) {
+export default function Dashboard({ clients: initialClients, assessmentCounts, pendingAcuteCount, formazioneAlerts = [], solleciti: sollecitiIniziali = [], sollecitiOfferta: sollecitiOffertaIniziali = [], agenda = [], oggi = '', avvisoEmail = null }) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
   const [solleciti, setSolleciti] = useState(sollecitiIniziali);
@@ -70,6 +70,11 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-6">
+        {avvisoEmail && (
+          <div role="alert" className="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+            <strong>Le email con link sono bloccate.</strong> {avvisoEmail}
+          </div>
+        )}
         {agenda.length > 0 && (
           <div className="mb-5 bg-white rounded-2xl border border-gray-200 p-4">
             <h2 className="font-semibold text-gray-700 text-sm mb-2">📅 Questa settimana</h2>
@@ -252,10 +257,8 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     const { getSollecitiCheckup } = await import('../../lib/checkup-server');
     // Il link nella mail = l'indirizzo da cui Enrico sta usando la piattaforma (come la
     // scheda azienda con window.location), non una variabile d'ambiente da tenere allineata.
-    const h = (ctx && ctx.req && ctx.req.headers) || {};
-    const host = h['x-forwarded-host'] || h.host;
-    const proto = h['x-forwarded-proto'] || (host && /^localhost|^127\./.test(host) ? 'http' : 'https');
-    solleciti = await getSollecitiCheckup({ baseUrl: host ? `${proto}://${host}` : 'https://eswork-app.vercel.app' });
+    const { indirizzoDallaRichiesta } = await import('../../lib/indirizzo-sito.mjs');
+    solleciti = await getSollecitiCheckup({ baseUrl: indirizzoDallaRichiesta((ctx && ctx.req && ctx.req.headers) || {}) });
   } catch (_) {}
 
   // Agenda della settimana: ricontatti "Non ora", offerte aperte in scadenza, check-up
@@ -281,5 +284,14 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     }));
   } catch (_) {}
 
-  return { props: { clients, assessmentCounts, pendingAcuteCount, formazioneAlerts, solleciti, sollecitiOfferta, agenda, oggi } };
+  // Le email con link partono solo con un indirizzo del sito sensato: se la variabile
+  // è sbagliata lo si dice QUI, dove qualcuno guarda, non solo nei log.
+  let avvisoEmail = null;
+  try {
+    const { indirizzoPerEmail } = await import('../../lib/indirizzo-sito.mjs');
+    const r = indirizzoPerEmail({ NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL, VERCEL_ENV: process.env.VERCEL_ENV });
+    if (!r.ok) avvisoEmail = r.errore;
+  } catch (_) {}
+
+  return { props: { clients, assessmentCounts, pendingAcuteCount, formazioneAlerts, solleciti, sollecitiOfferta, agenda, oggi, avvisoEmail } };
 });

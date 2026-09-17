@@ -385,8 +385,10 @@ ${FIRMA}`;
             distinguere: dentro il tetto, tetto applicato, nessuna forbice promessa.
             «Nessun tetto» e «prezzo dentro il tetto» non sono la stessa cosa quando
             si rilegge un'offerta a settimane di distanza (Enrico, 14/9). */}
-        {calc && (() => {
-          const st = tetto?.stato;
+        {calc && tetto && (() => {
+          // Modalità preventivo (calcolatore, senza check-up): il tetto non si calcola,
+          // quindi il riquadro non c'è. Prima la pagina andava in errore su tetto.min.
+          const st = tetto.stato;
           const stile = st === 'capato' ? 'bg-amber-50 border-amber-300 text-amber-900'
             : st === 'sopra_autorizzato' ? 'bg-red-50 border-red-200 text-red-800'
             : st === 'dentro' ? 'bg-green-50 border-green-200 text-green-800'
@@ -765,7 +767,22 @@ ${FIRMA}`;
             </div>
           </div>
 
-          {/* Tempo dipendenti */}
+          {/* Tempo dipendenti — v2: tre voci dal protocollo (come i testi); v1: congelato */}
+          {calc.hours_prevention != null ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: roi ? 10 : 0 }}>
+            {[
+              { titolo: 'In trattamento', ore: calc.hours_treated, circa: true, nota: 'Pre-validazione, ciclo e formazione', bg: '#fef2f2', bd: '#fecaca', col: '#dc2626' },
+              { titolo: 'In prevenzione', ore: calc.hours_prevention, circa: true, nota: 'Sessioni di prevenzione e formazione', bg: '#fffbeb', bd: '#fde68a', col: '#b45309' },
+              { titolo: 'Tutti gli altri', ore: calc.hours_untreated, circa: false, nota: 'Solo formazione collettiva', bg: '#f0fdf4', bd: '#bbf7d0', col: '#16a34a' },
+            ].map(v => (
+              <div key={v.titolo} style={{ background: v.bg, borderRadius: 12, padding: '8px 10px', border: `1px solid ${v.bd}`, textAlign: 'center', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: v.col, marginBottom: 2 }}>{v.titolo}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: v.col }}>{v.circa ? 'circa ' : ''}{v.ore} ore</div>
+                <div style={{ fontSize: 8.5, color: '#4b5563' }}>nel primo anno di programma · {v.nota}</div>
+              </div>
+            ))}
+          </div>
+          ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: roi ? 10 : 0 }}>
             <div style={{ background: '#fef2f2', borderRadius: 12, padding: '8px 10px', border: '1px solid #fecaca', textAlign: 'center', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
               <div style={{ fontSize: 9, fontWeight: 700, color: '#dc2626', marginBottom: 2 }}>Dipendente TRATTATO</div>
@@ -778,6 +795,8 @@ ${FIRMA}`;
               <div style={{ fontSize: 8.5, color: '#4b5563' }}>Solo formazione collettiva</div>
             </div>
           </div>
+
+          )}
 
           {/* ROI (solo se disponibili i giorni di assenza) */}
           {roi && (

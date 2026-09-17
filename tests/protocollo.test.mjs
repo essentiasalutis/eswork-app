@@ -71,14 +71,14 @@ test('moduli di formazione: regola del protocollo anche nel prezzo', () => {
   assert.equal(fraseTemiFormazione(), 'due temi nel primo anno di programma e uno negli anni successivi');
 });
 
-test('tempo richiesto: calcolato dal protocollo, arrotondato per eccesso', () => {
+test('tempo richiesto: tre voci calcolate dal protocollo, arrotondate per eccesso', () => {
   const o = oreRichiestePrimoAnno();
-  assert.deepEqual({ t: o.trattamento, a: o.altri }, { t: 4, a: 2 });
-  assert.equal(o.esatte.trattamento, 4);
-  assert.equal(fraseTempoRichiesto(), 'circa 4 ore nel primo anno di programma per chi è in trattamento e 2 ore per tutti gli altri');
-  assert.equal(fraseTempoRichiesto({ breve: true }), 'circa 4 ore nel primo anno di programma per chi è in trattamento, 2 per tutti gli altri');
-  // 3,5 ore esatte (3 sedute da 30′ + 2 moduli da 1 ora) diventano 4: per eccesso, mai per difetto.
+  assert.deepEqual(o.esatte, { trattamento: 4.25, prevenzione: 4, altri: 2 });
+  assert.deepEqual({ t: o.trattamento, p: o.prevenzione, a: o.altri }, { t: 5, p: 4, a: 2 });
+  assert.equal(fraseTempoRichiesto(), 'circa 5 ore nel primo anno di programma per chi è in trattamento, circa 4 per chi fa prevenzione, 2 ore per tutti gli altri');
+  assert.equal(fraseTempoRichiesto({ maiuscola: true }).slice(0, 7), 'Circa 5');
+  // Per eccesso, mai per difetto: con 3 sedute sarebbero 0,25 + 1,5 + 2 = 3,75 ore → 4.
   const scomodo = oreRichiestePrimoAnno({ ...PROTOCOLLO, sedute_per_ciclo: 3 });
-  assert.equal(scomodo.esatte.trattamento, 3.5);
+  assert.equal(scomodo.esatte.trattamento, 3.75);
   assert.equal(scomodo.trattamento, 4);
 });

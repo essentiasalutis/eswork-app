@@ -9,6 +9,7 @@ import {
   proCanAccessPatientClinical,
 } from '../../../../lib/store';
 import { validaNrsChiusura } from '../../../../lib/nrs';
+import { PROTOCOLLO } from '../../../../lib/protocollo.mjs';
 
 // Livello B — la sessione fa parte della cartella clinica: solo l'osteopata
 // assegnato al paziente può leggerla/modificarla.
@@ -66,8 +67,8 @@ export default requireProAuth(async function handler(req, res) {
       const cycle = await getActiveCycleByPatient(patientId).catch(() => null);
       if (cycle) {
         const newCompleted = (cycle.sessions_completed || 0) + 1;
-        // Il ciclo va chiuso se raggiunge le 4 sessioni o se l'osteopata segnala un esito
-        const shouldClose = newCompleted >= 4 || !!cycle_outcome;
+        // Il ciclo va chiuso se raggiunge le sedute previste o se l'osteopata segnala un esito
+        const shouldClose = newCompleted >= (cycle.sessions_planned || PROTOCOLLO.sedute_per_ciclo) || !!cycle_outcome;
 
         if (shouldClose && pgicVal == null) {
           // REGOLA v4: nessun ciclo si chiude senza PGIC → resta APERTO in attesa di PGIC

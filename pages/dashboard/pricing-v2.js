@@ -4,6 +4,7 @@ import Link from 'next/link';
 import NavMenu from '../../components/NavMenu';
 import { requireAuthSsr } from '../../lib/auth';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
+import { PARAMETRI_PROTOCOLLO_LISTINO, eRegolaDelProtocollo, percento } from '../../lib/protocollo.mjs';
 
 // Etichette umane dei fattori numerici v2 (la v1 è congelata nel codice e NON
 // compare qui: impossibile modificarla da UI).
@@ -13,7 +14,7 @@ const PARAM_LABELS = {
   session_duration_min: 'Durata seduta (minuti)',
   prevention_sessions_per_l2: 'Sessioni prevenzione per L2',
   tariffa_sessione_prevenzione: 'Tariffa sessione prevenzione (€)',
-  buffer_pct: 'Buffer clinico (es. 0.20 = 20%) — solo su clinica',
+  buffer_pct: 'Buffer clinico — solo su clinica',
   capienza_aula: 'Capienza aula (formazione)',
   training_modules_y1: 'Moduli formazione Anno 1',
   training_modules_y2: 'Moduli formazione Anno 2+',
@@ -106,12 +107,24 @@ export default function PricingV2Page() {
           <div className={box}>
             <h2 className="font-semibold text-gray-800 mb-3">Fattori di calcolo (v2)</h2>
             <div className="grid md:grid-cols-2 gap-3">
-              {Object.keys(PARAM_LABELS).map(k => (
+              {Object.keys(PARAM_LABELS).filter(k => !eRegolaDelProtocollo(k)).map(k => (
                 <label key={k} className="text-xs text-gray-500">{PARAM_LABELS[k]}
                   <input type="number" step="any" defaultValue={params[k]} className={`${inputCls} mt-1`}
                     onBlur={e => { if (String(params[k]) !== e.target.value && e.target.value !== '') put({ tipo: 'setting', key: k, value: e.target.value }, 'parametro salvato'); }} />
                 </label>
               ))}
+            </div>
+            <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <div className="text-xs font-semibold text-gray-700">Regole del protocollo — non modificabili</div>
+              <p className="text-[11px] text-gray-500 mt-0.5">Sono contrattuali: le leggono insieme il prezzo, i testi al cliente e i limiti della piattaforma. Si cambiano solo nel codice (lib/protocollo.mjs), con una decisione.</p>
+              <div className="grid md:grid-cols-2 gap-2 mt-2">
+                {Object.entries(PARAMETRI_PROTOCOLLO_LISTINO).map(([k, v]) => (
+                  <div key={k} className="flex items-center justify-between text-xs text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                    <span>{PARAM_LABELS[k] || k}</span>
+                    <strong className="tabular-nums text-gray-900">{k === 'buffer_pct' ? percento(v) : v}</strong>
+                  </div>
+                ))}
+              </div>
             </div>
             <p className="text-[11px] text-gray-400 mt-3">Solo fattori primitivi: i costi si calcolano (es. ergonomia ufficio e reparto = minuti/60 × tariffa oraria sportello del cliente; studio postazione = forfait × n postazioni; check-up pacchetto = n dipendenti × €/dipendente).</p>
           </div>

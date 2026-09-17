@@ -18,6 +18,7 @@ import { vistaCartellaCurante } from '../../../lib/vista';
 import { nomeLivello } from '../../../lib/livelli';
 import { documentiMancanti, prevedeSedute } from '../../../lib/documenti-seduta.mjs';
 import { dirittoCicli } from '../../../lib/anno-programma.mjs';
+import { PROTOCOLLO } from '../../../lib/protocollo.mjs';
 import { dataIt } from '../../../lib/date-it.mjs';
 
 // ─── NRS Slider ───────────────────────────────────────────────────────────────
@@ -983,7 +984,7 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
                   ? <div className="w-full py-2.5 px-3 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-700">{d.messaggio}</div>
                   : <button onClick={() => startCycle('prevention')} disabled={cycleLoading}
                       className="w-full py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold disabled:opacity-60">
-                      {cycleLoading ? 'Avvio...' : '+ Avvia ciclo di prevenzione (4 sessioni)'}
+                      {cycleLoading ? 'Avvio...' : `+ Avvia ciclo di prevenzione (${PROTOCOLLO.sessioni_prevenzione_l2} sessioni)`}
                     </button>;
               })()}
 

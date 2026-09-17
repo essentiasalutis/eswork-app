@@ -22,6 +22,7 @@ import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
 import { kAnonPartition, tooSmall, K_ANON } from '../../../../lib/kanon';
 import { dataIt } from '../../../../lib/date-it.mjs';
+import { conProtocollo } from '../../../../lib/protocollo.mjs';
 
 export const config = { maxDuration: 60 };
 
@@ -173,7 +174,7 @@ ${isPacchetto ? '' : quoteBlock}
   // giro ha scritto "6-8 sedute per giornata" (la giornata ne vale 14) e "frequenza
   // quindicinale", cioè impegni di erogazione inventati dentro il documento che
   // fissa il prezzo. Stessa logica della definizione tassativa dei livelli.
-  const pOp = { ...{ sessions_per_l1: 4, session_duration_min: 30, prevention_sessions_per_l2: 4 }, ...(v2Params || {}) };
+  const pOp = conProtocollo(v2Params || {});   // i numeri del protocollo, non scritti a mano
   const parametriOperativi = (!isV2 || isPacchetto) ? '' : `
 PARAMETRI OPERATIVI REALI (usa ESATTAMENTE questi, non altri):
 - Seduta osteopatica individuale: ${pOp.session_duration_min} minuti

@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { RIGA_AREA_NON_ATTIVA } from '../../lib/attivazione';
 import { etichettaLivello } from '../../lib/livelli';
 import { dataIt } from '../../lib/date-it.mjs';
+import { PROTOCOLLO, inLettere } from '../../lib/protocollo.mjs';
 
 // ─── Header ────────────────────────────────────────────────────────────────────
 function Header() {
@@ -228,10 +229,10 @@ function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining, rinnovo
         <div style={{ fontSize: 13, opacity: .85, marginTop: 8, lineHeight: 1.6 }}>
           Il tuo check-up ha rilevato disturbi iniziali che non limitano ancora la tua attività.{' '}
           {attivo ? (
-            <>Il programma prevede per te 4 sessioni di prevenzione con l&apos;osteopata, in sede.<br />
+            <>Il programma prevede per te {PROTOCOLLO.sessioni_prevenzione_l2} sessioni di prevenzione con l&apos;osteopata, in sede.<br />
             Se il tuo stato cambia, puoi segnalarlo tramite il bottone qui sotto.</>
           ) : (
-            <>Se il programma verrà attivato, prevede per te 4 sessioni di prevenzione con l&apos;osteopata, in sede.</>
+            <>Se il programma verrà attivato, prevede per te {PROTOCOLLO.sessioni_prevenzione_l2} sessioni di prevenzione con l&apos;osteopata, in sede.</>
           )}
         </div>
       </div>
@@ -385,7 +386,7 @@ function OptedOutScreen({ patient }) {
       <div style={{ fontSize: 48, marginBottom: 16 }}>🏁</div>
       <div style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>Percorso completato</div>
       <div style={{ fontSize: 14, color: '#64748b', lineHeight: 1.6 }}>
-        Hai completato i due cicli di trattamento previsti dal protocollo. Il coordinatore ti contatterà per valutare i prossimi passi. Grazie per aver partecipato al programma.
+        Hai completato i {inLettere(PROTOCOLLO.cicli_trattamento_per_anno)} cicli di trattamento previsti dal protocollo. Il coordinatore ti contatterà per valutare i prossimi passi. Grazie per aver partecipato al programma.
       </div>
     </div>
   );

@@ -8,6 +8,7 @@
 import { requireAuth } from '../../../lib/auth';
 import { getPricingSettingsV2, updatePricingSettingV2, getServiziDeliverable, updateServizioDeliverable } from '../../../lib/pricing/settings';
 import { DEFAULTS_V2 } from '../../../lib/pricing/v2';
+import { eRegolaDelProtocollo } from '../../../lib/protocollo.mjs';
 
 export default requireAuth(async function handler(req, res) {
   try {
@@ -19,6 +20,10 @@ export default requireAuth(async function handler(req, res) {
       const b = req.body || {};
       if (b.tipo === 'setting') {
         if (!b.key) return res.status(400).json({ error: 'key mancante' });
+        // Regole del protocollo: contrattuali, non si modificano dal Listino.
+        if (eRegolaDelProtocollo(b.key)) {
+          return res.status(403).json({ error: `«${b.key}» è una regola del protocollo: non si modifica dal Listino. Vale per prezzo, testi e limiti insieme (lib/protocollo.mjs).` });
+        }
         // I fattori numerici devono restare numeri (mai NaN nel motore).
         if (Object.prototype.hasOwnProperty.call(DEFAULTS_V2, b.key) && !Number.isFinite(Number(b.value))) {
           return res.status(422).json({ error: `"${b.key}" deve essere un numero` });

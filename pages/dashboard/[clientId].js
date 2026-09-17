@@ -14,6 +14,7 @@ import { CONFIG } from '../../lib/config';
 import NavMenu from '../../components/NavMenu';
 import { nomeLivello } from '../../lib/livelli';
 import { dataIt } from '../../lib/date-it.mjs';
+import { PROTOCOLLO } from '../../lib/protocollo.mjs';
 
 
 
@@ -553,7 +554,7 @@ ${FIRMA}`,
     if (res.ok && capacity) {
       const fallback = (patientsNrs || []).filter(p => p.level === 'level1').length;
       const contracted = v != null && v > 0 ? v : fallback;
-      const budget = Math.ceil(contracted * (1 + (capacity.buffer_pct || 0.2)));
+      const budget = Math.ceil(contracted * (1 + PROTOCOLLO.buffer_pct));
       const committed = capacity.used + capacity.pending;
       setCapacity({
         ...capacity,
@@ -1339,7 +1340,7 @@ ${FIRMA}`,
           </div>
         )}
 
-        {/* ── Capacità trattamenti (anno) — L1 contratto + buffer 20% ── */}
+        {/* ── Capacità trattamenti (anno di programma) — L1 contratto + buffer del protocollo ── */}
         {capacity && capacity.budget > 0 && (() => {
           const pct = Math.min(100, Math.round(capacity.committed / capacity.budget * 100));
           const barColor = capacity.intakeSaturated ? '#dc2626' : pct >= 80 ? '#ca8a04' : '#16a34a';

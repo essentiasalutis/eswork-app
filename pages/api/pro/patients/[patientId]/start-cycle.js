@@ -10,6 +10,7 @@ import {
   getTreatmentCapacity,
 } from '../../../../../lib/store';
 import { finestraAnno, dirittoCicli } from '../../../../../lib/anno-programma.mjs';
+import { PROTOCOLLO } from '../../../../../lib/protocollo.mjs';
 
 
 export default requireProAuth(async function handler(req, res) {
@@ -49,7 +50,7 @@ export default requireProAuth(async function handler(req, res) {
         professional_id: proId,
         cycle_number: 1,
         cycle_type: 'prevention',
-        sessions_planned: 4,   // 4 sessioni di prevenzione attiva/anno
+        sessions_planned: PROTOCOLLO.sessioni_prevenzione_l2,
         sessions_completed: 0,
         status: 'active',
         started_at: new Date().toISOString(),
@@ -64,7 +65,7 @@ export default requireProAuth(async function handler(req, res) {
   if (patient.level !== 'level1') return res.status(400).json({ error: 'Solo pazienti L1 possono avere cicli di trattamento' });
 
   // CAPACITÀ CONTRATTUALE: i cicli di trattamento non possono superare i percorsi
-  // pagati (L1 contratto + buffer 20%). Tutela automatica contro l'over-delivery.
+  // pagati (L1 contratto + buffer del protocollo). Tutela automatica contro l'over-delivery.
   const capacity = await getTreatmentCapacity(patient.client_id).catch(() => null);
   if (capacity?.deliverySaturated) {
     return res.status(409).json({
@@ -98,11 +99,11 @@ export default requireProAuth(async function handler(req, res) {
     });
   }
 
-  // Controlla 60 giorni da ultimo ciclo
+  // Distanza minima tra cicli (regola del protocollo)
   if (patient.last_cycle_end_date) {
     const daysSince = Math.floor((Date.now() - new Date(patient.last_cycle_end_date)) / (1000 * 60 * 60 * 24));
-    if (daysSince < 60) {
-      return res.status(400).json({ error: `Distanza minima 60 giorni tra cicli. Mancano ${60 - daysSince} giorni.` });
+    if (daysSince < PROTOCOLLO.giorni_tra_cicli) {
+      return res.status(400).json({ error: `Distanza minima ${PROTOCOLLO.giorni_tra_cicli} giorni tra cicli. Mancano ${PROTOCOLLO.giorni_tra_cicli - daysSince} giorni.` });
     }
   }
 
@@ -114,7 +115,7 @@ export default requireProAuth(async function handler(req, res) {
       professional_id: proId,
       cycle_number,
       cycle_type: 'treatment',
-      sessions_planned: 4,
+      sessions_planned: PROTOCOLLO.sedute_per_ciclo,
       sessions_completed: 0,
       status: 'active',
       started_at: new Date().toISOString(),

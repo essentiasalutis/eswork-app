@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: MSG_NON_ATTIVO, programma_non_attivo: true });
   }
 
-  // Budget personale: 2 auto-segnalazioni per anno di programma dell'azienda.
+  // Budget personale: auto-segnalazioni per anno di programma dell'azienda (protocollo).
   // Se la lettura fallisce non si apre una segnalazione fuori regola: si rifiuta.
   let budget;
   try { budget = await getSelfTriggerBudget(patient.id, client); }
@@ -51,7 +51,7 @@ export default async function handler(req, res) {
   }
 
   // Capacità contrattuale azienda: cicli avviati + candidati in coda non possono
-  // superare i percorsi pagati (L1 contratto + buffer 20%). Tutela automatica:
+  // superare i percorsi pagati (L1 contratto + buffer del protocollo). Tutela automatica:
   // niente nuovi ingressi oltre quanto contrattualizzato.
   const capacity = await getTreatmentCapacity(patient.client_id).catch(() => null);
   if (capacity?.intakeSaturated) {

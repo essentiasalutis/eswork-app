@@ -14,6 +14,7 @@ import {
 import { sendCyclePgicLink } from '../../../../../lib/notify';
 import { parseNrs, validaNrsChiusura } from '../../../../../lib/nrs';
 import { documentiMancanti } from '../../../../../lib/documenti-seduta.mjs';
+import { PROTOCOLLO } from '../../../../../lib/protocollo.mjs';
 
 // Nessuna seduta senza documenti (Enrico, 17/9): il blocco vive QUI, non solo nella
 // pagina. Vale per ogni seduta, di trattamento o di prevenzione.
@@ -69,11 +70,12 @@ export default requireProAuth(async function handler(req, res) {
         // Tabella non ancora creata — ignora gracefully
       }
 
-      // Controlla limite 4 sessioni per ciclo
+      // Limite di sedute per ciclo: quelle previste dal ciclo (dal protocollo)
       if (activeCycle) {
         const cycleSessions = sessions.filter(s => s.cycle_id === activeCycle.id && s.closed_at);
-        if (close && cycleSessions.length >= 4) {
-          return res.status(400).json({ error: 'Limite di 4 sessioni per ciclo raggiunto' });
+        const previste = activeCycle.sessions_planned || PROTOCOLLO.sedute_per_ciclo;
+        if (close && cycleSessions.length >= previste) {
+          return res.status(400).json({ error: `Limite di ${previste} sedute per ciclo raggiunto` });
         }
       }
 
@@ -101,7 +103,7 @@ export default requireProAuth(async function handler(req, res) {
         if (activeCycle) {
           try {
             const newCompleted = (activeCycle.sessions_completed || 0) + 1;
-            const planned = activeCycle.sessions_planned || 4;
+            const planned = activeCycle.sessions_planned || PROTOCOLLO.sedute_per_ciclo;
             // REGOLA v4: alla seduta finale il ciclo NON si chiude da solo: passa a
             // 'pending_pgic' e si chiude solo registrando il PGIC (via "Chiudi ciclo").
             const reachedEnd = newCompleted >= planned && activeCycle.status === 'active';

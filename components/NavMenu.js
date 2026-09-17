@@ -17,7 +17,6 @@ const NAV_ITEMS = [
   { href: '/dashboard/restratifications', label: 'Ri-stratificazioni', icon: '🔄', color: 'rose' },
   { href: '/dashboard/finance', label: 'Finance', icon: '💶', color: 'emerald' },
   { href: '/dashboard/pricing-v2', label: 'Listino v2', icon: '🏷️', color: 'green' },
-  { href: '/dashboard/settings', label: 'Settings', icon: '⚙️', color: 'gray' },
 ];
 
 export default function NavMenu({ onLogout }) {

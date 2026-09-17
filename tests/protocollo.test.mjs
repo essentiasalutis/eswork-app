@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PROTOCOLLO, conProtocollo, eRegolaDelProtocollo, inLettere, percento } from '../lib/protocollo.mjs';
+import { PROTOCOLLO, conProtocollo, eRegolaDelProtocollo, inLettere, percento, oreRichiestePrimoAnno, fraseTempoRichiesto, fraseTemiFormazione } from '../lib/protocollo.mjs';
 import { MAX_CICLI_TRATTAMENTO, MAX_CICLI_PREVENZIONE, MAX_AUTOSEGNALAZIONI } from '../lib/anno-programma.mjs';
 import { DEFAULTS_V2 } from '../lib/pricing/v2-defaults.mjs';
 import { ORG_PARAMS, sogliaDefaultPerFascia } from '../lib/org-regole.mjs';
@@ -13,6 +13,7 @@ test('i valori del protocollo sono quelli contrattuali', () => {
     cicli_trattamento_per_anno: 2, cicli_prevenzione_per_anno: 1,
     giorni_tra_cicli: 60, autosegnalazioni_per_anno: 2, buffer_pct: 0.20,
     durata_prevalidazione_min: 15,
+    formazione_moduli_primo_anno: 2, formazione_moduli_anni_successivi: 1, formazione_ore_modulo: 1,
     recupero_finestra_mesi: 6,
     recupero_soglie: [{ max: 50, soglia: 5 }, { max: 200, soglia: 10 }, { max: Infinity, soglia: 20 }],
   });
@@ -61,4 +62,23 @@ test('recupero neoassunti (Art. 5-bis c. 5): la regola della formazione legge il
   assert.equal(sogliaDefaultPerFascia(51), 10);
   assert.equal(sogliaDefaultPerFascia(200), 10);
   assert.equal(sogliaDefaultPerFascia(201), 20);
+});
+
+test('moduli di formazione: regola del protocollo anche nel prezzo', () => {
+  const p = conProtocollo({ training_modules_y1: 5, training_modules_y2: 4 });
+  assert.equal(p.training_modules_y1, 2);
+  assert.equal(p.training_modules_y2, 1);
+  assert.equal(fraseTemiFormazione(), 'due temi nel primo anno di programma e uno negli anni successivi');
+});
+
+test('tempo richiesto: calcolato dal protocollo, arrotondato per eccesso', () => {
+  const o = oreRichiestePrimoAnno();
+  assert.deepEqual({ t: o.trattamento, a: o.altri }, { t: 4, a: 2 });
+  assert.equal(o.esatte.trattamento, 4);
+  assert.equal(fraseTempoRichiesto(), 'circa 4 ore nel primo anno di programma per chi è in trattamento e 2 ore per tutti gli altri');
+  assert.equal(fraseTempoRichiesto({ breve: true }), 'circa 4 ore nel primo anno di programma per chi è in trattamento, 2 per tutti gli altri');
+  // 3,5 ore esatte (3 sedute da 30′ + 2 moduli da 1 ora) diventano 4: per eccesso, mai per difetto.
+  const scomodo = oreRichiestePrimoAnno({ ...PROTOCOLLO, sedute_per_ciclo: 3 });
+  assert.equal(scomodo.esatte.trattamento, 3.5);
+  assert.equal(scomodo.trattamento, 4);
 });

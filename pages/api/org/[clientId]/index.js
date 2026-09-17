@@ -15,7 +15,7 @@ export default requireAuth(async function handler(req, res) {
   }
   if (req.method === 'PUT') {
     try { return res.json(await updateClientOrgParams(clientId, req.body || {})); }
-    catch (e) { return res.status(500).json({ error: e.message }); }
+    catch (e) { return res.status(e.status || 500).json({ error: e.message }); }
   }
   return res.status(405).end();
 });

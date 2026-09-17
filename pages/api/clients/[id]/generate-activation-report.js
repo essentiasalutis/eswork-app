@@ -22,7 +22,7 @@ import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
 import { kAnonPartition, tooSmall, K_ANON } from '../../../../lib/kanon';
 import { dataIt } from '../../../../lib/date-it.mjs';
-import { conProtocollo } from '../../../../lib/protocollo.mjs';
+import { conProtocollo, PROTOCOLLO } from '../../../../lib/protocollo.mjs';
 
 export const config = { maxDuration: 60 };
 
@@ -199,7 +199,7 @@ VINCOLI TASSATIVI SUL TESTO:
 - MAI i termini Core, Plus, Enterprise, "tier", "modello Core/Plus/Enterprise": sono nomi INTERNI, non ti vengono forniti e non vanno inventati. Il prodotto si chiama SOLO "${nomeProdotto}".` : '';
   const istruzioniPacchetto = isPacchetto ? `
 ════ PRODOTTO "${nomeProdotto}" — 12 mesi, non rinnovabile, AUTOCONCLUSIVO ════
-Include SOLO: check-up completo (già svolto), formazione (2 moduli), consulenza ergonomico-posturale (osservazione delle postazioni e del gesto, con raccomandazioni di adeguamento: descrivila in termini generali, SENZA citare numeri di postazioni o di addetti).
+Include SOLO: check-up completo (già svolto), formazione (${PROTOCOLLO.formazione_moduli_primo_anno} moduli), consulenza ergonomico-posturale (osservazione delle postazioni e del gesto, con raccomandazioni di adeguamento: descrivila in termini generali, SENZA citare numeri di postazioni o di addetti).
 NON include: trattamenti individuali, percorsi clinici, prevenzione attiva, sportello osteopatico, follow-up, monitoraggio.
 
 DIVIETI ASSOLUTI — valgono su TUTTO il testo, incluse le PARAFRASI che aggirano la lettera del divieto ma ne violano lo spirito:

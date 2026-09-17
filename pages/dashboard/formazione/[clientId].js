@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { requireAuthSsr } from '../../../lib/auth';
 import { TIPO_ERGONOMIA } from '../../../lib/org-regole.mjs';
 import { dataIt, giornoIt } from '../../../lib/date-it.mjs';
+import { PROTOCOLLO, inLettere } from '../../../lib/protocollo.mjs';
 
 const fmt = d => d ? dataIt(d, { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const eur = n => `€${Math.round(Number(n) || 0).toLocaleString('it-IT')}`;
@@ -82,7 +83,7 @@ export default function FormazionePage({ clientId }) {
           <details className={box}>
             <summary className="cursor-pointer text-sm font-semibold text-gray-700">⚙️ Parametri programma</summary>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3">
-              {[['Avvio programma', 'data_avvio_programma', 'date'], ['Anno (override)', 'anno_programma', 'number'], ['Popolazione aderente', 'popolazione_aderente', 'number'], ['Soglia trigger (X)', 'soglia_x', 'number'], ['Capienza gruppo', 'capienza_gruppo', 'number'], ['Listino concentrata €', 'listino_concentrata', 'number'], ['Listino base completa €', 'listino_base_completa', 'number']].map(([lbl, k, type]) => (
+              {[['Avvio programma', 'data_avvio_programma', 'date'], ['Anno (override)', 'anno_programma', 'number'], ['Popolazione aderente', 'popolazione_aderente', 'number'], ['Capienza gruppo', 'capienza_gruppo', 'number'], ['Listino concentrata €', 'listino_concentrata', 'number'], ['Listino base completa €', 'listino_base_completa', 'number']].map(([lbl, k, type]) => (
                 <label key={k} className="text-xs text-gray-500">{lbl}
                   <input type={type} value={params[k] ?? ''} onChange={e => setParams(p => ({ ...p, [k]: e.target.value }))} className={`${inputCls} w-full mt-1`} />
                 </label>
@@ -96,7 +97,7 @@ export default function FormazionePage({ clientId }) {
           <div className={`${box} ${proposta.active ? 'border-green-300' : ''}`}>
             <div className="flex items-center justify-between flex-wrap gap-2">
               <h2 className="font-bold text-gray-900">🆕 Nuovi ingressi in attesa di recupero</h2>
-              <span className="text-sm text-gray-500">{coda.length} in coda · soglia {params.soglia_x}</span>
+              <span className="text-sm text-gray-500">{coda.length} in coda · soglia {params.soglia_x} (contratto, Art. 5-bis c. 5)</span>
             </div>
             {coda.length === 0 ? <p className="text-sm text-gray-400 mt-2">Nessun nuovo ingresso in attesa.</p> : (
               <>
@@ -105,7 +106,7 @@ export default function FormazionePage({ clientId }) {
                   <div className="mt-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
                     <div className="text-sm font-semibold text-green-800">⏰ Trigger attivo — {proposta.motivo === 'soglia' ? 'soglia raggiunta' : '6 mesi dal primo in coda'}</div>
                     <div className="text-sm text-green-700 mt-1">
-                      Proposta: <strong>{proposta.proposta.tipo === 'base_concentrata' ? 'Base concentrata (1h30)' : 'Base completa (due moduli)'}</strong> · {proposta.proposta.nGruppi} gruppo/i · {proposta.proposta.nPartecipanti} partecipanti · stima <strong>{eur(proposta.proposta.importo)}</strong>
+                      Proposta: <strong>{proposta.proposta.tipo === 'base_concentrata' ? 'Base concentrata (1h30)' : `Base completa (${inLettere(PROTOCOLLO.formazione_moduli_primo_anno)} moduli)`}</strong> · {proposta.proposta.nGruppi} gruppo/i · {proposta.proposta.nPartecipanti} partecipanti · stima <strong>{eur(proposta.proposta.importo)}</strong>
                     </div>
                     {ergonomiaCoda && (
                       <div className="text-sm text-green-700 mt-1">

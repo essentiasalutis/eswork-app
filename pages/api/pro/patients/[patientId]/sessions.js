@@ -9,9 +9,24 @@ import {
   logAccess,
   getActiveCycleByPatient,
   updateTreatmentCycle,
+  getPatientDocuments,
 } from '../../../../../lib/store';
 import { sendCyclePgicLink } from '../../../../../lib/notify';
 import { parseNrs, validaNrsChiusura } from '../../../../../lib/nrs';
+import { documentiMancanti } from '../../../../../lib/documenti-seduta.mjs';
+
+// Nessuna seduta senza documenti (Enrico, 17/9): il blocco vive QUI, non solo nella
+// pagina. Vale per ogni seduta, di trattamento o di prevenzione.
+async function bloccoDocumenti(res, patientId) {
+  const mancanti = documentiMancanti(await getPatientDocuments(patientId));
+  if (!mancanti.length) return false;
+  res.status(409).json({
+    codice: 'documenti_mancanti',
+    mancanti,
+    error: 'Prima di registrare una seduta servono consenso al trattamento, informativa estesa e anamnesi, firmati e validi.',
+  });
+  return true;
+}
 
 export default requireProAuth(async function handler(req, res) {
   const { patientId } = req.query;
@@ -32,6 +47,7 @@ export default requireProAuth(async function handler(req, res) {
   // POST — crea nuova sessione (atomica: crea e chiude in un colpo)
   if (req.method === 'POST') {
     try {
+      if (await bloccoDocumenti(res, patientId)) return;
       const sessions = await getSessionsByPatient(patientId);
       const nextNumber = sessions.filter(s => s.closed_at).length + 1;
       const { nrs_pre, nrs_post, treatment_notes, next_session_notes, close } = req.body;
@@ -119,6 +135,10 @@ export default requireProAuth(async function handler(req, res) {
       // Chiusura di una visita aperta: valgono gli stessi due NRS del POST.
       // La MODIFICA di una seduta già chiusa resta libera — le sedute storiche
       // senza NRS devono restare correggibili, non bloccate.
+      // Chiudere una visita aperta è registrare una seduta: stesso blocco del POST.
+      // Correggere una seduta già chiusa resta libero (lo storico si corregge).
+      if (close && !session.closed_at && await bloccoDocumenti(res, patientId)) return;
+
       if (close && !session.closed_at) {
         const errNrs = validaNrsChiusura({
           nrs_pre: nrs_pre !== undefined ? nrs_pre : session.nrs_pre,

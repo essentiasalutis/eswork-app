@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import SignatureCanvas from './SignatureCanvas';
+import { documentiMancanti } from '../lib/documenti-seduta.mjs';
 // I testi da firmare arrivano dall'ARCHIVIO (prop `testi`, caricata lato server):
 // nessuna copia nel codice. Alla firma si rimandano solo i loro identificativi.
 
@@ -65,11 +66,9 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
   function upd(k, v) { setF(prev => ({ ...prev, [k]: v })); }
   function toggle(key) { setOpen(p => ({ ...p, [key]: !p[key] })); }
 
+  // Stessa regola dell'API delle sedute: un consenso vale solo se legato all'archivio.
   function allComplete() {
-    return ['consent_treatment', 'privacy_extended', 'anamnesi'].every(type => {
-      const d = docs.find(d => d.type === type);
-      return d && (d.status === 'signed' || d.status === 'completed');
-    });
+    return documentiMancanti(docs).length === 0;
   }
 
   const canSave = !!(f.pain_location && f.job_activity && nrsTouched && signature);

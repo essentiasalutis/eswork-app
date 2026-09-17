@@ -13,7 +13,7 @@ export default requireAuth(async function handler(req, res) {
 
   try {
     // Idempotente: NON blocchiamo se la riga paziente è già sparita (es. eliminata
-    // lato professionista). In quel caso ripuliamo comunque eventuali figli orfani
+    // da una versione precedente, quando anche l'osteopata poteva cancellare: dal 17/9 non più). Ripuliamo comunque eventuali figli orfani
     // e rispondiamo ok, così la voce sparisce dalla lista dell'amministratore.
     const patient = await getPatientById(patientId);
 

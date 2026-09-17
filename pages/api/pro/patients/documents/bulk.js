@@ -91,7 +91,8 @@ export default requireProAuth(async function handler(req, res) {
     await logAccess({ professional_id: proId, action: 'sign_documents', patient_id: patientId, ip, user_agent: req.headers['user-agent'], details: 'Firma cumulativa: consenso + privacy + anamnesi' }).catch(() => {});
 
     console.log(`[bulk-docs] patient=${patientId} signed at ${now} — consent=${docConsent.id} privacy=${docPrivacy.id} anamnesi=${docAnamnesi.id}`);
-    return res.json([docConsent, docPrivacy, docAnamnesi]);
+    // Mai l'immagine della firma autografa verso il browser (come la pagina SSR).
+    return res.json([docConsent, docPrivacy, docAnamnesi].map(d => ({ ...d, signature_image: undefined })));
 
   } catch (e) {
     console.error('[bulk-docs] error:', e.message);

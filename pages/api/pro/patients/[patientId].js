@@ -5,7 +5,6 @@ import {
   proCanAccessPatientClinical,
   logAccess,
 } from '../../../../lib/store';
-import supabase from '../../../../lib/db';
 
 export default requireProAuth(async function handler(req, res) {
   const { patientId } = req.query;
@@ -34,15 +33,11 @@ export default requireProAuth(async function handler(req, res) {
     }
   }
 
+  // DELETE — tolto all'osteopata (Enrico, 17/9). Cancellare un paziente cancella
+  // sedute e documenti firmati: è documentazione clinica da conservare. Resta solo
+  // la procedura dell'amministratore (/api/admin/patients/[patientId]).
   if (req.method === 'DELETE') {
-    try {
-      await supabase.from('sessions').delete().eq('patient_id', patientId);
-      const { error } = await supabase.from('patients').delete().eq('id', patientId);
-      if (error) throw error;
-      return res.json({ ok: true });
-    } catch (e) {
-      return res.status(500).json({ error: e.message });
-    }
+    return res.status(403).json({ error: 'La cancellazione di un paziente non è consentita dalla cartella: la documentazione clinica va conservata.' });
   }
 
   res.status(405).end();

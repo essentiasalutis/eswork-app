@@ -16,6 +16,7 @@ import PatientDocuments from '../../../components/PatientDocuments';
 import { validaNrsChiusura } from '../../../lib/nrs';
 import { vistaCartellaCurante } from '../../../lib/vista';
 import { nomeLivello } from '../../../lib/livelli';
+import { documentiMancanti, prevedeSedute } from '../../../lib/documenti-seduta.mjs';
 
 // ─── NRS Slider ───────────────────────────────────────────────────────────────
 
@@ -751,23 +752,10 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
     });
   }
 
+  // Stessa regola dell'API delle sedute (lib/documenti-seduta.mjs): la pagina la
+  // mostra, il blocco vero è sul server.
   function allDocsSigned() {
-    const types = ['consent_treatment', 'privacy_extended', 'anamnesi'];
-    return types.every(t => {
-      const d = patientDocs.find(doc => doc.type === t);
-      return d && (d.status === 'signed' || d.status === 'completed');
-    });
-  }
-
-  async function deletePatient() {
-    const name = `${patient.first_name} ${patient.last_name}`;
-    if (!confirm(`Eliminare definitivamente il paziente ${name}?\n\nVerranno cancellate anche tutte le sedute registrate. Questa azione non è reversibile.`)) return;
-    const res = await fetch(`/api/pro/patients/${patient.id}`, { method: 'DELETE' });
-    if (res.ok) {
-      router.replace(`/pro/clients/${patient.client_id}/patients`);
-    } else {
-      alert('Errore durante l\'eliminazione. Riprova.');
-    }
+    return documentiMancanti(patientDocs).length === 0;
   }
 
   async function startCycle(type = 'treatment') {
@@ -852,12 +840,6 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
           </div>
           <div className="text-center text-xs text-gray-300 pb-1 flex items-center justify-center gap-3">
             <span>{proName} — Essentia Salutis</span>
-            <button
-              onClick={deletePatient}
-              className="text-red-400 hover:text-red-600 text-xs underline"
-            >
-              Elimina paziente
-            </button>
           </div>
         </header>
 
@@ -895,8 +877,8 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
             )}
           </div>
 
-          {/* ── Documenti e consensi (solo L1) ───────────────────────────── */}
-          {patient.level === 'level1' && (
+          {/* ── Documenti e consensi (L1 e L2 con prevenzione) ───────────── */}
+          {prevedeSedute(patient) && (
             <div className="bg-white rounded-2xl border border-gray-200 p-4">
               <h3 className="font-semibold text-gray-800 mb-3 text-sm flex items-center gap-2">
                 📄 Documenti e consensi
@@ -1100,9 +1082,11 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
           )}
 
           {!showNewSession && activeCycle?.status !== 'pending_pgic' && (
-            patient.level === 'level1' && !allDocsSigned() ? (
+            !allDocsSigned() ? (
               <div className="w-full py-3 px-4 rounded-xl bg-orange-50 border border-orange-200 text-sm text-orange-700 text-center">
-                ⚠️ Prima di poter avviare il trattamento, completare i 3 documenti nella sezione <strong>"Documenti e consensi"</strong>.
+                {prevedeSedute(patient)
+                  ? <>⚠️ Prima di registrare una seduta, completare i 3 documenti nella sezione <strong>"Documenti e consensi"</strong>.</>
+                  : <>Le sedute si registrano per i pazienti in trattamento (Livello 1) o in prevenzione (Livello 2 con diritto), dopo i 3 documenti firmati.</>}
               </div>
             ) : (
               <button onClick={() => setShowNewSession(true)}

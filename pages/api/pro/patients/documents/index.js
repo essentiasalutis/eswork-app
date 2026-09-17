@@ -11,7 +11,7 @@ import { getClientIp } from '../../../../../lib/rate-limit';
 import { vistaDocumentoPaziente } from '../../../../../lib/vista';
 
 // GET  /api/pro/patients/documents?patientId=xxx
-// POST /api/pro/patients/documents — firma o compila documento
+// POST /api/pro/patients/documents — aggiorna l'anamnesi (i consensi: solo /bulk)
 // Livello B (cartella clinica): SOLO l'osteopata assegnato al paziente.
 export default requireProAuth(async function handler(req, res) {
   const proId = req.proSession.proId;
@@ -37,29 +37,34 @@ export default requireProAuth(async function handler(req, res) {
     }
   }
 
+  // POST — SOLO l'anamnesi (modifica dalla cartella). I due consensi si firmano
+  // unicamente da /documents/bulk, contro la versione d'archivio (v64): qui prima
+  // si poteva segnare «firmato» un consenso senza firma, senza archivio e con
+  // l'azienda presa dal corpo della richiesta.
   if (req.method === 'POST') {
     try {
-      const { type, client_id, signature_image, form_data, pro_notes, document_text } = req.body;
-      if (!type || !client_id) return res.status(400).json({ error: 'type e client_id richiesti' });
+      const { type, form_data, pro_notes } = req.body || {};
+      if (type !== 'anamnesi') {
+        return res.status(400).json({ error: 'Da qui si aggiorna solo l\'anamnesi: i consensi si firmano con la firma cumulativa.' });
+      }
+      if (!form_data || typeof form_data !== 'object') return res.status(400).json({ error: 'dati anamnesi obbligatori' });
 
       const ip = getClientIp(req);
       const now = new Date().toISOString();
-      const isAnamnesi = type === 'anamnesi';
-
       const fields = {
         professional_id: proId,
-        status: isAnamnesi ? 'completed' : 'signed',
+        status: 'completed',
         signed_at: now,
         ip_hash: hashIp(ip),
         user_agent: req.headers['user-agent']?.slice(0, 200) || null,
-        ...(signature_image && { signature_image }),
-        ...(document_text && { content_hash: hashContent(document_text) }),
-        ...(form_data && { form_data }),
+        form_data,
+        content_hash: hashContent(JSON.stringify(form_data)),
         ...(pro_notes !== undefined && { pro_notes }),
       };
 
-      const doc = await upsertPatientDocument(patientId, client_id, type, fields);
-      await logAccess({ professional_id: proId, action: 'sign_document', patient_id: patientId, ip, user_agent: req.headers['user-agent'], details: `Documento ${type} ${isAnamnesi ? 'compilato' : 'firmato'}` }).catch(() => {});
+      // L'azienda si legge dal paziente, non dal corpo della richiesta.
+      const doc = await upsertPatientDocument(patientId, patient.client_id, 'anamnesi', fields);
+      await logAccess({ professional_id: proId, action: 'sign_document', patient_id: patientId, ip, user_agent: req.headers['user-agent'], details: 'Documento anamnesi compilato' }).catch(() => {});
       return res.json(vistaDocumentoPaziente(doc));
     } catch (e) {
       console.error('[patient-docs] save error:', e.message);

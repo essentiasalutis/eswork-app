@@ -12,6 +12,7 @@
 import crypto from 'crypto';
 import supabase from '../../../lib/db';
 import { computeLevel } from '../../../lib/scoring';
+import { sessioneConsensiValida, collegaSessioneAPaziente } from '../../../lib/testi-legali-server';
 
 const NEUTRO_ERR = 'Non è stato possibile completare la registrazione, riprova.';
 
@@ -21,12 +22,16 @@ export default async function handler(req, res) {
     const b = req.body || {};
     const token = typeof b.token === 'string' ? b.token : '';
     const answers = b.answers && typeof b.answers === 'object' ? b.answers : null;
-    const informativa_version = typeof b.informativa_version === 'string' ? b.informativa_version.trim() : '';
-    // Guardia 2: senza versione del consenso NON si procede (prova monca). Reject neutro
-    // PRIMA dell'RPC — nessun default silenzioso. (L'RPC ha comunque un RAISE belt-and-braces.)
-    if (!token || token.length < 32 || !answers || !informativa_version) {
+    // Guardia 2 (v64): i consensi sono già registrati dal server, uno per casella,
+    // con la versione decisa dal server. Qui si verifica la sessione — completa,
+    // recente, non ancora usata. La versione passata all'RPC viene da lì, MAI dal
+    // browser. È una lettura prima del consumo, ma sulla sessione dei consensi, non
+    // sul token: non dice nulla sulla validità dell'invito (risposta sempre neutra).
+    const consensi = await sessioneConsensiValida(b.consensi_sessione_id, 'informativa_checkup').catch(() => null);
+    if (!token || token.length < 32 || !answers || !consensi) {
       return res.status(200).json({ ok: false, message: NEUTRO_ERR });
     }
+    const informativa_version = consensi[0].versione;
 
     // Logica clinica in JS (l'RPC persiste il valore pre-calcolato).
     const computed_level = computeLevel(answers);
@@ -50,6 +55,11 @@ export default async function handler(req, res) {
       // token invalido/consumato/scaduto/revocato, o errore tecnico → stesso neutro.
       return res.status(200).json({ ok: false, message: NEUTRO_ERR });
     }
+    // Collega i consensi registrati al paziente appena creato dall'RPC.
+    try {
+      const { data: p } = await supabase.from('patients').select('id').eq('care_token', care_token).maybeSingle();
+      if (p) await collegaSessioneAPaziente(b.consensi_sessione_id, p.id);
+    } catch (e) { console.error('[invito] collega consensi:', e.message); }
     // B1: care_token nel BODY, mai in URL. La pagina lo usa per il link personale.
     return res.status(200).json({ ok: true, care_token });
   } catch (_e) {

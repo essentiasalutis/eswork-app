@@ -674,7 +674,7 @@ function ClosedSessionCard({ session: s, patientId, onUpdated }) {
 
 // ─── Pagina principale ────────────────────────────────────────────────────────
 
-export default function PatientPage({ proName, patient: initialPatient, sessions: initialSessions, client, documents: initialDocs, cycles: initialCycles }) {
+export default function PatientPage({ proName, patient: initialPatient, sessions: initialSessions, client, documents: initialDocs, cycles: initialCycles , testiFirma = null}) {
   const router = useRouter();
   const [patient, setPatient] = useState(initialPatient);
   const [sessions, setSessions] = useState(initialSessions);
@@ -911,6 +911,7 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
                 patient={patient}
                 documents={patientDocs}
                 onDocsChange={setPatientDocs}
+                testi={testiFirma}
               />
             </div>
           )}
@@ -1164,6 +1165,14 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
     getPatientDocuments(patientId),
   ]);
 
+  // Testi da firmare in cartella: dall'archivio (v64), unica fonte del testo legale.
+  let testiFirma = null;
+  try {
+    const { testiPerFirmaInCartella, perIlBrowser } = await import('../../../lib/testi-legali-server');
+    const t = await testiPerFirmaInCartella();
+    testiFirma = { consenso: perIlBrowser(t.consenso), informativa: perIlBrowser(t.informativa) };
+  } catch (e) { console.error('[cartella] testi da firmare:', e.message); }
+
   // Carica cicli (graceful: tabella potrebbe non esistere ancora)
   let cycles = [];
   try {
@@ -1183,6 +1192,7 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
       client,
       documents: documents.map(d => ({ ...d, signature_image: undefined })), // non passare la firma al client per default
       cycles,
+      testiFirma,
     },
   };
 });

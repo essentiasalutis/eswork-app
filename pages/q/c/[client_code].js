@@ -13,7 +13,6 @@ import { useState, useRef, useEffect } from 'react';
 import Head from 'next/head';
 import { BODY_ZONES } from '../../../lib/scoring';
 import { ConsentScreen } from '../../../components/ConsentScreen';
-import { INFORMATIVA_QUESTIONARIO } from '../../../lib/legal-texts';
 import { NmqQuestionnaire } from '../../../components/NmqQuestionnaire';
 
 // ─── Logo ES Work ─────────────────────────────────────────────────────────────
@@ -28,7 +27,7 @@ function ESLogo({ size = 56 }) {
 
 // ─── Fase 0: Welcome screen ───────────────────────────────────────────────────
 
-function WelcomeScreen({ clientName, chiudeFrase, firmato, onIdentified }) {
+function WelcomeScreen({ clientName, chiudeFrase, firmato, testoInformativa, onIdentified }) {
   const [informativa, setInformativa] = useState(false);
   const [altroSotto, setAltroSotto] = useState(true);   // il testo è lungo: all'apertura c'è sempre altro sotto
   return (
@@ -89,8 +88,8 @@ function WelcomeScreen({ clientName, chiudeFrase, firmato, onIdentified }) {
           <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b border-gray-100">
               <div>
-                <div className="font-bold text-gray-900">{INFORMATIVA_QUESTIONARIO.titolo}</div>
-                <div className="text-xs text-gray-500 mt-0.5">{INFORMATIVA_QUESTIONARIO.sottotitolo}</div>
+                <div className="font-bold text-gray-900">{testoInformativa?.contenuto?.titolo}</div>
+                <div className="text-xs text-gray-500 mt-0.5">{testoInformativa?.contenuto?.sottotitolo}</div>
               </div>
               <button onClick={() => setInformativa(false)} className="text-gray-400 text-xl leading-none px-1">✕</button>
             </div>
@@ -98,7 +97,7 @@ function WelcomeScreen({ clientName, chiudeFrase, firmato, onIdentified }) {
               const el = e.currentTarget;
               setAltroSotto(el.scrollHeight - el.scrollTop - el.clientHeight > 12);
             }}>
-              {INFORMATIVA_QUESTIONARIO.sezioni.map(sez => (
+              {(testoInformativa?.contenuto?.sezioni || []).map(sez => (
                 <div key={sez.id} className="mb-4">
                   <div className="font-semibold text-gray-800 text-sm mb-1">{sez.titolo}</div>
                   <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">{sez.testo}</p>
@@ -406,7 +405,7 @@ const PHASES = {
   DONE: 'done',
 };
 
-export default function SelfDeclarePage({ client, error: serverError, checkup, sedi = [], emailAttiva = false }) {
+export default function SelfDeclarePage({ client, error: serverError, checkup, sedi = [], emailAttiva = false, informativa = null }) {
   const [phase, setPhase] = useState(PHASES.WELCOME);
   const [wantsContact, setWantsContact] = useState(true);
   const [contactData, setContactData] = useState(null);
@@ -417,7 +416,9 @@ export default function SelfDeclarePage({ client, error: serverError, checkup, s
   const [chiusoMsg, setChiusoMsg] = useState(null); // check-up chiuso scoperto all'invio (oltre la grazia)
   const [level, setLevel] = useState(null);
   const [careToken, setCareToken] = useState(null);
-  const [consentVersion, setConsentVersion] = useState(null);
+  // Identificativo della sessione dei consensi, restituito dal server alla conferma
+  // delle caselle: la prova del consenso è già registrata, qui si consegna solo il legame.
+  const [consensiSessione, setConsensiSessione] = useState(null);
 
   const STORAGE_KEY = client ? `eswork_q_${client.id}` : null;
 
@@ -447,10 +448,9 @@ export default function SelfDeclarePage({ client, error: serverError, checkup, s
         location: contactData?.location || null,
         wants_to_be_contacted: wantsContact,
         answers,
-        // Prova del consenso (l'utente ha spuntato entrambe le caselle per arrivare qui)
-        consent_privacy: true,
-        consent_health: true,
-        informativa_version: consentVersion,
+        // I consensi NON si mandano più come costanti: sono già registrati dal server,
+        // uno per casella, alla conferma della schermata. Qui solo il legame.
+        consensi_sessione_id: consensiSessione,
       };
 
       const res = await fetch(`/api/self-declare/${client.share_code}`, {
@@ -519,6 +519,7 @@ export default function SelfDeclarePage({ client, error: serverError, checkup, s
 
       {phase === PHASES.WELCOME && (
         <WelcomeScreen
+          testoInformativa={informativa}
           clientName={client.name}
           chiudeFrase={checkup?.chiudeFrase || null}
           firmato={!!checkup?.firmato}
@@ -527,7 +528,7 @@ export default function SelfDeclarePage({ client, error: serverError, checkup, s
       )}
 
       {phase === PHASES.CONSENT && (
-        <ConsentScreen onComplete={(version) => { setConsentVersion(version); setPhase(PHASES.CONTACT); }} />
+        <ConsentScreen testo={informativa} canale="checkup" onComplete={(sessioneId) => { setConsensiSessione(sessioneId); setPhase(PHASES.CONTACT); }} />
       )}
 
       {phase === PHASES.CONTACT && (
@@ -608,7 +609,13 @@ export async function getServerSideProps({ params }) {
     // il dominio mittente non è ancora verificato, e un pulsante che promette un invio
     // che non parte è peggio di un pulsante assente.
     const { invioEmailAttivo } = await import('../../../lib/email');
-    return { props: { client: { id: client.id, name: client.name, share_code: client_code, tier }, checkup, sedi, emailAttiva: invioEmailAttivo() } };
+    // L'informativa si legge dall'archivio (unica fonte del testo legale, v64).
+    let informativa = null;
+    try {
+      const { testoInVigore, perIlBrowser } = await import('../../../lib/testi-legali-server');
+      informativa = perIlBrowser(await testoInVigore('informativa_checkup'));
+    } catch (e) { console.error('[q/c] informativa:', e.message); }
+    return { props: { client: { id: client.id, name: client.name, share_code: client_code, tier }, checkup, sedi, emailAttiva: invioEmailAttivo(), informativa } };
   } catch (e) {
     return { props: { client: null, error: 'Errore interno: ' + e.message } };
   }

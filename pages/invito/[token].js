@@ -123,11 +123,11 @@ function Done({ careToken }) {
   );
 }
 
-export default function InvitoPage({ alive }) {
+export default function InvitoPage({ alive, informativa = null }) {
   const router = useRouter();
   const token = router.query.token;
   const [phase, setPhase] = useState(PHASES.WELCOME);
-  const [consentVersion, setConsentVersion] = useState(null);
+  const [consensiSessione, setConsensiSessione] = useState(null);   // legame ai consensi già registrati dal server
   const [contact, setContact] = useState(null);
   const [answers, setAnswers] = useState({});
   const [nmqStep, setNmqStep] = useState(0);
@@ -152,7 +152,7 @@ export default function InvitoPage({ alive }) {
           phone: contact?.phone || null,
           location: contact?.location || null,
           wants_to_be_contacted: true,
-          informativa_version: consentVersion,
+          consensi_sessione_id: consensiSessione,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -177,7 +177,7 @@ export default function InvitoPage({ alive }) {
       </Head>
       {!alive ? <DeadLink />
         : phase === PHASES.WELCOME ? <Welcome onContinue={() => setPhase(PHASES.CONSENT)} />
-        : phase === PHASES.CONSENT ? <ConsentScreen onComplete={(version) => { setConsentVersion(version); setPhase(PHASES.CONTACT); }} />
+        : phase === PHASES.CONSENT ? <ConsentScreen testo={informativa} canale="invito" onComplete={(sessioneId) => { setConsensiSessione(sessioneId); setPhase(PHASES.CONTACT); }} />
         : phase === PHASES.CONTACT ? <ContactForm onSubmit={(data) => { setContact(data); setPhase(PHASES.NMQ); }} />
         : phase === PHASES.NMQ ? (
           <NmqQuestionnaire
@@ -197,14 +197,22 @@ export default function InvitoPage({ alive }) {
   );
 }
 
-// getServerSideProps MUTO: ritorna SOLO { alive } (booleano). Nessun nome azienda,
-// nessun dipendente_id. Referrer-Policy: no-referrer sulla route (oltre alla meta).
+// getServerSideProps MUTO: ritorna { alive } (booleano) e il testo pubblico
+// dell'informativa dall'archivio. Nessun nome azienda, nessun dipendente_id.
+// Referrer-Policy: no-referrer sulla route (oltre alla meta).
 export async function getServerSideProps({ params, res }) {
   res.setHeader('Referrer-Policy', 'no-referrer');
   try {
     const { invitoTokenAlive } = await import('../../lib/org');
     const alive = await invitoTokenAlive(params.token);
-    return { props: { alive: !!alive } };
+    let informativa = null;
+    if (alive) {
+      try {
+        const { testoInVigore, perIlBrowser } = await import('../../lib/testi-legali-server');
+        informativa = perIlBrowser(await testoInVigore('informativa_checkup'));
+      } catch (e) { console.error('[invito] informativa:', e.message); }
+    }
+    return { props: { alive: !!alive, informativa } };
   } catch {
     return { props: { alive: false } };
   }

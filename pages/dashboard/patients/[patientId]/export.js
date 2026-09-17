@@ -7,14 +7,17 @@ import {
   getClientById,
   getConsentByPatient,
 } from '../../../../lib/store';
-import { CONSENSO_TRATTAMENTO, INFORMATIVA_PRIVACY_ESTESA } from '../../../../lib/legal-texts';
 
 const NMQ_LABELS_IT = {
   '<1m': 'Meno di 1 mese', '1-3m': '1–3 mesi', '3-6m': '3–6 mesi',
   '6-12m': '6–12 mesi', '>12m': 'Più di 12 mesi',
 };
 
-export default function PatientExport({ patient, client, documents, sessions, assessmentConsent, exportedAt }) {
+export default function PatientExport({ patient, client, documents, sessions, assessmentConsent, exportedAt, testoConsenso, testoInformativa }) {
+  // Si stampa la versione FIRMATA, presa dall'archivio. Se il documento non è
+  // ancora firmato si stampa quella in vigore, e lo si dichiara.
+  const CONSENSO_TRATTAMENTO = testoConsenso?.contenuto || { titolo: 'Consenso informato al trattamento osteopatico', sezioni: [] };
+  const INFORMATIVA_PRIVACY_ESTESA = testoInformativa?.contenuto || { titolo: 'Informativa sul trattamento dei dati personali', sezioni: [] };
 
   const getDoc = type => documents.find(d => d.type === type);
   const consent = getDoc('consent_treatment');
@@ -110,7 +113,7 @@ export default function PatientExport({ patient, client, documents, sessions, as
         {/* ── CONSENSO TRATTAMENTO ── */}
         <div className="page-break" />
         <h2>1. {CONSENSO_TRATTAMENTO.titolo}</h2>
-        <p className="meta">{CONSENSO_TRATTAMENTO.riferimento}</p>
+        <p className="meta">{CONSENSO_TRATTAMENTO.riferimento}{testoConsenso ? ` · versione ${testoConsenso.versione}${testoConsenso.firmata ? '' : ' (in vigore, non ancora firmata)'}` : ''}</p>
         {CONSENSO_TRATTAMENTO.sezioni.map(s => (
           <div key={s.id}>
             <h3>{s.titolo}</h3>
@@ -130,7 +133,7 @@ export default function PatientExport({ patient, client, documents, sessions, as
         {/* ── INFORMATIVA PRIVACY ── */}
         <div className="page-break" />
         <h2>2. {INFORMATIVA_PRIVACY_ESTESA.titolo}</h2>
-        <p className="meta">{INFORMATIVA_PRIVACY_ESTESA.riferimento}</p>
+        <p className="meta">{INFORMATIVA_PRIVACY_ESTESA.riferimento}{testoInformativa ? ` · versione ${testoInformativa.versione}${testoInformativa.firmata ? '' : ' (in vigore, non ancora firmata)'}` : ''}</p>
         {INFORMATIVA_PRIVACY_ESTESA.sezioni.map(s => (
           <div key={s.id}>
             <h3>{s.titolo}</h3>
@@ -254,8 +257,24 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     getConsentByPatient(patientId).catch(() => null),
   ]);
 
+  const { testoPerId, testoInVigore } = await import('../../../../lib/testi-legali-server');
+  const doc = t => documents.find(d => d.type === t);
+  const carica = async (tipo, codice) => {
+    const d = doc(tipo);
+    try {
+      if (d && d.testo_legale_id) { const t = await testoPerId(d.testo_legale_id); return t ? { versione: t.versione, contenuto: t.contenuto, firmata: true } : null; }
+      const t = await testoInVigore(codice); return t ? { versione: t.versione, contenuto: t.contenuto, firmata: false } : null;
+    } catch (e) { console.error('[export] testo', codice, e.message); return null; }
+  };
+  const [testoConsenso, testoInformativa] = await Promise.all([
+    carica('consent_treatment', 'consenso_trattamento'),
+    carica('privacy_extended', 'informativa_estesa'),
+  ]);
+
   return {
     props: {
+      testoConsenso,
+      testoInformativa,
       patient,
       client,
       documents: JSON.parse(JSON.stringify(documents)), // serializza Date

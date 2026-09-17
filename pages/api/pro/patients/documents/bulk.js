@@ -2,6 +2,7 @@ import { requireProAuth } from '../../../../../lib/pro-auth';
 import { upsertPatientDocument, getPatientById, proCanAccessPatientClinical, logAccess } from '../../../../../lib/store';
 import { hashIp, hashContent } from '../../../../../lib/crypto-utils';
 import { getClientIp } from '../../../../../lib/rate-limit';
+import { testoAccettabile, registraConsensoSoggetto } from '../../../../../lib/testi-legali-server';
 
 // POST /api/pro/patients/documents/bulk?patientId=xxx
 // Salva consenso + privacy + anamnesi in un'unica operazione con firma cumulativa.
@@ -24,15 +25,25 @@ export default requireProAuth(async function handler(req, res) {
 
   try {
     const {
-      client_id,
       signature_image,
       form_data,
       pro_notes,
-      consent_text,
-      privacy_text,
+      consenso_testo_id,
+      informativa_testo_id,
     } = req.body;
+    // L'azienda si legge dal paziente, non dal corpo della richiesta.
+    const client_id = patient.client_id;
 
-    if (!client_id)       return res.status(400).json({ error: 'client_id richiesto' });
+    // v64: i due testi firmati sono quelli dell'ARCHIVIO che il server ha servito
+    // alla pagina. L'impronta è quella archiviata: MAI calcolata su un testo
+    // arrivato dal browser. Versione ritirata da troppo tempo o sconosciuta → no.
+    const [tConsenso, tInformativa] = await Promise.all([
+      testoAccettabile(consenso_testo_id, 'consenso_trattamento'),
+      testoAccettabile(informativa_testo_id, 'informativa_estesa'),
+    ]);
+    if (!tConsenso || !tInformativa) {
+      return res.status(409).json({ error: 'I testi da firmare sono stati aggiornati: ricarica la cartella e fai rileggere i documenti prima di firmare.' });
+    }
     if (!signature_image) return res.status(400).json({ error: 'firma obbligatoria' });
     if (!form_data)       return res.status(400).json({ error: 'dati anamnesi obbligatori' });
 
@@ -50,12 +61,16 @@ export default requireProAuth(async function handler(req, res) {
       upsertPatientDocument(patientId, client_id, 'consent_treatment', {
         ...base,
         status:       'signed',
-        content_hash: consent_text ? hashContent(consent_text) : null,
+        content_hash: tConsenso.impronta,
+        testo_legale_id: tConsenso.id,
+        versione:     tConsenso.versione,
       }),
       upsertPatientDocument(patientId, client_id, 'privacy_extended', {
         ...base,
         status:       'signed',
-        content_hash: privacy_text ? hashContent(privacy_text) : null,
+        content_hash: tInformativa.impronta,
+        testo_legale_id: tInformativa.id,
+        versione:     tInformativa.versione,
       }),
       upsertPatientDocument(patientId, client_id, 'anamnesi', {
         ...base,
@@ -64,6 +79,13 @@ export default requireProAuth(async function handler(req, res) {
         pro_notes:    pro_notes || null,
         content_hash: hashContent(JSON.stringify(form_data)),
       }),
+    ]);
+
+    // Registro dei consensi: una riga per documento firmato.
+    const ipHash = hashIp(ip); const ua = req.headers['user-agent']?.slice(0, 200) || null;
+    await Promise.all([
+      registraConsensoSoggetto({ soggettoId: patientId, testo: tConsenso, consenso: 'trattamento', canale: 'cartella', ipHash, userAgent: ua }),
+      registraConsensoSoggetto({ soggettoId: patientId, testo: tInformativa, consenso: 'informativa_estesa', canale: 'cartella', ipHash, userAgent: ua }),
     ]);
 
     await logAccess({ professional_id: proId, action: 'sign_documents', patient_id: patientId, ip, user_agent: req.headers['user-agent'], details: 'Firma cumulativa: consenso + privacy + anamnesi' }).catch(() => {});

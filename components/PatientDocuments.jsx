@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import SignatureCanvas from './SignatureCanvas';
-import { CONSENSO_TRATTAMENTO, INFORMATIVA_PRIVACY_ESTESA } from '../lib/legal-texts';
+// I testi da firmare arrivano dall'ARCHIVIO (prop `testi`, caricata lato server):
+// nessuna copia nel codice. Alla firma si rimandano solo i loro identificativi.
 
 const todayStr = () => new Date().toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
 // ─── Componente principale ─────────────────────────────────────────────────────
 
-export default function PatientDocuments({ patientId, clientId, patient, documents: initialDocs, onDocsChange }) {
+export default function PatientDocuments({ patientId, clientId, patient, documents: initialDocs, onDocsChange, testi = null }) {
+  const CONSENSO_TRATTAMENTO = testi?.consenso?.contenuto || { sezioni: [] };
+  const INFORMATIVA_PRIVACY_ESTESA = testi?.informativa?.contenuto || { sezioni: [] };
   const [docs, setDocs] = useState(initialDocs || []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -105,18 +108,15 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
     setSaving(true);
     setError(null);
     try {
-      const consentText  = CONSENSO_TRATTAMENTO.sezioni.map(s => s.titolo + '\n' + s.testo).join('\n\n');
-      const privacyText  = INFORMATIVA_PRIVACY_ESTESA.sezioni.map(s => s.titolo + '\n' + s.testo).join('\n\n');
       const res = await fetch(`/api/pro/patients/documents/bulk?patientId=${patientId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          client_id:       clientId,
-          signature_image: signature,
-          form_data:       f,
-          pro_notes:       proNotes,
-          consent_text:    consentText,
-          privacy_text:    privacyText,
+          signature_image:      signature,
+          form_data:            f,
+          pro_notes:            proNotes,
+          consenso_testo_id:    testi?.consenso?.id || null,
+          informativa_testo_id: testi?.informativa?.id || null,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error);

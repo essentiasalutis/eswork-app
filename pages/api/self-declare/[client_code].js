@@ -13,6 +13,7 @@ import {
 import { computeLevel } from '../../../lib/scoring';
 import { hashIp } from '../../../lib/crypto-utils';
 import { getClientIp } from '../../../lib/rate-limit';
+import { sessioneConsensiValida, collegaSessioneAPaziente } from '../../../lib/testi-legali-server';
 import { statoCheckupCliente } from '../../../lib/checkup-server';
 import { ilGiorno, etichettaOra, oggiRoma as giornoRoma } from '../../../lib/checkup';
 
@@ -52,16 +53,19 @@ export default async function handler(req, res) {
       location,
       wants_to_be_contacted,
       answers,
-      consent_privacy,
-      consent_health,
-      informativa_version,
+      consensi_sessione_id,
     } = req.body || {};
 
-    // GATE CONSENSO: nessun dato (anche di salute, art.9) viene trattato senza
-    // entrambi i consensi espliciti. Difesa lato server, non solo gate UI.
-    if (consent_privacy !== true || consent_health !== true) {
-      return res.status(400).json({ error: 'Consensi obbligatori mancanti: privacy e dati di salute.' });
+    // GATE CONSENSO (v64): i consensi sono già registrati dal server, UNO PER
+    // CASELLA, alla conferma della schermata — con la versione decisa dal server.
+    // Qui si verifica che quella sessione esista, sia recente, completa e non
+    // ancora usata. Niente più valori «true» scritti fissi nella pagina: senza
+    // una sessione valida non si tratta nessun dato, nemmeno di salute.
+    const consensi = await sessioneConsensiValida(consensi_sessione_id, 'informativa_checkup').catch(() => null);
+    if (!consensi) {
+      return res.status(400).json({ error: 'Consensi obbligatori mancanti o scaduti: torna alla schermata dei consensi e confermali di nuovo.' });
     }
+    const versioneAccettata = consensi[0].versione;
 
     // GATE CHECK-UP — PRIMA di creare qualunque cosa. Prima di questo gate il
     // record del dipendente nasceva comunque e la risposta si perdeva in silenzio
@@ -119,15 +123,21 @@ export default async function handler(req, res) {
         }).catch(e => console.error('insertResponse error:', e.message));
       }
 
-      // 4-bis. PROVA DEL CONSENSO (persistita e riconducibile): chi (patient_id),
-      //        a cosa (privacy + salute art.9), quale versione dell'informativa,
-      //        quando (timestamp), con quale impronta tecnica (ip_hash, user_agent).
+      // 4-bis. PROVA DEL CONSENSO: le righe del registro (v64) si collegano al
+      //        paziente appena nato. È l'unico aggiornamento che la banca dati ammette.
+      await collegaSessioneAPaziente(consensi_sessione_id, patient.id)
+        .catch(e => console.error('collegaSessioneAPaziente error:', e.message));
+
+      // Compatibilità: assessment_consents resta letta da scheda azienda ed export.
+      // Le date ora sono quelle REALI di ciascun consenso e la versione quella
+      // decisa dal server. La prova vera è in consensi_registrati.
+      const at = k => (consensi.find(r => r.consenso === k) || {}).atto_at || now;
       await insertAssessmentConsent({
         assessment_id: assessment?.id || null,
         patient_id: patient.id,
-        consent_privacy_at: now,
-        consent_health_at: now,
-        informativa_version: informativa_version || null,
+        consent_privacy_at: at('privacy'),
+        consent_health_at: at('salute'),
+        informativa_version: versioneAccettata,
         ip_hash: hashIp(getClientIp(req)),
         user_agent: (req.headers['user-agent'] || '').slice(0, 200) || null,
       }).catch(e => console.error('insertAssessmentConsent error:', e.message));

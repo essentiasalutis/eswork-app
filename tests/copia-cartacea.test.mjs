@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { giornoRoma, erroreDataFirma, versioneInVigoreIl, erroreMotivo, tipoDaiByte, GIORNI_MAX } from '../lib/copia-cartacea.mjs';
+import { giornoRoma, erroreDataFirma, versioneInVigoreIl, erroreMotivo, tipoDaiByte, GIORNI_MAX, cartaSospesa, CARTA_SOSPESA, MESSAGGI } from '../lib/copia-cartacea.mjs';
 
 // 17 settembre 2026, 10:00 a Roma (08:00 UTC)
 const ADESSO = new Date('2026-09-17T08:00:00Z');
@@ -61,4 +61,13 @@ test('tipo del file dai byte, non dal nome', () => {
   assert.equal(tipoDaiByte(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d])).mime, 'image/png');
   assert.equal(tipoDaiByte(Buffer.from('<html>')), null);
   assert.equal(tipoDaiByte(Buffer.from('MZ\x90\x00')), null);
+});
+
+test('informativa estesa su carta sospesa, e il messaggio dice perché', () => {
+  assert.equal(cartaSospesa('privacy_extended'), true);
+  assert.equal(cartaSospesa('consent_treatment'), false);
+  const m = MESSAGGI[CARTA_SOSPESA.privacy_extended];
+  assert.match(m, /formula di consenso/);
+  assert.match(m, /art\. 9/);
+  assert.match(m, /in piattaforma/);
 });

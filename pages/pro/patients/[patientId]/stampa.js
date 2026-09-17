@@ -6,7 +6,7 @@
 import Head from 'next/head';
 import { requireProAuthSsr } from '../../../../lib/pro-auth';
 import { getPatientById, proCanAccessPatientClinical } from '../../../../lib/store';
-import { CODICE_PER_DOCUMENTO } from '../../../../lib/copia-cartacea.mjs';
+import { CODICE_PER_DOCUMENTO, cartaSospesa } from '../../../../lib/copia-cartacea.mjs';
 
 export default function StampaModulo({ testo, paziente }) {
   const c = testo.contenuto || {};
@@ -73,7 +73,9 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   if (ctx.req.proSession.mustReset) return { redirect: { destination: '/pro/reset-password', permanent: false } };
 
   const codice = CODICE_PER_DOCUMENTO[ctx.query.documento];
-  if (!codice) return { notFound: true };
+  // Carta sospesa per questo documento: non si stampa un modulo che poi non si
+  // potrebbe caricare (il perché è nella cartella).
+  if (!codice || cartaSospesa(ctx.query.documento)) return { notFound: true };
 
   const patient = await getPatientById(patientId);
   if (!patient || !(await proCanAccessPatientClinical(proId, patient))) return { notFound: true };

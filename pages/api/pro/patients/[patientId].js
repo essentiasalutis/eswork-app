@@ -5,6 +5,8 @@ import {
   proCanAccessPatientClinical,
   logAccess,
 } from '../../../../lib/store';
+import { validaModifica } from '../../../../lib/modifica-paziente.mjs';
+import { vistaCartellaCurante } from '../../../../lib/vista';
 
 export default requireProAuth(async function handler(req, res) {
   const { patientId } = req.query;
@@ -21,13 +23,21 @@ export default requireProAuth(async function handler(req, res) {
     // Livello B — accesso alla cartella clinica di dettaglio: tracciato
     const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
     await logAccess({ professional_id: proId, action: 'view_patient', patient_id: patientId, ip, user_agent: req.headers['user-agent'], details: 'Apertura cartella clinica' }).catch(() => {});
-    return res.json(patient);
+    // Proiezione della cartella (12/9): niente email, telefono e campi di servizio.
+    return res.json(vistaCartellaCurante(patient));
   }
 
+  // PATCH — solo l'anamnesi (lib/modifica-paziente.mjs). Azienda, livello, stato,
+  // prevenzione, osteopata assegnato e chiave dell'area personale non si toccano
+  // da qui: prima il corpo della richiesta si salvava così com'era.
   if (req.method === 'PATCH') {
+    const v = validaModifica(req.body);
+    if (!v.ok) return res.status(400).json({ error: v.errore, campi_rifiutati: v.campi_rifiutati || [] });
     try {
-      const updated = await updatePatient(patientId, req.body);
-      return res.json(updated);
+      const updated = await updatePatient(patientId, v.campi);
+      const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
+      await logAccess({ professional_id: proId, action: 'edit_patient', patient_id: patientId, ip, user_agent: req.headers['user-agent'], details: `Anamnesi modificata: ${Object.keys(v.campi).join(', ')}` }).catch(() => {});
+      return res.json(vistaCartellaCurante(updated));
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }

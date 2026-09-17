@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MOTIVI, MESSAGGI, GIORNI_MAX, BYTE_MAX, giornoRoma } from '../lib/copia-cartacea.mjs';
+import { MOTIVI, MESSAGGI, GIORNI_MAX, BYTE_MAX, giornoRoma, cartaSospesa, CARTA_SOSPESA } from '../lib/copia-cartacea.mjs';
 
 // Firma su carta — l'ECCEZIONE (punto d). Si stampa la versione in vigore, si fa
 // firmare, si carica entro 7 giorni indicando la versione. Il documento risulta
@@ -13,7 +13,11 @@ const NON_SO = '__non_so';
 
 const fmt = (iso) => (iso ? new Date(iso).toLocaleDateString('it-IT') : '');
 
-export default function CopiaCartacea({ patientId, daCaricare, versioni, onAccettata }) {
+export default function CopiaCartacea({ patientId, daCaricare: richiesti, versioni, onAccettata }) {
+  // Documenti che su carta non si possono caricare (per ora: l'informativa estesa,
+  // che non contiene una formula di consenso). Si mostrano con il perché.
+  const sospesi = richiesti.filter(cartaSospesa);
+  const daCaricare = richiesti.filter(t => !cartaSospesa(t));
   const [aperto, setAperto] = useState(false);
   const [scelti, setScelti] = useState(() => Object.fromEntries(daCaricare.map(t => [t, true])));
   const [versione, setVersione] = useState(() => Object.fromEntries(daCaricare.map(t => [t, ''])));
@@ -66,6 +70,17 @@ export default function CopiaCartacea({ patientId, daCaricare, versioni, onAccet
   const label = { fontSize: 12, fontWeight: 600, color: '#334155', display: 'block', marginBottom: 4 };
   const campo = { width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 13, background: '#fff', boxSizing: 'border-box' };
 
+  const avvisoSospesi = sospesi.length > 0 && (
+    <div style={{ fontSize: 12, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 10px', lineHeight: 1.6 }}>
+      {sospesi.map(t => <div key={t}>{MESSAGGI[CARTA_SOSPESA[t]]}</div>)}
+    </div>
+  );
+
+  // Nulla da caricare su carta: resta solo il perché.
+  if (!daCaricare.length) {
+    return sospesi.length ? <div style={box}>{avvisoSospesi}</div> : null;
+  }
+
   if (!aperto) {
     return (
       <button onClick={() => setAperto(true)}
@@ -84,6 +99,7 @@ export default function CopiaCartacea({ patientId, daCaricare, versioni, onAccet
       </div>
 
       <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.6, background: '#f8fafc', borderRadius: 8, padding: '8px 10px' }}>
+        {avvisoSospesi}
         Stampa la versione in vigore, falla firmare e carica la copia entro {GIORNI_MAX} giorni dalla firma.
         La versione è stampata a piè di pagina del modulo.
         <div style={{ display: 'flex', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>

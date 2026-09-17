@@ -1,5 +1,6 @@
 import { requireAuth } from '../../../../../lib/auth';
-import { getPatientById, getProfessionalById, proCanAccessClient, updatePatient } from '../../../../../lib/store';
+import { getPatientById, getProfessionalById, proCanAccessClient, updatePatient, getProAssignmentEligibility } from '../../../../../lib/store';
+import { messaggioNonConforme } from '../../../../../lib/pro-docs';
 
 // Admin: assegna (o rimuove) il professionista referente di un paziente.
 // PUT { professional_id: string | null }
@@ -21,6 +22,13 @@ export default requireAuth(async function handler(req, res) {
       const ok = await proCanAccessClient(professional_id, patient.client_id);
       if (!ok) {
         return res.status(400).json({ error: "Il professionista non è assegnato a quest'azienda. Assegnalo prima all'azienda." });
+      }
+      // Conformità (Enrico, 17/9): nessuna NUOVA presa in carico da un professionista
+      // non in regola, per qualunque requisito. Se il paziente è già in carico allo
+      // stesso professionista non cambia nulla: la cura prosegue.
+      if (patient.assigned_professional_id !== professional_id) {
+        const elig = await getProAssignmentEligibility(professional_id);
+        if (elig.blocked) return res.status(409).json({ error: messaggioNonConforme(elig.reasons), blocked: true, reasons: elig.reasons });
       }
     }
 

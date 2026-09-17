@@ -24,14 +24,14 @@ export default async function handler(req, res) {
   const patient = await getPatientByCareToken(token).catch(() => null);
   if (!patient) return res.status(404).json({ error: 'Link non valido o scaduto' });
 
-  const [cycles, sessions, miniChecks, reassessment, selfTriggerBudget, client] = await Promise.all([
+  const [cycles, sessions, miniChecks, reassessment, client] = await Promise.all([
     getCyclesByPatient(patient.id).catch(() => []),
     getSessionsByPatient(patient.id).catch(() => []),
     getMiniChecksByPatient(patient.id).catch(() => []),
     getReassessmentT12ByPatient(patient.id).catch(() => null),
-    getSelfTriggerBudget(patient.id).catch(() => ({ used: 0, max: 2, remaining: 2 })),
     getClientById(patient.client_id).catch(() => null),
   ]);
+  const selfTriggerBudget = await getSelfTriggerBudget(patient.id, client).catch(() => null);
 
   return res.json({
     patient: vistaPazienteAreaPersonale(patient),
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
     // «Il mio percorso»: righe già pronte (fonte unica anche per i mini-check, che
     // prima viaggiavano come lista a sé).
     percorso: vistaPercorso({ sessions, cycles, miniChecks, reassessment }),
-    selfTriggerBudget: { remaining: selfTriggerBudget ? selfTriggerBudget.remaining : 2 },
+    selfTriggerBudget: { remaining: selfTriggerBudget ? selfTriggerBudget.remaining : 2, rinnovoIl: selfTriggerBudget ? selfTriggerBudget.rinnovoIlTesto : null },
     // Solo il sì/no: la pagina spegne i pulsanti del percorso finché il programma
     // non è attivo. Il gate vero resta sul server (lib/attivazione + self-trigger).
     programmaAttivo: programmaAttivo(client),

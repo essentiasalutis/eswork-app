@@ -25,7 +25,7 @@ const RC = {
 };
 const fmt = d => d ? dataIt(d, { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
-export default function ProCompliancePage({ overview: initial }) {
+export default function ProCompliancePage({ overview: initial, versioniAccordo = [] }) {
   const [rows, setRows] = useState(initial || []);
 
   async function download(id) {
@@ -80,6 +80,7 @@ export default function ProCompliancePage({ overview: initial }) {
                 <tr className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                   <th className="px-4 py-3">Professionista</th>
                   {COLS.map(c => <th key={c.key} className="px-3 py-3 text-center">{c.label}</th>)}
+                  <th className="px-3 py-3 text-center">Accordo dati</th>
                   <th className="px-4 py-3">Stato RC</th>
                 </tr>
               </thead>
@@ -96,6 +97,9 @@ export default function ProCompliancePage({ overview: initial }) {
                           {isSusp && <span className="text-[10px] font-bold uppercase tracking-wide text-red-700 bg-red-100 px-1.5 py-0.5 rounded">non assegnare</span>}
                         </div>
                         <div className="text-xs text-gray-400">{row.professional.email}{!row.professional.active && ' · disattivato'}</div>
+                        {row.assignBlocked && (row.assignReasons || []).length > 0 && (
+                          <div className="text-xs text-red-700 mt-1">Non assegnabile: {row.assignReasons.join('; ')}</div>
+                        )}
                       </td>
                       {COLS.map(c => c.qualification ? (
                         <td key={c.key} className="px-3 py-3 text-center">
@@ -119,6 +123,9 @@ export default function ProCompliancePage({ overview: initial }) {
                           )}
                         </td>
                       ))}
+                      <td className="px-3 py-3 text-center align-top">
+                        <CellaAccordo proId={row.professional.id} accordo={row.accordo} versioni={versioniAccordo} />
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${rc.cls}`}>{rc.txt}</span>
@@ -132,7 +139,7 @@ export default function ProCompliancePage({ overview: initial }) {
                   );
                 })}
                 {rows.length === 0 && (
-                  <tr><td colSpan={COLS.length + 2} className="px-4 py-8 text-center text-gray-400">Nessun professionista.</td></tr>
+                  <tr><td colSpan={COLS.length + 3} className="px-4 py-8 text-center text-gray-400">Nessun professionista.</td></tr>
                 )}
               </tbody>
             </table>
@@ -156,8 +163,71 @@ function QualChip({ label, doc, onDownload }) {
   return <span className="text-[10px] text-gray-300 px-1.5 py-0.5" title="Non fornito">{label}</span>;
 }
 
+// Accordo sul trattamento dei dati (v66): stato, file caricati (apribili) e
+// caricamento della copia firmata da parte dell'admin, con la dicitura. La
+// sottoscrizione no: la dà solo il professionista.
+const STATO_ACCORDO = {
+  valido: { txt: 'In regola', cls: 'bg-green-100 text-green-700' },
+  in_preavviso: { txt: 'Preavviso', cls: 'bg-amber-100 text-amber-700' },
+  mancante: { txt: 'Non in regola', cls: 'bg-red-100 text-red-700' },
+  testo_non_pubblicato: { txt: 'Testo non pubblicato', cls: 'bg-gray-100 text-gray-600' },
+};
+function CellaAccordo({ proId, accordo, versioni }) {
+  const [file, setFile] = useState(null);
+  const [versione, setVersione] = useState((versioni.find(v => v.stato === 'in_vigore') || versioni[0] || {}).id || '');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const st = STATO_ACCORDO[accordo?.stato] || { txt: 'Verifica non disponibile', cls: 'bg-red-100 text-red-700' };
+  const firmaVigente = accordo && versioni.find(v => v.stato === 'in_vigore') && (accordo.firme || []).some(f => f.valore === 'dato' && f.testo_legale_id === versioni.find(v => v.stato === 'in_vigore').id);
+
+  async function carica() {
+    if (!file || !versione) return;
+    setBusy(true); setMsg('');
+    try {
+      const base = `/api/admin/professionals/${proId}/accordo`;
+      const p = await fetch(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ azione: 'prepara', content_type: file.type }) });
+      const pj = await p.json(); if (!p.ok) throw new Error(pj.error || 'Errore');
+      const up = await fetch(pj.signed_url, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+      if (!up.ok) throw new Error('Il file non è stato caricato: riprova.');
+      const c = await fetch(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ azione: 'carica', path: pj.path, testo_id: versione }) });
+      const cj = await c.json(); if (!c.ok) throw new Error(cj.error || 'Errore');
+      window.location.reload();
+    } catch (e) { setMsg(e.message); }
+    setBusy(false);
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-1 min-w-[150px]">
+      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${st.cls}`} title={accordo?.motivo || ''}>{st.txt}{accordo?.versione ? ` · ${accordo.versione}` : ''}</span>
+      {accordo && accordo.stato !== 'testo_non_pubblicato' && (
+        <span className="text-[11px] text-gray-500">{firmaVigente ? 'sottoscritto' : 'non sottoscritto'}</span>
+      )}
+      {(accordo?.file || []).map(f => (
+        <a key={f.id} href={`/api/admin/professionals/${proId}/accordo?file=${f.id}`} target="_blank" rel="noopener noreferrer" className="text-[11px] text-indigo-700 underline">
+          copia v. {f.versione} · {fmt(f.caricato_il)}{String(f.caricato_da).startsWith('admin:') ? ' · caricata dall’amministratore' : ''}
+        </a>
+      ))}
+      {versioni.length > 0 && (
+        <details className="text-left w-full">
+          <summary className="text-[11px] text-gray-500 cursor-pointer text-center">carica copia firmata</summary>
+          <div className="mt-1 space-y-1">
+            <select value={versione} onChange={e => setVersione(e.target.value)} className="w-full text-xs border border-gray-200 rounded px-1 py-1">
+              {versioni.map(v => <option key={v.id} value={v.id}>{v.versione}{v.stato === 'in_vigore' ? ' (in vigore)' : ''}</option>)}
+            </select>
+            <input type="file" accept="application/pdf,image/jpeg,image/png" onChange={e => setFile(e.target.files?.[0] || null)} className="w-full text-[11px]" />
+            <button onClick={carica} disabled={!file || busy} className="w-full text-xs font-semibold py-1 rounded bg-gray-900 text-white disabled:bg-gray-200 disabled:text-gray-400">{busy ? 'Verifica…' : 'Carica'}</button>
+            {msg && <div className="text-[11px] text-red-700">{msg}</div>}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
 export const getServerSideProps = requireAuthSsr(async () => {
   let overview = [];
   try { overview = await getProComplianceOverview(); } catch (_) {}
-  return { props: { overview: JSON.parse(JSON.stringify(overview)) } };
+  let versioniAccordo = [];
+  try { const { versioniAccordo: va } = await import('../../lib/accordo-server'); versioniAccordo = await va(); } catch (_) {}
+  return { props: { overview: JSON.parse(JSON.stringify(overview)), versioniAccordo: JSON.parse(JSON.stringify(versioniAccordo)) } };
 });

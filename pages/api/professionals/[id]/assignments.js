@@ -1,5 +1,6 @@
 import { requireAuth } from '../../../../lib/auth';
 import { getAssignmentsByProfessional, upsertAssignment, getProAssignmentEligibility } from '../../../../lib/store';
+import { messaggioNonConforme } from '../../../../lib/pro-docs';
 
 export default requireAuth(async function handler(req, res) {
   const { id } = req.query;
@@ -24,7 +25,7 @@ export default requireAuth(async function handler(req, res) {
         const elig = await getProAssignmentEligibility(id);
         if (elig.blocked) {
           return res.status(409).json({
-            error: 'Professionista non assegnabile: documentazione incompleta',
+            error: messaggioNonConforme(elig.reasons, 'Assegnazione non consentita'),
             blocked: true,
             reasons: elig.reasons,
           });

@@ -6,6 +6,7 @@ import { getProDocuments } from '../../lib/store';
 import { rcStatusFrom } from '../../lib/compliance';
 import { SLOTS, QUALIFICATION_TYPES } from '../../lib/pro-docs';
 import { dataIt } from '../../lib/date-it.mjs';
+import AvvisoAccordo from '../../components/AvvisoAccordo';
 
 const ACCEPT = '.pdf,.jpg,.jpeg,.png';
 const MAX = 10 * 1024 * 1024;
@@ -63,7 +64,7 @@ function RcBanner({ rc }) {
   return null;
 }
 
-export default function ProDocumentsPage({ proName, documents: initial, rc }) {
+export default function ProDocumentsPage({ proName, documents: initial, rc, accordo = null }) {
   const [docs, setDocs] = useState(initial || []);
   const [busy, setBusy] = useState(null);   // doc_type in corso
   const [err, setErr] = useState('');
@@ -172,6 +173,8 @@ export default function ProDocumentsPage({ proName, documents: initial, rc }) {
             ))}
           </div>
 
+          <div className="mt-3"><AvvisoAccordo stato={accordo} compatto /></div>
+
           <p className="text-xs text-gray-400 mt-6">
             🔒 I file sono conservati in archivio cifrato e privato. Ogni caricamento e accesso è registrato in un registro dedicato. Formati: PDF, JPG, PNG (max 10 MB).
           </p>
@@ -246,5 +249,11 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   const rcDoc = documents.find(d => d.doc_type === 'rc_policy') || null;
   const { status, days } = rcStatusFrom(rcDoc);
   const rc = { status, days, expiry: rcDoc?.expiry_date || null };
-  return { props: { proName, documents: JSON.parse(JSON.stringify(documents)), rc } };
+  let accordo = null;
+  try {
+    const { statoAccordoPro } = await import('../../lib/accordo-server');
+    const { statoPerIlBrowser } = await import('../../lib/accordo.mjs');
+    accordo = statoPerIlBrowser(await statoAccordoPro(proId));
+  } catch (_) {}
+  return { props: { proName, documents: JSON.parse(JSON.stringify(documents)), rc, accordo: JSON.parse(JSON.stringify(accordo)) } };
 });

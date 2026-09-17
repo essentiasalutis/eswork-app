@@ -9,6 +9,7 @@ import {
   getPreValidationByPatient,
   getTreatmentCapacity,
 } from '../../../../../lib/store';
+import { finestraAnno, dirittoCicli } from '../../../../../lib/anno-programma.mjs';
 
 
 export default requireProAuth(async function handler(req, res) {
@@ -27,14 +28,19 @@ export default requireProAuth(async function handler(req, res) {
   const activeCycle = cycles.find(c => c.status === 'active' || c.status === 'pending_pgic');
   if (activeCycle) return res.status(409).json({ error: 'Ciclo già aperto per questo paziente' });
 
+  // Diritti annuali contati sull'ANNO DI PROGRAMMA dell'azienda, dalla data di avvio
+  // (lib/anno-programma.mjs). Prima si contavano tutti i cicli di sempre.
+  const azienda = await getClientById(patient.client_id).catch(() => null);
+  const finestra = finestraAnno(azienda?.data_avvio_programma || null);
+
   if (cycleType === 'prevention') {
     // Ciclo di PREVENZIONE — riservato ai L2 idonei (livello fissato a inizio anno).
     // Dalla v61 il diritto NON dipende più dalla configurazione dell'azienda: spetta a
     // ogni Livello 2. Distinto dal ciclo di trattamento.
     if (patient.level !== 'level2') return res.status(400).json({ error: 'La prevenzione attiva è riservata ai pazienti Livello 2' });
     if (!patient.prevention_eligible) return res.status(400).json({ error: 'Prevenzione attiva non spettante quest\'anno (diritto fissato a inizio anno — regola opzione A)' });
-    const prevCount = cycles.filter(c => c.cycle_type === 'prevention').length;
-    if (prevCount >= 1) return res.status(400).json({ error: 'Ciclo di prevenzione annuale già erogato' });
+    const diritto = dirittoCicli({ cicli: cycles, tipo: 'prevention', finestra });
+    if (diritto.esaurito) return res.status(400).json({ error: diritto.messaggio, rinnovo_il: diritto.rinnovoIl });
 
     try {
       const cycle = await createTreatmentCycle({
@@ -68,7 +74,8 @@ export default requireProAuth(async function handler(req, res) {
   }
 
   const closedTreatment = cycles.filter(c => c.status === 'closed' && (c.cycle_type || 'treatment') === 'treatment');
-  if (closedTreatment.length >= 2) return res.status(400).json({ error: 'Massimo 2 cicli per anno raggiunti' });
+  const diritto = dirittoCicli({ cicli: cycles, tipo: 'treatment', finestra });
+  if (diritto.esaurito) return res.status(400).json({ error: diritto.messaggio, rinnovo_il: diritto.rinnovoIl });
 
   // GATE CLINICO INVARIABILE (v4): nessun ciclo di trattamento senza pre-validazione
   // confermata l1_confirmed. La pre-validazione deve essere RIFERITA al ciclo che si

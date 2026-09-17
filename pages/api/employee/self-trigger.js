@@ -37,12 +37,16 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: MSG_NON_ATTIVO, programma_non_attivo: true });
   }
 
-  // Budget personale: massimo 2 attivazioni l'anno
-  const budget = await getSelfTriggerBudget(patient.id);
+  // Budget personale: 2 auto-segnalazioni per anno di programma dell'azienda.
+  // Se la lettura fallisce non si apre una segnalazione fuori regola: si rifiuta.
+  let budget;
+  try { budget = await getSelfTriggerBudget(patient.id, client); }
+  catch (_) { return res.status(503).json({ error: 'Servizio momentaneamente non disponibile, riprova tra qualche minuto.' }); }
   if (budget.remaining <= 0) {
     return res.status(429).json({
-      error: 'Hai esaurito le 2 auto-segnalazioni disponibili quest\'anno. Per necessità urgenti scrivi a info@essentiasalutis.it',
+      error: `Hai usato le ${budget.max} auto-segnalazioni previste per quest'anno di programma.${budget.rinnovoIlTesto ? ` Tornano disponibili il ${budget.rinnovoIlTesto}.` : ''} Per necessità urgenti scrivi a info@essentiasalutis.it`,
       remaining: 0,
+      rinnovo_il: budget.rinnovoIl,
     });
   }
 

@@ -134,7 +134,7 @@ function SelfTriggerModal({ token, onClose, onSent }) {
 }
 
 // ─── Dashboard L1 ─────────────────────────────────────────────────────────────
-function DashboardL1({ patient, cycles, nrs, onSelfTrigger, remaining, attivo = true }) {
+function DashboardL1({ patient, cycles, nrs, onSelfTrigger, remaining, rinnovo = null, attivo = true }) {
   const activeCycle = cycles.find(c => c.status === 'active' || c.status === 'pending_pgic');
   const closedCycles = cycles.filter(c => c.status === 'closed');
   // Self-trigger per L1 solo a fine ciclo (per richiedere il 2° ciclo), non durante
@@ -209,13 +209,13 @@ function DashboardL1({ patient, cycles, nrs, onSelfTrigger, remaining, attivo = 
       <CheckPeriodici attivo={attivo} />
 
       {/* Self-trigger — solo a fine ciclo per richiedere il 2° ciclo */}
-      {canSelfTrigger && <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} label="Richiedi un nuovo ciclo" attivo={attivo} />}
+      {canSelfTrigger && <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} rinnovo={rinnovo} label="Richiedi un nuovo ciclo" attivo={attivo} />}
     </div>
   );
 }
 
 // ─── Dashboard L2 ─────────────────────────────────────────────────────────────
-function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining, attivo = true }) {
+function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining, rinnovo = null, attivo = true }) {
   // I mini-check non viaggiano più come lista a sé: vivono nel percorso (fonte unica).
   // La resa resta quella di prima — "T3 · Molto meglio" e la data — e la parola del
   // PGIC è quella scelta rispondendo (lib/pgic.js).
@@ -256,7 +256,7 @@ function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining, attivo 
       )}
 
       <CheckPeriodici attivo={attivo} />
-      <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} attivo={attivo} />
+      <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} rinnovo={rinnovo} attivo={attivo} />
     </div>
   );
 }
@@ -300,7 +300,7 @@ function MioPercorso({ percorso = [] }) {
 }
 
 // ─── Dashboard L3 ─────────────────────────────────────────────────────────────
-function DashboardL3({ patient, onSelfTrigger, remaining, attivo = true }) {
+function DashboardL3({ patient, onSelfTrigger, remaining, rinnovo = null, attivo = true }) {
   return (
     <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ background: 'linear-gradient(135deg, #166534 0%, #16a34a 100%)', borderRadius: 18, padding: '20px', color: '#fff' }}>
@@ -322,7 +322,7 @@ function DashboardL3({ patient, onSelfTrigger, remaining, attivo = true }) {
       </div>
 
       <CheckPeriodici attivo={attivo} />
-      <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} attivo={attivo} />
+      <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} rinnovo={rinnovo} attivo={attivo} />
     </div>
   );
 }
@@ -352,7 +352,7 @@ function CheckPeriodici({ attivo = true }) {
 // Prima che il programma sia attivo il pulsante NON c'è: al suo posto una riga che
 // spiega perché. Premerlo avvierebbe una presa in carico fuori contratto — il
 // rifiuto vero sta comunque sul server (lib/attivazione).
-function SelfTriggerButton({ onPress, remaining = 2, label = 'Ho iniziato ad avere un disturbo', attivo = true }) {
+function SelfTriggerButton({ onPress, remaining = 2, rinnovo = null, label = 'Ho iniziato ad avere un disturbo', attivo = true }) {
   if (!attivo) {
     return (
       <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 14, padding: '16px' }}>
@@ -367,11 +367,12 @@ function SelfTriggerButton({ onPress, remaining = 2, label = 'Ho iniziato ad ave
       <div style={{ fontSize: 13, fontWeight: 700, color: exhausted ? '#64748b' : '#1d4ed8', marginBottom: 4 }}>🩺 {label}</div>
       <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12, lineHeight: 1.5 }}>
         Se avverti un nuovo disturbo, segnalalo: un osteopata ti ricontatterà per una breve videochiamata di valutazione.
-        <br /><strong>{remaining}</strong> {remaining === 1 ? 'segnalazione disponibile' : 'segnalazioni disponibili'} quest&apos;anno.
+        <br /><strong>{remaining}</strong> {remaining === 1 ? 'segnalazione disponibile' : 'segnalazioni disponibili'} in quest&apos;anno di programma.
+        {exhausted && rinnovo && <><br />Tornano disponibili il {rinnovo}.</>}
       </div>
       <button onClick={onPress} disabled={exhausted}
         style={{ background: exhausted ? '#e2e8f0' : '#0369a1', color: exhausted ? '#94a3b8' : '#fff', border: 'none', borderRadius: 10, padding: '12px 20px', fontSize: 14, fontWeight: 700, cursor: exhausted ? 'not-allowed' : 'pointer', width: '100%' }}>
-        {exhausted ? 'Limite annuale raggiunto' : 'Segnala ora'}
+        {exhausted ? 'Limite dell\'anno di programma raggiunto' : 'Segnala ora'}
       </button>
     </div>
   );
@@ -511,12 +512,13 @@ export default function EmployeeDashboard() {
   const [showSelfTrigger, setShowSelfTrigger] = useState(false);
   const [sentToast, setSentToast] = useState(false);
   const [remaining, setRemaining] = useState(2);
+  const [rinnovo, setRinnovo] = useState(null);
 
   useEffect(() => {
     if (!token) return;
     fetch(`/api/employee/${token}`)
       .then(r => r.json())
-      .then(d => { setData(d); setRemaining(d?.selfTriggerBudget?.remaining ?? 2); setLoading(false); })
+      .then(d => { setData(d); setRemaining(d?.selfTriggerBudget?.remaining ?? 2); setRinnovo(d?.selfTriggerBudget?.rinnovoIl || null); setLoading(false); })
       .catch(() => { setError('Errore di rete'); setLoading(false); });
   }, [token]);
 
@@ -567,10 +569,10 @@ export default function EmployeeDashboard() {
               {isOptedOut
                 ? <OptedOutScreen patient={patient} />
                 : level === 'level1'
-                  ? <DashboardL1 patient={patient} cycles={cycles} nrs={nrs} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} attivo={attivo} />
+                  ? <DashboardL1 patient={patient} cycles={cycles} nrs={nrs} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} rinnovo={rinnovo} attivo={attivo} />
                   : level === 'level2'
-                    ? <DashboardL2 patient={patient} percorso={percorso} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} attivo={attivo} />
-                    : <DashboardL3 patient={patient} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} attivo={attivo} />
+                    ? <DashboardL2 patient={patient} percorso={percorso} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} rinnovo={rinnovo} attivo={attivo} />
+                    : <DashboardL3 patient={patient} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} rinnovo={rinnovo} attivo={attivo} />
               }
 
               {/* Il mio percorso — per tutti i livelli, solo se c'è qualcosa da mostrare */}

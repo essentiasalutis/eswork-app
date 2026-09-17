@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { requireProAuthSsr } from '../../lib/pro-auth';
 import { getAssignmentsByProfessional, getPatientsByClient, getReferralLeadsByProfessional } from '../../lib/store';
+import AvvisoAccordo from '../../components/AvvisoAccordo';
 
 // ── Redenzione buono visita B2C ────────────────────────────────────────────────
 function RedeemVoucher() {
@@ -115,7 +116,7 @@ function LeadsList({ leads }) {
   );
 }
 
-export default function ProDashboard({ proName, clients, leads }) {
+export default function ProDashboard({ proName, clients, leads, accordo = null }) {
   async function logout() {
     await fetch('/api/pro/auth/logout', { method: 'POST' });
     window.location.href = '/pro/login';
@@ -126,6 +127,7 @@ export default function ProDashboard({ proName, clients, leads }) {
       <ProHeader proName={proName} onLogout={logout} />
 
       <main className="max-w-5xl mx-auto px-6 py-6">
+        <AvvisoAccordo stato={accordo} />
         {/* Link area osteopata */}
         <Link href="/osteopath/dashboard"
           className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-2xl p-3 mb-5 hover:bg-green-100 transition-colors">
@@ -212,5 +214,13 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
 
   const leads = await getReferralLeadsByProfessional(proId).catch(() => []);
 
-  return { props: { proName, clients, leads } };
+  // Accordo sul trattamento dei dati: avviso a ogni accesso finché non è in regola.
+  let accordo = null;
+  try {
+    const { statoAccordoPro } = await import('../../lib/accordo-server');
+    const { statoPerIlBrowser } = await import('../../lib/accordo.mjs');
+    accordo = statoPerIlBrowser(await statoAccordoPro(proId));
+  } catch (_) {}
+
+  return { props: { proName, clients, leads, accordo } };
 });

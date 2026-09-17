@@ -6,7 +6,9 @@ import {
   addToWaitlist,
   generateId,
   proCanAccessClient,
+  getProAssignmentEligibility,
 } from '../../../../lib/store';
+import { messaggioNonConforme } from '../../../../lib/pro-docs';
 import supabase from '../../../../lib/db';
 
 export default requireProAuth(async function handler(req, res) {
@@ -31,6 +33,15 @@ export default requireProAuth(async function handler(req, res) {
     // Livello A — la pre-validazione è accessibile agli osteopati assegnati all'AZIENDA
     if (!(await proCanAccessClient(proId, patient.client_id))) {
       return res.status(403).json({ error: 'Accesso negato' });
+    }
+
+    // La pre-validazione PRENDE IN CARICO il paziente (assigned_professional_id).
+    // Conformità (Enrico, 17/9): nessuna NUOVA presa in carico se il professionista
+    // non è in regola, per qualunque requisito. Chi ha già il paziente in carico
+    // prosegue (es. nuova pre-validazione per il secondo ciclo).
+    if (patient.assigned_professional_id !== proId) {
+      const elig = await getProAssignmentEligibility(proId);
+      if (elig.blocked) return res.status(409).json({ error: messaggioNonConforme(elig.reasons), blocked: true, reasons: elig.reasons });
     }
 
     const preVal = await insertPreValidation({

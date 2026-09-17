@@ -17,6 +17,7 @@ import { validaNrsChiusura } from '../../../lib/nrs';
 import { vistaCartellaCurante } from '../../../lib/vista';
 import { nomeLivello } from '../../../lib/livelli';
 import { documentiMancanti, prevedeSedute } from '../../../lib/documenti-seduta.mjs';
+import { dirittoCicli } from '../../../lib/anno-programma.mjs';
 import { dataIt } from '../../../lib/date-it.mjs';
 
 // ─── NRS Slider ───────────────────────────────────────────────────────────────
@@ -676,7 +677,7 @@ function ClosedSessionCard({ session: s, patientId, onUpdated }) {
 
 // ─── Pagina principale ────────────────────────────────────────────────────────
 
-export default function PatientPage({ proName, patient: initialPatient, sessions: initialSessions, client, documents: initialDocs, cycles: initialCycles , testiFirma = null}) {
+export default function PatientPage({ proName, patient: initialPatient, sessions: initialSessions, client, documents: initialDocs, cycles: initialCycles , testiFirma = null, finestraAnno = null}) {
   const router = useRouter();
   const [patient, setPatient] = useState(initialPatient);
   const [sessions, setSessions] = useState(initialSessions);
@@ -963,23 +964,28 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
                 </div>
               )}
 
-              {/* L1 CONFERMATO (active) — ciclo di trattamento (max 2/anno) */}
-              {!activeCycle && patient.level === 'level1' && patient.level_status === 'active' &&
-                closedCycles.filter(c => (c.cycle_type || 'treatment') === 'treatment').length < 2 && (
-                <button onClick={() => startCycle('treatment')} disabled={cycleLoading}
-                  className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-60">
-                  {cycleLoading ? 'Avvio...' : `+ Avvia ciclo di trattamento`}
-                </button>
-              )}
+              {/* L1 CONFERMATO (active) — ciclo di trattamento: 2 per ANNO DI PROGRAMMA
+                  (stessa regola del server, lib/anno-programma.mjs) */}
+              {!activeCycle && patient.level === 'level1' && patient.level_status === 'active' && (() => {
+                const d = dirittoCicli({ cicli: cycles, tipo: 'treatment', finestra: finestraAnno });
+                return d.esaurito
+                  ? <div className="w-full py-2.5 px-3 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-700">{d.messaggio}</div>
+                  : <button onClick={() => startCycle('treatment')} disabled={cycleLoading}
+                      className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-60">
+                      {cycleLoading ? 'Avvio...' : `+ Avvia ciclo di trattamento`}
+                    </button>;
+              })()}
 
-              {/* L2 idoneo — ciclo di prevenzione attiva (4 sessioni/anno, Plus/Enterprise) */}
-              {!activeCycle && patient.level === 'level2' && patient.prevention_eligible &&
-                !cycles.some(c => c.cycle_type === 'prevention') && (
-                <button onClick={() => startCycle('prevention')} disabled={cycleLoading}
-                  className="w-full py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold disabled:opacity-60">
-                  {cycleLoading ? 'Avvio...' : '+ Avvia ciclo di prevenzione (4 sessioni)'}
-                </button>
-              )}
+              {/* L2 idoneo — ciclo di prevenzione: 1 per ANNO DI PROGRAMMA */}
+              {!activeCycle && patient.level === 'level2' && patient.prevention_eligible && (() => {
+                const d = dirittoCicli({ cicli: cycles, tipo: 'prevention', finestra: finestraAnno });
+                return d.esaurito
+                  ? <div className="w-full py-2.5 px-3 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-700">{d.messaggio}</div>
+                  : <button onClick={() => startCycle('prevention')} disabled={cycleLoading}
+                      className="w-full py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold disabled:opacity-60">
+                      {cycleLoading ? 'Avvio...' : '+ Avvia ciclo di prevenzione (4 sessioni)'}
+                    </button>;
+              })()}
 
               {closedCycles.length > 0 && (
                 <div className="mt-3 space-y-2">
@@ -1174,6 +1180,11 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
     cycles = [];
   }
 
+  // Anno di programma dell'azienda: la cartella mostra i diritti con la stessa
+  // regola del server (e la stessa finestra, calcolata una volta sola qui).
+  const { finestraAnno } = await import('../../../lib/anno-programma.mjs');
+  const finestra = finestraAnno(client?.data_avvio_programma || null);
+
   return {
     props: {
       proName,
@@ -1186,6 +1197,7 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
       documents: documents.map(d => ({ ...d, signature_image: undefined, file_path: undefined })), // né la firma né il percorso del file
       cycles,
       testiFirma,
+      finestraAnno: finestra,
     },
   };
 });

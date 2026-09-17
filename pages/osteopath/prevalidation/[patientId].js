@@ -3,7 +3,8 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requireProAuthSsr } from '../../../lib/pro-auth';
-import { getPatientById, getClientById, proCanAccessClient } from '../../../lib/store';
+import { getPatientById, getClientById, proCanAccessClient, getProAssignmentEligibility } from '../../../lib/store';
+import { messaggioNonConforme } from '../../../lib/pro-docs';
 import { vistaPazienteMinima } from '../../../lib/vista';
 
 const PAIN_ZONES = [
@@ -25,7 +26,7 @@ const COLOR_MAP = {
   amber: { bg: 'bg-amber-50', border: 'border-amber-400', text: 'text-amber-800', selBg: 'bg-amber-500', selText: 'text-white' },
 };
 
-export default function PrevalidationForm({ patient }) {
+export default function PrevalidationForm({ patient, bloccoPresaInCarico = null }) {
   const router = useRouter();
   const { patientId } = router.query;
 
@@ -118,6 +119,12 @@ export default function PrevalidationForm({ patient }) {
         </header>
 
         <main className="max-w-2xl mx-auto px-5 py-6">
+          {bloccoPresaInCarico && (
+            <div role="alert" className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6 text-sm text-red-800">
+              <strong>{bloccoPresaInCarico}</strong> Completa i documenti in{' '}
+              <Link href="/pro/documents" className="underline font-semibold">Documenti e conformità</Link> prima della videocall.
+            </div>
+          )}
           {/* Info call */}
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6 text-sm text-blue-800">
             <strong>📞 Compilare durante o immediatamente dopo la videocall</strong> di pre-validazione (15 min) con il paziente.
@@ -218,5 +225,11 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   // chi è e per quale azienda — come dice il commento sopra. Prima passava la cartella
   // clinica intera, che la pagina non mostra ma che viaggiava nel sorgente.
   const azienda = await getClientById(patient.client_id).catch(() => null);
-  return { props: { patient: vistaPazienteMinima(patient, azienda ? azienda.name : null) } };
+  // Conformità: lo si dice all'apertura, non dopo la videocall (il blocco vero è nell'API).
+  let bloccoPresaInCarico = null;
+  if (patient.assigned_professional_id !== proId) {
+    const elig = await getProAssignmentEligibility(proId).catch(() => ({ blocked: true, reasons: ['verifica della conformità non disponibile'] }));
+    if (elig.blocked) bloccoPresaInCarico = messaggioNonConforme(elig.reasons, 'Non puoi prendere in carico questo paziente');
+  }
+  return { props: { patient: vistaPazienteMinima(patient, azienda ? azienda.name : null), bloccoPresaInCarico } };
 });

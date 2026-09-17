@@ -126,6 +126,11 @@ export default requireAuth(async function handler(req, res) {
 
   if (req.method === 'DELETE') {
     try {
+      // Cancellare un'azienda cancella i suoi pazienti: stesso vincolo di
+      // conservazione della cancellazione del singolo paziente (Enrico, 17/9).
+      const { vincoloConservazioneAzienda } = await import('../../../lib/conservazione-server');
+      const vincolo = await vincoloConservazioneAzienda(id);
+      if (vincolo.bloccato) return res.status(409).json({ codice: 'conservazione', error: vincolo.messaggio, fino_al: vincolo.finoAl, pazienti: vincolo.pazienti });
       await deleteClientById(id);
       return res.json({ ok: true });
     } catch (e) {

@@ -51,6 +51,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
     if (!confirm('Eliminare questo cliente e tutti i suoi dati?')) return;
     const res = await fetch(`/api/clients/${id}`, { method: 'DELETE' });
     if (res.ok) setClients(prev => prev.filter(c => c.id !== id));
+    else { const d = await res.json().catch(() => ({})); alert(d.error || 'Cancellazione non riuscita'); }
   }
 
   return (

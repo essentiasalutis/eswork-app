@@ -898,10 +898,12 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
             </div>
           )}
 
-          {/* ── Ciclo di trattamento (solo L1) ───────────────────────── */}
-          {patient.level === 'level1' && (
+          {/* ── Ciclo: trattamento (L1) o prevenzione (L2 con diritto) ───────
+               Prima il blocco era solo L1: il pulsante della prevenzione, che ci
+               stava dentro, non compariva mai (Enrico, 17/9). */}
+          {prevedeSedute(patient) && (
             <div className="bg-white rounded-2xl border border-gray-200 p-4">
-              <h3 className="font-semibold text-gray-800 mb-3 text-sm">Ciclo di trattamento</h3>
+              <h3 className="font-semibold text-gray-800 mb-3 text-sm">{patient.level === 'level2' ? 'Ciclo di prevenzione' : 'Ciclo di trattamento'}</h3>
 
               {patient.level_status === 'opted_out' && (
                 <div className="mb-3 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-800 font-medium">

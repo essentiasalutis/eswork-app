@@ -16,7 +16,7 @@ export default function RetentionPage({ review }) {
     try {
       const res = await fetch(`/api/admin/patients/${p.id}`, { method: 'DELETE' });
       if (res.ok) setDue(prev => prev.filter(x => x.id !== p.id));
-      else alert('Errore nella cancellazione');
+      else { const d = await res.json().catch(() => ({})); alert(d.error || 'Errore nella cancellazione'); }
     } catch { alert('Errore di rete'); }
     setBusyId(null);
   }

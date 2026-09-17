@@ -6,6 +6,7 @@ import { requireProAuthSsr } from '../../../lib/pro-auth';
 import { getPatientById, getClientById, proCanAccessClient, getProAssignmentEligibility } from '../../../lib/store';
 import { messaggioNonConforme } from '../../../lib/pro-docs';
 import { vistaPazienteMinima } from '../../../lib/vista';
+import { PROTOCOLLO } from '../../../lib/protocollo.mjs';
 
 const PAIN_ZONES = [
   'Collo', 'Spalle', 'Braccia/gomiti', 'Polsi/mani',
@@ -127,7 +128,7 @@ export default function PrevalidationForm({ patient, bloccoPresaInCarico = null 
           )}
           {/* Info call */}
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6 text-sm text-blue-800">
-            <strong>📞 Compilare durante o immediatamente dopo la videocall</strong> di pre-validazione (15 min) con il paziente.
+            <strong>📞 Compilare durante o immediatamente dopo la videocall</strong> di pre-validazione ({PROTOCOLLO.durata_prevalidazione_min} min) con il paziente.
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">

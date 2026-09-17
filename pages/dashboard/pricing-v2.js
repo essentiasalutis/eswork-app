@@ -4,7 +4,7 @@ import Link from 'next/link';
 import NavMenu from '../../components/NavMenu';
 import { requireAuthSsr } from '../../lib/auth';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
-import { PARAMETRI_PROTOCOLLO_LISTINO, eRegolaDelProtocollo, percento } from '../../lib/protocollo.mjs';
+import { PROTOCOLLO, PARAMETRI_PROTOCOLLO_LISTINO, eRegolaDelProtocollo, percento } from '../../lib/protocollo.mjs';
 
 // Etichette umane dei fattori numerici v2 (la v1 è congelata nel codice e NON
 // compare qui: impossibile modificarla da UI).
@@ -133,18 +133,21 @@ export default function PricingV2Page() {
           <div className={box}>
             <h2 className="font-semibold text-gray-800 mb-3">Parametri formazione (turnover / recupero)</h2>
             <div className="grid md:grid-cols-3 gap-3">
-              {[['listino_concentrata', 'Listino base concentrata (€/gruppo)'], ['listino_base_completa', 'Listino base completa (€/gruppo)'], ['finestra_recupero_mesi', 'Finestra recupero (mesi)'], ['hr_ingressi_max_per_ora', 'Rate-limit HR (max ingressi/ora per azienda)']].map(([k, lbl]) => (
+              {[['listino_concentrata', 'Listino base concentrata (€/gruppo)'], ['listino_base_completa', 'Listino base completa (€/gruppo)'], ['hr_ingressi_max_per_ora', 'Rate-limit HR (max ingressi/ora per azienda)']].map(([k, lbl]) => (
                 <label key={k} className="text-xs text-gray-500">{lbl}
                   <input type="number" step="any" defaultValue={texts[k] ?? ''} className={`${inputCls} mt-1`}
                     onBlur={e => { if ((texts[k] ?? '') !== e.target.value && e.target.value !== '') put({ tipo: 'setting', key: k, value: e.target.value }, 'parametro salvato'); }} />
                 </label>
               ))}
             </div>
-            <label className="block text-xs text-gray-500 mt-3">Soglie recupero per fascia (JSON: max=null = oltre)
-              <textarea rows={2} defaultValue={texts.soglia_recupero_fasce || ''} className={`${inputCls} mt-1 font-mono text-xs`}
-                onBlur={e => { if ((texts.soglia_recupero_fasce || '') !== e.target.value) put({ tipo: 'setting', key: 'soglia_recupero_fasce', value: e.target.value }, 'soglie salvate'); }} />
-            </label>
-            <p className="text-[11px] text-gray-400 mt-2">Globali, editabili qui. Override per-azienda opzionale sui listini (colonna cliente); capienza gruppo resta per-azienda. Precedenza: override cliente → questi → default.</p>
+            <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <div className="text-xs font-semibold text-gray-700">Recupero neoassunti — regola del protocollo, non modificabile (contratto azienda, Art. 5-bis c. 5)</div>
+              <div className="grid md:grid-cols-2 gap-2 mt-2 text-xs text-gray-600">
+                <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2"><span>Finestra di recupero</span><strong className="tabular-nums text-gray-900">{PROTOCOLLO.recupero_finestra_mesi} mesi</strong></div>
+                <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2"><span>Soglie per fascia</span><strong className="tabular-nums text-gray-900">{PROTOCOLLO.recupero_soglie.map((f, i, a) => f.max === Infinity ? `oltre ${a[i - 1].max}: ${f.soglia}` : `fino a ${f.max}: ${f.soglia}`).join(' · ')}</strong></div>
+              </div>
+            </div>
+            <p className="text-[11px] text-gray-400 mt-2">I listini della formazione sono globali ed editabili qui; override per-azienda opzionale (colonna cliente); capienza gruppo resta per-azienda.</p>
           </div>
 
           {/* Check-up: durata proposta all'avvio (modificabile caso per caso) */}

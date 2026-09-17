@@ -155,8 +155,8 @@ function DashboardL1({ patient, cycles, nrs, onSelfTrigger, remaining, rinnovo =
           <>
             <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>Sei stato identificato come candidato al protocollo di trattamento.</div>
             <div style={{ fontSize: 13, opacity: .85, marginTop: 8, lineHeight: 1.5 }}>{attivo
-              ? 'Sarai contattato dal nostro coordinatore per fissare la pre-validazione clinica (videocall di 15 minuti).'
-              : 'Se il programma verrà attivato, sarai contattato dal nostro coordinatore per fissare la pre-validazione clinica (videochiamata di circa 15 minuti).'}</div>
+              ? `Sarai contattato dal nostro coordinatore per fissare la pre-validazione clinica (videocall di ${PROTOCOLLO.durata_prevalidazione_min} minuti).`
+              : `Se il programma verrà attivato, sarai contattato dal nostro coordinatore per fissare la pre-validazione clinica (videochiamata di circa ${PROTOCOLLO.durata_prevalidazione_min} minuti).`}</div>
           </>
         ) : (
           <>
@@ -368,7 +368,7 @@ function SelfTriggerButton({ onPress, remaining = 2, rinnovo = null, label = 'Ho
       <div style={{ fontSize: 13, fontWeight: 700, color: exhausted ? '#64748b' : '#1d4ed8', marginBottom: 4 }}>🩺 {label}</div>
       <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12, lineHeight: 1.5 }}>
         Se avverti un nuovo disturbo, segnalalo: un osteopata ti ricontatterà per una breve videochiamata di valutazione.
-        <br /><strong>{remaining}</strong> {remaining === 1 ? 'segnalazione disponibile' : 'segnalazioni disponibili'} in quest&apos;anno di programma.
+        <br /><strong>{remaining}</strong> {remaining === 1 ? 'segnalazione disponibile' : 'segnalazioni disponibili'} nell&apos;anno di programma della tua azienda.
         {exhausted && rinnovo && <><br />Tornano disponibili il {rinnovo}.</>}
       </div>
       <button onClick={onPress} disabled={exhausted}

@@ -44,7 +44,7 @@ export default async function handler(req, res) {
   catch (_) { return res.status(503).json({ error: 'Servizio momentaneamente non disponibile, riprova tra qualche minuto.' }); }
   if (budget.remaining <= 0) {
     return res.status(429).json({
-      error: `Hai usato le ${budget.max} auto-segnalazioni previste per quest'anno di programma.${budget.rinnovoIlTesto ? ` Tornano disponibili il ${budget.rinnovoIlTesto}.` : ''} Per necessità urgenti scrivi a info@essentiasalutis.it`,
+      error: `Hai usato le ${budget.max} auto-segnalazioni previste nell'anno di programma della tua azienda.${budget.rinnovoIlTesto ? ` Tornano disponibili il ${budget.rinnovoIlTesto}.` : ''} Per necessità urgenti scrivi a info@essentiasalutis.it`,
       remaining: 0,
       rinnovo_il: budget.rinnovoIl,
     });

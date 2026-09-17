@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { PROTOCOLLO, conProtocollo, eRegolaDelProtocollo, inLettere, percento } from '../lib/protocollo.mjs';
 import { MAX_CICLI_TRATTAMENTO, MAX_CICLI_PREVENZIONE, MAX_AUTOSEGNALAZIONI } from '../lib/anno-programma.mjs';
 import { DEFAULTS_V2 } from '../lib/pricing/v2-defaults.mjs';
+import { ORG_PARAMS, sogliaDefaultPerFascia } from '../lib/org-regole.mjs';
 
 // Le regole firmate con il cliente (Enrico, 17/9). Se uno di questi numeri cambia,
 // il test deve fallire: la modifica va decisa, non scivolata.
@@ -11,6 +12,9 @@ test('i valori del protocollo sono quelli contrattuali', () => {
     sedute_per_ciclo: 4, durata_seduta_min: 30, sessioni_prevenzione_l2: 4,
     cicli_trattamento_per_anno: 2, cicli_prevenzione_per_anno: 1,
     giorni_tra_cicli: 60, autosegnalazioni_per_anno: 2, buffer_pct: 0.20,
+    durata_prevalidazione_min: 15,
+    recupero_finestra_mesi: 6,
+    recupero_soglie: [{ max: 50, soglia: 5 }, { max: 200, soglia: 10 }, { max: Infinity, soglia: 20 }],
   });
   assert.equal(Object.isFrozen(PROTOCOLLO), true);
 });
@@ -31,6 +35,9 @@ test('il prezzo usa il protocollo, qualunque cosa sia salvata nel listino', () =
   assert.equal(p.tariffa_sessione_prevenzione, 50, 'i parametri commerciali restano modificabili');
   assert.equal(eRegolaDelProtocollo('buffer_pct'), true);
   assert.equal(eRegolaDelProtocollo('l2_multiplier'), false);
+  assert.equal(eRegolaDelProtocollo('finestra_recupero_mesi'), true);
+  assert.equal(eRegolaDelProtocollo('soglia_recupero_fasce'), true);
+  assert.equal(eRegolaDelProtocollo('listino_concentrata'), false, 'il prezzo della formazione resta commerciale');
 });
 
 test('i default del listino v2 coincidono con il protocollo', () => {
@@ -45,4 +52,13 @@ test('numeri per le frasi', () => {
   assert.equal(inLettere(4, { maiuscola: true }), 'Quattro');
   assert.equal(inLettere(12), '12');
   assert.equal(percento(0.2), '20%');
+});
+
+test('recupero neoassunti (Art. 5-bis c. 5): la regola della formazione legge il protocollo', () => {
+  assert.equal(ORG_PARAMS.finestra_mesi, PROTOCOLLO.recupero_finestra_mesi);
+  assert.deepEqual(ORG_PARAMS.soglia_fasce, PROTOCOLLO.recupero_soglie);
+  assert.equal(sogliaDefaultPerFascia(50), 5);
+  assert.equal(sogliaDefaultPerFascia(51), 10);
+  assert.equal(sogliaDefaultPerFascia(200), 10);
+  assert.equal(sogliaDefaultPerFascia(201), 20);
 });

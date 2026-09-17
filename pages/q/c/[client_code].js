@@ -308,12 +308,12 @@ function CompletionScreen({ level, wantsContact, careToken, firmato = false, ema
         {isL1 && (firmato ? (
           <>
             <p className="text-gray-600 mb-2">Dalle tue risposte emerge un quadro che può beneficiare di un supporto osteopatico.</p>
-            <p className="text-gray-600">Sarai contattato dall&apos;osteopata per una <strong>pre-validazione clinica</strong> (videochiamata di circa 15 minuti) che confermerà il percorso più adatto a te.</p>
+            <p className="text-gray-600">Sarai contattato dall&apos;osteopata per una <strong>pre-validazione clinica</strong> (videochiamata di circa {PROTOCOLLO.durata_prevalidazione_min} minuti) che confermerà il percorso più adatto a te.</p>
           </>
         ) : (
           <>
             <p className="text-gray-600 mb-2">Dalle tue risposte emerge un quadro che può beneficiare di un supporto osteopatico.</p>
-            <p className="text-gray-600">La tua azienda sta valutando l&apos;attivazione del programma: <strong>se il programma verrà attivato</strong>, sarai contattato dall&apos;osteopata per una <strong>pre-validazione clinica</strong> (videochiamata di circa 15 minuti) che confermerà il percorso più adatto a te.</p>
+            <p className="text-gray-600">La tua azienda sta valutando l&apos;attivazione del programma: <strong>se il programma verrà attivato</strong>, sarai contattato dall&apos;osteopata per una <strong>pre-validazione clinica</strong> (videochiamata di circa {PROTOCOLLO.durata_prevalidazione_min} minuti) che confermerà il percorso più adatto a te.</p>
           </>
         ))}
 
@@ -322,12 +322,12 @@ function CompletionScreen({ level, wantsContact, careToken, firmato = false, ema
         {isL2 && (firmato ? (
           <>
             <p className="text-gray-600 mb-2">Hai riportato alcuni fastidi, senza un impatto sulle tue attività.</p>
-            <p className="text-gray-600">Sei incluso nella <strong>prevenzione attiva</strong>: {PROTOCOLLO.sessioni_prevenzione_l2} sessioni di prevenzione con l&apos;osteopata durante l&apos;anno, più la formazione collettiva. Se la situazione peggiora, puoi <strong>segnalarlo</strong> dalla tua area personale (fino a {PROTOCOLLO.autosegnalazioni_per_anno} volte l&apos;anno) per essere ricontattato dall&apos;osteopata.</p>
+            <p className="text-gray-600">Sei incluso nella <strong>prevenzione attiva</strong>: {PROTOCOLLO.sessioni_prevenzione_l2} sessioni di prevenzione con l&apos;osteopata nell&apos;anno di programma della tua azienda, più la formazione collettiva. Se la situazione peggiora, puoi <strong>segnalarlo</strong> dalla tua area personale (fino a {PROTOCOLLO.autosegnalazioni_per_anno} volte nell&apos;anno di programma della tua azienda) per essere ricontattato dall&apos;osteopata.</p>
           </>
         ) : (
           <>
             <p className="text-gray-600 mb-2">Hai riportato alcuni fastidi, senza un impatto sulle tue attività.</p>
-            <p className="text-gray-600">La tua azienda sta valutando l&apos;attivazione del programma: <strong>se verrà attivato</strong>, sarai incluso nella <strong>prevenzione attiva</strong> — {PROTOCOLLO.sessioni_prevenzione_l2} sessioni di prevenzione con l&apos;osteopata durante l&apos;anno — e nella formazione collettiva su postura ed ergonomia.</p>
+            <p className="text-gray-600">La tua azienda sta valutando l&apos;attivazione del programma: <strong>se verrà attivato</strong>, sarai incluso nella <strong>prevenzione attiva</strong> — {PROTOCOLLO.sessioni_prevenzione_l2} sessioni di prevenzione con l&apos;osteopata nell&apos;anno di programma della tua azienda — e nella formazione collettiva su postura ed ergonomia.</p>
           </>
         ))}
 
@@ -337,7 +337,7 @@ function CompletionScreen({ level, wantsContact, careToken, firmato = false, ema
         {!isL1 && !isL2 && (firmato ? (
           <>
             <p className="text-gray-600 mb-2">Non hai riportato disturbi in atto: è la risposta migliore.</p>
-            <p className="text-gray-600">Per te il programma è la <strong>prevenzione</strong>: formazione collettiva su postura ed ergonomia e sistemazione della postazione. <strong>Non riceverai una chiamata dall&apos;osteopata, ed è un buon segno</strong>: le sedute individuali vanno a chi ha un disturbo in corso. Se inizi ad avvertirne uno, puoi <strong>segnalarlo</strong> dalla tua area personale in qualsiasi momento (fino a {PROTOCOLLO.autosegnalazioni_per_anno} volte l&apos;anno).</p>
+            <p className="text-gray-600">Per te il programma è la <strong>prevenzione</strong>: formazione collettiva su postura ed ergonomia e sistemazione della postazione. <strong>Non riceverai una chiamata dall&apos;osteopata, ed è un buon segno</strong>: le sedute individuali vanno a chi ha un disturbo in corso. Se inizi ad avvertirne uno, puoi <strong>segnalarlo</strong> dalla tua area personale in qualsiasi momento (fino a {PROTOCOLLO.autosegnalazioni_per_anno} volte nell&apos;anno di programma della tua azienda).</p>
           </>
         ) : (
           <>

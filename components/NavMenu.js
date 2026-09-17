@@ -15,13 +15,12 @@ const NAV_ITEMS = [
   { href: '/dashboard/data-requests', label: 'Richieste GDPR', icon: '🔐', color: 'violet' },
   { href: '/dashboard/retention', label: 'Conservazione dati', icon: '🗄️', color: 'amber' },
   { href: '/dashboard/restratifications', label: 'Ri-stratificazioni', icon: '🔄', color: 'rose' },
-  { href: '/dashboard/acute-events', label: 'Eventi acuti (storico)', icon: '🗄️', color: 'red', badge: true },
   { href: '/dashboard/finance', label: 'Finance', icon: '💶', color: 'emerald' },
   { href: '/dashboard/pricing-v2', label: 'Listino v2', icon: '🏷️', color: 'green' },
   { href: '/dashboard/settings', label: 'Settings', icon: '⚙️', color: 'gray' },
 ];
 
-export default function NavMenu({ pendingAcuteCount = 0, onLogout }) {
+export default function NavMenu({ onLogout }) {
   const [open, setOpen] = useState(false);
   const [nonLette, setNonLette] = useState(0);
   const ref = useRef(null);
@@ -71,13 +70,7 @@ export default function NavMenu({ pendingAcuteCount = 0, onLogout }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           )}
         </svg>
-        {/* Red dot if pending acute events */}
-        {pendingAcuteCount > 0 && !open && (
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
-            {pendingAcuteCount > 9 ? '9+' : pendingAcuteCount}
-          </span>
-        )}
-        {pendingAcuteCount === 0 && nonLette > 0 && !open && (
+        {nonLette > 0 && !open && (
           <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
             {nonLette > 9 ? '9+' : nonLette}
           </span>
@@ -107,11 +100,6 @@ export default function NavMenu({ pendingAcuteCount = 0, onLogout }) {
                 {item.badgeComunicazioni && nonLette > 0 && (
                   <span className="w-5 h-5 bg-blue-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
                     {nonLette > 9 ? '9+' : nonLette}
-                  </span>
-                )}
-                {item.badge && pendingAcuteCount > 0 && (
-                  <span className="w-5 h-5 bg-red-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                    {pendingAcuteCount > 9 ? '9+' : pendingAcuteCount}
                   </span>
                 )}
                 {isActive && (

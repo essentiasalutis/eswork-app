@@ -5,7 +5,6 @@ import { requireProAuthSsr } from '../../lib/pro-auth';
 import { vistaPazienteLista } from '../../lib/vista';
 import {
   getPatientsByProfessional,
-  getAcuteEventsByProfessional,
   getWaitlistByProfessional,
   getClientById,
 } from '../../lib/store';
@@ -50,8 +49,7 @@ function Badge({ label, color }) {
 
 const LEVEL_LABEL = { level1: 'L1', level2: 'L2', level3: 'L3' };
 
-export default function OsteopathDashboard({ proName, l1Patients, acuteEvents, waitlist, allPatients }) {
-  const pendingAcute = acuteEvents.filter(e => e.status === 'pending');
+export default function OsteopathDashboard({ proName, l1Patients, waitlist, allPatients }) {
   const pendingWaitlist = waitlist;
 
   return (
@@ -62,10 +60,9 @@ export default function OsteopathDashboard({ proName, l1Patients, acuteEvents, w
 
         <main className="max-w-4xl mx-auto px-5 py-6 space-y-6">
           {/* Stats rapide */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {[
               { label: 'Pazienti L1', value: l1Patients.length, color: '#0369a1' },
-              { label: 'Acuti pending', value: pendingAcute.length, color: pendingAcute.length > 0 ? '#dc2626' : '#16a34a' },
               { label: 'Pre-val. da fare', value: pendingWaitlist.length, color: pendingWaitlist.length > 0 ? '#ca8a04' : '#16a34a' },
             ].map(s => (
               <div key={s.label} className="bg-white rounded-2xl border border-gray-200 p-4 text-center">
@@ -74,40 +71,6 @@ export default function OsteopathDashboard({ proName, l1Patients, acuteEvents, w
               </div>
             ))}
           </div>
-
-          {/* Alert eventi acuti */}
-          {pendingAcute.length > 0 && (
-            <div>
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">🚨 Eventi acuti da gestire</div>
-              <div className="space-y-2">
-                {pendingAcute.map(ev => {
-                  const deadline = ev.escalation_deadline ? new Date(ev.escalation_deadline) : null;
-                  const hoursLeft = deadline ? Math.round((deadline - Date.now()) / 3600000) : null;
-                  const isOverdue = hoursLeft != null && hoursLeft <= 0;
-                  return (
-                    <div key={ev.id} className={`bg-white rounded-2xl border p-4 ${isOverdue ? 'border-red-300' : 'border-orange-200'}`}>
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div>
-                          <div className="font-semibold text-gray-900 text-sm">
-                            {ev.patients?.first_name} {ev.patients?.last_name}
-                          </div>
-                          <div className="text-xs text-gray-500">{ev.clients?.name} · NRS {ev.nrs ?? '—'} · {ev.pain_zone || 'zona n.d.'}</div>
-                          {ev.description && <div className="text-xs text-gray-400 mt-1 italic">{ev.description.slice(0, 100)}</div>}
-                        </div>
-                        <div className="text-right shrink-0">
-                          {hoursLeft != null && (
-                            <div className={`text-xs font-bold ${isOverdue ? 'text-red-600' : hoursLeft < 6 ? 'text-orange-600' : 'text-gray-500'}`}>
-                              {isOverdue ? '⚠️ Scaduto' : `⏱ ${hoursLeft}h rimaste`}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {/* Pre-validazioni pendenti */}
           {pendingWaitlist.length > 0 && (
@@ -198,9 +161,8 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   const proId = ctx.req.proSession.proId;
   const proName = ctx.req.proSession.proName;
 
-  const [patients, acuteEvents, waitlist] = await Promise.all([
+  const [patients, waitlist] = await Promise.all([
     getPatientsByProfessional(proId).catch(() => []),
-    getAcuteEventsByProfessional(proId).catch(() => []),
     getWaitlistByProfessional(proId).catch(() => []),
   ]);
 
@@ -227,7 +189,6 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
     props: {
       proName,
       l1Patients,
-      acuteEvents,
       waitlist: codaEtichettata,
       allPatients: elenco,
     },

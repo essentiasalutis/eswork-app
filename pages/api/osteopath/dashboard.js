@@ -2,7 +2,6 @@ import { requireProAuth } from '../../../lib/pro-auth';
 import {
   getPatientsByProfessional,
   getCyclesByPatient,
-  getAcuteEventsByProfessional,
   getWaitlistByProfessional,
   getAllRestratAlerts,
 } from '../../../lib/store';
@@ -13,9 +12,8 @@ export default requireProAuth(async function handler(req, res) {
 
   const proId = req.proSession.proId;
 
-  const [patients, acuteEvents, waitlist] = await Promise.all([
+  const [patients, waitlist] = await Promise.all([
     getPatientsByProfessional(proId).catch(() => []),
-    getAcuteEventsByProfessional(proId).catch(() => []),
     getWaitlistByProfessional(proId).catch(() => []),
   ]);
 
@@ -40,7 +38,6 @@ export default requireProAuth(async function handler(req, res) {
     patients: elenco,
     l1Patients,
     cyclesMap,
-    acuteEvents,
     waitlist,
     proId,
   });

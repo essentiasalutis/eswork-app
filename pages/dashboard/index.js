@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { getSessionToken, verifyToken } from '../../lib/auth';
-import { getClients, getAssessmentCounts, getAllAcuteEvents } from '../../lib/store';
+import { getClients, getAssessmentCounts } from '../../lib/store';
 import { getDashboardFormazione } from '../../lib/org';
 import NavMenu from '../../components/NavMenu';
 import { TYPE_COLORS, TYPE_LABELS } from '../../lib/scoring';
@@ -18,7 +18,7 @@ const AGENDA = {
   checkup: { icona: '📋', testo: 'Check-up in chiusura', scaduto: '' },
 };
 
-export default function Dashboard({ clients: initialClients, assessmentCounts, pendingAcuteCount, formazioneAlerts = [], solleciti: sollecitiIniziali = [], sollecitiOfferta: sollecitiOffertaIniziali = [], agenda = [], oggi = '', avvisoEmail = null }) {
+export default function Dashboard({ clients: initialClients, assessmentCounts, formazioneAlerts = [], solleciti: sollecitiIniziali = [], sollecitiOfferta: sollecitiOffertaIniziali = [], agenda = [], oggi = '', avvisoEmail = null }) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
   const [solleciti, setSolleciti] = useState(sollecitiIniziali);
@@ -65,7 +65,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
             <span className="text-sm text-gray-500 ml-2">Dashboard</span>
           </div>
           <div className="flex items-center gap-2">
-            <NavMenu pendingAcuteCount={pendingAcuteCount} onLogout={logout} />
+            <NavMenu onLogout={logout} />
           </div>
         </div>
       </header>
@@ -241,14 +241,6 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     getAssessmentCounts(),
   ]);
 
-  // Conta eventi acuti pending (graceful: tabella potrebbe non esistere ancora)
-  let pendingAcuteCount = 0;
-  try {
-    const acuteEvents = await getAllAcuteEvents();
-    pendingAcuteCount = acuteEvents.filter(e => e.status === 'pending').length;
-  } catch (_) {
-    pendingAcuteCount = 0;
-  }
 
   let formazioneAlerts = [];
   try { formazioneAlerts = await getDashboardFormazione(giornoIt()); } catch (_) {}
@@ -294,5 +286,5 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     if (!r.ok) avvisoEmail = r.errore;
   } catch (_) {}
 
-  return { props: { clients, assessmentCounts, pendingAcuteCount, formazioneAlerts, solleciti, sollecitiOfferta, agenda, oggi, avvisoEmail } };
+  return { props: { clients, assessmentCounts, formazioneAlerts, solleciti, sollecitiOfferta, agenda, oggi, avvisoEmail } };
 });

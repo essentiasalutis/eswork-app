@@ -5,6 +5,7 @@ import { requireAuthSsr } from '../../lib/auth';
 import { getAllRestratAlerts, getAllPatients } from '../../lib/store';
 import { CONFIG } from '../../lib/config';
 import NavMenu from '../../components/NavMenu';
+import { dataIt } from '../../lib/date-it.mjs';
 
 // Sessioni per un nuovo L1 (protocollo v4: 4 sedute)
 const SESSIONS_PER_NEW_L1 = CONFIG.sessions_per_l1;
@@ -204,9 +205,7 @@ export default function RestratificationsPage({ alerts: initialAlerts, bufferByC
                     ? { level1: 'L1', level2: 'L2', level3: 'L3' }[alert.patients.level] || alert.patients.level
                     : '';
                   const clientName = alert.clients?.name || '—';
-                  const date = new Date(alert.created_at).toLocaleDateString('it-IT', {
-                    day: '2-digit', month: 'short', year: 'numeric',
-                  });
+                  const date = dataIt(alert.created_at, { day: '2-digit', month: 'short', year: 'numeric' });
 
                   return (
                     <div key={alert.id} className="bg-white border border-gray-200 rounded-2xl p-4">

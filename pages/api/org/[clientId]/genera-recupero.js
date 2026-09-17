@@ -3,10 +3,11 @@
 // body opzionale: { origine: 'recupero_autonomo' | 'campagna_aggiornamento' }
 import { requireAuth } from '../../../../lib/auth';
 import { generaSessioneRecupero } from '../../../../lib/org';
+import { giornoIt } from '../../../../lib/date-it.mjs';
 
 export default requireAuth(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = giornoIt();
   const origine = (req.body && req.body.origine) || 'recupero_autonomo';
   try {
     const r = await generaSessioneRecupero(req.query.clientId, { today, origine });

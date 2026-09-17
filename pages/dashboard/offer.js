@@ -18,6 +18,7 @@ import { vistaRiservata, K_ANON, SUPPRESSED } from '../../lib/kanon';
 import { pianoDeterministico } from '../../lib/piano';
 import { legendaLivelli } from '../../lib/livelli';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
+import { dataIt } from '../../lib/date-it.mjs';
 
 // ─── Firma standard ───────────────────────────────────────────────────────────
 
@@ -98,7 +99,7 @@ function EmailModal({ modal, onClose, onInvia }) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function today() {
-  return new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
+  return dataIt(new Date(), { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
 // generateInterventionPlan rimossa — ora usa AI via /api/ai/intervention-plan
@@ -400,7 +401,7 @@ ${FIRMA}`;
                 {st === 'capato' && <><strong>tetto applicato</strong>: il dimensionamento reale vale {fmt(tetto.calcolato)}, si propone il massimo promesso <strong>{fmt(tetto.max)}</strong> ({fmt(tetto.scostamento)} assorbiti). L&apos;offerta si invia così com&apos;è; lo scostamento resta registrato per la trattativa dell&apos;Anno 2.{' '}
                   <button onClick={() => setSforamento({ calcolato: tetto.calcolato, massimo: tetto.max, scostamento: tetto.scostamento })}
                     className="underline font-semibold">Superare il massimo promesso…</button></>}
-                {st === 'sopra_autorizzato' && <><strong>⚠ sopra il massimo, autorizzato</strong>: proposto {fmt(tetto.calcolato)} contro un massimo promesso di {fmt(tetto.max)} ({fmt(tetto.scostamento)} oltre). Motivazione registrata il {client?.sforamento_forbice_at ? new Date(client.sforamento_forbice_at).toLocaleDateString('it-IT') : '—'}.{' '}
+                {st === 'sopra_autorizzato' && <><strong>⚠ sopra il massimo, autorizzato</strong>: proposto {fmt(tetto.calcolato)} contro un massimo promesso di {fmt(tetto.max)} ({fmt(tetto.scostamento)} oltre). Motivazione registrata il {client?.sforamento_forbice_at ? dataIt(client.sforamento_forbice_at) : '—'}.{' '}
                   <button onClick={revocaSforamento} className="underline font-semibold">Torna al massimo promesso</button></>}
                 </>
               )}

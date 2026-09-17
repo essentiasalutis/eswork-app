@@ -7,6 +7,7 @@ import { getDashboardFormazione } from '../../lib/org';
 import NavMenu from '../../components/NavMenu';
 import { TYPE_COLORS, TYPE_LABELS } from '../../lib/scoring';
 import { etichettaData, ilGiorno } from '../../lib/checkup';
+import { dataIt, giornoIt } from '../../lib/date-it.mjs';
 
 // Righe dell'agenda "Questa settimana": cosa c'è da fare e quando (e come si chiama
 // quando la data è già passata).
@@ -160,7 +161,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, p
                     {a.active
                       ? <span className="font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">⏰ {a.motivo === 'soglia' ? 'soglia raggiunta' : 'scaduto (6 mesi)'}</span>
                       : <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">scade tra {a.giorniAllaScadenza}gg</span>}
-                    {a.prossimaCampagna && <span className="text-gray-400">campagna: {new Date(a.prossimaCampagna).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })}</span>}
+                    {a.prossimaCampagna && <span className="text-gray-400">campagna: {dataIt(a.prossimaCampagna, { day: '2-digit', month: 'short' })}</span>}
                     <span className="text-blue-600 font-medium">Apri →</span>
                   </span>
                 </Link>
@@ -250,7 +251,7 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
   }
 
   let formazioneAlerts = [];
-  try { formazioneAlerts = await getDashboardFormazione(new Date().toISOString().slice(0, 10)); } catch (_) {}
+  try { formazioneAlerts = await getDashboardFormazione(giornoIt()); } catch (_) {}
 
   let solleciti = [];
   try {

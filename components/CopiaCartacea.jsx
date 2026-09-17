@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MOTIVI, MESSAGGI, GIORNI_MAX, BYTE_MAX, giornoRoma, cartaSospesa, CARTA_SOSPESA } from '../lib/copia-cartacea.mjs';
+import { dataIt } from '../lib/date-it.mjs';
 
 // Firma su carta — l'ECCEZIONE (punto d). Si stampa la versione in vigore, si fa
 // firmare, si carica entro 7 giorni indicando la versione. Il documento risulta
@@ -11,7 +12,7 @@ const ETICHETTE = {
 };
 const NON_SO = '__non_so';
 
-const fmt = (iso) => (iso ? new Date(iso).toLocaleDateString('it-IT') : '');
+const fmt = (iso) => (iso ? dataIt(iso) : '');
 
 export default function CopiaCartacea({ patientId, daCaricare: richiesti, versioni, onAccettata }) {
   // Documenti che su carta non si possono caricare (per ora: l'informativa estesa,

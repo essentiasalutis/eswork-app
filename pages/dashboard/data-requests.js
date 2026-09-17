@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
 import { getDataRequests } from '../../lib/store';
+import { dataOraIt } from '../../lib/date-it.mjs';
 
 const TYPE_LABEL = {
   access: 'Accesso / copia dati',
@@ -72,7 +73,7 @@ export default function DataRequestsPage({ requests: initial }) {
                           <span className="text-sm font-semibold text-gray-800">{name}</span>
                           {r.clients?.name && <span className="text-xs text-gray-400">· {r.clients.name}</span>}
                         </div>
-                        <div className="text-xs text-gray-400 mt-1">{new Date(r.created_at).toLocaleString('it-IT')}</div>
+                        <div className="text-xs text-gray-400 mt-1">{dataOraIt(r.created_at)}</div>
                         {r.note && <div className="text-sm text-gray-700 mt-2 bg-gray-50 rounded-lg p-2">{r.note}</div>}
                         {r.response_note && <div className="text-xs text-gray-500 mt-2">Esito: {r.response_note}</div>}
                       </div>

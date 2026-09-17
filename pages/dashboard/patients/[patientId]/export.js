@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import { requireAuthSsr } from '../../../../lib/auth';
+import { dataIt, dataOraIt } from '../../../../lib/date-it.mjs';
 import {
   getPatientById,
   getPatientDocuments,
@@ -14,7 +15,7 @@ const NMQ_LABELS_IT = {
 };
 
 const MOTIVI_CARTA = { tablet_non_disponibile: 'Tablet non disponibile', connessione_assente: 'Connessione assente', preferenza_paziente: 'Preferenza del paziente', altro: 'Altro' };
-const giorno = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('it-IT');
+const giorno = (d) => dataIt(d);
 
 // Firma su carta (punto d): cosa è stato dichiarato, quando è stato caricato e
 // l'impronta del file, con il link per aprire la copia (l'apertura si registra).
@@ -23,7 +24,7 @@ function DatiCarta({ doc, copie, patientId }) {
   const copia = copie.find(c => c.file_path === doc.file_path && c.documento === doc.type);
   return (
     <div style={{ fontSize: 10, marginTop: 4 }}>
-      Firmato su carta il {giorno(doc.carta_data_firma)} (data dichiarata dall&apos;osteopata) · caricato il {new Date(doc.caricato_il).toLocaleDateString('it-IT')} · motivo: {MOTIVI_CARTA[doc.carta_motivo] || doc.carta_motivo}{doc.carta_motivo_nota ? ` — ${doc.carta_motivo_nota}` : ''}
+      Firmato su carta il {giorno(doc.carta_data_firma)} (data dichiarata dall&apos;osteopata) · caricato il {dataIt(doc.caricato_il)} · motivo: {MOTIVI_CARTA[doc.carta_motivo] || doc.carta_motivo}{doc.carta_motivo_nota ? ` — ${doc.carta_motivo_nota}` : ''}
       <div className="hash">File SHA-256: {doc.file_impronta}</div>
       {copia && <a className="no-print" href={`/api/admin/patients/${patientId}/carta?copia=${copia.id}`} target="_blank" rel="noopener noreferrer">Apri la copia firmata</a>}
     </div>
@@ -100,7 +101,7 @@ export default function PatientExport({ patient, client, documents, sessions, as
           </div>
           <div style={{ textAlign: 'right', fontSize: 10, color: '#6b7280' }}>
             <div>Esportato il</div>
-            <div style={{ fontWeight: 700 }}>{new Date(exportedAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+            <div style={{ fontWeight: 700 }}>{dataIt(exportedAt, { day: '2-digit', month: 'long', year: 'numeric' })}</div>
             <div style={{ marginTop: 8 }}>
               <span className="badge badge-ok">✅ Documenti completi</span>
             </div>
@@ -120,7 +121,7 @@ export default function PatientExport({ patient, client, documents, sessions, as
               <tr key={label}>
                 <td>{label}</td>
                 <td><span className={`badge ${doc?.status === 'signed' || doc?.status === 'completed' ? 'badge-ok' : 'badge-warn'}`}>{doc?.status === 'signed' ? 'Firmato' : doc?.status === 'completed' ? 'Compilato' : 'Mancante'}</span></td>
-                <td>{doc?.signed_at ? new Date(doc.signed_at).toLocaleDateString('it-IT') : '—'}{doc?.modalita === 'carta' ? ' (su carta)' : ''}</td>
+                <td>{doc?.signed_at ? dataIt(doc.signed_at) : '—'}{doc?.modalita === 'carta' ? ' (su carta)' : ''}</td>
                 <td className="hash">{doc?.content_hash ? doc.content_hash.slice(0, 32) + '…' : '—'}</td>
               </tr>
             ))}
@@ -139,7 +140,7 @@ export default function PatientExport({ patient, client, documents, sessions, as
         ))}
         {consent && (
           <div className="sig-box">
-            <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 6 }}>Firma del paziente — {new Date(consent.signed_at).toLocaleDateString('it-IT')}</div>
+            <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 6 }}>Firma del paziente — {dataIt(consent.signed_at)}</div>
             {consent.signature_image && (
               <img src={consent.signature_image} alt="Firma" style={{ maxWidth: 300, height: 80, objectFit: 'contain', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4 }} />
             )}
@@ -160,7 +161,7 @@ export default function PatientExport({ patient, client, documents, sessions, as
         ))}
         {privacy && (
           <div className="sig-box">
-            <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 6 }}>Firma del paziente — {new Date(privacy.signed_at).toLocaleDateString('it-IT')}</div>
+            <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 6 }}>Firma del paziente — {dataIt(privacy.signed_at)}</div>
             {privacy.signature_image && (
               <img src={privacy.signature_image} alt="Firma" style={{ maxWidth: 300, height: 80, objectFit: 'contain', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4 }} />
             )}
@@ -180,7 +181,7 @@ export default function PatientExport({ patient, client, documents, sessions, as
                     <td>{c.documento === 'consent_treatment' ? 'Consenso al trattamento' : 'Informativa estesa'}</td>
                     <td>{c.versione}</td>
                     <td>{giorno(c.data_firma)}</td>
-                    <td>{new Date(c.caricato_il).toLocaleDateString('it-IT')}</td>
+                    <td>{dataIt(c.caricato_il)}</td>
                     <td>{MOTIVI_CARTA[c.motivo] || c.motivo}{c.motivo_nota ? ` — ${c.motivo_nota}` : ''}</td>
                     <td className="hash">{c.file_impronta.slice(0, 16)}… <a className="no-print" href={`/api/admin/patients/${patient.id}/carta?copia=${c.id}`} target="_blank" rel="noopener noreferrer">apri</a></td>
                   </tr>
@@ -228,7 +229,7 @@ export default function PatientExport({ patient, client, documents, sessions, as
               </>
             )}
             <div className="sig-box" style={{ marginTop: 12 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 6 }}>Firma del paziente — {new Date(anamnesi.signed_at).toLocaleDateString('it-IT')}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 6 }}>Firma del paziente — {dataIt(anamnesi.signed_at)}</div>
               {anamnesi.signature_image && (
                 <img src={anamnesi.signature_image} alt="Firma" style={{ maxWidth: 300, height: 80, objectFit: 'contain', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4 }} />
               )}
@@ -248,7 +249,7 @@ export default function PatientExport({ patient, client, documents, sessions, as
               {closedSessions.map((s, i) => (
                 <tr key={s.id}>
                   <td>{i + 1}</td>
-                  <td>{new Date(s.date).toLocaleDateString('it-IT')}</td>
+                  <td>{dataIt(s.date)}</td>
                   <td><strong style={{ color: s.nrs_pre >= 7 ? '#dc2626' : s.nrs_pre >= 4 ? '#ca8a04' : '#16a34a' }}>{s.nrs_pre ?? '—'}/10</strong></td>
                   <td>{s.treatment_notes || '—'}</td>
                   <td>{s.next_session_notes || '—'}</td>
@@ -263,10 +264,10 @@ export default function PatientExport({ patient, client, documents, sessions, as
         {assessmentConsent ? (
           <table>
             <tbody>
-              <tr><td><strong>Consenso dati personali</strong></td><td>✓ prestato il {new Date(assessmentConsent.consent_privacy_at).toLocaleString('it-IT')}</td></tr>
-              <tr><td><strong>Consenso dati di salute (art. 9 GDPR)</strong></td><td>✓ prestato il {new Date(assessmentConsent.consent_health_at).toLocaleString('it-IT')}</td></tr>
+              <tr><td><strong>Consenso dati personali</strong></td><td>✓ prestato il {dataOraIt(assessmentConsent.consent_privacy_at)}</td></tr>
+              <tr><td><strong>Consenso dati di salute (art. 9 GDPR)</strong></td><td>✓ prestato il {dataOraIt(assessmentConsent.consent_health_at)}</td></tr>
               <tr><td><strong>Versione informativa accettata</strong></td><td>{assessmentConsent.informativa_version || '—'}</td></tr>
-              <tr><td><strong>Registrato il</strong></td><td>{assessmentConsent.created_at ? new Date(assessmentConsent.created_at).toLocaleString('it-IT') : '—'}</td></tr>
+              <tr><td><strong>Registrato il</strong></td><td>{assessmentConsent.created_at ? dataOraIt(assessmentConsent.created_at) : '—'}</td></tr>
               <tr><td><strong>Impronta tecnica</strong></td><td>IP (hash): {assessmentConsent.ip_hash || '—'} · User-agent: {assessmentConsent.user_agent || '—'}</td></tr>
             </tbody>
           </table>

@@ -6,6 +6,7 @@ import { requireAuthSsr } from '../../lib/auth';
 import { testoMailStima } from '../../lib/stima-mail';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
 import MailRiepilogo from '../../components/MailRiepilogo';
+import { dataIt } from '../../lib/date-it.mjs';
 
 // Pagina STIMA (pre-assessment, cliente-facing). Mostra l'output di buildQuoteHtml
 // (UNICA fonte) in un iframe stampabile, con Scarica PDF (server). I numeri della
@@ -164,7 +165,7 @@ export default function StimaPage() {
           )}
           {variante === 'programma' && snapMeta && (() => {
             const s = snapMeta;
-            const fmt = s.at ? new Date(s.at).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+            const fmt = s.at ? dataIt(s.at, { day: '2-digit', month: 'short', year: 'numeric' }) : null;
             let text, cls, icon;
             if (s.frozen) { icon = '🔒'; text = 'Forbice congelata — la catena Stima→Report è chiusa: non più modificabile.'; cls = 'bg-gray-100 text-gray-600 border-gray-200'; }
             else if (s.preview && !s.exists) { icon = '⚠'; text = 'ANTEPRIMA — forbice non impegnata: genera il PDF per fissarla.'; cls = 'bg-amber-50 text-amber-900 border-amber-300 font-semibold'; }

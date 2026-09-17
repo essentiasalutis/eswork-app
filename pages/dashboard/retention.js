@@ -3,8 +3,9 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
 import { getRetentionReview } from '../../lib/store';
+import { dataIt } from '../../lib/date-it.mjs';
 
-function fmt(d) { return d ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'; }
+function fmt(d) { return d ? dataIt(d, { day: '2-digit', month: 'short', year: 'numeric' }) : '—'; }
 
 export default function RetentionPage({ review }) {
   const [due, setDue] = useState(review.due || []);

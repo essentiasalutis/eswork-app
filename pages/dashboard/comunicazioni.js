@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
 import NavMenu from '../../components/NavMenu';
 import { CATEGORIE_BREVI, STATI } from '../../lib/comunicazioni';
+import { dataIt, dataOraIt } from '../../lib/date-it.mjs';
 
 // Messaggi che le aziende mandano dal link HR, divisi per azienda.
 // La risposta verso l'HR è STRUTTURATA: stato + eventuale data programmata. È
@@ -47,7 +48,7 @@ export default function ComunicazioniPage() {
     return (perAzienda[b][0].created_at || '').localeCompare(perAzienda[a][0].created_at || '');
   });
   const nonLette = (items || []).filter(c => !c.letta_at).length;
-  const dt = s => (s ? new Date(s).toLocaleString('it-IT', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
+  const dt = s => (s ? dataOraIt(s, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
 
   return (
     <>
@@ -96,7 +97,7 @@ export default function ComunicazioniPage() {
                         <span className="text-xs text-gray-400 truncate">· {dt(c.created_at)}</span>
                       </div>
                       <span className={`text-xs font-semibold px-2 py-1 rounded-full flex-shrink-0 ${c.stato === 'chiusa' ? 'bg-gray-100 text-gray-500' : c.stato === 'programmata' ? 'bg-green-100 text-green-800' : c.stato === 'presa_in_carico' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>
-                        {STATI[c.stato]}{c.stato === 'programmata' && c.data_programmata ? ` · ${new Date(`${c.data_programmata}T00:00:00`).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}` : ''}
+                        {STATI[c.stato]}{c.stato === 'programmata' && c.data_programmata ? ` · ${dataIt(c.data_programmata, { day: 'numeric', month: 'short' })}` : ''}
                       </span>
                     </button>
                     {aperta === c.id && (

@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { RIGA_AREA_NON_ATTIVA } from '../../lib/attivazione';
 import { etichettaLivello } from '../../lib/livelli';
+import { dataIt } from '../../lib/date-it.mjs';
 
 // ─── Header ────────────────────────────────────────────────────────────────────
 function Header() {
@@ -248,7 +249,7 @@ function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining, attivo 
           {miniChecks.slice(0, 3).map((mc, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}>
               <span style={{ color: '#374151' }}>{mc.momento?.toUpperCase()} · {mc.pgic || '—'}</span>
-              <span style={{ color: '#64748b', fontSize: 11 }}>{mc.data ? new Date(mc.data).toLocaleDateString('it-IT') : '—'}</span>
+              <span style={{ color: '#64748b', fontSize: 11 }}>{mc.data ? dataIt(mc.data) : '—'}</span>
             </div>
           ))}
         </div>
@@ -266,7 +267,7 @@ function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining, attivo 
 // (decisione Enrico, 12/9): quelle restano nella cartella del professionista.
 function MioPercorso({ percorso = [] }) {
   if (!percorso.length) return null;
-  const data = d => (d ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+  const data = d => (d ? dataIt(d, { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
   return (
     <div style={{ padding: '0 16px 20px' }}>
       <div style={{ background: '#fff', borderRadius: 14, border: '1.5px solid #e2e8f0', padding: '16px' }}>
@@ -461,7 +462,7 @@ function RightsSection({ token, patient }) {
 
         {withdrawn ? (
           <div style={{ ...btn('#f1f5f9', '#64748b', '#e2e8f0'), cursor: 'default' }}>
-            🚫 Consenso revocato il {new Date(patient.consent_withdrawn_at).toLocaleDateString('it-IT')}
+            🚫 Consenso revocato il {dataIt(patient.consent_withdrawn_at)}
           </div>
         ) : (
           <>

@@ -6,6 +6,7 @@ import { TUTTI, normalizza } from '../../../lib/pipeline';
 import { isYmd, oggiRoma, aggiungiGiorni } from '../../../lib/checkup';
 import { getOrgParams } from '../../../lib/org';
 import { aggiornaClienteTollerante } from '../../../lib/pipeline-server';
+import { giornoIt } from '../../../lib/date-it.mjs';
 
 const V54 = ['ricontatto_il', 'offerta_scade_il'];
 const DATE_SEMPLICI = [...V54, 'secondo_incontro_il', 'data_avvio_programma'];
@@ -105,8 +106,9 @@ export default requireAuth(async function handler(req, res) {
         // Durata 12 mesi, NON rinnovabile: scadenza fissata all'attivazione.
         body.stato_ingresso = 'attivo';
         if (!body.data_scadenza_ingresso) {
-          const start = client.contract_start_date ? new Date(client.contract_start_date) : new Date();
-          start.setMonth(start.getMonth() + 12);
+          // Dal giorno di inizio contratto, o da OGGI in Italia (non il giorno UTC).
+          const start = new Date(`${client.contract_start_date || giornoIt()}T12:00:00Z`);
+          start.setUTCMonth(start.getUTCMonth() + 12);
           body.data_scadenza_ingresso = start.toISOString().slice(0, 10);
         }
       }

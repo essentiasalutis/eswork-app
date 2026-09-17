@@ -17,6 +17,7 @@ import { validaNrsChiusura } from '../../../lib/nrs';
 import { vistaCartellaCurante } from '../../../lib/vista';
 import { nomeLivello } from '../../../lib/livelli';
 import { documentiMancanti, prevedeSedute } from '../../../lib/documenti-seduta.mjs';
+import { dataIt } from '../../../lib/date-it.mjs';
 
 // ─── NRS Slider ───────────────────────────────────────────────────────────────
 
@@ -663,7 +664,7 @@ function ClosedSessionCard({ session: s, patientId, onUpdated }) {
           {s.nrs_pre !== null && (
             <span className="text-sm font-semibold" style={{ color: s.nrs_pre <= 3 ? '#16a34a' : s.nrs_pre <= 6 ? '#ca8a04' : '#dc2626' }}>NRS {s.nrs_pre}{s.nrs_post !== null ? `→${s.nrs_post}` : ''}/10</span>
           )}
-          <span className="text-xs text-gray-400">{new Date(s.date).toLocaleDateString('it-IT')}</span>
+          <span className="text-xs text-gray-400">{dataIt(s.date)}</span>
           <button onClick={() => setEditing(true)} className="text-xs text-blue-600 hover:underline">Modifica</button>
         </div>
       </div>

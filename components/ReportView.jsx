@@ -8,6 +8,7 @@ import { CONFIG } from '../lib/config';
 import { kAnonPartition, maskCount, tooSmall, K_ANON, K_ANON_INCROCIO, SUPPRESSED } from '../lib/kanon';
 import { convieneAggregare, NOTA_DISTRETTI } from '../lib/distretti';
 import { nomeLivello } from '../lib/livelli';
+import { dataIt } from '../lib/date-it.mjs';
 
 // ─── Commento clinico AI (parte discorsiva integrata nel report dati) ──────────
 // Un solo report di attivazione: cruscotti/dati + commento discorsivo AI.
@@ -398,7 +399,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
           </div>
         </div>
         <div className="text-right text-xs text-gray-400">
-          <div>{new Date(assessment.created_at || Date.now()).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
+          <div>{dataIt(assessment.created_at || Date.now(), { day: '2-digit', month: 'long', year: 'numeric' })}</div>
           <div>{n} risposte</div>
         </div>
       </div>

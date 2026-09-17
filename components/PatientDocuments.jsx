@@ -2,10 +2,11 @@ import { useState } from 'react';
 import SignatureCanvas from './SignatureCanvas';
 import { documentiMancanti, documentoValido } from '../lib/documenti-seduta.mjs';
 import CopiaCartacea from './CopiaCartacea';
+import { dataIt } from '../lib/date-it.mjs';
 // I testi da firmare arrivano dall'ARCHIVIO (prop `testi`, caricata lato server):
 // nessuna copia nel codice. Alla firma si rimandano solo i loro identificativi.
 
-const todayStr = () => new Date().toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const todayStr = () => dataIt(new Date(), { day: '2-digit', month: '2-digit', year: 'numeric' });
 
 // ─── Componente principale ─────────────────────────────────────────────────────
 
@@ -159,7 +160,7 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
       <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 14, padding: '18px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#15803d' }}>
-            ✅ Documenti firmati il {anchor?.signed_at ? new Date(anchor.signed_at).toLocaleDateString('it-IT') : '—'}
+            ✅ Documenti firmati il {anchor?.signed_at ? dataIt(anchor.signed_at) : '—'}
           </div>
           <button
             onClick={() => { setEditingAnamnesi(true); setOpen(p => ({ ...p, anamnesi: true })); }}
@@ -185,7 +186,7 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
               )}
               {d?.modalita === 'carta' && (
                 <span style={{ fontSize: 11, color: '#92400e', background: '#fef3c7', borderRadius: 99, padding: '1px 8px' }}>
-                  su carta · firmato il {new Date(`${d.carta_data_firma}T12:00:00Z`).toLocaleDateString('it-IT')} · caricato il {new Date(d.caricato_il).toLocaleDateString('it-IT')} · v. {d.versione}
+                  su carta · firmato il {dataIt(d.carta_data_firma)} · caricato il {dataIt(d.caricato_il)} · v. {d.versione}
                   {' · '}<button onClick={() => apriCopia(type)} style={{ background: 'none', border: 'none', padding: 0, color: '#0369a1', fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>apri copia</button>
                 </span>
               )}

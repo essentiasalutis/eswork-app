@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
 import { getProComplianceOverview } from '../../lib/store';
 import { SHOW_RC_RECEIPT } from '../../lib/pro-docs';
+import { dataIt } from '../../lib/date-it.mjs';
 
 // Colonne documento della vista admin. La "Qualifica" collassa i due sotto-slot
 // (titolo di formazione + albo) in un'unica colonna: ✓ se almeno uno è presente,
@@ -22,7 +23,7 @@ const RC = {
   no_expiry: { txt: 'Scadenza assente', cls: 'bg-amber-100 text-amber-700' },
   valid:     { txt: 'Valida',           cls: 'bg-green-100 text-green-700' },
 };
-const fmt = d => d ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const fmt = d => d ? dataIt(d, { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 export default function ProCompliancePage({ overview: initial }) {
   const [rows, setRows] = useState(initial || []);

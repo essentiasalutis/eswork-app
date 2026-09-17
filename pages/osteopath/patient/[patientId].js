@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { requireProAuthSsr } from '../../../lib/pro-auth';
 import { registraLettura, AZIONI } from '../../../lib/audit';
 import { senzaCredenziali } from '../../../lib/vista';
+import { dataIt } from '../../../lib/date-it.mjs';
 import {
   getPatientById,
   getSessionsByPatient,
@@ -127,7 +128,7 @@ export default function OsteopathPatientView({ patient, sessions, cycles, preVal
                 <div><div className="text-xs text-gray-400">Zona dolore</div><div className="font-semibold text-gray-800">{preValidation.pain_zone || '—'}</div></div>
                 <div><div className="text-xs text-gray-400">Durata sintomi</div><div className="font-semibold text-gray-800">{preValidation.symptom_duration_months != null ? `${preValidation.symptom_duration_months} mesi` : '—'}</div></div>
                 <div><div className="text-xs text-gray-400">Durata call</div><div className="font-semibold text-gray-800">{preValidation.duration_minutes ? `${preValidation.duration_minutes} min` : '—'}</div></div>
-                <div><div className="text-xs text-gray-400">Data</div><div className="font-semibold text-gray-800">{new Date(preValidation.created_at).toLocaleDateString('it-IT')}</div></div>
+                <div><div className="text-xs text-gray-400">Data</div><div className="font-semibold text-gray-800">{dataIt(preValidation.created_at)}</div></div>
               </div>
               {preValidation.clinical_notes && (
                 <div className="mt-3 text-xs text-gray-500 bg-gray-50 rounded-xl p-3 italic">{preValidation.clinical_notes}</div>
@@ -163,7 +164,7 @@ export default function OsteopathPatientView({ patient, sessions, cycles, preVal
                     <div className="text-xs text-gray-500 mt-1">
                       {c.sessions_completed}/{c.sessions_planned} sessioni
                       {c.outcome && ` · ${c.outcome === 'improved' ? '✅ Migliorato' : '⚠️ Non migliorato'}`}
-                      {c.closed_at && ` · Chiuso ${new Date(c.closed_at).toLocaleDateString('it-IT')}`}
+                      {c.closed_at && ` · Chiuso ${dataIt(c.closed_at)}`}
                     </div>
                     {c.status === 'active' && (
                       <div className="mt-2 flex gap-1">
@@ -189,7 +190,7 @@ export default function OsteopathPatientView({ patient, sessions, cycles, preVal
                   <div key={s.id} className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0">
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold text-gray-800">
-                        {s.date ? new Date(s.date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                        {s.date ? dataIt(s.date, { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                       </div>
                       {s.notes && <div className="text-xs text-gray-400 truncate">{s.notes}</div>}
                     </div>
@@ -253,7 +254,7 @@ export default function OsteopathPatientView({ patient, sessions, cycles, preVal
                   </div>
                 </div>
                 <div><div className="text-xs text-gray-400">Completato</div>
-                  <div className="font-semibold text-gray-800">{reassessmentT12.completed_at ? new Date(reassessmentT12.completed_at).toLocaleDateString('it-IT') : '—'}</div>
+                  <div className="font-semibold text-gray-800">{reassessmentT12.completed_at ? dataIt(reassessmentT12.completed_at) : '—'}</div>
                 </div>
               </div>
             </div>

@@ -4,8 +4,9 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../../lib/auth';
 import { TIPO_ERGONOMIA } from '../../../lib/org-regole.mjs';
+import { dataIt, giornoIt } from '../../../lib/date-it.mjs';
 
-const fmt = d => d ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const fmt = d => d ? dataIt(d, { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const eur = n => `€${Math.round(Number(n) || 0).toLocaleString('it-IT')}`;
 
 export default function FormazionePage({ clientId }) {
@@ -45,7 +46,7 @@ export default function FormazionePage({ clientId }) {
 
   async function eroga() {
     const ids = Object.keys(presenti).filter(k => presenti[k]);
-    const j = await call('PUT', `/api/org/sessioni/${erogaFor.id}`, { azione: 'eroga', data_erogazione: new Date().toISOString().slice(0, 10), presenti: ids, ergonomia: conErgonomia }, 'eroga');
+    const j = await call('PUT', `/api/org/sessioni/${erogaFor.id}`, { azione: 'eroga', data_erogazione: giornoIt(), presenti: ids, ergonomia: conErgonomia }, 'eroga');
     if (j && j.ergonomiaNonRegistrata) setErr('Sessione registrata, ma l\'ergonomia no: manca la migration v59.');
     setErogaFor(null); setPresenti({}); setConErgonomia(true);
   }
@@ -131,7 +132,7 @@ export default function FormazionePage({ clientId }) {
           <div className={box}>
             <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
               <h2 className="font-bold text-gray-900">🪑 Interventi di ergonomia ({interventiErgonomia.length})</h2>
-              <button onClick={() => setErgoFor({ data: new Date().toISOString().slice(0, 10), note: '', scelti: {} })}
+              <button onClick={() => setErgoFor({ data: giornoIt(), note: '', scelti: {} })}
                 className="text-xs font-semibold text-white bg-gray-800 px-3 py-1.5 rounded-xl hover:bg-gray-700">+ Registra intervento</button>
             </div>
             <p className="text-xs text-gray-400 mb-2">Chi ha ricevuto l&apos;ergonomia e quando. L&apos;ergonomia dei nuovi ingressi si registra da sola confermando i presenti della sessione di recupero.</p>

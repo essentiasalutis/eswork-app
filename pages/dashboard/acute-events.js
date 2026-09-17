@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Head from 'next/head';
 import { getAllAcuteEvents, updateAcuteEvent } from '../../lib/store';
 import NavMenu from '../../components/NavMenu';
+import { dataOraIt } from '../../lib/date-it.mjs';
 
 const STATUS_LABELS = {
   pending: 'In attesa',
@@ -118,7 +119,7 @@ export default function AcuteEventsPage({ events: initialEvents }) {
                           <span className="text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">{e.pain_zone}</span>
                         )}
                         <span className="text-xs text-gray-400">
-                          {new Date(e.reported_at).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          {dataOraIt(e.reported_at, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
 

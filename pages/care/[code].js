@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Head from 'next/head';
+import { dataIt } from '../../lib/date-it.mjs';
 
 const BOOKING_URL = 'https://essentiasalutis.it';
 const BOOKING_EMAIL = 'info@essentiasalutis.it';
@@ -159,7 +160,7 @@ export default function CarePage({ code, clientName, type, expiresAt, valid, dis
 
               {expiresAt && (
                 <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 20px' }}>
-                  Valido fino al {new Date(expiresAt).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}
+                  Valido fino al {dataIt(expiresAt, { day: '2-digit', month: 'long', year: 'numeric' })}
                 </p>
               )}
 

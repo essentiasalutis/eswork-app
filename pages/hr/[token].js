@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { CATEGORIE, CATEGORIE_BREVI, STATI, TESTO_MAX, AVVISO_PRIVACY } from '../../lib/comunicazioni';
+import { dataIt as dataItalia } from '../../lib/date-it.mjs';
 
 // Pagina PUBBLICA HR (token-gated). MUTA sull'identità dell'azienda: nessun nome
 // cliente, nessun logo cliente, nessun dato che colleghi il link a un'azienda
@@ -78,7 +79,7 @@ export default function HrIngressoPage() {
   }
 
   const num = v => (v == null ? '—' : v);
-  const dataIt = d => (d ? new Date(`${d}T00:00:00`).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+  const dataIt = d => (d ? dataItalia(d, { day: 'numeric', month: 'short', year: 'numeric' }) : '');
   const box = 'bg-white rounded-2xl border border-gray-200';
   const inputCls = 'w-full px-4 py-3 rounded-xl border border-gray-300 text-base focus:outline-none focus:ring-2 focus:ring-green-500';
 

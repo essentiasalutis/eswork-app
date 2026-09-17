@@ -5,14 +5,15 @@ import { requireProAuthSsr } from '../../lib/pro-auth';
 import { getProDocuments } from '../../lib/store';
 import { rcStatusFrom } from '../../lib/compliance';
 import { SLOTS, QUALIFICATION_TYPES } from '../../lib/pro-docs';
+import { dataIt } from '../../lib/date-it.mjs';
 
 const ACCEPT = '.pdf,.jpg,.jpeg,.png';
 const MAX = 10 * 1024 * 1024;
-const fmt = d => d ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const fmt = d => d ? dataIt(d, { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 function RcBanner({ rc }) {
   if (!rc) return null;
-  const date = rc.expiry ? new Date(rc.expiry).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' }) : null;
+  const date = rc.expiry ? dataIt(rc.expiry, { day: '2-digit', month: 'long', year: 'numeric' }) : null;
   const inDays = rc.days === 0 ? 'scade oggi' : rc.days === 1 ? 'scade tra 1 giorno' : `scade tra ${rc.days} giorni`;
 
   if (rc.status === 'expired') {

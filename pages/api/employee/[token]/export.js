@@ -12,6 +12,7 @@ import {
   getDataRequestsByPatient,
 } from '../../../../lib/store';
 import { limiteAreaPersonale } from '../../../../lib/employee-guard';
+import { giornoIt } from '../../../../lib/date-it.mjs';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
@@ -73,7 +74,7 @@ export default async function handler(req, res) {
     })),
   };
 
-  const filename = `es-work_miei-dati_${(patient.last_name || 'dati').toLowerCase()}_${new Date().toISOString().slice(0, 10)}.json`;
+  const filename = `es-work_miei-dati_${(patient.last_name || 'dati').toLowerCase()}_${giornoIt()}.json`;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   return res.status(200).send(JSON.stringify(copia, null, 2));

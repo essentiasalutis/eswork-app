@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { requireAuthSsr } from '../../../lib/auth';
 import { getClientById, getWaitlistByClient } from '../../../lib/store';
 import { senzaCredenziali } from '../../../lib/vista';
+import { dataIt } from '../../../lib/date-it.mjs';
 
 // Nota terminologia v4: i "turni di avvio" scaglionano l'inizio dei trattamenti L1
 // (capienza sportello). La colonna DB resta `cohort` (solo storage).
@@ -171,7 +172,7 @@ export default function WaitlistPage({ client, waitlist: initialWaitlist }) {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-400">
-                        {entry.created_at ? new Date(entry.created_at).toLocaleDateString('it-IT') : '—'}
+                        {entry.created_at ? dataIt(entry.created_at) : '—'}
                       </td>
                     </tr>
                   );

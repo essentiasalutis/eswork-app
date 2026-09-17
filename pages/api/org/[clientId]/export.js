@@ -4,6 +4,7 @@
 import { requireAuth } from '../../../../lib/auth';
 import { getOrgDipendenti, getOrgPartecipazioni, buildRegistroCsv, annoProgramma } from '../../../../lib/org';
 import { getClientById } from '../../../../lib/store';
+import { giornoIt } from '../../../../lib/date-it.mjs';
 
 export default requireAuth(async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
@@ -12,7 +13,7 @@ export default requireAuth(async function handler(req, res) {
     const [client, dipendenti, partecipazioni] = await Promise.all([
       getClientById(clientId), getOrgDipendenti(clientId), getOrgPartecipazioni(clientId),
     ]);
-    const anno = annoProgramma(client, new Date().toISOString().slice(0, 10));
+    const anno = annoProgramma(client, giornoIt());
     const csv = buildRegistroCsv(dipendenti, partecipazioni, anno);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="registro-formazione-${clientId}.csv"`);

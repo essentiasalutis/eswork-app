@@ -21,6 +21,7 @@ import { getForchettaSnapshot, freezeStimaSnapshot } from '../../../../lib/prici
 import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
 import { kAnonPartition, tooSmall, K_ANON } from '../../../../lib/kanon';
+import { dataIt } from '../../../../lib/date-it.mjs';
 
 export const config = { maxDuration: 60 };
 
@@ -122,7 +123,7 @@ export default requireAuth(async function handler(req, res) {
     ? (v2Texts.naming_cliente_pacchetto_prevenzione || 'Pacchetto Prevenzione')
     : (v2Texts.naming_cliente_programma_completo || 'Programma ES Work');
   const testoEvoluzione = v2Texts.testo_evoluzione_pacchetto || '';
-  const dataOggi = new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+  const dataOggi = dataIt(new Date(), { day: 'numeric', month: 'long', year: 'numeric' });
   // Nota deterministica in fondo a ogni report (mai generata dall'AI). Due varianti:
   // quella con l'AI si usa SOLO sul testo che l'AI ha scritto davvero.
   const noteReport = await getNoteReport();

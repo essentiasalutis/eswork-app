@@ -2,6 +2,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
 import { getProDocAccessLogs } from '../../lib/store';
+import { dataOraIt } from '../../lib/date-it.mjs';
 
 const ACTION_LABEL = {
   upload_pro_doc: 'Caricamento',
@@ -62,7 +63,7 @@ export default function ProDocLogPage({ logs }) {
                     const actor = l.actor_type === 'admin' ? `Titolare · ${l.actor_id || '—'}` : `${subject} (osteopata)`;
                     return (
                       <tr key={l.id} className="border-t border-gray-100">
-                        <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{new Date(l.created_at).toLocaleString('it-IT')}</td>
+                        <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{dataOraIt(l.created_at)}</td>
                         <td className="px-4 py-2.5 text-gray-800 font-medium">{actor}</td>
                         <td className="px-4 py-2.5">
                           <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: color + '18', color }}>

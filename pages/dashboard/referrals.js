@@ -4,12 +4,13 @@ import { useRouter } from 'next/router';
 import { requireAuthSsr } from '../../lib/auth';
 import { getAllReferralCodes } from '../../lib/store';
 import NavMenu from '../../components/NavMenu';
+import { dataIt } from '../../lib/date-it.mjs';
 
 // ─── Helper ────────────────────────────────────────────────────────────────────
 
 function fmtDate(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return dataIt(iso, { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function pct(used, total) {
@@ -248,7 +249,7 @@ export default function ReferralsPage({ codes: initialCodes }) {
                 <option value="all">Tutti i mesi</option>
                 {availableMonths.map(m => (
                   <option key={m} value={m}>
-                    {new Date(m + '-01').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}
+                    {dataIt(m + '-01', { month: 'long', year: 'numeric' })}
                   </option>
                 ))}
               </select>

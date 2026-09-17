@@ -6,6 +6,7 @@ import { requireProAuthSsr } from '../../../lib/pro-auth';
 import { registraLettura, AZIONI } from '../../../lib/audit';
 import { getSessionById, getPatientById, proCanAccessPatientClinical } from '../../../lib/store';
 import { validaNrsChiusura } from '../../../lib/nrs';
+import { dataIt } from '../../../lib/date-it.mjs';
 
 export default function SessionForm({ session }) {
   const router = useRouter();
@@ -78,7 +79,7 @@ export default function SessionForm({ session }) {
     );
   }
 
-  const sessionDate = session?.date ? new Date(session.date).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Data non specificata';
+  const sessionDate = session?.date ? dataIt(session.date, { day: '2-digit', month: 'long', year: 'numeric' }) : 'Data non specificata';
 
   return (
     <>

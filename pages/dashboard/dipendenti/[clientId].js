@@ -18,8 +18,9 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../../lib/auth';
 import { storicoDipendente, TIPO_ERGONOMIA } from '../../../lib/org-regole.mjs';
+import { dataIt, giornoIt } from '../../../lib/date-it.mjs';
 
-const fmt = d => d ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const fmt = d => d ? dataIt(d, { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 // Stato base del dipendente (calcolato client-side dalle partecipazioni).
 function statoBase(dipId, parts) {
@@ -244,7 +245,7 @@ export default function DipendentiPage({ clientId }) {
                         <td className="text-right whitespace-nowrap">
                           {d.attivo && <>
                             <button onClick={() => call('PUT', `/api/org/${clientId}/dipendenti/${d.id}`, { straordinario: !d.straordinario }, d.id)} title="Straordinario" className="text-xs text-purple-600 px-1">⇅</button>
-                            <button onClick={() => { if (confirm(`Segnare cessato ${d.nome}?`)) call('PUT', `/api/org/${clientId}/dipendenti/${d.id}`, { attivo: false, data_cessazione: new Date().toISOString().slice(0, 10) }, d.id); }} title="Cessazione" className="text-xs text-red-500 px-1">✕</button>
+                            <button onClick={() => { if (confirm(`Segnare cessato ${d.nome}?`)) call('PUT', `/api/org/${clientId}/dipendenti/${d.id}`, { attivo: false, data_cessazione: giornoIt() }, d.id); }} title="Cessazione" className="text-xs text-red-500 px-1">✕</button>
                           </>}
                         </td>
                       </tr>

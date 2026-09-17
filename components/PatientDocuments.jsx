@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import SignatureCanvas from './SignatureCanvas';
-import { documentiMancanti } from '../lib/documenti-seduta.mjs';
+import { documentiMancanti, documentoValido } from '../lib/documenti-seduta.mjs';
+import CopiaCartacea from './CopiaCartacea';
 // I testi da firmare arrivano dall'ARCHIVIO (prop `testi`, caricata lato server):
 // nessuna copia nel codice. Alla firma si rimandano solo i loro identificativi.
 
@@ -66,6 +67,27 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
   function upd(k, v) { setF(prev => ({ ...prev, [k]: v })); }
   function toggle(key) { setOpen(p => ({ ...p, [key]: !p[key] })); }
 
+  // Copia su carta accettata dal SERVER: si aggiornano solo i documenti che ha scritto.
+  function copiaAccettata(nuovi) {
+    const tipi = new Set(nuovi.map(d => d.type));
+    const next = [...docs.filter(d => !tipi.has(d.type)), ...nuovi];
+    setDocs(next);
+    onDocsChange?.(next);
+  }
+
+  async function apriCopia(tipo) {
+    setError(null);
+    try {
+      const r = await fetch(`/api/pro/patients/${patientId}/carta?documento=${tipo}`);
+      const j = await r.json();
+      if (r.ok && j.url) window.open(j.url, '_blank', 'noopener');
+      else setError(j.error || 'Copia non disponibile');
+    } catch { setError('Errore di rete'); }
+  }
+
+  const consensiValidi = documentoValido(docs.find(d => d.type === 'consent_treatment')) && documentoValido(docs.find(d => d.type === 'privacy_extended'));
+  const consensiDaCaricare = ['consent_treatment', 'privacy_extended'].filter(t => !documentoValido(docs.find(d => d.type === t)));
+
   // Stessa regola dell'API delle sedute: un consenso vale solo se legato all'archivio.
   function allComplete() {
     return documentiMancanti(docs).length === 0;
@@ -92,8 +114,9 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
       });
       if (!res.ok) throw new Error((await res.json()).error);
       const updated = await res.json();
-      setDocs(prev => prev.map(d => d.type === 'anamnesi' ? updated : d));
-      onDocsChange?.(docs.map(d => d.type === 'anamnesi' ? updated : d));
+      const next = [...docs.filter(d => d.type !== 'anamnesi'), { ...(docs.find(d => d.type === 'anamnesi') || {}), ...updated, form_data: f, pro_notes: proNotes }];
+      setDocs(next);
+      onDocsChange?.(next);
       setEditingAnamnesi(false);
     } catch (e) {
       setError(e.message);
@@ -160,9 +183,40 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
                   #{d.content_hash.slice(0, 8)}
                 </span>
               )}
+              {d?.modalita === 'carta' && (
+                <span style={{ fontSize: 11, color: '#92400e', background: '#fef3c7', borderRadius: 99, padding: '1px 8px' }}>
+                  su carta · firmato il {new Date(`${d.carta_data_firma}T12:00:00Z`).toLocaleDateString('it-IT')} · caricato il {new Date(d.caricato_il).toLocaleDateString('it-IT')} · v. {d.versione}
+                  {' · '}<button onClick={() => apriCopia(type)} style={{ background: 'none', border: 'none', padding: 0, color: '#0369a1', fontWeight: 600, cursor: 'pointer', fontSize: 11 }}>apri copia</button>
+                </span>
+              )}
             </div>
           );
         })}
+        {error && <div style={{ color: '#dc2626', fontSize: 12, marginTop: 6 }}>❌ {error}</div>}
+      </div>
+    );
+  }
+
+  // ── Vista "consensi firmati su carta, anamnesi da compilare" ────────────────
+  // I consensi valgono (accettati dal server); resta l'anamnesi, che si compila
+  // in piattaforma come sempre.
+  if (consensiValidi && !allComplete() && !editingAnamnesi) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, fontSize: 13, color: '#166534' }}>
+          ✅ Consenso e informativa validi{docs.some(d => d.modalita === 'carta') ? ' (copia su carta accettata)' : ''}. Manca l'anamnesi.
+        </div>
+        <Accordion icon="🩺" title="Anamnesi ES Work" expanded={open.anamnesi} onToggle={() => toggle('anamnesi')}>
+          {anamnesiFormFields({ f, upd, nrsTouched, setNrsTouched, proNotes, setProNotes })}
+        </Accordion>
+        {error && <div style={{ color: '#dc2626', fontSize: 13, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8 }}>❌ {error}</div>}
+        <button
+          onClick={handleSaveAnamnesiOnly}
+          disabled={!canSaveAnamnesi || savingAnamnesi}
+          style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', fontSize: 14, fontWeight: 700, cursor: canSaveAnamnesi ? 'pointer' : 'not-allowed', background: canSaveAnamnesi ? '#0369a1' : '#e2e8f0', color: canSaveAnamnesi ? '#fff' : '#94a3b8' }}
+        >
+          {savingAnamnesi ? 'Salvataggio…' : '💾 Salva anamnesi'}
+        </button>
       </div>
     );
   }
@@ -294,6 +348,15 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
       >
         {saving ? 'Salvataggio in corso…' : canSave ? '✍️ Firma e salva tutti i documenti' : 'Compila anamnesi e firma per procedere'}
       </button>
+
+      {consensiDaCaricare.length > 0 && (
+        <CopiaCartacea
+          patientId={patientId}
+          daCaricare={consensiDaCaricare}
+          versioni={testi?.versioni}
+          onAccettata={copiaAccettata}
+        />
+      )}
     </div>
   );
 }

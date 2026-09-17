@@ -55,6 +55,11 @@ export default requireProAuth(async function handler(req, res) {
       ip_hash:         hashIp(ip),
       user_agent:      req.headers['user-agent']?.slice(0, 200) || null,
       signature_image,
+      // Firma in piattaforma: il documento corrente non è più una copia su carta.
+      // Le copie caricate prima restano in copie_cartacee e nell'archivio file.
+      modalita: 'piattaforma',
+      carta_data_firma: null, carta_motivo: null, carta_motivo_nota: null,
+      file_path: null, file_mime: null, file_bytes: null, file_impronta: null, caricato_il: null,
     };
 
     const [docConsent, docPrivacy, docAnamnesi] = await Promise.all([

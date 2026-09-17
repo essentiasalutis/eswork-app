@@ -1152,9 +1152,15 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   // Testi da firmare in cartella: dall'archivio (v64), unica fonte del testo legale.
   let testiFirma = null;
   try {
-    const { testiPerFirmaInCartella, perIlBrowser } = await import('../../../lib/testi-legali-server');
-    const t = await testiPerFirmaInCartella();
-    testiFirma = { consenso: perIlBrowser(t.consenso), informativa: perIlBrowser(t.informativa) };
+    const { testiPerFirmaInCartella, perIlBrowser, versioniPubblicate } = await import('../../../lib/testi-legali-server');
+    const [t, vConsenso, vInformativa] = await Promise.all([
+      testiPerFirmaInCartella(), versioniPubblicate('consenso_trattamento'), versioniPubblicate('informativa_estesa'),
+    ]);
+    // `versioni`: per indicare quale versione è stata firmata su carta (punto d).
+    testiFirma = {
+      consenso: perIlBrowser(t.consenso), informativa: perIlBrowser(t.informativa),
+      versioni: { consent_treatment: vConsenso, privacy_extended: vInformativa },
+    };
   } catch (e) { console.error('[cartella] testi da firmare:', e.message); }
 
   // Carica cicli (graceful: tabella potrebbe non esistere ancora)
@@ -1174,7 +1180,7 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
       patient: vistaCartellaCurante(patient),
       sessions: sessions.map(s => ({ ...s, professionals: undefined })),
       client,
-      documents: documents.map(d => ({ ...d, signature_image: undefined })), // non passare la firma al client per default
+      documents: documents.map(d => ({ ...d, signature_image: undefined, file_path: undefined })), // né la firma né il percorso del file
       cycles,
       testiFirma,
     },

@@ -4,9 +4,9 @@ import { useRouter } from 'next/router';
 import { requireAuthSsr } from '../../lib/auth';
 import NavMenu from '../../components/NavMenu';
 
-export default function CompliancePage({ data: initialData }) {
+export default function CompliancePage({ data: initialData, carta = null }) {
   const router = useRouter();
-  const [data] = useState(initialData);
+  const [data] = useState(initialData || []);
   const [expanded, setExpanded] = useState({});
 
   async function logout() {
@@ -41,7 +41,7 @@ export default function CompliancePage({ data: initialData }) {
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
             <div className="text-3xl font-bold text-gray-900">{totalPatients}</div>
-            <div className="text-sm text-gray-500 mt-1">Pazienti L1 totali</div>
+            <div className="text-sm text-gray-500 mt-1">Pazienti con sedute previste</div>
           </div>
           <div className="bg-white rounded-xl border border-green-200 p-4 text-center">
             <div className="text-3xl font-bold text-green-600">{totalComplete}</div>
@@ -57,11 +57,11 @@ export default function CompliancePage({ data: initialData }) {
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100">
             <h2 className="font-semibold text-gray-800">Stato per azienda</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Solo pazienti Livello 1 — click su una riga per vedere i dettagli</p>
+            <p className="text-xs text-gray-500 mt-0.5">Livello 1 e Livello 2 con prevenzione. Un consenso conta solo se legato a una versione dell&apos;archivio — click su una riga per i dettagli</p>
           </div>
 
           {data.length === 0 ? (
-            <div className="p-8 text-center text-gray-400 text-sm">Nessun paziente L1 registrato.</div>
+            <div className="p-8 text-center text-gray-400 text-sm">Nessun paziente con sedute previste.</div>
           ) : (
             <div className="divide-y divide-gray-100">
               {data.map(c => {
@@ -83,7 +83,7 @@ export default function CompliancePage({ data: initialData }) {
                         >
                           {c.clientName}
                         </Link>
-                        <span className="text-xs text-gray-400">{c.total} paz. L1</span>
+                        <span className="text-xs text-gray-400">{c.total} pazienti</span>
                       </div>
                       <div className="flex items-center gap-4">
                         {/* Barra progresso */}
@@ -120,6 +120,8 @@ export default function CompliancePage({ data: initialData }) {
                                   <span className={`font-medium ${p.complete ? 'text-gray-800' : 'text-gray-500'}`}>
                                     {p.name}
                                   </span>
+                                  {p.level === 'level2' && <span className="ml-2 text-gray-400">L2 prevenzione</span>}
+                                  {p.suCarta && <span className="ml-2 text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">su carta</span>}
                                 </td>
                                 <td className="px-3 py-2.5 text-center">{p.consent ? '✅' : '⚠️'}</td>
                                 <td className="px-3 py-2.5 text-center">{p.privacy ? '✅' : '⚠️'}</td>
@@ -151,6 +153,38 @@ export default function CompliancePage({ data: initialData }) {
           )}
         </div>
 
+        {/* Firme su carta: l'eccezione resta un'eccezione? */}
+        {carta && (
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h2 className="font-semibold text-gray-800">Firme su carta</h2>
+            <p className="text-xs text-gray-500 mt-0.5">La firma in piattaforma è la regola. Se la carta cresce, c&apos;è un problema operativo da risolvere.</p>
+            <div className="grid grid-cols-3 gap-4 mt-4">
+              <div className="text-center"><div className="text-2xl font-bold text-gray-900">{carta.consensiInPiattaforma}</div><div className="text-xs text-gray-500">consensi in piattaforma</div></div>
+              <div className="text-center"><div className="text-2xl font-bold text-amber-600">{carta.consensiSuCarta}</div><div className="text-xs text-gray-500">consensi su carta (validi oggi)</div></div>
+              <div className="text-center"><div className="text-2xl font-bold text-gray-900">{(carta.consensiInPiattaforma + carta.consensiSuCarta) ? Math.round(carta.consensiSuCarta / (carta.consensiInPiattaforma + carta.consensiSuCarta) * 100) : 0}%</div><div className="text-xs text-gray-500">quota su carta</div></div>
+            </div>
+            {carta.caricamenti > 0 && (
+              <div className="grid md:grid-cols-2 gap-6 mt-5 text-sm">
+                <div>
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Perché ({carta.caricamenti} caricamenti)</div>
+                  {Object.entries(carta.perMotivo).map(([k, n]) => (
+                    <div key={k} className="flex justify-between py-1 border-b border-gray-100"><span>{carta.motivi[k]}</span><span className="font-semibold tabular-nums">{n}</span></div>
+                  ))}
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Per osteopata</div>
+                  {carta.perOsteopata.map(o => (
+                    <div key={o.id} className="flex justify-between py-1 border-b border-gray-100">
+                      <span>{o.nome}</span>
+                      <span className="text-gray-500">{Object.entries(o.motivi).map(([k, n]) => `${carta.motivi[k]} ${n}`).join(' · ')} <strong className="text-gray-900 tabular-nums ml-2">{o.caricamenti}</strong></span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Note normative */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-800">
           <strong>📋 Nota sulla conservazione:</strong> I documenti firmati vengono conservati per almeno 10 anni dall'ultima seduta del paziente, in conformità agli obblighi normativi sulle cartelle cliniche (D.Lgs 196/2003, GDPR, normativa sanitaria). Alla scadenza del termine i dati vengono cancellati su procedura del titolare del trattamento (cancellazione assistita e validata). Lo stato è consultabile nella sezione &quot;Conservazione dati&quot;.
@@ -167,13 +201,11 @@ export async function getServerSideProps(ctx) {
   if (authResult.redirect) return authResult;
 
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    const res = await fetch(`${baseUrl}/api/admin/compliance`, {
-      headers: { cookie: ctx.req.headers.cookie || '' },
-    });
-    const data = res.ok ? await res.json() : [];
-    return { props: { data } };
-  } catch {
-    return { props: { data: [] } };
+    const { datiConformita } = await import('../../lib/conformita');
+    const j = await datiConformita();
+    return { props: { data: j.aziende, carta: j.carta } };
+  } catch (e) {
+    console.error('[compliance] dati:', e.message);
+    return { props: { data: [], carta: null } };
   }
 }

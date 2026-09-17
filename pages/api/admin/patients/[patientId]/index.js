@@ -1,6 +1,7 @@
 import { requireAuth } from '../../../../../lib/auth';
 import { getPatientById } from '../../../../../lib/store';
 import supabase from '../../../../../lib/db';
+import { rimuoviFilePaziente } from '../../../../../lib/copia-cartacea-server';
 
 // DELETE /api/admin/patients/[patientId] — elimina un paziente/dipendente e
 // tutti i suoi dati collegati. Le risposte NMQ (responses) restano: sono
@@ -30,6 +31,7 @@ export default requireAuth(async function handler(req, res) {
       'acute_events',
       'checkpoints',
       'patient_documents',
+      'copie_cartacee',
       'reassessments_t12',
       'email_log',
     ];
@@ -37,6 +39,9 @@ export default requireAuth(async function handler(req, res) {
       // tollerante: la tabella potrebbe non esistere o non avere righe
       await supabase.from(table).delete().eq('patient_id', patientId).then(() => {}, () => {});
     }
+
+    // Le copie cartacee (file nell'archivio privato) seguono il paziente.
+    await rimuoviFilePaziente(patientId).catch(e => console.error('[admin delete] file:', e.message));
 
     const { error } = await supabase.from('patients').delete().eq('id', patientId);
     if (error) throw error;

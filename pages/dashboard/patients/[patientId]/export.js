@@ -13,7 +13,24 @@ const NMQ_LABELS_IT = {
   '6-12m': '6–12 mesi', '>12m': 'Più di 12 mesi',
 };
 
-export default function PatientExport({ patient, client, documents, sessions, assessmentConsent, exportedAt, testoConsenso, testoInformativa }) {
+const MOTIVI_CARTA = { tablet_non_disponibile: 'Tablet non disponibile', connessione_assente: 'Connessione assente', preferenza_paziente: 'Preferenza del paziente', altro: 'Altro' };
+const giorno = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('it-IT');
+
+// Firma su carta (punto d): cosa è stato dichiarato, quando è stato caricato e
+// l'impronta del file, con il link per aprire la copia (l'apertura si registra).
+function DatiCarta({ doc, copie, patientId }) {
+  if (!doc || doc.modalita !== 'carta') return null;
+  const copia = copie.find(c => c.file_path === doc.file_path && c.documento === doc.type);
+  return (
+    <div style={{ fontSize: 10, marginTop: 4 }}>
+      Firmato su carta il {giorno(doc.carta_data_firma)} (data dichiarata dall&apos;osteopata) · caricato il {new Date(doc.caricato_il).toLocaleDateString('it-IT')} · motivo: {MOTIVI_CARTA[doc.carta_motivo] || doc.carta_motivo}{doc.carta_motivo_nota ? ` — ${doc.carta_motivo_nota}` : ''}
+      <div className="hash">File SHA-256: {doc.file_impronta}</div>
+      {copia && <a className="no-print" href={`/api/admin/patients/${patientId}/carta?copia=${copia.id}`} target="_blank" rel="noopener noreferrer">Apri la copia firmata</a>}
+    </div>
+  );
+}
+
+export default function PatientExport({ patient, client, documents, sessions, assessmentConsent, exportedAt, testoConsenso, testoInformativa, copieCartacee = [] }) {
   // Si stampa la versione FIRMATA, presa dall'archivio. Se il documento non è
   // ancora firmato si stampa quella in vigore, e lo si dichiara.
   const CONSENSO_TRATTAMENTO = testoConsenso?.contenuto || { titolo: 'Consenso informato al trattamento osteopatico', sezioni: [] };
@@ -103,7 +120,7 @@ export default function PatientExport({ patient, client, documents, sessions, as
               <tr key={label}>
                 <td>{label}</td>
                 <td><span className={`badge ${doc?.status === 'signed' || doc?.status === 'completed' ? 'badge-ok' : 'badge-warn'}`}>{doc?.status === 'signed' ? 'Firmato' : doc?.status === 'completed' ? 'Compilato' : 'Mancante'}</span></td>
-                <td>{doc?.signed_at ? new Date(doc.signed_at).toLocaleDateString('it-IT') : '—'}</td>
+                <td>{doc?.signed_at ? new Date(doc.signed_at).toLocaleDateString('it-IT') : '—'}{doc?.modalita === 'carta' ? ' (su carta)' : ''}</td>
                 <td className="hash">{doc?.content_hash ? doc.content_hash.slice(0, 32) + '…' : '—'}</td>
               </tr>
             ))}
@@ -127,6 +144,7 @@ export default function PatientExport({ patient, client, documents, sessions, as
               <img src={consent.signature_image} alt="Firma" style={{ maxWidth: 300, height: 80, objectFit: 'contain', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4 }} />
             )}
             <div className="hash" style={{ marginTop: 6 }}>SHA-256: {consent.content_hash}</div>
+            <DatiCarta doc={consent} copie={copieCartacee} patientId={patient.id} />
           </div>
         )}
 
@@ -147,7 +165,29 @@ export default function PatientExport({ patient, client, documents, sessions, as
               <img src={privacy.signature_image} alt="Firma" style={{ maxWidth: 300, height: 80, objectFit: 'contain', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4 }} />
             )}
             <div className="hash" style={{ marginTop: 6 }}>SHA-256: {privacy.content_hash}</div>
+            <DatiCarta doc={privacy} copie={copieCartacee} patientId={patient.id} />
           </div>
+        )}
+
+        {copieCartacee.length > 0 && (
+          <>
+            <h3>Copie firmate su carta caricate (tutte, anche quelle sostituite)</h3>
+            <table>
+              <thead><tr><th>Documento</th><th>Versione</th><th>Firmata il</th><th>Caricata il</th><th>Motivo</th><th>File SHA-256</th></tr></thead>
+              <tbody>
+                {copieCartacee.map(c => (
+                  <tr key={c.id}>
+                    <td>{c.documento === 'consent_treatment' ? 'Consenso al trattamento' : 'Informativa estesa'}</td>
+                    <td>{c.versione}</td>
+                    <td>{giorno(c.data_firma)}</td>
+                    <td>{new Date(c.caricato_il).toLocaleDateString('it-IT')}</td>
+                    <td>{MOTIVI_CARTA[c.motivo] || c.motivo}{c.motivo_nota ? ` — ${c.motivo_nota}` : ''}</td>
+                    <td className="hash">{c.file_impronta.slice(0, 16)}… <a className="no-print" href={`/api/admin/patients/${patient.id}/carta?copia=${c.id}`} target="_blank" rel="noopener noreferrer">apri</a></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
         )}
 
         {/* ── ANAMNESI ── */}
@@ -266,15 +306,23 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       const t = await testoInVigore(codice); return t ? { versione: t.versione, contenuto: t.contenuto, firmata: false } : null;
     } catch (e) { console.error('[export] testo', codice, e.message); return null; }
   };
-  const [testoConsenso, testoInformativa] = await Promise.all([
+  const [testoConsenso, testoInformativa, copieCartacee] = await Promise.all([
     carica('consent_treatment', 'consenso_trattamento'),
     carica('privacy_extended', 'informativa_estesa'),
+    (async () => {
+      const { default: supabase } = await import('../../../../lib/db');
+      const { data } = await supabase.from('copie_cartacee')
+        .select('id, documento, versione, data_firma, motivo, motivo_nota, file_path, file_impronta, caricato_il')
+        .eq('patient_id', patientId).order('caricato_il', { ascending: true });
+      return data || [];
+    })().catch(() => []),
   ]);
 
   return {
     props: {
       testoConsenso,
       testoInformativa,
+      copieCartacee,
       patient,
       client,
       documents: JSON.parse(JSON.stringify(documents)), // serializza Date

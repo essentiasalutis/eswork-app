@@ -97,3 +97,8 @@ test('«persone attese» del dimensionamento non è un paragone', () => {
   assert.deepEqual(controllaTesto('Il programma copre 51 persone attese.', { dati: '51 persone attese' }), []);
   assert.ok(controllaTesto('risultato migliore dell\'atteso').length > 0);
 });
+
+test('«lista d\'attesa» non è un paragone, ma «senza liste d\'attesa» è un fatto non fornito', () => {
+  assert.deepEqual(controllaTesto('La lista d\'attesa è gestita dalla piattaforma.'), []);
+  assert.ok(controllaTesto('352 sedute, senza liste d\'attesa.', { dati: '352' }).some(p => p.includes('lista d\'attesa')));
+});

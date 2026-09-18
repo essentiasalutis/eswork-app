@@ -165,7 +165,8 @@ ${DEFINIZIONE_LIVELLI}
 
 NOTA PRIVACY: dove un gruppo è "n.d." è stato soppresso per riservatezza (k-anonymity). NON dedurre, stimare o ricostruire i valori soppressi. ATTENZIONE: un gruppo può risultare soppresso ANCHE se conta ${K_ANON} persone o più — è la soppressione secondaria, che impedisce di ricavarlo per differenza dagli altri. Quindi NON affermare che i gruppi soppressi siano "inferiori a ${K_ANON}": di' solo che non sono pubblicabili per tutela della riservatezza. I dati dei dipendenti si dicono RISERVATI, mai «anonimi»: il dato individuale esiste ed è protetto.
 ${clinicoBlock}
-CHECK-UP: ${stratTotal > 0 ? `${stratTotal} questionari raccolti` : 'nessun questionario ancora raccolto'}
+CHECK-UP: ${stratTotal > 0 ? `${stratTotal} questionari raccolti${client.employees ? ` su ${client.employees} dipendenti (adesione ${Math.round(stratTotal / client.employees * 100)}%)` : ''}` : 'nessun questionario ancora raccolto'}
+NUMERI (tassativo): usa SOLO i numeri presenti in questi dati. VIETATO calcolarne di nuovi (somme, differenze, percentuali, proiezioni sulla popolazione): se un numero non c'è, descrivi senza numero.
 ${isPacchetto ? '' : quoteBlock}
 `.trim();
 
@@ -442,7 +443,7 @@ export async function buildQuoteBlock(client_id, client, answers) {
     // entrambi giusti, ma il passaggio non era spiegato da nessuna parte.
     const obsPct = responders > 0 ? Math.round((nmq.level1.count / responders) * 100) : null;
     const rigaDimensionamento = (pricingVersion === 'v2' && obsPct != null && nEmp > responders)
-      ? `\n- Dimensionamento: la quota in Livello 1 osservata sui ${responders} questionari (${obsPct}%) è riportata sull'intera popolazione di ${nEmp} dipendenti (${real.l1} persone attese), così il programma copre anche chi non ha compilato il questionario`
+      ? `\n- Dimensionamento: la quota in Livello 1 osservata sui ${responders} questionari (${obsPct}%) è riportata sull'intera popolazione di ${nEmp} dipendenti (${real.l1} persone attese), così il programma copre anche chi non ha compilato il questionario${real.l2 != null ? `; per la prevenzione il programma è dimensionato su ${real.l2} persone in Livello 2` : ''}. Sono gli UNICI numeri di persone sull'intera popolazione: non proiettare altri livelli`
       : '';
 
     // ERGONOMIA: e' una voce PAGATA (fino a qui invisibile nel documento). Senza

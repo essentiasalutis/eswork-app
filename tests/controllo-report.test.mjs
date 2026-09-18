@@ -58,3 +58,29 @@ test('formazione già erogata: il prompt lo dice', async () => {
   assert.ok(r.includes('GIÀ attiva'));
   assert.ok(rigaFormazione([]).includes('nessuna sessione ancora erogata'));
 });
+
+test('prezzi all\'italiana: «35.120 €» è 35120, non 35,12', () => {
+  assert.deepEqual(numeriDi('investimento di 35.120 € (forbice 35.120–62.120)'), [35120, 35120, 62120]);
+  assert.deepEqual(controllaTesto('Investimento Anno 1: € 35.120.', { dati: 'Prezzo: 35120' }), []);
+});
+
+test('«sorveglianza sanitaria» del Medico Competente non è un errore', () => {
+  assert.deepEqual(controllaTesto('La sorveglianza sanitaria resta del Medico Competente.'), []);
+});
+
+test('generaConControllo: riscrive una volta, poi segna da rivedere', async () => {
+  const { generaConControllo } = await import('../lib/controllo-report.mjs');
+  const dati = 'Sedute: 352';
+  let chiamate = 0;
+  const buono = await generaConControllo(async () => (++chiamate === 1 ? { testo: 'interventi fisioterapici' } : { testo: '352 sedute osteopatiche' }), dati);
+  assert.equal(buono.aiStatus, 'ai');
+  assert.equal(chiamate, 2);
+  const cattivo = await generaConControllo(async () => ({ testo: 'in linea con gli standard' }), dati);
+  assert.equal(cattivo.aiStatus, 'ai_da_rivedere');
+  assert.ok(cattivo.problemi.length > 0);
+});
+
+test('«in linea con la Stima di investimento» è un fatto, non un paragone inventato', () => {
+  assert.deepEqual(controllaTesto('L\'investimento è in linea con la Stima di investimento presentata.'), []);
+  assert.ok(controllaTesto('risultati in linea con il settore').length > 0);
+});

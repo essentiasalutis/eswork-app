@@ -23,7 +23,7 @@ import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { kAnonPartition, maskCount, tooSmall, K_ANON } from '../../../../lib/kanon';
 import { PROTOCOLLO } from '../../../../lib/protocollo.mjs';
 import { DEFINIZIONE_LIVELLI, VERSO_DEI_LIVELLI, IDENTITA_PROFESSIONALE, NIENTE_RIFERIMENTI_INVENTATI, programmaPrevisto, divisioneSedute, rigaFormazione } from '../../../../lib/regole-report.mjs';
-import { controllaTesto, richiestaCorrezione } from '../../../../lib/controllo-report.mjs';
+import { generaConControllo } from '../../../../lib/controllo-report.mjs';
 import { getOrgSessioni } from '../../../../lib/org';
 
 export const config = { maxDuration: 60 };
@@ -341,17 +341,11 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
   try {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const chiedi = messages => anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 1500, messages })
-      .then(m => m.content[0]?.text || '');
+      .then(m => ({ testo: m.content[0]?.text || '', troncato: m.stop_reason === 'max_tokens' }));
     // Controllo automatico (lib/controllo-report.mjs): se il testo usa parole vietate
     // o numeri che non sono nei dati, si fa riscrivere UNA volta con l'elenco degli
     // errori. Se restano, il report si salva «da rivedere» e l'elenco torna a chi lo apre.
-    let testo = await chiedi([{ role: 'user', content: prompt }]);
-    let problemi = controllaTesto(testo, { dati: prompt });
-    if (problemi.length) {
-      testo = await chiedi([{ role: 'user', content: prompt }, { role: 'assistant', content: testo }, { role: 'user', content: richiestaCorrezione(problemi) }]);
-      problemi = controllaTesto(testo, { dati: prompt });
-    }
-    const aiStatus = problemi.length ? 'ai_da_rivedere' : 'ai';
+    const { testo, problemi, aiStatus } = await generaConControllo(chiedi, prompt);
     const report = finalize(testo, true);
     const pdfUrl = await tryGeneratePdf(client, reportType, report, id, checkpoint).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: report, checkpoint, created_by: 'admin', ai_status: aiStatus, pdf_url: pdfUrl }).catch(() => null);

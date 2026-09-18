@@ -1,4 +1,5 @@
 import { DEFINIZIONE_LIVELLI, IDENTITA_PROFESSIONALE } from '../../../../lib/regole-report.mjs';
+import { generaConControllo } from '../../../../lib/controllo-report.mjs';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireAuth } from '../../../../lib/auth';
 import {
@@ -218,12 +219,7 @@ PRINCIPIO GUIDA: la stratificazione è la fotografia dello stato della popolazio
 
   try {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 4000,
-      messages: [{
-        role: 'user',
-        content: `Sei un consulente clinico di ES Work (Essentia Salutis). Genera un Report di Attivazione professionale per un'azienda cliente.
+    const prompt = `Sei un consulente clinico di ES Work (Essentia Salutis). Genera un Report di Attivazione professionale per un'azienda cliente.
 
 DATI CLIENTE:
 ${dataBlock}
@@ -256,16 +252,18 @@ RISULTATI CLINICI (tassativo): MAI promettere risultati clinici — niente «ris
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.${sezioneComprende ? '\nCOMPONENTI: NON scrivere una sezione con l\'elenco delle componenti del programma né le loro quantità (niente «Cosa include» / «Cosa comprende»): la inserisce il sistema con i testi approvati.' : ''}
 DATA: se includi un'intestazione con il riepilogo del cliente, riporta "Data: ${dataOggi}". Usa ESATTAMENTE questa data; non inventarne altre né citare altre date nel testo.
-Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole totali.`,
-      }],
-    });
+Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole totali.`;
+    const chiedi = messages => anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 4000, messages })
+      .then(m => ({ testo: m.content[0]?.text || '', troncato: m.stop_reason === 'max_tokens' }));
+    // Controllo automatico, come per i report di monitoraggio (lib/controllo-report.mjs).
+    const { testo, troncato, problemi, aiStatus } = await generaConControllo(chiedi, prompt);
 
     // Testo troncato (visto l'11/9: "Prossimi Passi" finiva a metà frase) → meglio il testo di riserva.
-    if (message.stop_reason === 'max_tokens') throw new Error('testo dell\'AI troncato: troppo lungo');
-    const report = conNota(inserisciCosaComprende(message.content[0]?.text || '', sezioneComprende), true);
+    if (troncato) throw new Error('testo dell\'AI troncato: troppo lungo');
+    const report = conNota(inserisciCosaComprende(testo, sezioneComprende), true);
     const pdfUrl = await tryGeneratePdf(client, 'activation', report, id).catch(() => null);
-    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', ai_status: 'ai', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
-    return res.json({ report, source: 'ai', ai_status: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
+    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', ai_status: aiStatus, pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
+    return res.json({ report, source: 'ai', ai_status: aiStatus, problemi, pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
     // Qui la chiamata è stata fatta: i dati SONO usciti, la risposta non è stata usata.
     // Si salva solo la classe, mai il messaggio d'errore (può contenere il payload).

@@ -39,6 +39,7 @@ export default requireAuth(async function handler(req, res) {
       'restratification_alerts',
       'acute_events',
       'checkpoints',
+      'anamnesi_integrazioni',
       'patient_documents',
       'copie_cartacee',
       'reassessments_t12',

@@ -9,10 +9,7 @@ import {
   getConsentByPatient,
 } from '../../../../lib/store';
 
-const NMQ_LABELS_IT = {
-  '<1m': 'Meno di 1 mese', '1-3m': '1–3 mesi', '3-6m': '3–6 mesi',
-  '6-12m': '6–12 mesi', '>12m': 'Più di 12 mesi',
-};
+import { SEZIONI_ANAMNESI, CAMPI_ANAMNESI, valoreLeggibile, originaleDaDocumento, versioneCorrente, svuotato, autoreOriginale } from '../../../../lib/anamnesi.mjs';
 
 const MOTIVI_CARTA = { tablet_non_disponibile: 'Tablet non disponibile', connessione_assente: 'Connessione assente', preferenza_paziente: 'Preferenza del paziente', altro: 'Altro' };
 const giorno = (d) => dataIt(d);
@@ -31,7 +28,7 @@ function DatiCarta({ doc, copie, patientId }) {
   );
 }
 
-export default function PatientExport({ patient, client, documents, sessions, assessmentConsent, exportedAt, testoConsenso, testoInformativa, copieCartacee = [] }) {
+export default function PatientExport({ patient, client, documents, sessions, assessmentConsent, exportedAt, testoConsenso, testoInformativa, copieCartacee = [], integrazioniAnamnesi = [] }) {
   // Si stampa la versione FIRMATA, presa dall'archivio. Se il documento non è
   // ancora firmato si stampa quella in vigore, e lo si dichiara.
   const CONSENSO_TRATTAMENTO = testoConsenso?.contenuto || { titolo: 'Consenso informato al trattamento osteopatico', sezioni: [] };
@@ -41,7 +38,12 @@ export default function PatientExport({ patient, client, documents, sessions, as
   const consent = getDoc('consent_treatment');
   const privacy = getDoc('privacy_extended');
   const anamnesi = getDoc('anamnesi');
-  const f = anamnesi?.form_data || {};
+  // Versione corrente = originale firmato + integrazioni dell'osteopata (v71). Ogni
+  // campo integrato lo dice, con l'originale del paziente accanto (Enrico, 18/9:
+  // un documento clinico che cambia senza dirlo è peggio di uno incompleto).
+  const originaleAnamnesi = originaleDaDocumento(anamnesi);
+  const { valori: anamnesiCorrente, storia: storiaAnamnesi, integrazioni: integrazioniOrdinate } = versioneCorrente(originaleAnamnesi, integrazioniAnamnesi);
+  const gruppiIntegrazioni = integrazioniOrdinate.reduce((acc, r) => { (acc[r.gruppo] ||= []).push(r); return acc; }, {});
 
   const closedSessions = sessions.filter(s => s.closed_at).sort((a, b) => new Date(a.date) - new Date(b.date));
 
@@ -116,7 +118,7 @@ export default function PatientExport({ patient, client, documents, sessions, as
             {[
               { label: 'Consenso informato al trattamento osteopatico', doc: consent },
               { label: 'Informativa privacy (art. 13 GDPR)', doc: privacy },
-              { label: 'Anamnesi strutturata ES Work', doc: anamnesi },
+              { label: `Anamnesi strutturata ES Work${integrazioniOrdinate.length ? ` — integrata dall'osteopata dopo la firma (${Object.keys(gruppiIntegrazioni).length} ${Object.keys(gruppiIntegrazioni).length === 1 ? 'volta' : 'volte'}, l'ultima il ${dataIt(integrazioniOrdinate[integrazioniOrdinate.length - 1].creato_il)})` : ''}`, doc: anamnesi },
             ].map(({ label, doc }) => (
               <tr key={label}>
                 <td>{label}</td>
@@ -196,44 +198,70 @@ export default function PatientExport({ patient, client, documents, sessions, as
         <h2>3. Anamnesi strutturata ES Work</h2>
         {anamnesi ? (
           <>
-            <h3>Storia clinica</h3>
-            <table>
-              <tbody>
-                {[
-                  ['Patologie pregresse/in corso', f.patologie_pregresse],
-                  ['Interventi chirurgici', f.interventi_chirurgici],
-                  ['Farmaci in corso', f.farmaci_in_corso],
-                  ['Allergie', f.allergie],
-                  ['Familiarità', f.familiarita],
-                ].map(([k, v]) => v ? <tr key={k}><td style={{ width: 200, color: '#6b7280' }}>{k}</td><td>{v}</td></tr> : null)}
-              </tbody>
-            </table>
-            <h3>Disturbi attuali</h3>
-            <table>
-              <tbody>
-                <tr><td style={{ width: 200, color: '#6b7280' }}>Motivo consultazione</td><td>{f.motivo_consultazione}</td></tr>
-                <tr><td style={{ color: '#6b7280' }}>Zone interessate</td><td>{(f.sede_dolore || []).join(', ') || '—'}</td></tr>
-                <tr><td style={{ color: '#6b7280' }}>NRS iniziale</td><td><strong style={{ fontSize: 14 }}>{f.nrs}/10</strong></td></tr>
-                <tr><td style={{ color: '#6b7280' }}>Durata disturbo</td><td>{NMQ_LABELS_IT[f.durata] || f.durata}</td></tr>
-                {f.fattori_peggio && <tr><td style={{ color: '#6b7280' }}>Fattori peggiorativi</td><td>{f.fattori_peggio}</td></tr>}
-                {f.fattori_meglio && <tr><td style={{ color: '#6b7280' }}>Fattori migliorativi</td><td>{f.fattori_meglio}</td></tr>}
-                {f.sesso_f && <tr><td style={{ color: '#6b7280' }}>Gravidanza in corso</td><td>{f.gravidanza ? `Sì — settimana ${f.settimana_gravidanza}` : 'No'}</td></tr>}
-              </tbody>
-            </table>
-            {anamnesi.pro_notes && (
-              <>
-                <h3>Note cliniche del professionista</h3>
-                <div style={{ background: '#fef9c3', border: '1px solid #fde68a', borderRadius: 6, padding: '10px 12px', fontSize: 11 }}>
-                  {anamnesi.pro_notes}
+            <p style={{ fontSize: 10, color: '#6b7280' }}>
+              Versione corrente. {integrazioniOrdinate.length
+                ? `L'anamnesi è stata integrata dall'osteopata dopo la firma (${integrazioniOrdinate.length} ${integrazioniOrdinate.length === 1 ? 'integrazione' : 'integrazioni'} su ${Object.keys(storiaAnamnesi).length} ${Object.keys(storiaAnamnesi).length === 1 ? 'campo' : 'campi'}): i campi integrati sono segnati con ⁽ⁱ⁾ e riportano il testo originale del paziente; l'elenco completo è nella sezione «Integrazioni successive alla firma».`
+                : 'Nessuna integrazione dopo la firma: è il testo firmato dal paziente.'}
+            </p>
+            {SEZIONI_ANAMNESI.map(sez => {
+              const righe = sez.campi.filter(c => storiaAnamnesi[c.campo] || valoreLeggibile(c.campo, anamnesiCorrente[c.campo]) !== '—');
+              if (!righe.length) return null;
+              return (
+                <div key={sez.titolo}>
+                  <h3>{sez.titolo}</h3>
+                  <table>
+                    <tbody>
+                      {righe.map(c => {
+                        const st = storiaAnamnesi[c.campo];
+                        const ultima = st && st[st.length - 1];
+                        return (
+                          <tr key={c.campo}>
+                            <td style={{ width: 200, color: '#6b7280' }}>{c.etichetta}{st ? ' ⁽ⁱ⁾' : ''}</td>
+                            <td>
+                              {st && svuotato(ultima) ? <em>campo svuotato</em> : valoreLeggibile(c.campo, anamnesiCorrente[c.campo])}
+                              {st && (
+                                <div style={{ fontSize: 9, color: '#92400e', marginTop: 2 }}>
+                                  {svuotato(ultima) ? 'Rimosso' : 'Integrato'} dall&apos;osteopata ({ultima.osteopata}) il {dataOraIt(ultima.creato_il)} — motivo: {ultima.motivo}.
+                                  {' '}{autoreOriginale(c.campo)}: «{valoreLeggibile(c.campo, originaleAnamnesi[c.campo])}».
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              </>
-            )}
+              );
+            })}
             <div className="sig-box" style={{ marginTop: 12 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 6 }}>Firma del paziente — {dataIt(anamnesi.signed_at)}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 6 }}>
+                Firma del paziente sulla versione originale del {dataIt(anamnesi.signed_at)}{integrazioniOrdinate.length ? ' — la firma non copre le integrazioni successive' : ''}
+              </div>
               {anamnesi.signature_image && (
                 <img src={anamnesi.signature_image} alt="Firma" style={{ maxWidth: 300, height: 80, objectFit: 'contain', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4 }} />
               )}
             </div>
+            {integrazioniOrdinate.length > 0 && (
+              <>
+                <h3>Integrazioni successive alla firma</h3>
+                <table>
+                  <thead><tr><th>Data e ora</th><th>Osteopata</th><th>Campo</th><th>Prima</th><th>Dopo</th><th>Motivo</th></tr></thead>
+                  <tbody>
+                    {Object.values(gruppiIntegrazioni).flatMap(g => g.map(r => (
+                      <tr key={r.id}>
+                        <td>{dataOraIt(r.creato_il)}</td>
+                        <td>{r.osteopata}</td>
+                        <td>{CAMPI_ANAMNESI[r.campo]?.etichetta || r.campo}</td>
+                        <td>{valoreLeggibile(r.campo, r.valore_prima)}</td>
+                        <td>{svuotato(r) ? <em>svuotato</em> : valoreLeggibile(r.campo, r.valore_dopo)}</td>
+                        <td>{r.motivo}</td>
+                      </tr>
+                    )))}
+                  </tbody>
+                </table>
+              </>
+            )}
           </>
         ) : <p>Anamnesi non disponibile.</p>}
 
@@ -307,7 +335,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       const t = await testoInVigore(codice); return t ? { versione: t.versione, contenuto: t.contenuto, firmata: false } : null;
     } catch (e) { console.error('[export] testo', codice, e.message); return null; }
   };
-  const [testoConsenso, testoInformativa, copieCartacee] = await Promise.all([
+  const [testoConsenso, testoInformativa, copieCartacee, integrazioniAnamnesi] = await Promise.all([
     carica('consent_treatment', 'consenso_trattamento'),
     carica('privacy_extended', 'informativa_estesa'),
     (async () => {
@@ -317,6 +345,15 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         .eq('patient_id', patientId).order('caricato_il', { ascending: true });
       return data || [];
     })().catch(() => []),
+    // Integrazioni dell'anamnesi (v71) con il nome dell'osteopata. Se la lettura
+    // fallisce la pagina NON si stampa: senza integrazioni l'anamnesi corrente
+    // sembrerebbe l'originale.
+    (async () => {
+      const { getIntegrazioniAnamnesi, getProfessionals } = await import('../../../../lib/store');
+      const [righe, pro] = await Promise.all([getIntegrazioniAnamnesi(patientId), getProfessionals().catch(() => [])]);
+      const nomi = Object.fromEntries((pro || []).map(p => [p.id, p.name]));
+      return righe.map(r => ({ id: r.id, campo: r.campo, valore_prima: r.valore_prima, valore_dopo: r.valore_dopo, motivo: r.motivo, gruppo: r.gruppo, creato_il: r.creato_il, osteopata: nomi[r.professional_id] || 'Osteopata' }));
+    })(),
   ]);
 
   return {
@@ -330,6 +367,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       sessions: JSON.parse(JSON.stringify(sessions)),
       assessmentConsent: assessmentConsent ? JSON.parse(JSON.stringify(assessmentConsent)) : null,
       exportedAt: new Date().toISOString(),
+      integrazioniAnamnesi: JSON.parse(JSON.stringify(integrazioniAnamnesi)),
     },
   };
 });

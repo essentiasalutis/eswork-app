@@ -2,8 +2,8 @@ import { useState } from 'react';
 import SignatureCanvas from './SignatureCanvas';
 import { documentiMancanti, documentoValido } from '../lib/documenti-seduta.mjs';
 import CopiaCartacea from './CopiaCartacea';
-import { dataIt } from '../lib/date-it.mjs';
-import { MESSAGGIO_BLOCCO_ANAMNESI } from '../lib/anamnesi.mjs';
+import { dataIt, dataOraIt } from '../lib/date-it.mjs';
+import { SEZIONI_ANAMNESI, CAMPI_ANAMNESI, valoreLeggibile, versioneCorrente, svuotato, autoreOriginale } from '../lib/anamnesi.mjs';
 // I testi da firmare arrivano dall'ARCHIVIO (prop `testi`, caricata lato server):
 // nessuna copia nel codice. Alla firma si rimandano solo i loro identificativi.
 
@@ -63,7 +63,6 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
     notes:                       patient?.notes || '',
   });
 
-  const [editingAnamnesi, setEditingAnamnesi] = useState(false);
   const [savingAnamnesi, setSavingAnamnesi] = useState(false);
 
   function upd(k, v) { setF(prev => ({ ...prev, [k]: v })); }
@@ -119,7 +118,6 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
       const next = [...docs.filter(d => d.type !== 'anamnesi'), { ...(docs.find(d => d.type === 'anamnesi') || {}), ...updated, form_data: f, pro_notes: proNotes }];
       setDocs(next);
       onDocsChange?.(next);
-      setEditingAnamnesi(false);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -155,7 +153,7 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
   }
 
   // ── Vista "già firmato" ──────────────────────────────────────────────────────
-  if (allComplete() && !editingAnamnesi) {
+  if (allComplete()) {
     const anchor = docs.find(d => d.type === 'consent_treatment') || docs[0];
     return (
       <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 14, padding: '18px 20px' }}>
@@ -163,15 +161,6 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
           <div style={{ fontSize: 15, fontWeight: 700, color: '#15803d' }}>
             ✅ Documenti firmati il {anchor?.signed_at ? dataIt(anchor.signed_at) : '—'}
           </div>
-          {/* Spento il 18/9: sovrascriveva l'anamnesi firmata (lib/anamnesi.mjs). */}
-          <button disabled title={MESSAGGIO_BLOCCO_ANAMNESI}
-            style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, padding: '5px 12px', cursor: 'not-allowed' }}
-          >
-            ✏️ Modifica anamnesi
-          </button>
-        </div>
-        <div style={{ fontSize: 12, color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
-          {MESSAGGIO_BLOCCO_ANAMNESI}
         </div>
         {[
           { type: 'consent_treatment', label: '📋 Consenso informato al trattamento osteopatico' },
@@ -198,6 +187,7 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
           );
         })}
         {error && <div style={{ color: '#dc2626', fontSize: 12, marginTop: 6 }}>❌ {error}</div>}
+        <AnamnesiCartella patientId={patientId} />
       </div>
     );
   }
@@ -205,7 +195,7 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
   // ── Vista "consensi firmati su carta, anamnesi da compilare" ────────────────
   // I consensi valgono (accettati dal server); resta l'anamnesi, che si compila
   // in piattaforma come sempre.
-  if (consensiValidi && !allComplete() && !editingAnamnesi) {
+  if (consensiValidi && !allComplete()) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, fontSize: 13, color: '#166534' }}>
@@ -221,29 +211,6 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
           style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', fontSize: 14, fontWeight: 700, cursor: canSaveAnamnesi ? 'pointer' : 'not-allowed', background: canSaveAnamnesi ? '#0369a1' : '#e2e8f0', color: canSaveAnamnesi ? '#fff' : '#94a3b8' }}
         >
           {savingAnamnesi ? 'Salvataggio…' : '💾 Salva anamnesi'}
-        </button>
-      </div>
-    );
-  }
-
-  // ── Vista "modifica solo anamnesi" ───────────────────────────────────────────
-  if (allComplete() && editingAnamnesi) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10 }}>
-          <span style={{ fontSize: 13, color: '#92400e', fontWeight: 600 }}>✏️ Stai modificando l'anamnesi — consensi e privacy restano validi</span>
-          <button onClick={() => { setEditingAnamnesi(false); setError(null); }} style={{ fontSize: 12, color: '#64748b', background: 'none', border: 'none', cursor: 'pointer' }}>Annulla</button>
-        </div>
-        <Accordion icon="🩺" title="Anamnesi ES Work" expanded={open.anamnesi} onToggle={() => toggle('anamnesi')}>
-          {anamnesiFormFields({ f, upd, nrsTouched, setNrsTouched, proNotes, setProNotes })}
-        </Accordion>
-        {error && <div style={{ color: '#dc2626', fontSize: 13, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8 }}>❌ {error}</div>}
-        <button
-          onClick={handleSaveAnamnesiOnly}
-          disabled={!canSaveAnamnesi || savingAnamnesi}
-          style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', fontSize: 14, fontWeight: 700, cursor: canSaveAnamnesi ? 'pointer' : 'not-allowed', background: canSaveAnamnesi ? '#0369a1' : '#e2e8f0', color: canSaveAnamnesi ? '#fff' : '#94a3b8' }}
-        >
-          {savingAnamnesi ? 'Salvataggio…' : '💾 Salva modifiche anamnesi'}
         </button>
       </div>
     );
@@ -367,6 +334,134 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
 }
 
 // ─── Form anamnesi (riutilizzato in prima firma e in modifica) ────────────────
+
+// ── Anamnesi in cartella: lettura e integrazioni (v71, Enrico 18/9) ─────────────
+// L'originale firmato dal paziente non cambia mai. Ogni modifica dell'osteopata è
+// un'integrazione con data e motivo, e nella lettura si vede quale campo è stato
+// integrato, da chi, quando, perché, e cosa aveva scritto il paziente.
+function AnamnesiCartella({ patientId }) {
+  const [dati, setDati] = useState(null);
+  const [aperta, setAperta] = useState(false);
+  const [integrando, setIntegrando] = useState(false);
+  const [valori, setValori] = useState({});
+  const [motivo, setMotivo] = useState('');
+  const [errore, setErrore] = useState(null);
+  const [lavoro, setLavoro] = useState(false);
+
+  async function carica() {
+    setErrore(null); setLavoro(true);
+    try {
+      const r = await fetch(`/api/pro/patients/${patientId}/anamnesi`);
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Anamnesi non disponibile');
+      setDati(j); return j;
+    } catch (e) { setErrore(e.message); return null; } finally { setLavoro(false); }
+  }
+  async function apri() { if (!aperta && !dati) await carica(); setAperta(a => !a); }
+  async function iniziaIntegrazione() {
+    const j = dati || await carica();
+    if (!j) return;
+    setValori({ ...j.corrente }); setMotivo(''); setIntegrando(true); setAperta(true);
+  }
+  async function salva() {
+    setErrore(null); setLavoro(true);
+    try {
+      const r = await fetch(`/api/pro/patients/${patientId}/anamnesi`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ valori, motivo }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Integrazione non registrata');
+      setDati(j); setIntegrando(false);
+    } catch (e) { setErrore(e.message); } finally { setLavoro(false); }
+  }
+
+  const btn = { fontSize: 12, fontWeight: 600, borderRadius: 8, padding: '5px 12px', cursor: 'pointer' };
+  const upd = (k, v) => setValori(p => ({ ...p, [k]: v }));
+  const { storia = {}, integrazioni = [] } = dati ? versioneCorrente(dati.originale, dati.integrazioni) : {};
+  const gruppi = integrazioni.reduce((acc, r) => { (acc[r.gruppo] ||= []).push(r); return acc; }, {});
+
+  return (
+    <div style={{ marginTop: 12, background: '#fff', border: '1px solid #bbf7d0', borderRadius: 10, padding: '12px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>🩺 Anamnesi{dati && integrazioni.length ? ` · ${integrazioni.length} integrazion${integrazioni.length === 1 ? 'e' : 'i'}` : ''}</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {!integrando && <button onClick={apri} disabled={lavoro} style={{ ...btn, color: '#0f172a', background: '#f1f5f9', border: '1px solid #e2e8f0' }}>{aperta ? 'Chiudi' : 'Leggi'}</button>}
+          {!integrando && <button onClick={iniziaIntegrazione} disabled={lavoro} style={{ ...btn, color: '#0369a1', background: '#e0f2fe', border: '1px solid #bae6fd' }}>✏️ Integra anamnesi</button>}
+        </div>
+      </div>
+      {errore && <div role="alert" style={{ color: '#dc2626', fontSize: 12, marginTop: 8 }}>❌ {errore}</div>}
+
+      {integrando && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 12, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
+            L&apos;originale firmato dal paziente non cambia: ogni campo che modifichi si aggiunge come integrazione, con la data di oggi e il motivo. Si può anche svuotare un campo: il testo originale resta visibile.
+          </div>
+          {anamnesiFormFields({ f: valori, upd, nrsTouched: true, setNrsTouched: () => {}, proNotes: valori.pro_notes || '', setProNotes: v => upd('pro_notes', v) })}
+          <FF label="Motivo dell'integrazione (obbligatorio, una riga)">
+            <input value={motivo} onChange={e => setMotivo(e.target.value)} maxLength={200} placeholder="es. riferito dal paziente alla seconda seduta"
+              style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 13 }} />
+          </FF>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button onClick={() => { setIntegrando(false); setErrore(null); }} style={{ ...btn, flex: 1, padding: 11, color: '#475569', background: '#f1f5f9', border: '1px solid #e2e8f0' }}>Annulla</button>
+            <button onClick={salva} disabled={lavoro || motivo.trim().length < 3}
+              style={{ ...btn, flex: 2, padding: 11, color: '#fff', background: motivo.trim().length < 3 ? '#cbd5e1' : '#0369a1', border: 'none', cursor: motivo.trim().length < 3 ? 'not-allowed' : 'pointer' }}>
+              {lavoro ? 'Registrazione…' : '💾 Registra integrazione'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {aperta && !integrando && dati && (
+        <div style={{ marginTop: 10, fontSize: 13 }}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>
+            Firmata dal paziente il {dataIt(dati.firmata_il)}{dati.modalita === 'carta' ? ' (su carta)' : ''}. Qui sotto la versione corrente: i campi integrati dall&apos;osteopata sono segnati, con il testo originale del paziente.
+          </div>
+          {SEZIONI_ANAMNESI.map(sez => {
+            const righe = sez.campi.filter(c => storia[c.campo] || valoreLeggibile(c.campo, dati.corrente[c.campo]) !== '—');
+            if (!righe.length) return null;
+            return (
+              <div key={sez.titolo} style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>{sez.titolo}</div>
+                {righe.map(c => {
+                  const st = storia[c.campo];
+                  const ultima = st && st[st.length - 1];
+                  return (
+                    <div key={c.campo} style={{ padding: '5px 0', borderBottom: '1px solid #f1f5f9' }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <span style={{ color: '#64748b', minWidth: 190 }}>{c.etichetta}</span>
+                        <span style={{ color: '#0f172a', fontWeight: st ? 600 : 400 }}>{st && svuotato(ultima) ? <em style={{ color: '#94a3b8' }}>campo svuotato</em> : valoreLeggibile(c.campo, dati.corrente[c.campo])}</span>
+                      </div>
+                      {st && (
+                        <div style={{ marginLeft: 198, marginTop: 3, fontSize: 11, color: '#92400e', background: '#fffbeb', borderRadius: 6, padding: '4px 8px' }}>
+                          {svuotato(ultima) ? 'Rimosso' : 'Integrato'} dall&apos;osteopata ({ultima.osteopata}) il {dataOraIt(ultima.creato_il)} — motivo: {ultima.motivo}
+                          <div style={{ color: '#475569', marginTop: 2 }}>{autoreOriginale(c.campo)}: <strong>{valoreLeggibile(c.campo, dati.originale[c.campo])}</strong></div>
+                          {st.length > 1 && <div style={{ color: '#475569', marginTop: 2 }}>{st.length} integrazioni su questo campo: vedi l&apos;elenco qui sotto.</div>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+          {integrazioni.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Integrazioni successive alla firma</div>
+              {Object.values(gruppi).map(g => (
+                <div key={g[0].gruppo} style={{ fontSize: 12, padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
+                  <div><strong>{dataOraIt(g[0].creato_il)}</strong> · {g[0].osteopata} · motivo: {g[0].motivo}</div>
+                  {g.map(r => (
+                    <div key={r.id} style={{ color: '#475569', marginLeft: 12 }}>
+                      {CAMPI_ANAMNESI[r.campo]?.etichetta || r.campo}: {valoreLeggibile(r.campo, r.valore_prima)} → {svuotato(r) ? 'svuotato' : valoreLeggibile(r.campo, r.valore_dopo)}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function anamnesiFormFields({ f, upd, nrsTouched, setNrsTouched, proNotes, setProNotes }) {
   return (

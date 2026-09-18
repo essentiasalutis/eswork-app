@@ -1,11 +1,9 @@
 import { requireProAuth } from '../../../../lib/pro-auth';
 import {
   getPatientById,
-  updatePatient,
   proCanAccessPatientClinical,
   logAccess,
 } from '../../../../lib/store';
-import { validaModifica } from '../../../../lib/modifica-paziente.mjs';
 import { vistaCartellaCurante } from '../../../../lib/vista';
 
 export default requireProAuth(async function handler(req, res) {
@@ -27,20 +25,12 @@ export default requireProAuth(async function handler(req, res) {
     return res.json(vistaCartellaCurante(patient));
   }
 
-  // PATCH — solo l'anamnesi (lib/modifica-paziente.mjs). Azienda, livello, stato,
-  // prevenzione, osteopata assegnato e chiave dell'area personale non si toccano
-  // da qui: prima il corpo della richiesta si salvava così com'era.
+  // PATCH — tolto il 18/9 (Enrico): c'è una sola anamnesi, il documento firmato, e
+  // si modifica solo con le integrazioni (/api/pro/patients/[id]/anamnesi, v71).
+  // Qui si modificavano i campi d'anamnesi della scheda: una seconda copia che
+  // nessun documento mostrava.
   if (req.method === 'PATCH') {
-    const v = validaModifica(req.body);
-    if (!v.ok) return res.status(400).json({ error: v.errore, campi_rifiutati: v.campi_rifiutati || [] });
-    try {
-      const updated = await updatePatient(patientId, v.campi);
-      const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
-      await logAccess({ professional_id: proId, action: 'edit_patient', patient_id: patientId, ip, user_agent: req.headers['user-agent'], details: `Anamnesi modificata: ${Object.keys(v.campi).join(', ')}` }).catch(() => {});
-      return res.json(vistaCartellaCurante(updated));
-    } catch (e) {
-      return res.status(500).json({ error: e.message });
-    }
+    return res.status(405).json({ error: 'La scheda del paziente non si modifica da qui: l\'anamnesi si integra dalla cartella («Integra anamnesi»), il livello si cambia con «Riclassifica».' });
   }
 
   // DELETE — tolto all'osteopata (Enrico, 17/9). Cancellare un paziente cancella

@@ -41,6 +41,7 @@ const COHORT_REP_MIN = 0.70;
 
 export default requireAuth(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
+  const avvio = Date.now(); // per il tempo massimo della funzione (maxDuration 60 s): PDF e salvataggio dopo
 
   const { id } = req.query;
   const { checkpoint = 't3' } = req.body;
@@ -345,7 +346,7 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
     // Controllo automatico (lib/controllo-report.mjs): se il testo usa parole vietate
     // o numeri che non sono nei dati, si fa riscrivere UNA volta con l'elenco degli
     // errori. Se restano, il report si salva «da rivedere» e l'elenco torna a chi lo apre.
-    const { testo, problemi, aiStatus } = await generaConControllo(chiedi, prompt);
+    const { testo, problemi, aiStatus } = await generaConControllo(chiedi, prompt, { scadenza: avvio + 45000 });
     const report = finalize(testo, true);
     const pdfUrl = await tryGeneratePdf(client, reportType, report, id, checkpoint).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: report, checkpoint, created_by: 'admin', ai_status: aiStatus, pdf_url: pdfUrl }).catch(() => null);

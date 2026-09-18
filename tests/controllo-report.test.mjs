@@ -80,6 +80,14 @@ test('generaConControllo: riscrive una volta, poi segna da rivedere', async () =
   assert.ok(cattivo.problemi.length > 0);
 });
 
+test('generaConControllo: senza tempo per riscrivere non richiama, segna da rivedere', async () => {
+  const { generaConControllo } = await import('../lib/controllo-report.mjs');
+  let t = 0, chiamate = 0;
+  const r = await generaConControllo(async () => { chiamate++; t += 30000; return { testo: 'interventi fisioterapici' }; }, 'x', { scadenza: 45000, adesso: () => t });
+  assert.equal(chiamate, 1);
+  assert.equal(r.aiStatus, 'ai_da_rivedere');
+});
+
 test('«in linea con la Stima di investimento» è un fatto, non un paragone inventato', () => {
   assert.deepEqual(controllaTesto('L\'investimento è in linea con la Stima di investimento presentata.'), []);
   assert.ok(controllaTesto('risultati in linea con il settore').length > 0);

@@ -46,6 +46,7 @@ function stratLines(l1, l2, l3, total) {
 
 export default requireAuth(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
+  const avvio = Date.now(); // per il tempo massimo della funzione (maxDuration 60 s): PDF e salvataggio dopo
 
   const { id } = req.query;
   const client = await getClientById(id).catch(() => null);
@@ -256,7 +257,7 @@ Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole tota
     const chiedi = messages => anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 4000, messages })
       .then(m => ({ testo: m.content[0]?.text || '', troncato: m.stop_reason === 'max_tokens' }));
     // Controllo automatico, come per i report di monitoraggio (lib/controllo-report.mjs).
-    const { testo, troncato, problemi, aiStatus } = await generaConControllo(chiedi, prompt);
+    const { testo, troncato, problemi, aiStatus } = await generaConControllo(chiedi, prompt, { scadenza: avvio + 45000 });
 
     // Testo troncato (visto l'11/9: "Prossimi Passi" finiva a metà frase) → meglio il testo di riserva.
     if (troncato) throw new Error('testo dell\'AI troncato: troppo lungo');

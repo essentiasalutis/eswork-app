@@ -35,3 +35,18 @@ test('il programma descritto viene dal protocollo', () => {
   assert.ok(t.includes(`${PROTOCOLLO.sedute_per_ciclo} sedute da ${PROTOCOLLO.durata_seduta_min} minuti`));
   assert.ok(t.includes(`${PROTOCOLLO.formazione_moduli_primo_anno} moduli nel primo anno`));
 });
+
+test('sedute divise per tipo di ciclo; senza ciclo noto niente divisione', async () => {
+  const { divisioneSedute } = await import('../lib/regole-report.mjs');
+  const cicli = [{ id: 'c1', cycle_type: 'treatment' }, { id: 'c2', cycle_type: 'prevention' }];
+  const chiusa = '2026-01-01';
+  const d = divisioneSedute([{ cycle_id: 'c1', closed_at: chiusa }, { cycle_id: 'c2', closed_at: chiusa }, { cycle_id: 'c2', closed_at: chiusa }, { cycle_id: 'c2', closed_at: null }], cicli);
+  assert.equal(d.trattamento, 1);
+  assert.equal(d.prevenzione, 2);
+  assert.equal(d.divisibile, true);
+  assert.equal(d.ore(4), 2);
+  // Il difetto del 18/9: sedute senza cycle_id non diventano «trattamento».
+  const senza = divisioneSedute([{ closed_at: chiusa }, { closed_at: chiusa }], cicli);
+  assert.equal(senza.trattamento, 0);
+  assert.equal(senza.divisibile, false);
+});

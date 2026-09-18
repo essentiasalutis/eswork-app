@@ -22,8 +22,9 @@ import { stratificazioneOsservata } from '../../../../lib/scoring';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { kAnonPartition, maskCount, tooSmall, K_ANON } from '../../../../lib/kanon';
 import { PROTOCOLLO } from '../../../../lib/protocollo.mjs';
-import { DEFINIZIONE_LIVELLI, VERSO_DEI_LIVELLI, IDENTITA_PROFESSIONALE, NIENTE_RIFERIMENTI_INVENTATI, programmaPrevisto, divisioneSedute } from '../../../../lib/regole-report.mjs';
+import { DEFINIZIONE_LIVELLI, VERSO_DEI_LIVELLI, IDENTITA_PROFESSIONALE, NIENTE_RIFERIMENTI_INVENTATI, programmaPrevisto, divisioneSedute, rigaFormazione } from '../../../../lib/regole-report.mjs';
 import { controllaTesto, richiestaCorrezione } from '../../../../lib/controllo-report.mjs';
+import { getOrgSessioni } from '../../../../lib/org';
 
 export const config = { maxDuration: 60 };
 
@@ -85,6 +86,7 @@ export default requireAuth(async function handler(req, res) {
   // Ore di intervento osteopatico: sedute chiuse × durata della seduta dal protocollo,
   // divise fra trattamento e prevenzione. Fornite all'AI perché non le stimi (scriveva
   // «50 min/sessione») e non attribuisca al Livello 1 anche le ore di prevenzione.
+  const formazioneTxt = rigaFormazione(await getOrgSessioni(id).catch(() => []));
   const div = divisioneSedute(sessions, tuttiCicli);
   const ore = div.ore;
   const oreSedute = ore(completed);
@@ -234,6 +236,7 @@ DATI ANNO 1 (i valori "n.d." sono soppressi per riservatezza/k-anonymity, < ${K_
 - Sessioni completate/pianificate: ${completed}/${planned}
 - Ore di seduta osteopatica erogate: ${oreSedute} in tutto (${completed} sedute da ${PROTOCOLLO.durata_seduta_min} minuti)${div.divisibile ? `, di cui ${ore(div.trattamento)} di trattamento (${div.trattamento} sedute) e ${ore(div.prevenzione)} di prevenzione (${div.prevenzione} sessioni)` : ''}
 - Persone con un percorso di trattamento avviato: ${inTrattamentoD}; con un percorso di prevenzione avviato: ${inPrevenzioneD}
+${formazioneTxt}
 - Check-up a 12 mesi completati: ${t12.count}
 - Prevalenza osservata a 12 mesi (${t12.t12N} check-up): ${t12.t12Strat}
 - Settore: ${client.sector === 1 ? 'Manifattura' : 'Servizi'}
@@ -277,6 +280,7 @@ Persone seguite dall'osteopata (queste sono le persone in percorso):
 - Con un percorso di trattamento avviato: ${inTrattamentoD}
 - Con un percorso di prevenzione avviato: ${inPrevenzioneD}
 - Sessioni completate/pianificate: ${completed}/${planned}${divisioneTxt}
+${formazioneTxt}
 - Riduzione media NRS per sessione: ${avgDelta} punti
 - Settore: ${client.sector === 1 ? 'Manifattura' : 'Servizi'}
 

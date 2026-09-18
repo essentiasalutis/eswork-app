@@ -50,3 +50,11 @@ test('sedute divise per tipo di ciclo; senza ciclo noto niente divisione', async
   assert.equal(senza.trattamento, 0);
   assert.equal(senza.divisibile, false);
 });
+
+test('formazione già erogata: il prompt lo dice', async () => {
+  const { rigaFormazione } = await import('../lib/regole-report.mjs');
+  const r = rigaFormazione([{ tipo: 'base', stato: 'erogata' }, { tipo: 'ergonomia', stato: 'erogata' }, { tipo: 'base', stato: 'pianificata' }]);
+  assert.ok(r.includes('1 sessioni di formazione già erogate, 1 interventi di ergonomia'));
+  assert.ok(r.includes('GIÀ attiva'));
+  assert.ok(rigaFormazione([]).includes('nessuna sessione ancora erogata'));
+});

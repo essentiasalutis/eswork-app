@@ -92,3 +92,8 @@ test('«in linea con la Stima di investimento» è un fatto, non un paragone inv
   assert.deepEqual(controllaTesto('L\'investimento è in linea con la Stima di investimento presentata.'), []);
   assert.ok(controllaTesto('risultati in linea con il settore').length > 0);
 });
+
+test('«persone attese» del dimensionamento non è un paragone', () => {
+  assert.deepEqual(controllaTesto('Il programma copre 51 persone attese.', { dati: '51 persone attese' }), []);
+  assert.ok(controllaTesto('risultato migliore dell\'atteso').length > 0);
+});

@@ -21,6 +21,7 @@ import { CONFIG_V1 } from '../../../../lib/pricing/v1';
 import { stratificazioneOsservata } from '../../../../lib/scoring';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { kAnonPartition, maskCount, tooSmall, K_ANON } from '../../../../lib/kanon';
+import { DEFINIZIONE_LIVELLI, VERSO_DEI_LIVELLI, IDENTITA_PROFESSIONALE, NIENTE_RIFERIMENTI_INVENTATI } from '../../../../lib/regole-report.mjs';
 
 export const config = { maxDuration: 60 };
 
@@ -70,6 +71,15 @@ export default requireAuth(async function handler(req, res) {
     ? (sessionsWithNrs.reduce((a, s) => a + (s.nrs_pre - s.nrs_post), 0) / sessionsWithNrs.length).toFixed(1)
     : 'n.d.';
 
+  // Chi ha davvero un percorso avviato: i conteggi per livello sono la
+  // classificazione dei dipendenti, non le persone seguite (l'AI scriveva
+  // «105 dipendenti seguiti in prevenzione» leggendo il Livello 2).
+  const tuttiCicli = await getAllCyclesByClient(id).catch(() => []);
+  const personeCon = tipo => new Set((tuttiCicli || []).filter(c => (c.cycle_type || 'treatment') === tipo).map(c => c.patient_id)).size;
+  const conNd = n => { const m = maskCount(n); return m == null ? 'n.d.' : m; };
+  const inTrattamentoD = conNd(personeCon('treatment'));
+  const inPrevenzioneD = conNd(personeCon('prevention'));
+
   const isAnnual = checkpoint === 't12';
   const checkLabel = checkpoint === 't3' ? '3 mesi' : checkpoint === 't6' ? '6 mesi' : '12 mesi (Annuale)';
 
@@ -114,6 +124,7 @@ export default requireAuth(async function handler(req, res) {
   // ── «La fotografia a sei mesi» (solo T6): il questionario è tornato a tutta la
   // popolazione, quindi il confronto con la partenza si può fare davvero.
   let rifotoSection = '';
+  let checkup6 = null; // { compilati, iniziali }: il check-up a sei mesi di TUTTA la popolazione
   if (checkpoint === 't6') {
     try {
       const [assessments, reass6] = await Promise.all([
@@ -124,6 +135,7 @@ export default requireAuth(async function handler(req, res) {
       const t0Answers = t0Ass ? await getResponsesByAssessment(t0Ass.id).catch(() => []) : [];
       const t0 = stratificazioneOsservata(t0Answers);
       const t6 = stratificazioneOsservata((reass6 || []).map(r => r.nmq_data).filter(Boolean));
+      checkup6 = { compilati: t6.n, iniziali: t0.n };
       const pgicVals = (reass6 || []).map(r => r.pgic).filter(v => v != null);
       const migliorati = pgicVals.filter(v => v >= 4).length;
       rifotoSection = sezioneRifotografia({
@@ -214,6 +226,9 @@ DATI ANNO 1 (i valori "n.d." sono soppressi per riservatezza/k-anonymity, < ${K_
 - Prevalenza osservata a 12 mesi (${t12.t12N} check-up): ${t12.t12Strat}
 - Settore: ${client.sector === 1 ? 'Manifattura' : 'Servizi'}
 
+${DEFINIZIONE_LIVELLI}
+${VERSO_DEI_LIVELLI}
+
 STRUTTURA (markdown, ## per titoli):
 
 ## Sintesi dei risultati a 12 mesi
@@ -234,24 +249,34 @@ IMPORTANTE: riporta le percentuali di prevalenza ESATTAMENTE come indicate sopra
 (3-4 azioni: mantenimento, prevenzione L2, formazione avanzata)
 
 ${t12.count === 0 ? 'NOTA: nessun check-up a 12 mesi ancora registrato — segnala che i KPI di esito saranno disponibili al completamento dei check-up.' : ''}
+${IDENTITA_PROFESSIONALE}
+${NIENTE_RIFERIMENTI_INVENTATI}
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
 Tono: clinico, orientato ai risultati e alla direzione. Italiano. Max 650 parole.` : `Sei un consulente clinico ES Work. Genera un Report Intermedio professionale a ${checkLabel} per un'azienda cliente.
 
 DATI CLINICI (i valori "n.d." sono soppressi per riservatezza/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
-- Pazienti L1 (${nomeLivello('level1').toLowerCase()}): ${l1d}
-- Pazienti L2 (${nomeLivello('level2').toLowerCase()}): ${l2d}
-- Pazienti L3 (${nomeLivello('level3').toLowerCase()}): ${l3d}
+Distribuzione ATTUALE dei dipendenti per livello (è una classificazione, NON il numero di persone seguite in un percorso):
+- Livello 1 (${nomeLivello('level1').toLowerCase()}): ${l1d}
+- Livello 2 (${nomeLivello('level2').toLowerCase()}): ${l2d}
+- Livello 3 (${nomeLivello('level3').toLowerCase()}): ${l3d}
+Persone seguite dall'osteopata (queste sono le persone in percorso):
+- Con un percorso di trattamento avviato: ${inTrattamentoD}
+- Con un percorso di prevenzione avviato: ${inPrevenzioneD}
 - Sessioni completate/pianificate: ${completed}/${planned}
 - Riduzione media NRS per sessione: ${avgDelta} punti
 - Settore: ${client.sector === 1 ? 'Manifattura' : 'Servizi'}
 
-MINI-CHECK ${checkpoint.toUpperCase()} (questionari compilati dai dipendenti a ${checkLabel}):
+MINI-CHECK ${checkpoint.toUpperCase()} — breve questionario inviato SOLO a chi ha avviato un percorso con l'osteopata, a ${checkpoint === 't6' ? '180' : '90'} giorni dall'inizio del suo primo percorso. NON va a tutta la popolazione e NON è il check-up: il numero di compilati dipende da quanti percorsi sono partiti da almeno ${checkpoint === 't6' ? 'sei' : 'tre'} mesi, NON misura l'adesione dei dipendenti.
 ${mc.smallGroup ? `- Spaccato mini-check non pubblicabile: meno di ${K_ANON} compilati (tutela della riservatezza).` : `- Compilati: ${mc.count}
 - NRS medio dichiarato: ${mc.avgNrs}
 ${mc.limitationsPct != null ? `- Con limitazioni funzionali: ${mc.limitationsPct}%` : ''}
 - Richiedono contatto: ${mc.wantsContact} (triage: ${mc.needsContact} da ricontattare)`}
 ${mc.count === 0 ? 'NOTA: nessun mini-check ancora compilato — segnala che i KPI di percezione arriveranno coi questionari.' : ''}
+${checkup6 ? `CHECK-UP A SEI MESI (tutta la popolazione, stesse domande del check-up iniziale): ${checkup6.compilati} compilati, a fronte di ${checkup6.iniziali} al check-up iniziale. È QUESTO il dato di adesione a sei mesi; il confronto è già scritto dal sistema nella sezione «La fotografia a sei mesi».
+` : ''}
+${DEFINIZIONE_LIVELLI}
+${VERSO_DEI_LIVELLI}
 
 STRUTTURA REPORT (markdown, ## per titoli):
 
@@ -259,7 +284,7 @@ STRUTTURA REPORT (markdown, ## per titoli):
 (3-4 punti chiave di rilievo clinico e operativo)
 
 ## KPI Clinici
-(tabella o lista strutturata: sessioni, NRS sedute, mini-check ${checkpoint.toUpperCase()} con NRS dichiarato e limitazioni, pazienti per livello)
+(tabella o lista strutturata: sessioni, NRS sedute, persone in percorso, mini-check ${checkpoint.toUpperCase()} con NRS dichiarato e limitazioni, distribuzione per livello)
 
 ## Trend e Analisi
 (andamento NRS, compliance pazienti, situazioni da monitorare)
@@ -272,7 +297,9 @@ STRUTTURA REPORT (markdown, ## per titoli):
 
 ${checkpoint === 't6' ? `FOTOGRAFIA (tassativo): il confronto fra il check-up iniziale e quello dei sei mesi è già scritto dal sistema nella sezione «La fotografia a sei mesi», con le sue cautele sulla rappresentatività. NON duplicarlo, NON ricalcolare le percentuali e NON presentarlo come un risultato clinico dimostrato.
 ` : ''}${checkpoint === 't3' ? `MOVIMENTO (tassativo): il racconto di cosa si è mosso in questi tre mesi — percorsi avviati e conclusi, sedute, prevenzione, segnalazioni, nuovi ingressi, distribuzione attuale — è già scritto dal sistema nella sezione «Il movimento dei primi 3 mesi». NON duplicarlo e NON riscriverne i numeri. In particolare NON affermare che la distribuzione attuale derivi da un nuovo questionario: a tre mesi nessuno ricompila nulla.
-` : ''}LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
+` : ''}${IDENTITA_PROFESSIONALE}
+${NIENTE_RIFERIMENTI_INVENTATI}
+LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
 Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
 
@@ -457,7 +484,7 @@ Nessuna criticità operativa rilevante da segnalare in questa fase.
 ## Prossimi Passi
 
 1. Continuazione sportello osteopatico per pazienti L1 in corso
-2. Mini-check ${checkpoint === 't3' ? 'T6' : 'T12'} per tutti i dipendenti L2/L3
+2. Check-up ${checkpoint === 't3' ? 'a sei mesi' : 'annuale'} per tutti i dipendenti, con le stesse domande del check-up iniziale
 3. Review clinica con report intermedio aggiornato
 4. Valutazione candidati per ri-stratificazione L2→L1`;
 }

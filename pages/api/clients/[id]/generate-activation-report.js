@@ -1,3 +1,4 @@
+import { DEFINIZIONE_LIVELLI, IDENTITA_PROFESSIONALE } from '../../../../lib/regole-report.mjs';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireAuth } from '../../../../lib/auth';
 import {
@@ -158,11 +159,7 @@ STATO DEL PROGRAMMA: ${firmato ? 'attivo (contratto firmato)' : 'PROPOSTO (contr
 STRATIFICAZIONE (${stratTotal} questionari compilati):
 ${stratLines(l1Count, l2Count, l3Count, stratTotal)}
 
-DEFINIZIONE DEI LIVELLI (tassativa — NON invertirla, NON reinterpretarla):
-- Livello 1 = dolore in atto CON impatto funzionale. È il gruppo più critico, quello che necessita trattamento osteopatico individuale.
-- Livello 2 = dolore in atto SENZA impatto funzionale. Prevenzione attiva.
-- Livello 3 = nessun dolore in atto. Formazione collettiva su postura ed ergonomia.
-NON esiste una scala "rischio basso/medio/alto": non usarla e non invertire l'ordine. Se citi una priorità, la priorità clinica è il Livello 1.
+${DEFINIZIONE_LIVELLI}
 
 NOTA PRIVACY: dove un gruppo è "n.d." è stato soppresso per riservatezza (k-anonymity). NON dedurre, stimare o ricostruire i valori soppressi. ATTENZIONE: un gruppo può risultare soppresso ANCHE se conta ${K_ANON} persone o più — è la soppressione secondaria, che impedisce di ricavarlo per differenza dagli altri. Quindi NON affermare che i gruppi soppressi siano "inferiori a ${K_ANON}": di' solo che non sono pubblicabili per tutela della riservatezza. I dati dei dipendenti si dicono RISERVATI, mai «anonimi»: il dato individuale esiste ed è protetto.
 ${clinicoBlock}
@@ -254,7 +251,7 @@ ${isPacchetto
   ? '(SOLO gli step del pacchetto: restituzione dei risultati alla direzione, formazione collettiva, sopralluogo ergonomico e conferma delle postazioni, consulenza ergonomico-posturale; NIENTE monitoraggio, follow-up clinici o trattamenti)'
   : '(5 step operativi con timeframe indicativo)'}
 ${parametriOperativi}${vincoliV2}${istruzioniPacchetto}
-${firmato ? '' : 'STATO (tassativo): il contratto NON è ancora firmato, questo report PROPONE il programma. VIETATO scrivere che il programma è stato attivato, avviato, erogato o che è operativo, e VIETATO citare sessioni già svolte: scrivi «programma proposto», «si propone di attivare».\n'}IDENTITÀ PROFESSIONALE (tassativa): il servizio è OSTEOPATICO. Usa sempre "osteopata", "trattamento osteopatico", "sportello osteopatico". VIETATO "fisioterapista", "fisioterapico", "riabilitativo/riabilitazione" e ogni termine fisioterapico riferito al nostro servizio. VIETATO anche presentare il servizio come atto medico o come medicina del lavoro: mai "medicina osteopatica", "medico", "sanitario", "medicina del lavoro", "sorveglianza sanitaria" riferiti a noi. La sorveglianza sanitaria resta del Medico Competente aziendale; noi siamo un programma osteopatico di prevenzione e trattamento, distinto e complementare.
+${firmato ? '' : 'STATO (tassativo): il contratto NON è ancora firmato, questo report PROPONE il programma. VIETATO scrivere che il programma è stato attivato, avviato, erogato o che è operativo, e VIETATO citare sessioni già svolte: scrivi «programma proposto», «si propone di attivare».\n'}${IDENTITA_PROFESSIONALE}
 RISULTATI CLINICI (tassativo): MAI promettere risultati clinici — niente «risolvere», «eliminare», «guarire» il dolore o la sintomatologia. Il programma promette presa in carico e misura: scrivi «trattare», «prendere in carico», «monitorare».
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.${sezioneComprende ? '\nCOMPONENTI: NON scrivere una sezione con l\'elenco delle componenti del programma né le loro quantità (niente «Cosa include» / «Cosa comprende»): la inserisce il sistema con i testi approvati.' : ''}

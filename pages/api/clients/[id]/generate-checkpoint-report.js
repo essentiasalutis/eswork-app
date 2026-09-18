@@ -21,6 +21,7 @@ import { CONFIG_V1 } from '../../../../lib/pricing/v1';
 import { stratificazioneOsservata } from '../../../../lib/scoring';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { kAnonPartition, maskCount, tooSmall, K_ANON } from '../../../../lib/kanon';
+import { PROTOCOLLO } from '../../../../lib/protocollo.mjs';
 import { DEFINIZIONE_LIVELLI, VERSO_DEI_LIVELLI, IDENTITA_PROFESSIONALE, NIENTE_RIFERIMENTI_INVENTATI } from '../../../../lib/regole-report.mjs';
 
 export const config = { maxDuration: 60 };
@@ -79,6 +80,10 @@ export default requireAuth(async function handler(req, res) {
   const conNd = n => { const m = maskCount(n); return m == null ? 'n.d.' : m; };
   const inTrattamentoD = conNd(personeCon('treatment'));
   const inPrevenzioneD = conNd(personeCon('prevention'));
+
+  // Ore di intervento osteopatico: sedute chiuse × durata della seduta dal protocollo.
+  // Fornite all'AI perché non le stimi (scriveva «50 min/sessione»).
+  const oreSedute = Math.round(completed * PROTOCOLLO.durata_seduta_min / 60);
 
   const isAnnual = checkpoint === 't12';
   const checkLabel = checkpoint === 't3' ? '3 mesi' : checkpoint === 't6' ? '6 mesi' : '12 mesi (Annuale)';
@@ -222,6 +227,8 @@ export default requireAuth(async function handler(req, res) {
 DATI ANNO 1 (i valori "n.d." sono soppressi per riservatezza/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
 - Prevalenza osservata all'intake (${t12.t0N} risposte T0): ${t12.t0Strat}
 - Sessioni completate/pianificate: ${completed}/${planned}
+- Ore di seduta osteopatica erogate: ${oreSedute} (${completed} sedute da ${PROTOCOLLO.durata_seduta_min} minuti)
+- Persone con un percorso di trattamento avviato: ${inTrattamentoD}; con un percorso di prevenzione avviato: ${inPrevenzioneD}
 - Check-up a 12 mesi completati: ${t12.count}
 - Prevalenza osservata a 12 mesi (${t12.t12N} check-up): ${t12.t12Strat}
 - Settore: ${client.sector === 1 ? 'Manifattura' : 'Servizi'}
@@ -238,12 +245,12 @@ STRUTTURA (markdown, ## per titoli):
 Presenta in tabella i tre indicatori v4:
 1. **Riduzione del dolore** — riduzione media NRS per sessione: ${avgDelta} punti.
 2. **Miglioramento percepito (PGIC)** — PGIC medio ${t12.avgPgic}/5${t12.improvedPct != null ? `, ${t12.improvedPct}% dei dipendenti rivalutati riporta un miglioramento (PGIC 4-5)` : ''}.
-3. **Variazione della prevalenza L1** — prevalenza L1 OSSERVATA (stessa strumentazione ai due capi): dal ${t12.t0L1} all'intake al ${t12.t12L1} a 12 mesi${t12.kpiDeltaLabel}. NON confrontare conteggi grezzi (coorti T0/T12 di numerosità diversa: ${t12.t0N} vs ${t12.t12N}).
+3. **Variazione della prevalenza L1** — prevalenza L1 OSSERVATA (stessa strumentazione ai due capi): dal ${t12.t0L1} all'intake al ${t12.t12L1} a 12 mesi${t12.kpiDeltaLabel}. NON confrontare conteggi grezzi (coorti T0/T12 di numerosità diversa: ${t12.t0N} vs ${t12.t12N}). Le due coorti sono IN PARTE DIVERSE anche quando hanno la stessa numerosità: VIETATO scrivere che è «la stessa coorte» o che una quota di persone è «transitata» da un livello all'altro.
 
 IMPORTANTE: riporta le percentuali di prevalenza ESATTAMENTE come indicate sopra (${t12.t0L1} all'intake, ${t12.t12L1} a 12 mesi); non ricalcolarle né arrotondarle diversamente. Il commento prima/dopo è già fornito nella sezione "L'andamento del programma" più sotto: NON duplicarlo.
 
 ## Documentazione INAIL OT23
-(elementi per la richiesta di riduzione del tasso: interventi erogati, dipendenti coinvolti, ore, monitoraggio continuo)
+(elementi per la richiesta di riduzione del tasso: interventi erogati, dipendenti coinvolti, ore — SOLO il valore fornito sopra —, monitoraggio continuo)
 
 ## Raccomandazioni per l'Anno 2
 (3-4 azioni: mantenimento, prevenzione L2, formazione avanzata)

@@ -79,6 +79,8 @@ export default async function handler(req, res) {
       data: s.date, numero: s.session_number,
       nrs_pre: s.nrs_pre, nrs_post: s.nrs_post,
       note_trattamento: s.treatment_notes,
+      // Anche le indicazioni per la seduta successiva sono dati sulla persona (Enrico, 18/9).
+      indicazioni_prossima_seduta: s.next_session_notes || null,
     })),
     cicli: (cycles || []).map(c => ({
       numero: c.cycle_number, tipo: c.cycle_type, stato: c.status,

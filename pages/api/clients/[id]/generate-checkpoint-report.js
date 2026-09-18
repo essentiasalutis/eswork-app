@@ -63,7 +63,8 @@ export default requireAuth(async function handler(req, res) {
   const stratTotal = l1 + l2 + l3;
   const stratP = tooSmall(stratTotal) ? null
     : Object.fromEntries(kAnonPartition([{ key: 'l1', count: l1 }, { key: 'l2', count: l2 }, { key: 'l3', count: l3 }], stratTotal).map(c => [c.key, c]));
-  const ld = k => (!stratP || stratP[k].suppressed) ? `n.d.` : String(stratP[k].count);
+  // Conteggio e percentuale già calcolati: l'AI le calcolava da sé (15 su 228 = «6,6%»).
+  const ld = k => (!stratP || stratP[k].suppressed) ? `n.d.` : `${stratP[k].count} (${stratP[k].pct}%)`;
   const l1d = ld('l1'), l2d = ld('l2'), l3d = ld('l3');
 
   // sessione "completata" = chiusa (la tabella sessions usa closed_at, non status)
@@ -273,7 +274,7 @@ CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fond
 Tono: clinico, orientato ai risultati e alla direzione. Italiano. Max 650 parole.` : `Sei un consulente clinico ES Work. Genera un Report Intermedio professionale a ${checkLabel} per un'azienda cliente.
 
 DATI CLINICI (i valori "n.d." sono soppressi per riservatezza/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
-Distribuzione ATTUALE dei dipendenti per livello (è una classificazione, NON il numero di persone seguite in un percorso):
+Distribuzione ATTUALE dei dipendenti per livello, su ${stratTotal} dipendenti (è una classificazione, NON il numero di persone seguite in un percorso):
 - Livello 1 (${nomeLivello('level1').toLowerCase()}): ${l1d}
 - Livello 2 (${nomeLivello('level2').toLowerCase()}): ${l2d}
 - Livello 3 (${nomeLivello('level3').toLowerCase()}): ${l3d}

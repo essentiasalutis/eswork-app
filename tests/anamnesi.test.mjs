@@ -71,3 +71,31 @@ test('il modulo intero, con l\'età come numero, integra solo ciò che cambia', 
   assert.equal(r.ok, true);
   assert.deepEqual(r.righe.map(x => x.campo), ['pain_location']);
 });
+
+test('copia per il dipendente: dichiarato da lui, integrato dall\'osteopata con nome, data e motivo', async () => {
+  const { anamnesiPerInteressato } = await import('../lib/anamnesi.mjs');
+  const doc = { type: 'anamnesi', status: 'completed', signed_at: '2025-10-06T08:30:00Z', modalita: 'piattaforma', form_data: { pain_location: 'Collo', job_activity: 'Magazziniere' }, pro_notes: 'Test di Spurling negativo' };
+  const integrazioni = [
+    { id: 'a', campo: 'pain_location', valore_prima: 'Collo', valore_dopo: 'Collo e spalla destra', motivo: 'Riferito in seduta', creato_il: '2026-09-18T13:36:00Z', osteopata: 'Mario Rossi', gruppo: 'g1' },
+    { id: 'b', campo: 'job_activity', valore_prima: 'Magazziniere', valore_dopo: '', motivo: 'Dichiarato per errore', creato_il: '2026-09-18T13:40:00Z', osteopata: 'Mario Rossi', gruppo: 'g2' },
+  ];
+  const a = anamnesiPerInteressato(doc, integrazioni);
+  assert.equal(a.firmata_il, '06/10/2025');
+  const orig = Object.fromEntries(a.originale_firmato.map(v => [v.voce, v]));
+  assert.equal(orig['Zona / sede del dolore'].valore, 'Collo');
+  assert.match(orig['Zona / sede del dolore'].fonte, /dichiarato da te/);
+  assert.match(orig['Note cliniche del professionista'].fonte, /scritto dall'osteopata/, 'le note del professionista incluse, e non attribuite al paziente');
+  const corr = Object.fromEntries(a.versione_corrente.map(v => [v.voce, v]));
+  assert.equal(corr['Zona / sede del dolore'].valore, 'Collo e spalla destra');
+  assert.match(corr['Zona / sede del dolore'].fonte, /integrato dall'osteopata Mario Rossi il 18\/09\/2026.*Riferito in seduta.*nell'originale: Collo/);
+  assert.equal(corr['Mansione / attività svolta'].valore, 'campo svuotato');
+  assert.match(corr['Mansione / attività svolta'].fonte, /rimosso.*nell'originale: Magazziniere/);
+  assert.equal(a.integrazioni_successive_alla_firma.length, 2);
+  assert.equal(a.integrazioni_successive_alla_firma[1].dopo, 'campo svuotato');
+});
+
+test('senza anamnesi firmata la copia non la inventa', async () => {
+  const { anamnesiPerInteressato } = await import('../lib/anamnesi.mjs');
+  assert.equal(anamnesiPerInteressato(null, []), null);
+  assert.equal(anamnesiPerInteressato({ type: 'anamnesi', status: 'draft' }, []), null);
+});

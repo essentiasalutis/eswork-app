@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { applicaValidazione, isValidato, rigaValidazione, testoConValidazione } from '../lib/validazione.js';
 
-const CHI = 'Dott. Enrico Maiolo (osteopata)';
+const CHI = 'Dott. Enrico Maiolo, osteopata, responsabile clinico del programma';
 const QUANDO = '2026-09-12T10:00:00.000Z';
 
 test('validare scrive chi e quando, e apre la sequenza', () => {
@@ -32,8 +32,8 @@ test('non si valida due volte e non si revoca ciò che non è validato', () => {
 
 test('la riga si ferma al fatto: chi e quando', () => {
   const rec = { validato_da: CHI, validato_il: QUANDO };
-  assert.equal(rigaValidazione(rec), `Validato da ${CHI} il 12 settembre 2026.`);
-  assert.ok(!/responsabilità/i.test(rigaValidazione(rec)), 'nessuna assunzione di responsabilità dichiarata');
+  assert.equal(rigaValidazione(rec), 'Validato da Dott. Enrico Maiolo, osteopata, responsabile clinico del programma, il 12 settembre 2026.');
+  assert.ok(!/assume|responsabilità/i.test(rigaValidazione(rec)), 'il ruolo sì, nessuna formula di assunzione di responsabilità');
   assert.equal(rigaValidazione({}), null);
 });
 
@@ -43,5 +43,10 @@ test('il testo porta la riga solo se il registro lo conferma', () => {
   assert.ok(!isValidato({}));
   const conRiga = testoConValidazione(testo, { validato_da: CHI, validato_il: QUANDO });
   assert.ok(conRiga.startsWith(testo), 'il testo salvato non si riscrive');
-  assert.ok(conRiga.includes(`*Validato da ${CHI} il 12 settembre 2026.*`));
+  assert.ok(conRiga.includes(`*Validato da ${CHI}, il 12 settembre 2026.*`));
+});
+
+test('chi valida viene dal codice, con il ruolo', async () => {
+  const { VALIDATORE } = await import('../lib/validazione.js');
+  assert.equal(VALIDATORE, 'Dott. Enrico Maiolo, osteopata, responsabile clinico del programma');
 });

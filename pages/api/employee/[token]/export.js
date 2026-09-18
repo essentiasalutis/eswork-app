@@ -10,7 +10,11 @@ import {
   getReassessmentT12ByPatient,
   getConsentByPatient,
   getDataRequestsByPatient,
+  getPatientDocuments,
+  getIntegrazioniAnamnesi,
+  getProfessionals,
 } from '../../../../lib/store';
+import { anamnesiPerInteressato } from '../../../../lib/anamnesi.mjs';
 import { limiteAreaPersonale } from '../../../../lib/employee-guard';
 import { giornoIt } from '../../../../lib/date-it.mjs';
 
@@ -31,6 +35,22 @@ export default async function handler(req, res) {
     getConsentByPatient(patient.id).catch(() => null),
     getDataRequestsByPatient(patient.id).catch(() => []),
   ]);
+
+  // Anamnesi (18/9): originale firmato + integrazioni dell'osteopata, con nome, data e
+  // motivo. Se una delle due letture fallisce l'anamnesi NON esce a metà: senza le
+  // integrazioni sembrerebbe l'originale, o l'originale sembrerebbe la versione attuale.
+  let anamnesi = null;
+  try {
+    const docs = await getPatientDocuments(patient.id);
+    const doc = docs.find(d => d.type === 'anamnesi');
+    if (doc) {
+      const [righe, pro] = await Promise.all([getIntegrazioniAnamnesi(patient.id), getProfessionals().catch(() => [])]);
+      const nomi = Object.fromEntries((pro || []).map(p => [p.id, p.name]));
+      anamnesi = anamnesiPerInteressato(doc, righe.map(r => ({ ...r, osteopata: nomi[r.professional_id] || 'osteopata' })));
+    }
+  } catch (e) {
+    anamnesi = { non_disponibile: 'Non è stato possibile leggere l\'anamnesi completa in questo momento: riprova più tardi.' };
+  }
 
   const copia = {
     documento: 'Copia dei dati personali — ES Work (Essentia Salutis)',
@@ -54,6 +74,7 @@ export default async function handler(req, res) {
       versione_informativa: consent.informativa_version,
       registrato_il: consent.created_at,
     } : null,
+    anamnesi,
     sedute: (sessions || []).map(s => ({
       data: s.date, numero: s.session_number,
       nrs_pre: s.nrs_pre, nrs_post: s.nrs_post,

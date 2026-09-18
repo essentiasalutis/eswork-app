@@ -1,14 +1,13 @@
 // POST /api/clients/[id]/reports/[reportId]/valida → { azione: 'valida' | 'revoca' }
 //
 // La validazione professionale di un report è un FATTO REGISTRATO (v60): chi e quando.
-// Il testo salvato non si riscrive — la riga «Validato da … il …» viene aggiunta quando
+// Il testo salvato non si riscrive — la riga «Validato da …, il …» viene aggiunta quando
 // il documento si stampa — ma il PDF sì: è l'unico artefatto che esce dalla piattaforma,
 // e se dicesse cose diverse dal registro il registro non servirebbe a niente (Enrico, 12/9).
 import { requireAuth } from '../../../../../../lib/auth';
 import { getClientById, getGeneratedReportById, updateGeneratedReport, insertDocument } from '../../../../../../lib/store';
 import { generateAndStorePdf, buildReportHtml } from '../../../../../../lib/pdf';
-import { getPricingSettingsV2 } from '../../../../../../lib/pricing/settings';
-import { applicaValidazione, testoConValidazione, VALIDATORE_DEFAULT } from '../../../../../../lib/validazione';
+import { applicaValidazione, testoConValidazione, VALIDATORE } from '../../../../../../lib/validazione';
 
 export const config = { maxDuration: 60 };
 
@@ -21,8 +20,8 @@ export default requireAuth(async function handler(req, res) {
   const rec = await getGeneratedReportById(reportId);
   if (!rec || rec.client_id !== id) return res.status(404).json({ error: 'Report non trovato' });
 
-  let nome = VALIDATORE_DEFAULT;
-  try { const { texts } = await getPricingSettingsV2(); if (texts && texts.validatore_nome) nome = texts.validatore_nome; } catch (_) {}
+  // Chi valida: solo dal codice (lib/validazione.js), non più dal Listino (18/9).
+  const nome = VALIDATORE;
 
   const patch = applicaValidazione(rec, { azione, chi: nome });
   if (!patch) return res.status(409).json({ error: azione === 'valida' ? 'Report già validato' : 'Report non validato' });

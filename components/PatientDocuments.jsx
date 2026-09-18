@@ -584,8 +584,8 @@ function anamnesiFormFields({ f, upd, nrsTouched, setNrsTouched, proNotes, setPr
 
       <div style={{ background: '#fef9c3', border: '1px solid #fde68a', borderRadius: 10, padding: '14px', marginTop: 8 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 4 }}>📝 Note cliniche del professionista</div>
-        <div style={{ fontSize: 11, color: '#78350f', marginBottom: 8 }}>Test funzionali, valutazione posturale, palpazione. Non visibili al paziente.</div>
-        <textarea style={TS} rows={3} value={proNotes} onChange={e => setProNotes(e.target.value)} placeholder="Note riservate…" />
+        <div style={{ fontSize: 11, color: '#78350f', marginBottom: 8 }}>Test funzionali, valutazione posturale, palpazione. Il paziente può riceverle se richiede copia dei suoi dati.</div>
+        <textarea style={TS} rows={3} value={proNotes} onChange={e => setProNotes(e.target.value)} placeholder="Test funzionali, valutazione posturale…" />
       </div>
     </>
   );

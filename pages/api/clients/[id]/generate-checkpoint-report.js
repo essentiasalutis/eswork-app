@@ -84,6 +84,9 @@ export default requireAuth(async function handler(req, res) {
   const conNd = n => { const m = maskCount(n); return m == null ? 'n.d.' : m; };
   const inTrattamentoD = conNd(personeCon('treatment'));
   const inPrevenzioneD = conNd(personeCon('prevention'));
+  // Totale SENZA doppi conteggi: chi ha fatto trattamento e prevenzione conta una volta
+  // (l'AI sommava i due numeri).
+  const seguitiD = conNd(new Set((tuttiCicli || []).map(c => c.patient_id)).size);
 
   // Ore di intervento osteopatico: sedute chiuse × durata della seduta dal protocollo,
   // divise fra trattamento e prevenzione. Fornite all'AI perché non le stimi (scriveva
@@ -237,7 +240,7 @@ DATI ANNO 1 (i valori "n.d." sono soppressi per riservatezza/k-anonymity, < ${K_
 - Prevalenza osservata all'intake (${t12.t0N} risposte T0): ${t12.t0Strat}
 - Sessioni completate/pianificate: ${completed}/${planned}
 - Ore di seduta osteopatica erogate: ${oreSedute} in tutto (${completed} sedute da ${PROTOCOLLO.durata_seduta_min} minuti)${div.divisibile ? `, di cui ${ore(div.trattamento)} di trattamento (${div.trattamento} sedute) e ${ore(div.prevenzione)} di prevenzione (${div.prevenzione} sessioni)` : ''}
-- Persone con un percorso di trattamento avviato: ${inTrattamentoD}; con un percorso di prevenzione avviato: ${inPrevenzioneD}
+- Persone con un percorso di trattamento avviato: ${inTrattamentoD}; con un percorso di prevenzione avviato: ${inPrevenzioneD}; persone seguite in tutto (chi ha avuto entrambi i percorsi conta una volta): ${seguitiD}
 ${formazioneTxt}
 - Check-up a 12 mesi completati: ${t12.count}
 - Prevalenza osservata a 12 mesi (${t12.t12N} check-up): ${t12.t12Strat}
@@ -281,6 +284,7 @@ Distribuzione ATTUALE dei dipendenti per livello, su ${stratTotal} dipendenti (�
 Persone seguite dall'osteopata (queste sono le persone in percorso):
 - Con un percorso di trattamento avviato: ${inTrattamentoD}
 - Con un percorso di prevenzione avviato: ${inPrevenzioneD}
+- Persone seguite in tutto (chi ha avuto entrambi i percorsi conta una volta): ${seguitiD}
 - Sessioni completate/pianificate: ${completed}/${planned}${divisioneTxt}
 ${formazioneTxt}
 - Riduzione media NRS per sessione: ${avgDelta} punti

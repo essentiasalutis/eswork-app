@@ -1,5 +1,6 @@
 import { requireProAuth } from '../../../../../lib/pro-auth';
-import { upsertPatientDocument, getPatientById, proCanAccessPatientClinical, logAccess } from '../../../../../lib/store';
+import { upsertPatientDocument, getPatientById, getPatientDocuments, proCanAccessPatientClinical, logAccess } from '../../../../../lib/store';
+import { anamnesiGiaCompilata } from '../../../../../lib/anamnesi.mjs';
 import { hashIp, hashContent } from '../../../../../lib/crypto-utils';
 import { getClientIp } from '../../../../../lib/rate-limit';
 import { testoAccettabile, registraConsensoSoggetto } from '../../../../../lib/testi-legali-server';
@@ -62,6 +63,11 @@ export default requireProAuth(async function handler(req, res) {
       file_path: null, file_mime: null, file_bytes: null, file_impronta: null, caricato_il: null,
     };
 
+    // Una nuova firma dei consensi (per esempio su una nuova versione) NON riscrive
+    // l'anamnesi già compilata: resta l'originale con la sua firma (lib/anamnesi.mjs).
+    const esistenti = await getPatientDocuments(patientId);
+    const anamnesiEsistente = anamnesiGiaCompilata(esistenti) ? esistenti.find(d => d.type === 'anamnesi') : null;
+
     const [docConsent, docPrivacy, docAnamnesi] = await Promise.all([
       upsertPatientDocument(patientId, client_id, 'consent_treatment', {
         ...base,
@@ -77,7 +83,7 @@ export default requireProAuth(async function handler(req, res) {
         testo_legale_id: tInformativa.id,
         versione:     tInformativa.versione,
       }),
-      upsertPatientDocument(patientId, client_id, 'anamnesi', {
+      anamnesiEsistente ? Promise.resolve(anamnesiEsistente) : upsertPatientDocument(patientId, client_id, 'anamnesi', {
         ...base,
         status:       'completed',
         form_data,

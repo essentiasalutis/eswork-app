@@ -3,6 +3,7 @@ import SignatureCanvas from './SignatureCanvas';
 import { documentiMancanti, documentoValido } from '../lib/documenti-seduta.mjs';
 import CopiaCartacea from './CopiaCartacea';
 import { dataIt } from '../lib/date-it.mjs';
+import { MESSAGGIO_BLOCCO_ANAMNESI } from '../lib/anamnesi.mjs';
 // I testi da firmare arrivano dall'ARCHIVIO (prop `testi`, caricata lato server):
 // nessuna copia nel codice. Alla firma si rimandano solo i loro identificativi.
 
@@ -162,12 +163,15 @@ export default function PatientDocuments({ patientId, clientId, patient, documen
           <div style={{ fontSize: 15, fontWeight: 700, color: '#15803d' }}>
             ✅ Documenti firmati il {anchor?.signed_at ? dataIt(anchor.signed_at) : '—'}
           </div>
-          <button
-            onClick={() => { setEditingAnamnesi(true); setOpen(p => ({ ...p, anamnesi: true })); }}
-            style={{ fontSize: 12, fontWeight: 600, color: '#0369a1', background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: 8, padding: '5px 12px', cursor: 'pointer' }}
+          {/* Spento il 18/9: sovrascriveva l'anamnesi firmata (lib/anamnesi.mjs). */}
+          <button disabled title={MESSAGGIO_BLOCCO_ANAMNESI}
+            style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 8, padding: '5px 12px', cursor: 'not-allowed' }}
           >
             ✏️ Modifica anamnesi
           </button>
+        </div>
+        <div style={{ fontSize: 12, color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>
+          {MESSAGGIO_BLOCCO_ANAMNESI}
         </div>
         {[
           { type: 'consent_treatment', label: '📋 Consenso informato al trattamento osteopatico' },

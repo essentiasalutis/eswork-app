@@ -9,6 +9,7 @@ import {
 import { hashIp, hashContent } from '../../../../../lib/crypto-utils';
 import { getClientIp } from '../../../../../lib/rate-limit';
 import { vistaDocumentoPaziente } from '../../../../../lib/vista';
+import { anamnesiGiaCompilata, MESSAGGIO_BLOCCO_ANAMNESI } from '../../../../../lib/anamnesi.mjs';
 
 // GET  /api/pro/patients/documents?patientId=xxx
 // POST /api/pro/patients/documents — aggiorna l'anamnesi (i consensi: solo /bulk)
@@ -48,6 +49,11 @@ export default requireProAuth(async function handler(req, res) {
         return res.status(400).json({ error: 'Da qui si aggiorna solo l\'anamnesi: i consensi si firmano con la firma cumulativa.' });
       }
       if (!form_data || typeof form_data !== 'object') return res.status(400).json({ error: 'dati anamnesi obbligatori' });
+      // Solo la PRIMA compilazione (consensi su carta, anamnesi mancante). Un'anamnesi
+      // già compilata non si sovrascrive (lib/anamnesi.mjs, Enrico 18/9).
+      if (anamnesiGiaCompilata(await getPatientDocuments(patientId))) {
+        return res.status(409).json({ error: MESSAGGIO_BLOCCO_ANAMNESI });
+      }
 
       const ip = getClientIp(req);
       const now = new Date().toISOString();

@@ -275,7 +275,7 @@ export default function ClientPage({ dipInForza = 0, client: initialClient, asse
       const data = await res.json();
       if (data.report) {
         const title = type === 'activation' ? 'Report di Attivazione' : type === 't12' ? 'Report Annuale (12 mesi)' : `Report Intermedio ${type.toUpperCase()}`;
-        setReportModal({ id: data.report_id, title, content: data.report, source: data.source, ai_status: data.ai_status, pdf_url: data.pdf_url, dateStr: dataIt(new Date()) });
+        setReportModal({ id: data.report_id, title, content: data.report, source: data.source, ai_status: data.ai_status, problemi: data.problemi || [], pdf_url: data.pdf_url, dateStr: dataIt(new Date()) });
         setGeneratedReports(prev => [{ id: data.report_id || Date.now(), report_type: type === 'activation' ? 'activation' : `checkpoint_${type}`, created_at: new Date().toISOString(), pdf_url: data.pdf_url, content_text: data.report, ai_status: data.ai_status }, ...prev]);
       }
     } catch {}
@@ -285,6 +285,9 @@ export default function ClientPage({ dipInForza = 0, client: initialClient, asse
   // Perché un report ha il testo di riserva (v57). I record vecchi non hanno il valore:
   // in quel caso non si mostra nulla, non si indovina.
   function badgeAiStatus(stato, { conAi = false } = {}) {
+    if (stato === 'ai_da_rivedere') {
+      return <span title="Testo dell'AI che non ha superato il controllo automatico nemmeno dopo la riscrittura: va riletto prima di validarlo." className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">⚠ da rivedere</span>;
+    }
     if (stato === 'ai') {
       return conAi ? <span title="Testo generato dall'AI: i dati sono usciti verso Anthropic (Stati Uniti)." className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">✦ AI</span> : null;
     }
@@ -1705,6 +1708,12 @@ ${FIRMA}`,
             </button>
             <button onClick={() => setReportModal(null)} className="text-gray-400 hover:text-gray-600 text-xl px-2">✕</button>
           </div>
+          {(reportModal.problemi || []).length > 0 && (
+            <div role="alert" className="px-4 py-2.5 border-b border-amber-200 bg-amber-50 text-xs text-amber-900">
+              <strong>Controllo automatico:</strong> anche dopo la riscrittura il testo dell&apos;AI contiene punti da correggere prima di validarlo.
+              <ul className="list-disc ml-5 mt-1">{reportModal.problemi.map((p, i) => <li key={i}>{p}</li>)}</ul>
+            </div>
+          )}
           {isValidato(reportModal) && (
             <div className="px-5 pt-3 text-[11px] text-gray-500">
               {rigaValidazione(reportModal)} — se rigeneri il report la validazione <strong>non si trasferisce</strong>: il testo nuovo è un documento nuovo, da validare di nuovo.

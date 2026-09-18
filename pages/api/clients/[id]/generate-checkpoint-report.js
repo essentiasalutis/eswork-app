@@ -22,7 +22,8 @@ import { stratificazioneOsservata } from '../../../../lib/scoring';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { kAnonPartition, maskCount, tooSmall, K_ANON } from '../../../../lib/kanon';
 import { PROTOCOLLO } from '../../../../lib/protocollo.mjs';
-import { DEFINIZIONE_LIVELLI, VERSO_DEI_LIVELLI, IDENTITA_PROFESSIONALE, NIENTE_RIFERIMENTI_INVENTATI } from '../../../../lib/regole-report.mjs';
+import { DEFINIZIONE_LIVELLI, VERSO_DEI_LIVELLI, IDENTITA_PROFESSIONALE, NIENTE_RIFERIMENTI_INVENTATI, programmaPrevisto } from '../../../../lib/regole-report.mjs';
+import { controllaTesto, richiestaCorrezione } from '../../../../lib/controllo-report.mjs';
 
 export const config = { maxDuration: 60 };
 
@@ -81,9 +82,15 @@ export default requireAuth(async function handler(req, res) {
   const inTrattamentoD = conNd(personeCon('treatment'));
   const inPrevenzioneD = conNd(personeCon('prevention'));
 
-  // Ore di intervento osteopatico: sedute chiuse × durata della seduta dal protocollo.
-  // Fornite all'AI perché non le stimi (scriveva «50 min/sessione»).
-  const oreSedute = Math.round(completed * PROTOCOLLO.durata_seduta_min / 60);
+  // Ore di intervento osteopatico: sedute chiuse × durata della seduta dal protocollo,
+  // divise fra trattamento e prevenzione. Fornite all'AI perché non le stimi (scriveva
+  // «50 min/sessione») e non attribuisca al Livello 1 anche le ore di prevenzione.
+  const tipoCiclo = Object.fromEntries((tuttiCicli || []).map(c => [c.id, c.cycle_type || 'treatment']));
+  const chiuse = sessions.filter(s => s.closed_at);
+  const seduteTratt = chiuse.filter(s => tipoCiclo[s.cycle_id] !== 'prevention').length;
+  const sedutePrev = chiuse.length - seduteTratt;
+  const ore = n => Math.round(n * PROTOCOLLO.durata_seduta_min / 60);
+  const oreSedute = ore(completed);
 
   const isAnnual = checkpoint === 't12';
   const checkLabel = checkpoint === 't3' ? '3 mesi' : checkpoint === 't6' ? '6 mesi' : '12 mesi (Annuale)';
@@ -227,7 +234,7 @@ export default requireAuth(async function handler(req, res) {
 DATI ANNO 1 (i valori "n.d." sono soppressi per riservatezza/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
 - Prevalenza osservata all'intake (${t12.t0N} risposte T0): ${t12.t0Strat}
 - Sessioni completate/pianificate: ${completed}/${planned}
-- Ore di seduta osteopatica erogate: ${oreSedute} (${completed} sedute da ${PROTOCOLLO.durata_seduta_min} minuti)
+- Ore di seduta osteopatica erogate: ${oreSedute} in tutto (${completed} sedute da ${PROTOCOLLO.durata_seduta_min} minuti), di cui ${ore(seduteTratt)} di trattamento (${seduteTratt} sedute) e ${ore(sedutePrev)} di prevenzione (${sedutePrev} sessioni)
 - Persone con un percorso di trattamento avviato: ${inTrattamentoD}; con un percorso di prevenzione avviato: ${inPrevenzioneD}
 - Check-up a 12 mesi completati: ${t12.count}
 - Prevalenza osservata a 12 mesi (${t12.t12N} check-up): ${t12.t12Strat}
@@ -253,9 +260,10 @@ IMPORTANTE: riporta le percentuali di prevalenza ESATTAMENTE come indicate sopra
 (elementi per la richiesta di riduzione del tasso: interventi erogati, dipendenti coinvolti, ore — SOLO il valore fornito sopra —, monitoraggio continuo)
 
 ## Raccomandazioni per l'Anno 2
-(3-4 azioni: mantenimento, prevenzione L2, formazione avanzata)
+(3-4 azioni, scelte fra ciò che il programma prevede già)
 
 ${t12.count === 0 ? 'NOTA: nessun check-up a 12 mesi ancora registrato — segnala che i KPI di esito saranno disponibili al completamento dei check-up.' : ''}
+${programmaPrevisto()}
 ${IDENTITA_PROFESSIONALE}
 ${NIENTE_RIFERIMENTI_INVENTATI}
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
@@ -270,7 +278,7 @@ Distribuzione ATTUALE dei dipendenti per livello (è una classificazione, NON il
 Persone seguite dall'osteopata (queste sono le persone in percorso):
 - Con un percorso di trattamento avviato: ${inTrattamentoD}
 - Con un percorso di prevenzione avviato: ${inPrevenzioneD}
-- Sessioni completate/pianificate: ${completed}/${planned}
+- Sessioni completate/pianificate: ${completed}/${planned} (${seduteTratt} di trattamento, ${sedutePrev} di prevenzione)
 - Riduzione media NRS per sessione: ${avgDelta} punti
 - Settore: ${client.sector === 1 ? 'Manifattura' : 'Servizi'}
 
@@ -300,11 +308,12 @@ STRUTTURA REPORT (markdown, ## per titoli):
 (eventuali criticità operative o cliniche)
 
 ## Prossimi Passi
-(3-4 azioni per i prossimi ${checkpoint === 't3' ? '3' : '6'} mesi)
+(3-4 azioni per i prossimi ${checkpoint === 't3' ? '3' : '6'} mesi, scelte fra ciò che il programma prevede già)
 
 ${checkpoint === 't6' ? `FOTOGRAFIA (tassativo): il confronto fra il check-up iniziale e quello dei sei mesi è già scritto dal sistema nella sezione «La fotografia a sei mesi», con le sue cautele sulla rappresentatività. NON duplicarlo, NON ricalcolare le percentuali e NON presentarlo come un risultato clinico dimostrato.
 ` : ''}${checkpoint === 't3' ? `MOVIMENTO (tassativo): il racconto di cosa si è mosso in questi tre mesi — percorsi avviati e conclusi, sedute, prevenzione, segnalazioni, nuovi ingressi, distribuzione attuale — è già scritto dal sistema nella sezione «Il movimento dei primi 3 mesi». NON duplicarlo e NON riscriverne i numeri. In particolare NON affermare che la distribuzione attuale derivi da un nuovo questionario: a tre mesi nessuno ricompila nulla.
-` : ''}${IDENTITA_PROFESSIONALE}
+` : ''}${programmaPrevisto()}
+${IDENTITA_PROFESSIONALE}
 ${NIENTE_RIFERIMENTI_INVENTATI}
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
@@ -329,15 +338,22 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
 
   try {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 1500,
-      messages: [{ role: 'user', content: prompt }],
-    });
-    const report = finalize(message.content[0]?.text || '', true);
+    const chiedi = messages => anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 1500, messages })
+      .then(m => m.content[0]?.text || '');
+    // Controllo automatico (lib/controllo-report.mjs): se il testo usa parole vietate
+    // o numeri che non sono nei dati, si fa riscrivere UNA volta con l'elenco degli
+    // errori. Se restano, il report si salva «da rivedere» e l'elenco torna a chi lo apre.
+    let testo = await chiedi([{ role: 'user', content: prompt }]);
+    let problemi = controllaTesto(testo, { dati: prompt });
+    if (problemi.length) {
+      testo = await chiedi([{ role: 'user', content: prompt }, { role: 'assistant', content: testo }, { role: 'user', content: richiestaCorrezione(problemi) }]);
+      problemi = controllaTesto(testo, { dati: prompt });
+    }
+    const aiStatus = problemi.length ? 'ai_da_rivedere' : 'ai';
+    const report = finalize(testo, true);
     const pdfUrl = await tryGeneratePdf(client, reportType, report, id, checkpoint).catch(() => null);
-    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: report, checkpoint, created_by: 'admin', ai_status: 'ai', pdf_url: pdfUrl }).catch(() => null);
-    return res.json({ report, source: 'ai', ai_status: 'ai', pdf_url: pdfUrl, report_id: rec?.id });
+    const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: report, checkpoint, created_by: 'admin', ai_status: aiStatus, pdf_url: pdfUrl }).catch(() => null);
+    return res.json({ report, source: 'ai', ai_status: aiStatus, problemi, pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
     // Chiamata fatta: i dati sono usciti, la risposta non è stata usata. Solo la classe.
     const fallback = finalize(generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc));

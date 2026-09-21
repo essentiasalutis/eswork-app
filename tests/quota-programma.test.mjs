@@ -77,3 +77,24 @@ test('dicitura IVA: un solo punto nel codice, la vecchia non c\'è più', () => 
   const nuova = file.filter(f => /L\. 190\/2014/.test(fs.readFileSync(f, 'utf8')));
   assert.deepEqual(nuova, [path.join('lib', 'iva.mjs')]);
 });
+
+test('email con importi: dicitura breve accanto all\'importo, dallo stesso punto del codice', async () => {
+  const { DICITURA_IVA, DICITURA_IVA_BREVE } = await import('../lib/iva.mjs');
+  // stesso regime nelle due righe: al passaggio a società si cambiano insieme
+  assert.match(DICITURA_IVA, /forfettario/); assert.match(DICITURA_IVA_BREVE, /forfettario/);
+  const { testoMailStima } = await import('../lib/stima-mail.js');
+  const { testoRiepilogo } = await import('../lib/riepilogo.js');
+  const stima = testoMailStima({ azienda: 'Acme', referente: 'Anna', forchetta: { min: { price_y1: 41120 }, max: { price_y1: 68120 } } }).corpo;
+  assert.ok(stima.includes(`all'anno (${DICITURA_IVA_BREVE}).`));
+  const pacchetto = testoMailStima({ azienda: 'Acme', pacchetto: { price: 1750 } }).corpo;
+  assert.ok(pacchetto.includes(`per 12 mesi (${DICITURA_IVA_BREVE}).`));
+  const riep = testoRiepilogo({ referente: 'Anna', forchetta: { min: 41120, max: 68120 } }).corpo;
+  assert.ok(riep.includes(`€68.120 all'anno (${DICITURA_IVA_BREVE}).`));
+  for (const t of [stima, pacchetto, riep]) assert.equal(t.split(DICITURA_IVA_BREVE).length - 1, 1, 'una volta per email');
+  // nessuna delle due scritte è ricopiata a mano fuori da lib/iva.mjs
+  const file = [];
+  const giro = d => { for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); f.isDirectory() ? giro(p) : /\.(m?js|jsx)$/.test(f.name) && file.push(p); } };
+  giro('lib'); giro('pages'); giro('components');
+  assert.deepEqual(file.filter(f => fs.readFileSync(f, 'utf8').includes('IVA non applicata')), [path.join('lib', 'iva.mjs')]);
+  assert.match(fs.readFileSync('pages/dashboard/offer.js', 'utf8'), /Investimento Anno 1: \$\{prezzoY1\} \(\$\{DICITURA_IVA_BREVE\}\)/);
+});

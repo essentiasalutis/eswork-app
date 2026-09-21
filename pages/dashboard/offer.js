@@ -19,7 +19,7 @@ import { pianoDeterministico } from '../../lib/piano';
 import { legendaLivelli } from '../../lib/livelli';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
 import { dataIt } from '../../lib/date-it.mjs';
-import { DICITURA_IVA } from '../../lib/iva.mjs';
+import { DICITURA_IVA, DICITURA_IVA_BREVE } from '../../lib/iva.mjs';
 import { valutaSconto, rigaRinnovo, MOTIVO_MIN, pctIt, conArticolo } from '../../lib/sconto.mjs';
 import { ETICHETTA_POSIZIONE } from '../../lib/forbice.mjs';
 
@@ -382,7 +382,7 @@ In sintesi, il programma anno 1 prevede:
 • 2 review intermedie (3 e 6 mesi) + report annuale finale
 • Coordinamento completo e documentazione INAIL OT23
 
-Investimento Anno 1: ${prezzoY1}
+Investimento Anno 1: ${prezzoY1} (${DICITURA_IVA_BREVE})
 ${offertaVera && scadenza ? `\n${fraseValidita(scadenza)}\n` : ''}
 Il documento allegato contiene tutti i dettagli: dati emersi dal check-up, piano di intervento, analisi ROI e metodologia.
 

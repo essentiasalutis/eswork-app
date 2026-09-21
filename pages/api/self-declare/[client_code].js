@@ -168,7 +168,8 @@ export default async function handler(req, res) {
 
       return res.status(201).json({
         ok: true,
-        level: computed_level,
+        // Demo: il livello non esce nemmeno nella risposta (la schermata finale non lo dice).
+        level: demo ? null : computed_level,
         patient_id: patient.id,
         // Link area personale (self-trigger, mini-check, re-assessment)
         care_token: contatto ? patient.care_token : null,

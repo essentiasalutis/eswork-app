@@ -274,18 +274,16 @@ function ContactForm({ onSubmit, sedi = [], demo = false }) {
 
 // ─── Schermata completamento ──────────────────────────────────────────────────
 
-// Schermata finale della demo: il livello, detto senza promettere un percorso che
-// non partirà (nessun contatto, nessun osteopata).
-function CompletionDemo({ level }) {
-  const n = { level1: 1, level2: 2, level3: 3 }[level] || 3;
+// Schermata finale della demo (testo di Enrico, 21/9). MAI il livello individuale:
+// sarebbe una classificazione clinica consegnata senza la verifica di un professionista.
+function CompletionDemo() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col">
       <FasciaDemo />
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 text-center max-w-lg mx-auto">
         <ESLogo size={140} />
         <h2 className="text-2xl font-bold text-gray-900 mb-3 mt-4">Grazie!</h2>
-        <p className="text-gray-700 mb-3">Le tue risposte ti collocano nel <strong>Livello {n}</strong>: le vedremo tra poco, insieme a quelle della sala, nel report.</p>
-        <p className="text-sm text-gray-500">{FINE_DEMO}</p>
+        <p className="text-gray-700">{FINE_DEMO}</p>
       </div>
     </div>
   );
@@ -599,7 +597,7 @@ export default function SelfDeclarePage({ client, error: serverError, checkup, s
         />
       )}
 
-      {phase === PHASES.DONE && demo && <CompletionDemo level={level} />}
+      {phase === PHASES.DONE && demo && <CompletionDemo />}
       {phase === PHASES.DONE && !demo && (
         <CompletionScreen level={level} wantsContact={wantsContact} careToken={careToken} firmato={!!checkup?.firmato} emailAttiva={!!emailAttiva} email={contactData?.email || ''} />
       )}

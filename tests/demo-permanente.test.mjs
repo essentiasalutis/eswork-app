@@ -2,7 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { FASCIA_DEMO, CONTATTI_DEMO } from '../lib/demo.mjs';
+import { FASCIA_DEMO, CONTATTI_DEMO, FINE_DEMO } from '../lib/demo.mjs';
+import { VOCI_PROGRAMMA } from '../lib/programma.js';
 import { LIMITE_CHECKUP } from '../lib/limite-checkup.js';
 
 const src = f => fs.readFileSync(f, 'utf8');
@@ -10,6 +11,21 @@ const src = f => fs.readFileSync(f, 'utf8');
 test('i testi di Enrico, parola per parola', () => {
   assert.equal(FASCIA_DEMO, 'Modalità dimostrativa: le tue risposte sono anonime e verranno cancellate al termine della presentazione.');
   assert.equal(CONTATTI_DEMO, 'In un programma reale qui inseriresti nome, email e telefono, per essere ricontattato. In questa dimostrazione non servono.');
+  assert.equal(FINE_DEMO, 'Le tue risposte sono state registrate. Tra poco le vedremo insieme a quelle della sala, nel report. In questa dimostrazione nessuno ti contatterà e le tue risposte saranno cancellate al termine della presentazione.');
+});
+
+test('demo: nessun livello individuale, né a schermo né nella risposta del server', () => {
+  const pagina = src('pages/q/c/[client_code].js');
+  const fine = pagina.slice(pagina.indexOf('function CompletionDemo'), pagina.indexOf('function CompletionScreen'));
+  assert.ok(fine.length > 0 && !/[Ll]ivello|level/.test(fine), 'la schermata finale della demo non parla di livelli');
+  assert.match(src('pages/api/self-declare/[client_code].js'), /level: demo \? null : computed_level/);
+});
+
+test('voce 12: si promettono i dati degli interventi, non un dossier OT23 che non esiste', () => {
+  const v = VOCI_PROGRAMMA.find(x => x.n === 12);
+  assert.match(v.cliente, /^Dati e documentazione degli interventi erogati, utilizzabili per la domanda OT23/);
+  const testi = ['lib/programma.js', 'lib/leve.js', 'lib/pricing/v1.js', 'pages/dashboard/offer.js'].map(src).join('\n');
+  assert.ok(!/Dossier con la documentazione necessaria|documentazione INAIL OT23|La documentazione è prodotta da noi|Documentazione OT23 INAIL/.test(testi));
 });
 
 test('limite del check-up: 100 in 10 minuti per le aziende, 300 per la demo', () => {

@@ -151,9 +151,9 @@ export default function WaitlistPage({ client, waitlist: initialWaitlist }) {
                   return (
                     <tr key={entry.id} className="border-t border-gray-50 hover:bg-gray-50">
                       <td className="px-4 py-3">
-                        <Link href={`/osteopath/patient/${pat.id}`} className="font-semibold text-gray-900 hover:text-blue-600">
-                          {pat.first_name} {pat.last_name}
-                        </Link>
+                        {/* Testo semplice (21/9): il link apriva la vecchia scheda dell'osteopata,
+                            che per un candidato non ancora preso in carico non si apre per nessuno. */}
+                        <span className="font-semibold text-gray-900">{pat.first_name} {pat.last_name}</span>
                       </td>
                       <td className="px-4 py-3 text-gray-500 text-xs">{pat.location || '—'}</td>
                       <td className="px-4 py-3">

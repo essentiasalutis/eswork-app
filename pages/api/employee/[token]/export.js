@@ -13,7 +13,9 @@ import {
   getPatientDocuments,
   getIntegrazioniAnamnesi,
   getProfessionals,
+  getPreValidationsByPatient,
 } from '../../../../lib/store';
+import { esitoPrevalidazione } from '../../../../lib/prevalidazione.mjs';
 import { anamnesiPerInteressato } from '../../../../lib/anamnesi.mjs';
 import { limiteAreaPersonale } from '../../../../lib/employee-guard';
 import { giornoIt } from '../../../../lib/date-it.mjs';
@@ -26,6 +28,21 @@ export default async function handler(req, res) {
 
   const patient = await getPatientByCareToken(token).catch(() => null);
   if (!patient) return res.status(404).json({ error: 'Link non valido o scaduto' });
+
+  // Pre-validazioni (21/9, Enrico): dati scritti sulla persona, note cliniche comprese.
+  // Se la lettura fallisce la copia NON esce senza dirlo: la sezione lo dichiara.
+  let preValidazioni = null;
+  try {
+    const [righe, pro] = await Promise.all([getPreValidationsByPatient(patient.id), getProfessionals().catch(() => [])]);
+    const nomi = Object.fromEntries((pro || []).map(p => [p.id, p.name]));
+    preValidazioni = righe.slice().reverse().map(v => ({
+      data: v.created_at, osteopata: nomi[v.professional_id] || 'osteopata', esito: esitoPrevalidazione(v.outcome),
+      durata_videocall_minuti: v.duration_minutes, nrs_durante_videocall: v.nrs_during_call,
+      zona_dolore: v.pain_zone, durata_sintomi_mesi: v.symptom_duration_months, note_cliniche: v.clinical_notes || null,
+    }));
+  } catch (e) {
+    preValidazioni = { non_disponibile: 'Non è stato possibile leggere le pre-validazioni in questo momento: riprova più tardi.' };
+  }
 
   const [sessions, cycles, miniChecks, reassessment, consent, requests] = await Promise.all([
     getSessionsByPatient(patient.id).catch(() => []),
@@ -75,6 +92,7 @@ export default async function handler(req, res) {
       registrato_il: consent.created_at,
     } : null,
     anamnesi,
+    pre_validazioni: preValidazioni,
     sedute: (sessions || []).map(s => ({
       data: s.date, numero: s.session_number,
       nrs_pre: s.nrs_pre, nrs_post: s.nrs_post,

@@ -11,6 +11,7 @@ import {
 } from '../../../../lib/store';
 
 import { SEZIONI_ANAMNESI, CAMPI_ANAMNESI, valoreLeggibile, originaleDaDocumento, versioneCorrente, svuotato, autoreOriginale } from '../../../../lib/anamnesi.mjs';
+import { esitoPrevalidazione } from '../../../../lib/prevalidazione.mjs';
 
 const MOTIVI_CARTA = { tablet_non_disponibile: 'Tablet non disponibile', connessione_assente: 'Connessione assente', preferenza_paziente: 'Preferenza del paziente', altro: 'Altro' };
 const giorno = (d) => dataIt(d);
@@ -29,7 +30,7 @@ function DatiCarta({ doc, copie, patientId }) {
   );
 }
 
-export default function PatientExport({ patient, client, documents, sessions, assessmentConsent, exportedAt, testoConsenso, testoInformativa, copieCartacee = [], integrazioniAnamnesi = [] }) {
+export default function PatientExport({ patient, client, documents, sessions, assessmentConsent, exportedAt, testoConsenso, testoInformativa, copieCartacee = [], integrazioniAnamnesi = [], preValidazioni = [] }) {
   // Si stampa la versione FIRMATA, presa dall'archivio. Se il documento non è
   // ancora firmato si stampa quella in vigore, e lo si dichiara.
   const CONSENSO_TRATTAMENTO = testoConsenso?.contenuto || { titolo: 'Consenso informato al trattamento osteopatico', sezioni: [] };
@@ -266,9 +267,33 @@ export default function PatientExport({ patient, client, documents, sessions, as
           </>
         ) : <p>Anamnesi non disponibile.</p>}
 
+        {/* ── PRE-VALIDAZIONE (21/9) ── */}
+        <h2>4. Pre-validazione clinica</h2>
+        {preValidazioni.length === 0 ? (
+          <p>Nessuna pre-validazione registrata.</p>
+        ) : (
+          <table>
+            <thead><tr><th>Data</th><th>Osteopata</th><th>Esito</th><th>NRS in videocall</th><th>Zona</th><th>Durata sintomi</th><th>Durata videocall</th><th>Note cliniche</th></tr></thead>
+            <tbody>
+              {preValidazioni.map(v => (
+                <tr key={v.id}>
+                  <td>{dataIt(v.created_at)}</td>
+                  <td>{v.osteopata}</td>
+                  <td>{esitoPrevalidazione(v.outcome)}</td>
+                  <td>{v.nrs_during_call != null ? `${v.nrs_during_call}/10` : '—'}</td>
+                  <td>{v.pain_zone || '—'}</td>
+                  <td>{v.symptom_duration_months != null ? `${v.symptom_duration_months} mesi` : '—'}</td>
+                  <td>{v.duration_minutes != null ? `${v.duration_minutes} min` : '—'}</td>
+                  <td>{v.clinical_notes || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
         {/* ── SESSIONI ── */}
         <div className="page-break" />
-        <h2>4. Storico sedute e trend NRS</h2>
+        <h2>5. Storico sedute e trend NRS</h2>
         {closedSessions.length === 0 ? (
           <p>Nessuna seduta registrata.</p>
         ) : (
@@ -356,6 +381,14 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       return righe.map(r => ({ id: r.id, campo: r.campo, valore_prima: r.valore_prima, valore_dopo: r.valore_dopo, motivo: r.motivo, gruppo: r.gruppo, creato_il: r.creato_il, osteopata: nomi[r.professional_id] || 'Osteopata' }));
     })(),
   ]);
+  // Pre-validazioni (21/9): come le integrazioni, se la lettura fallisce la pagina non
+  // si stampa — una cartella «completa» senza la pre-validazione non lo sarebbe.
+  const preValidazioni = await (async () => {
+    const { getPreValidationsByPatient, getProfessionals } = await import('../../../../lib/store');
+    const [righe, pro] = await Promise.all([getPreValidationsByPatient(patientId), getProfessionals().catch(() => [])]);
+    const nomi = Object.fromEntries((pro || []).map(p => [p.id, p.name]));
+    return righe.slice().reverse().map(v => ({ id: v.id, created_at: v.created_at, osteopata: nomi[v.professional_id] || 'Osteopata', outcome: v.outcome, duration_minutes: v.duration_minutes, nrs_during_call: v.nrs_during_call, pain_zone: v.pain_zone, symptom_duration_months: v.symptom_duration_months, clinical_notes: v.clinical_notes }));
+  })();
 
   return {
     props: {
@@ -369,6 +402,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       assessmentConsent: assessmentConsent ? JSON.parse(JSON.stringify(assessmentConsent)) : null,
       exportedAt: new Date().toISOString(),
       integrazioniAnamnesi: JSON.parse(JSON.stringify(integrazioniAnamnesi)),
+      preValidazioni: JSON.parse(JSON.stringify(preValidazioni)),
     },
   };
 });

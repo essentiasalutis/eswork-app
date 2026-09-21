@@ -11,11 +11,17 @@ import {
   getClientById,
   getPatientDocuments,
   getCyclesByPatient,
+  getPreValidationsByPatient,
+  getMiniChecksByPatient,
+  getReassessmentT12ByPatient,
 } from '../../../lib/store';
 import PatientDocuments from '../../../components/PatientDocuments';
 import { validaNrsChiusura } from '../../../lib/nrs';
-import { vistaCartellaCurante, vistaAziendaPerPro, vistaDocumentoCartella } from '../../../lib/vista';
-import { nomeLivello } from '../../../lib/livelli';
+import { vistaCartellaCurante, vistaAziendaPerPro, vistaDocumentoCartella, vistaPrevalidazioniCartella, vistaMiniCheckCartella, vistaRivalutazioneCartella } from '../../../lib/vista';
+import { esitoPrevalidazione } from '../../../lib/prevalidazione.mjs';
+import { parolaPgic } from '../../../lib/pgic';
+import { AVVISO_COPIA_NOTE } from '../../../lib/copia-dati.mjs';
+import { nomeLivello, etichettaLivello } from '../../../lib/livelli';
 import { documentiMancanti, prevedeSedute } from '../../../lib/documenti-seduta.mjs';
 import { dirittoCicli } from '../../../lib/anno-programma.mjs';
 import { PROTOCOLLO } from '../../../lib/protocollo.mjs';
@@ -82,6 +88,71 @@ function NrsTrendChart({ sessions }) {
 }
 
 // ─── Form nuova sessione ──────────────────────────────────────────────────────
+
+// ─── Sola lettura (21/9): ciò che prima si vedeva solo nella vecchia scheda ───
+// /osteopath/patient — pre-validazione, mini-check, rivalutazione annuale.
+
+function Riga({ k, v }) {
+  return <div className="flex justify-between gap-3 text-xs py-1 border-b border-gray-50 last:border-0"><span className="text-gray-500">{k}</span><span className="font-medium text-gray-800 text-right">{v}</span></div>;
+}
+
+function Prevalidazioni({ lista }) {
+  if (!lista || lista.length === 0) return null;
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-4">
+      <h3 className="font-semibold text-gray-800 mb-2 text-sm">Pre-validazione{lista.length > 1 ? ` (${lista.length})` : ''}</h3>
+      <div className="space-y-3">
+        {lista.map(v => (
+          <div key={v.id}>
+            <Riga k="Data" v={v.created_at ? dataIt(v.created_at) : '—'} />
+            <Riga k="Esito" v={esitoPrevalidazione(v.outcome)} />
+            <Riga k="NRS durante la videocall" v={v.nrs_during_call != null ? `${v.nrs_during_call}/10` : '—'} />
+            <Riga k="Zona primaria" v={v.pain_zone || '—'} />
+            <Riga k="Durata dei sintomi" v={v.symptom_duration_months != null ? `${v.symptom_duration_months} mesi` : '—'} />
+            <Riga k="Durata della videocall" v={v.duration_minutes != null ? `${v.duration_minutes} min` : '—'} />
+            {v.clinical_notes && <div className="text-xs text-gray-700 bg-gray-50 rounded-lg px-3 py-2 mt-1.5 whitespace-pre-wrap">{v.clinical_notes}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MiniCheckRicevuti({ lista }) {
+  if (!lista || lista.length === 0) return null;
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-4">
+      <h3 className="font-semibold text-gray-800 mb-2 text-sm">Mini-check ricevuti</h3>
+      {lista.map(m => (
+        <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-gray-50 last:border-0 text-xs">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="font-semibold text-gray-800">{(m.check_type || '').toUpperCase() || 'Mini-check'}</span>
+            <span className="text-gray-500">{m.created_at ? dataIt(m.created_at) : ''}</span>
+            {m.pgic != null && <span className="text-gray-700">{parolaPgic(m.pgic, 'meglio')}</span>}
+            {m.nrs_current != null && <span className="text-gray-500">NRS {m.nrs_current}/10</span>}
+            {m.has_limitations && <span className="text-amber-700 font-semibold">Limitazioni</span>}
+            {m.wants_contact && <span className="text-blue-700 font-semibold">Vuole essere contattato</span>}
+          </div>
+          <span className={`font-semibold px-2 py-0.5 rounded-full ${m.triage_outcome === 'needs_contact' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+            {m.triage_outcome === 'needs_contact' ? 'Da contattare' : 'Nessun contatto necessario'}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RivalutazioneAnnuale({ r }) {
+  if (!r) return null;
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-4">
+      <h3 className="font-semibold text-gray-800 mb-2 text-sm">Rivalutazione annuale</h3>
+      <Riga k="Data" v={r.completed_at ? dataIt(r.completed_at) : '—'} />
+      <Riga k="Livello ricalcolato" v={etichettaLivello(r.computed_level) || '—'} />
+      <Riga k="Come sta rispetto a prima" v={r.pgic != null ? parolaPgic(r.pgic, 'migliorato') : '—'} />
+    </div>
+  );
+}
 
 function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved }) {
   const isFirst = sessionNumber === 1;
@@ -176,12 +247,14 @@ function SessionForm({ patientId, sessionNumber, lastNote, anamnesiNrs, onSaved 
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">Note trattamento *</label>
+            <p className="text-xs text-gray-500 mb-1">{AVVISO_COPIA_NOTE}</p>
             <textarea value={treatmentNotes} onChange={e => setTreatmentNotes(e.target.value)} rows={3}
               placeholder="Razionale osteopatico, tecniche utilizzate, risposta del paziente..."
               className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">Indicazioni prossima seduta</label>
+            <p className="text-xs text-gray-500 mb-1">{AVVISO_COPIA_NOTE}</p>
             <textarea value={nextNotes} onChange={e => setNextNotes(e.target.value)} rows={2}
               placeholder="Esercizi domiciliari, aree da rivalutare, priorità..."
               className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
@@ -254,11 +327,11 @@ function ClosedSessionCard({ session: s, patientId, onUpdated }) {
           </div>
         </div>
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Note trattamento</label>
+          <label className="text-xs text-gray-500 block mb-1">Note trattamento · {AVVISO_COPIA_NOTE}</label>
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm resize-none" />
         </div>
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Indicazioni prossima seduta</label>
+          <label className="text-xs text-gray-500 block mb-1">Indicazioni prossima seduta · {AVVISO_COPIA_NOTE}</label>
           <textarea value={next} onChange={e => setNext(e.target.value)} rows={2} className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm resize-none" />
         </div>
         <button onClick={save} disabled={saving} className="w-full py-2 rounded-xl bg-green-600 text-white text-sm font-semibold disabled:opacity-60">
@@ -288,7 +361,7 @@ function ClosedSessionCard({ session: s, patientId, onUpdated }) {
 
 // ─── Pagina principale ────────────────────────────────────────────────────────
 
-export default function PatientPage({ proName, patient: initialPatient, sessions: initialSessions, client, documents: initialDocs, cycles: initialCycles , testiFirma = null, finestraAnno = null}) {
+export default function PatientPage({ proName, patient: initialPatient, sessions: initialSessions, client, documents: initialDocs, cycles: initialCycles , testiFirma = null, finestraAnno = null, preValidations = [], miniChecks = [], reassessment = null }) {
   const router = useRouter();
   const [patient, setPatient] = useState(initialPatient);
   const [sessions, setSessions] = useState(initialSessions);
@@ -490,6 +563,8 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
             )}
           </div>
 
+          <Prevalidazioni lista={preValidations} />
+
           {/* ── Documenti e consensi (L1 e L2 con prevenzione) ───────────── */}
           {prevedeSedute(patient) && (
             <div className="bg-white rounded-2xl border border-gray-200 p-4">
@@ -641,6 +716,9 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
             </div>
           )}
 
+          <MiniCheckRicevuti lista={miniChecks} />
+          <RivalutazioneAnnuale r={reassessment} />
+
           {/* ── Link self-valutazione dipendente (L2/L3 → possibile upgrade L1) ── */}
           {(patient.level === 'level2' || patient.level === 'level3') && (
             <div className="bg-white rounded-2xl border border-gray-200 p-4">
@@ -763,10 +841,13 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   // Registro: la cartella si apre da qui, non dall'API (che ha il suo log).
   await registraLettura(ctx.req, { proId, azione: AZIONI.CARTELLA, patientId, dettaglio: 'Apertura cartella clinica' });
 
-  const [sessions, client, documents] = await Promise.all([
+  const [sessions, client, documents, preValidations, miniChecks, reassessment] = await Promise.all([
     getSessionsByPatient(patientId),
     getClientById(patient.client_id),
     getPatientDocuments(patientId),
+    getPreValidationsByPatient(patientId).catch(() => []),
+    getMiniChecksByPatient(patientId).catch(() => []),
+    getReassessmentT12ByPatient(patientId).catch(() => null),
   ]);
 
   // Testi da firmare in cartella: dall'archivio (v64), unica fonte del testo legale.
@@ -812,6 +893,9 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
       cycles,
       testiFirma,
       finestraAnno: finestra,
+      preValidations: vistaPrevalidazioniCartella(preValidations),
+      miniChecks: vistaMiniCheckCartella(miniChecks),
+      reassessment: vistaRivalutazioneCartella(reassessment),
     },
   };
 });

@@ -7,6 +7,7 @@ import { getPatientById, getClientById, proCanAccessClient, getProAssignmentElig
 import { messaggioNonConforme } from '../../../lib/pro-docs';
 import { vistaPazienteMinima } from '../../../lib/vista';
 import { PROTOCOLLO } from '../../../lib/protocollo.mjs';
+import { AVVISO_COPIA_NOTE } from '../../../lib/copia-dati.mjs';
 
 const PAIN_ZONES = [
   'Collo', 'Spalle', 'Braccia/gomiti', 'Polsi/mani',
@@ -89,7 +90,7 @@ export default function PrevalidationForm({ patient, bloccoPresaInCarico = null 
                 ← Dashboard
               </Link>
               {isL1 && (
-                <Link href={`/osteopath/patient/${patientId}`} className="text-sm font-semibold text-white bg-green-600 px-4 py-2 rounded-xl hover:bg-green-700">
+                <Link href={`/pro/patients/${patientId}`} className="text-sm font-semibold text-white bg-green-600 px-4 py-2 rounded-xl hover:bg-green-700">
                   Scheda paziente →
                 </Link>
               )}
@@ -175,7 +176,8 @@ export default function PrevalidationForm({ patient, bloccoPresaInCarico = null 
 
             {/* Note cliniche */}
             <div className="bg-white rounded-2xl border border-gray-200 p-5">
-              <label className="text-sm font-semibold text-gray-700 block mb-3">Note cliniche</label>
+              <label className="text-sm font-semibold text-gray-700 block mb-1">Note cliniche</label>
+              <p className="text-xs text-gray-500 mb-3">{AVVISO_COPIA_NOTE}</p>
               <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4}
                 placeholder="Anamnesi, test clinici eseguiti, impressione generale..."
                 className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 font-[inherit]" />

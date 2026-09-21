@@ -127,7 +127,7 @@ export default function OsteopathDashboard({ proName, l1Patients, waitlist, allP
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge label={`Ciclo ${p.current_cycle || 0}`} color="blue" />
-                      <Link href={`/osteopath/patient/${p.id}`}
+                      <Link href={`/pro/patients/${p.id}`}
                         className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100">
                         Scheda →
                       </Link>

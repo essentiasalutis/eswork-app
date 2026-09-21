@@ -2,7 +2,9 @@
 // campi che le pagine disegnano. Qui i campi che NON devono mai uscire.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { vistaDocumentoCartella, vistaLeadBuono, vistaSchedaSintetica, vistaSedutaDaModificare, vistaCodaPrevalidazione, vistaAziendaPerPro } from '../lib/vista.js';
+import fs from 'node:fs';
+import { vistaDocumentoCartella, vistaLeadBuono, vistaCodaPrevalidazione, vistaAziendaPerPro, vistaPrevalidazioniCartella, vistaMiniCheckCartella, vistaRivalutazioneCartella } from '../lib/vista.js';
+import { AVVISO_COPIA_NOTE } from '../lib/copia-dati.mjs';
 
 const nessuno = (o, campi, dove) => { const t = JSON.stringify(o); for (const c of campi) assert.ok(!t.includes(`"${c}"`), `${dove}: «${c}» non deve uscire`); };
 
@@ -21,23 +23,32 @@ test('richiesta di buono: niente IP, importi, riscatti', () => {
   nessuno(v, ['ip', 'amount', 'redeemed_by', 'location', 'confirm_response', 'client_id'], 'buono');
 });
 
-test('scheda sintetica: niente anamnesi, credenziali, note, questionario, testo libero', () => {
-  const v = vistaSchedaSintetica({
-    patient: { id: 'p1', first_name: 'A', last_name: 'B', level: 'level1', care_token: 'tok', email: 'a@x', phone: '3', red_flags: true, red_flags_details: 'x', medications_details: 'y', notes: 'n' },
-    sessions: [{ id: 's1', date: '2026-01-01', nrs_pre: 6, nrs_post: 3, treatment_notes: 'nota', next_session_notes: 'poi' }],
-    cycles: [{ id: 'c1', cycle_number: 1, status: 'active', pgic: 5 }],
-    preValidation: { outcome: 'l1_confirmed', clinical_notes: 'mostrata' },
-    reassessmentT12: { completed_at: 'x', computed_level: 'level2', pgic: 4, nmq_data: { a: 1 } },
-    miniChecks: [{ id: 'm1', check_type: 't3', nrs_current: 4, free_text: 'scritto dal dipendente' }],
-  });
-  assert.equal(v.patient.first_name, 'A');
-  assert.equal(v.sessions[0].nrs_post, 3);
-  assert.equal(v.preValidation.clinical_notes, 'mostrata', 'la pagina la disegna');
-  nessuno(v, ['care_token', 'email', 'phone', 'red_flags', 'red_flags_details', 'medications_details', 'notes', 'treatment_notes', 'next_session_notes', 'nmq_data', 'free_text'], 'scheda');
-});
-
-test('seduta da modificare, coda di pre-validazione, azienda per il professionista', () => {
-  nessuno(vistaSedutaDaModificare({ id: 's1', date: 'x', patient_id: 'p1', treatment_notes: 'n', nrs_pre: 5, patients: { id: 'p1', first_name: 'A', last_name: 'B', level: 'level1', clients: { name: 'Acme' } } }), ['treatment_notes', 'nrs_pre', 'level'], 'seduta');
+test('coda di pre-validazione, azienda per il professionista', () => {
   nessuno(vistaCodaPrevalidazione({ id: 'w1', patient_id: 'p1', client_id: 'c1', source: 'self_declaration', notes: 'n', score: 100, cohort: 'x', assigned_professional_id: 'pro', patients: { first_name: 'A', last_name: 'B', level: 'level1', clients: { name: 'Acme' } } }), ['score', 'cohort', 'assigned_professional_id', 'level'], 'coda');
   assert.deepEqual(Object.keys(vistaAziendaPerPro({ id: 'c1', name: 'Acme', sconto_motivo: 'x', sforamento_forbice_motivo: 'y', contact_email: 'z' })), ['id', 'name']);
+});
+
+test('cartella del curante: pre-validazione, mini-check, rivalutazione annuale', () => {
+  const [v] = vistaPrevalidazioniCartella([{ id: 'v1', created_at: 'x', outcome: 'l1_confirmed', nrs_during_call: 7, pain_zone: 'Collo', symptom_duration_months: 9, duration_minutes: 25, clinical_notes: 'nota', professional_id: 'pro', client_id: 'c1', patient_id: 'p1' }]);
+  assert.equal(v.clinical_notes, 'nota', 'le note si vedono: le scrive il curante');
+  nessuno(v, ['professional_id', 'client_id', 'patient_id'], 'pre-validazione');
+  const [m] = vistaMiniCheckCartella([{ id: 'm1', check_type: 't3', pgic: 4, has_limitations: true, wants_contact: false, triage_outcome: 'needs_contact', free_text: 'scritto dal lavoratore', client_id: 'c1', patient_id: 'p1' }]);
+  assert.equal(m.pgic, 4);
+  nessuno(m, ['free_text', 'client_id', 'patient_id'], 'mini-check');
+  nessuno(vistaRivalutazioneCartella({ completed_at: 'x', computed_level: 'level2', pgic: 4, nmq_data: { a: 1 }, client_id: 'c1' }), ['nmq_data', 'client_id'], 'rivalutazione');
+  assert.equal(vistaRivalutazioneCartella(null), null);
+});
+
+test('ogni campo di note dell\'osteopata dice, prima di scrivere, che il paziente può riceverle', () => {
+  for (const f of ['components/PatientDocuments.jsx', 'pages/osteopath/prevalidation/[patientId].js', 'pages/pro/patients/[patientId].js']) {
+    assert.match(fs.readFileSync(f, 'utf8'), /AVVISO_COPIA_NOTE/, f);
+  }
+  const cartella = fs.readFileSync('pages/pro/patients/[patientId].js', 'utf8');
+  assert.equal((cartella.match(/\{AVVISO_COPIA_NOTE\}/g) || []).length, 4, 'note e indicazioni, nella seduta nuova e in quella da modificare');
+  assert.match(AVVISO_COPIA_NOTE, /copia dei suoi dati/);
+});
+
+test('la pre-validazione entra nelle due copie dei dati', () => {
+  assert.match(fs.readFileSync('pages/api/employee/[token]/export.js', 'utf8'), /pre_validazioni: preValidazioni/);
+  assert.match(fs.readFileSync('pages/dashboard/patients/[patientId]/export.js', 'utf8'), /Pre-validazione clinica/);
 });

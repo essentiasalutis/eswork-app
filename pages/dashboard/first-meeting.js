@@ -7,6 +7,7 @@ import { calculatePacchetto } from '../../lib/pricing/v2';
 import { CONFIG } from '../../lib/config';
 import NavMenu from '../../components/NavMenu';
 import { PROTOCOLLO } from '../../lib/protocollo.mjs';
+import { DICITURA_IVA } from '../../lib/iva.mjs';
 
 const STEPS = ['Conosciamo l\'azienda', 'I numeri', 'Logistica', 'Preventivo'];
 const SECTORS = [['services', 'Servizi / Uffici'], ['manufacturing', 'Manifattura'], ['mix', 'Mix']];
@@ -69,6 +70,11 @@ function Toggle({ checked, onChange, label }) {
   );
 }
 
+// Riga IVA sotto il prezzo del Pacchetto: la stessa dicitura del programma.
+function vatExemptPacchetto(esente) {
+  return <div className="text-xs opacity-80 mt-1">{esente ? DICITURA_IVA : 'IVA da applicare sul totale'}</div>;
+}
+
 export default function FirstMeetingScheda({ client: initialClient, meeting, v2Params, modoIniziale = 'completo' }) {
   const router = useRouter();
   const d = meeting?.data || {};
@@ -79,6 +85,9 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
 
   const [clientId, setClientId] = useState(initialClient?.id || null);
   const [step, setStep] = useState(1);
+  // Importi per voce, costo e margine: solo per chi vende. Chiusi di base, perché
+  // questa schermata può essere davanti al cliente (Enrico, 21/9).
+  const [dettaglioInterno, setDettaglioInterno] = useState(false);
   // Intake telefonico ('rapido') = una schermata con i sei dati per la Stima; stessi dati e
   // stesso salvataggio del colloquio completo, che al primo incontro li ritrova compilati.
   const [modo, setModo] = useState(modoIniziale);
@@ -549,9 +558,19 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                     <div className="bg-blue-600 rounded-2xl p-5 text-white">
                       <div className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-1">Pacchetto prevenzione — 12 mesi, non rinnovabile</div>
                       <div className="text-4xl font-bold mb-1">{fmt(pacchetto.price)}</div>
-                      <div className="text-sm opacity-90">Formazione {fmt(pacchetto.training.sell)} · Ergonomia {fmt(pacchetto.ergonomia.sell)} · Check-up {fmt(pacchetto.assessment.sell)}</div>
+                      {vatExemptPacchetto(vatExempt)}
                       <div className="text-xs opacity-80 mt-1">Include check-up completo (consensi identici al programma), formazione {PROTOCOLLO.formazione_moduli_primo_anno} moduli, ergonomia. ESCLUDE cicli L1, prevenzione L2 e buffer clinico.</div>
                     </div>
+                    <button type="button" onClick={() => setDettaglioInterno(v => !v)} className="text-xs font-semibold text-gray-500 underline">
+                      {dettaglioInterno ? 'Nascondi il dettaglio interno' : 'Dettaglio interno'}
+                    </button>
+                    {dettaglioInterno && (
+                      <div className="bg-white rounded-2xl border border-gray-200 p-4 text-sm text-gray-700">
+                        <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Dettaglio voci — uso interno</div>
+                        Formazione {fmt(pacchetto.training.sell)} · Ergonomia {fmt(pacchetto.ergonomia.sell)} · Check-up {fmt(pacchetto.assessment.sell)}
+                        <div className="text-[11px] text-gray-400 mt-2">Costo {fmt(pacchetto.total_cost)} · margine {fmt(pacchetto.margin)}</div>
+                      </div>
+                    )}
                     {pacchetto.ergonomia_sotto_minimo && (
                       <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">⚠ Ergonomia sotto il minimo fatturabile: accorpare ad altra attività in sede (solo avviso).</div>
                     )}
@@ -579,19 +598,22 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                   <div className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-1">Investimento Anno 1 — scenario {scenario === 'avg' ? 'medio' : scenario}</div>
                   <div className="text-4xl font-bold mb-1">{fmt(calc.price_y1)}</div>
                   <div className="text-sm opacity-90">{fmt(calc.price_monthly_y1)}/mese · {fmt(calc.price_per_employee_y1)}/dip · {sel.l1} L1{prevenzioneL2 ? ` · ${sel.l2} L2 prevenzione` : ''}</div>
-                  <div className="text-xs opacity-80 mt-1">{vatExempt ? 'Esente IVA (forfettario)' : `+ IVA 22% = ${fmt(calc.y1.total_with_vat)}`}</div>
+                  <div className="text-xs opacity-80 mt-1">{vatExempt ? DICITURA_IVA : `+ IVA 22% = ${fmt(calc.y1.total_with_vat)}`}</div>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-gray-200 p-4">
-                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Dettaglio voci — Anno 1</div>
+                <button type="button" onClick={() => setDettaglioInterno(v => !v)} className="text-xs font-semibold text-gray-500 underline">
+                  {dettaglioInterno ? 'Nascondi il dettaglio interno' : 'Dettaglio interno'}
+                </button>
+                {dettaglioInterno && <div className="bg-white rounded-2xl border border-gray-200 p-4">
+                  <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Dettaglio voci — Anno 1 · uso interno</div>
                   <table className="w-full text-sm"><tbody>
                     {/* Cosa sono L1/L2/L3 e la pre-validazione: fonte unica lib/livelli.js */}
                     {calc.y1.items.map((it, i) => (<tr key={i} className="border-b border-gray-50"><td className="py-2 text-gray-600">{it.label}<span className="block text-[11px] text-gray-400">{it.detail}</span></td><td className="py-2 text-right font-medium text-gray-700">{fmt(it.sell)}</td></tr>))}
                     <tr className="border-b border-gray-50"><td className="py-2 text-gray-600">Buffer {Math.round(calc.y1.buffer_pct * 100)}%</td><td className="py-2 text-right font-medium text-gray-700">{fmt(calc.y1.buffer_sell)}</td></tr>
                     <tr className="border-t-2 border-gray-200"><td className="py-2 font-semibold text-gray-800">Totale Anno 1</td><td className="py-2 text-right font-bold text-green-700">{fmt(calc.y1.total_sell)}</td></tr>
                   </tbody></table>
-                  <div className="text-[11px] text-gray-400 mt-2">Costo professionista {fmt(calc.y1.total_cost)} · margine {fmt(calc.y1.margin)} — uso interno</div>
-                </div>
+                  <div className="text-[11px] text-gray-400 mt-2">Costo {fmt(calc.y1.total_cost)} · margine {fmt(calc.y1.margin)} — uso interno</div>
+                </div>}
 
                 <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
                   <div className="text-xs font-semibold text-blue-600 uppercase tracking-widest mb-1">Anno 2 e successivi (indicativo)</div>
@@ -628,7 +650,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                           </label>
                           <input type="number" step="0.1" value={l2Mult} onChange={e => setL2Mult(parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm" />
                         </div>
-                        <label className="flex items-center gap-2 text-sm text-gray-600 pb-2"><input type="checkbox" checked={vatExempt} onChange={e => setVatExempt(e.target.checked)} className="w-4 h-4 accent-green-600" />Esente IVA</label>
+                        <label className="flex items-center gap-2 text-sm text-gray-600 pb-2"><input type="checkbox" checked={vatExempt} onChange={e => setVatExempt(e.target.checked)} className="w-4 h-4 accent-green-600" />Senza IVA (regime forfettario)</label>
                       </div>
                     </div>
                   )}

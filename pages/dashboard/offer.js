@@ -19,6 +19,7 @@ import { pianoDeterministico } from '../../lib/piano';
 import { legendaLivelli } from '../../lib/livelli';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
 import { dataIt } from '../../lib/date-it.mjs';
+import { DICITURA_IVA } from '../../lib/iva.mjs';
 
 // ─── Firma standard ───────────────────────────────────────────────────────────
 
@@ -702,6 +703,7 @@ ${FIRMA}`;
               {fmt(calc.price_monthly_y1)}/mese · {fmt(calc.price_per_employee_y1)}/dipendente
             </div>
           </div>
+          <div style={{ fontSize: 10, color: '#64748b', margin: '-4px 0 10px' }}>{DICITURA_IVA}</div>
 
           {nuovoProgramma ? (
             // Quantità del primo anno, niente euro accanto alle voci (decisione Enrico).

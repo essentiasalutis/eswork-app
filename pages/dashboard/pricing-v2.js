@@ -23,7 +23,9 @@ const PARAM_LABELS = {
   ergonomia_forfait_postazione: 'Ergonomia reparto: studio postazione tipo, € a forfait',
   ergonomia_minuti_postazione: 'Ergonomia reparto: tempo in sede per studio postazione (minuti — solo pianificazione e minimo ore, NON prezzo)',
   ergonomia_minimo_ore: 'Ergonomia: minimo fatturabile (ore)',
-  assessment_prezzo_per_dipendente: 'Check-up nel pacchetto: € per dipendente dichiarato',
+  quota_programma_fissa: 'Programma, misurazione e regia: quota fissa per anno di programma (€)',
+  quota_programma_per_dipendente: 'Programma, misurazione e regia: € per dipendente dichiarato, per anno (vale anche come check-up del Pacchetto)',
+  quota_programma_costo_pct: 'Programma, misurazione e regia: costo, frazione della quota (0.30 = 30%) — solo per il margine interno',
 };
 
 const TEXT_LABELS = {

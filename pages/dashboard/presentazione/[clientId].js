@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { requireAuthSsr } from '../../../lib/auth';
 import { etichettaData } from '../../../lib/checkup';
 import { testoScartoLivello2 } from '../../../lib/offerta';
+import { DICITURA_IVA } from '../../../lib/iva.mjs';
 
 // Presentazione del Report di Attivazione (punto 7) — a schermo, nell'ordine di Enrico:
 // fotografia → stratificazione → piano → preventivo dentro la forbice → leve (prima
@@ -141,6 +142,7 @@ function Preventivo({ d }) {
       <div className="text-7xl font-extrabold text-green-600 mt-1">{eur(p.y1)}</div>
       <div className="text-2xl text-gray-700 mt-2">{eur(p.mese)} al mese · {eur(p.dipendente)} per dipendente</div>
       <div className="text-xl text-gray-600 mt-4">Anno 2 e successivi (indicativo): <strong>{eur(p.y2)}</strong> l&apos;anno</div>
+      <div className="text-sm text-gray-500 mt-2">{DICITURA_IVA}</div>
       {barra}
     </>
   );

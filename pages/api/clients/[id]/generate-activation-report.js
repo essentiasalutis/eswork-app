@@ -1,5 +1,6 @@
 import { DEFINIZIONE_LIVELLI, IDENTITA_PROFESSIONALE } from '../../../../lib/regole-report.mjs';
 import { generaConControllo } from '../../../../lib/controllo-report.mjs';
+import { parametriDaStimaCongelata } from '../../../../lib/pricing/v2-defaults.mjs';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireAuth } from '../../../../lib/auth';
 import {
@@ -385,7 +386,8 @@ export async function buildQuoteBlock(client_id, client, answers) {
       const si = snap.inputs || {};
       nEmp = parseInt(si.n) || (parseInt(client.employees) || responders);
       l2Mult = si.l2Mult != null ? Number(si.l2Mult) : CONFIG.l2_multiplier_default;
-      conditions = { pricingVersion, v2Params: snap.v2Params, ergonomia: si.ergonomia, tier: si.tier, groups: si.groups, rates: si.rates, vatExempt: si.vatExempt };
+      // Stima congelata prima della quota «Programma, misurazione e regia»: la quota vale zero.
+      conditions = { pricingVersion, v2Params: parametriDaStimaCongelata(snap.v2Params), ergonomia: si.ergonomia, tier: si.tier, groups: si.groups, rates: si.rates, vatExempt: si.vatExempt };
       min = snap.forchetta.min?.price_y1; avg = snap.forchetta.avg?.price_y1; max = snap.forchetta.max?.price_y1;
     } else {
       source = 'live';

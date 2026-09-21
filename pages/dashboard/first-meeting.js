@@ -10,6 +10,9 @@ import { PROTOCOLLO } from '../../lib/protocollo.mjs';
 import { DICITURA_IVA } from '../../lib/iva.mjs';
 import { tariffeMancanti, messaggioTariffeScheda } from '../../lib/tariffe.mjs';
 
+// OT23 in verifica con l'INAIL (Enrico, 21/9): la nota per te nel colloquio, in entrambe le modalità.
+const NOTA_PREMIO_INAIL = 'Quanto versano all’INAIL in un anno. Per ora non entra in nessun documento: finché l’INAIL non risponde per iscritto sull’ammissibilità del programma, niente percentuali né cifre di riduzione OT23. A chi firma in autunno va detto che la documentazione dell’anno in corso copre solo gli interventi fatti entro il 31/12: chi firma a ottobre ne ha due o tre mesi.';
+
 const STEPS = ['Conosciamo l\'azienda', 'I numeri', 'Logistica', 'Preventivo'];
 const SECTORS = [['services', 'Servizi / Uffici'], ['manufacturing', 'Manifattura'], ['mix', 'Mix']];
 const SECTOR_TO_INT = { services: 2, manufacturing: 1, mix: 1 };
@@ -379,7 +382,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
               <Field label="di cui per disturbi muscolo-scheletrici" hint="se lo sanno">
                 <input type="number" min="0" value={absenceDaysMsk} onChange={e => setAbsenceDaysMsk(e.target.value)} className={inputCls} />
               </Field>
-              <Field label="Premio INAIL annuo (€)" hint="se lo sanno" nota="Quanto versano all’INAIL in un anno. Serve a tradurre lo sconto OT23 in euro: senza, resta solo la percentuale e la leva pesa molto meno.">
+              <Field label="Premio INAIL annuo (€)" hint="se lo sanno" nota={NOTA_PREMIO_INAIL}>
                 <input type="number" min="0" value={premioInail} onChange={e => setPremioInail(e.target.value)} className={inputCls} />
               </Field>
             </div>
@@ -446,7 +449,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
               <Field label="di cui per disturbi muscolo-scheletrici" hint="se lo sanno">
                 <input type="number" min="0" value={absenceDaysMsk} onChange={e => setAbsenceDaysMsk(e.target.value)} className={inputCls} />
               </Field>
-              <Field label="Premio INAIL annuo (€)" hint="se lo sanno">
+              <Field label="Premio INAIL annuo (€)" hint="se lo sanno" nota={NOTA_PREMIO_INAIL}>
                 <input type="number" min="0" value={premioInail} onChange={e => setPremioInail(e.target.value)} className={inputCls} />
               </Field>
             </div>

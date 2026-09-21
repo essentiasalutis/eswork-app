@@ -25,6 +25,7 @@ import { PROTOCOLLO } from '../../../../lib/protocollo.mjs';
 import { DEFINIZIONE_LIVELLI, VERSO_DEI_LIVELLI, IDENTITA_PROFESSIONALE, NIENTE_RIFERIMENTI_INVENTATI, programmaPrevisto, divisioneSedute, rigaFormazione } from '../../../../lib/regole-report.mjs';
 import { generaConControllo } from '../../../../lib/controllo-report.mjs';
 import { getOrgSessioni } from '../../../../lib/org';
+import { TESTO_OT23_IN_VERIFICA } from '../../../../lib/ot23-stato.mjs';
 
 export const config = { maxDuration: 60 };
 
@@ -262,8 +263,8 @@ Presenta in tabella i tre indicatori v4:
 
 IMPORTANTE: riporta le percentuali di prevalenza ESATTAMENTE come indicate sopra (${t12.t0L1} all'intake, ${t12.t12L1} a 12 mesi); non ricalcolarle né arrotondarle diversamente. Il commento prima/dopo è già fornito nella sezione "L'andamento del programma" più sotto: NON duplicarlo.
 
-## Documentazione INAIL OT23
-(elementi per la richiesta di riduzione del tasso: interventi erogati, dipendenti coinvolti, ore — SOLO il valore fornito sopra —, monitoraggio continuo)
+## Documentazione degli interventi
+(SOLO gli interventi erogati e pianificati, con il valore fornito sopra. Poi riporta ESATTAMENTE questa frase, senza cambiarla: «${TESTO_OT23_IN_VERIFICA}» VIETATO citare percentuali o cifre di riduzione INAIL e VIETATO presentare l'OT23 come una riduzione ottenibile: l'ammissibilità è in verifica con l'INAIL.)
 
 ## Raccomandazioni per l'Anno 2
 (3-4 azioni, scelte fra ciò che il programma prevede già)
@@ -437,7 +438,7 @@ function buildAndamentoSection(t12, client, T) {
 // è presente (l'AI ha deviato dalle intestazioni), la appende in fondo. No-op se vuota.
 function injectAndamento(report, section) {
   if (!section) return report;
-  const anchors = ['## Documentazione INAIL OT23', '## Documentazione INAIL', '## Raccomandazioni'];
+  const anchors = ['## Documentazione degli interventi', '## Documentazione INAIL OT23', '## Documentazione INAIL', '## Raccomandazioni'];
   for (const a of anchors) {
     const idx = report.indexOf(a);
     if (idx !== -1) return `${report.slice(0, idx)}${section}\n\n${report.slice(idx)}`;
@@ -466,9 +467,9 @@ Sintesi dei risultati del programma ES Work al termine dell'Anno 1${t12.count ==
 | Miglioramento percepito (PGIC medio) | ${t12.avgPgic}/5${t12.improvedPct != null ? ` · ${t12.improvedPct}% migliorati` : ''} |
 | Prevalenza L1 osservata (intake → 12 mesi) | ${t12.t0L1} → ${t12.t12L1}${t12.kpiDeltaLabel} |
 
-## Documentazione INAIL OT23
+## Documentazione degli interventi
 
-Elementi per la richiesta di riduzione del tasso (modello OT23): ${completed} interventi erogati su ${planned} pianificati, monitoraggio continuo dei dipendenti, formazione collettiva e sportello osteopatico in sede.
+${completed} interventi erogati su ${planned} pianificati. ${TESTO_OT23_IN_VERIFICA}
 
 ## Raccomandazioni per l'Anno 2
 

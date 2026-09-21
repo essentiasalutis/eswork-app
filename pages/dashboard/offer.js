@@ -382,7 +382,7 @@ In sintesi, il programma anno 1 prevede:
 • Formazione collettiva su postura ed ergonomia
 • 2 review intermedie (3 e 6 mesi) + report annuale finale
 • Coordinamento completo
-• Dati e documentazione degli interventi erogati, utilizzabili per la domanda OT23
+• Documentazione degli interventi erogati: pianificazione, presenze, risultati
 
 Investimento Anno 1: ${prezzoY1} (${DICITURA_IVA_BREVE})
 ${scadenza ? `\n${fraseValidita(scadenza)}\n` : ''}

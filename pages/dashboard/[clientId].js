@@ -1482,7 +1482,7 @@ ${FIRMA}`,
             {[
               { type: 't3', label: '📊 Report T3 (3 mesi)', desc: 'KPI intermedi + trend NRS', color: 'blue' },
               { type: 't6', label: '📈 Report T6 (6 mesi)', desc: 'Review intermedia + KPI', color: 'purple' },
-              { type: 't12', label: '🏆 Report Annuale (12 mesi)', desc: '3 KPI esito + prevalenza + OT23', color: 'amber' },
+              { type: 't12', label: '🏆 Report Annuale (12 mesi)', desc: '3 KPI esito + prevalenza + documentazione interventi', color: 'amber' },
             ].map(({ type, label, desc, color }) => {
               const colorCls = {
                 green: 'bg-green-600 hover:bg-green-700 disabled:bg-green-300',

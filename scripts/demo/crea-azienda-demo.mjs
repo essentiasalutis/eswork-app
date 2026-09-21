@@ -35,8 +35,13 @@ const env = Object.fromEntries(fs.readFileSync('.env.local', 'utf8').split('\n')
 const db = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
 const BASE = 'http://localhost:3320';
 const PRO = 'pro_1777478722429_z57rq';
-const C = 'dmo_officine';
-const A = 'dmo_checkup_t0';
+// Identificativi: quelli della demo delle presentazioni, oppure (per le prove) quelli
+// di un'azienda usa e getta passati da variabili d'ambiente.
+const P = process.env.DEMO_PREFISSO || 'dmo';
+const C = process.env.DEMO_CLIENT || 'dmo_officine';
+const A = `${P}_checkup_t0`;
+const NOME = process.env.DEMO_NOME || 'Officine Demo S.p.A.';
+const CODICE = process.env.DEMO_CODICE || 'DMOOFF01';
 const AVVIO = '2025-09-22';
 
 // Sessione admin per le API locali (firmata come il server: chiave del ruolo admin,
@@ -50,7 +55,7 @@ const pick = (arr) => arr[Math.floor(r() * arr.length)];
 const tra = (a, b) => a + Math.floor(r() * (b - a + 1));
 const hex = (n) => crypto.randomBytes(n).toString('hex');
 let seq = 0;
-const id = (p) => `dmo_${p}_${(++seq).toString(36)}`;
+const id = (p) => `${P}_${p}_${(++seq).toString(36)}`;
 // Data e ora (Roma ≈ UTC+1/+2: 08:00Z = mattina) a partire da un giorno 'AAAA-MM-GG'.
 const g = (giorno, ora = 8, min = 0) => new Date(`${giorno}T${String(ora).padStart(2, '0')}:${String(min).padStart(2, '0')}:00Z`).toISOString();
 const piuGiorni = (giorno, n) => new Date(Date.parse(`${giorno}T12:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
@@ -188,14 +193,14 @@ async function fase1() {
   const { data: ti } = await db.from('testi_legali').select('id,versione,impronta').eq('codice', 'informativa_estesa').eq('stato', 'in_vigore').single();
   S.testi = { consenso: tc, informativa: ti };
 
-  await ins('clients', { id: C, name: 'Officine Demo S.p.A.', sector: 1, employees: 300, contact_name: 'Laura Ferri', contact_email: 'l.ferri@officinedemo.example', contact_phone: '011 000 0000', source: 'passaparola', pipeline_stage: 'meeting_scheduled', created_at: g('2025-07-10'), pricing_version: 'v2', tipo_prodotto: 'programma_completo', is_demo: true, capienza_gruppo: 25, assessment_share_code: 'DMOOFF01', hr_ingressi_token: hex(24) });
+  await ins('clients', { id: C, name: NOME, sector: 1, employees: 300, contact_name: 'Laura Ferri', contact_email: 'l.ferri@officinedemo.example', contact_phone: '011 000 0000', source: 'passaparola', pipeline_stage: 'meeting_scheduled', created_at: g('2025-07-10'), pricing_version: 'v2', tipo_prodotto: 'programma_completo', is_demo: true, capienza_gruppo: 25, assessment_share_code: CODICE, hr_ingressi_token: hex(24) });
   await ins('first_meetings', { id: id('fm'), client_id: C, employees: 300, sector: 1, max_people_training: 25, num_locations: 2, absence_days: 2100, turnover: 12, remote_work: 'no', work_shifts: 'due turni', internal_contact: 'Laura Ferri (HR)', motivation: 'Ridurre le assenze legate al mal di schiena in produzione', created_at: g('2025-07-10', 10), updated_at: g('2025-07-10', 11),
-    data: { step1: { nome: 'Officine Demo S.p.A.', ref_nome: 'Laura Ferri', ref_ruolo: 'Responsabile HR', ref_email: 'l.ferri@officinedemo.example', ref_tel: '011 000 0000', work_desc: 'Lavorazioni meccaniche, montaggio e magazzino su due turni; uffici tecnici e amministrativi.', sector: 'manufacturing', disturbi: ['Mal di schiena', 'Cervicale', 'Spalle', 'Dolori da movimentazione'], disturbi_altro: '', prev_fatta: 'no', prev_note: '', assenteismo: 'alto', absence_days: 2100, absence_days_msk: 700, premio_inail: 48000, note: 'Molte richieste dal reparto montaggio.' },
+    data: { step1: { nome: NOME, ref_nome: 'Laura Ferri', ref_ruolo: 'Responsabile HR', ref_email: 'l.ferri@officinedemo.example', ref_tel: '011 000 0000', work_desc: 'Lavorazioni meccaniche, montaggio e magazzino su due turni; uffici tecnici e amministrativi.', sector: 'manufacturing', disturbi: ['Mal di schiena', 'Cervicale', 'Spalle', 'Dolori da movimentazione'], disturbi_altro: '', prev_fatta: 'no', prev_note: '', assenteismo: 'alto', absence_days: 2100, absence_days_msk: 700, premio_inail: 48000, note: 'Molte richieste dal reparto montaggio.' },
       step2: { sedi: [{ nome: 'Stabilimento', employees: 200 }, { nome: 'Uffici', employees: 100 }], capienza: 25, training_mode: 'per_sede', fatturato: 'high', hr_maturity: 'medium', tier_override: null, tier: null, ergonomia_ufficio: 100, ergonomia_ufficio_auto: true, ergonomia_addetti: 40, ergonomia_postazioni: 6 },
       step3: { spazio: 'sala riunioni piano terra', spazio_note: '', fasce: ['Mattina', 'Prima/dopo turno'], mc: 'si', mc_nome: 'Dott. Medico Competente', mc_contatti: '', esg: 'si', refop_nome: 'Marco Villa', refop_ruolo: 'Capo reparto', refop_contatti: '' },
       params: { l2_mult: 2, vat_exempt: true } } });
   // Stima consegnata: il generatore vero scrive la forbice (snapshot) e porta la pipeline a «Stima inviata».
-  await api('POST', '/api/stima', { clientId: C, name: 'Officine Demo S.p.A.', contact_name: 'Laura Ferri', sector: 'manufacturing', employees: 300, groups: 12, vatExempt: true, l2Mult: 2, store: true, ergonomiaUfficio: 100, ergonomiaAddetti: 40, ergonomiaPostazioni: 6 });
+  await api('POST', '/api/stima', { clientId: C, name: NOME, contact_name: 'Laura Ferri', sector: 'manufacturing', employees: 300, groups: 12, vatExempt: true, l2Mult: 2, store: true, ergonomiaUfficio: 100, ergonomiaAddetti: 40, ergonomiaPostazioni: 6 });
   const { data: fm } = await db.from('first_meetings').select('id, stima_snapshot').eq('client_id', C).single();
   await upd('first_meetings', { stima_snapshot: { ...fm.stima_snapshot, at: g('2025-07-17', 10) } }, 'id', fm.id);
   log(`   Stima: forbice ${fm.stima_snapshot.forchetta.min.price_y1} – ${fm.stima_snapshot.forchetta.max.price_y1} €`);
@@ -205,7 +210,7 @@ async function fase1() {
   await ins('org_dipendente', S.dip.map(d => ({ id: d.did, client_id: C, nome: d.nome, matricola: d.matricola, data_ingresso: d.ingresso, attivo: true, straordinario: false, inserito_da: 'admin', area: d.area, created_at: g('2025-09-15') })));
 
   // Check-up: 25/8 – 7/9, 228 risposte (76%).
-  await ins('assessments', { id: A, client_id: C, type: 'initial', status: 'closed', share_code: 'DMOT0Q01', created_at: g('2025-08-25', 6), chiude_il: '2025-09-07', chiuso_at: g('2025-09-07', 21, 59) });
+  await ins('assessments', { id: A, client_id: C, type: 'initial', status: 'closed', share_code: process.env.DEMO_CODICE_T0 || 'DMOT0Q01', created_at: g('2025-08-25', 6), chiude_il: '2025-09-07', chiuso_at: g('2025-09-07', 21, 59) });
   const rispondenti = [...S.dip].sort(() => r() - 0.5).slice(0, 228);
   const livelli = [...Array(39).fill('level1'), ...Array(78).fill('level2'), ...Array(111).fill('level3')].sort(() => r() - 0.5);
   const resp = [], paz = [], cons = [], attesa = [];

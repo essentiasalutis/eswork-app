@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/pipeline', label: 'Pipeline', icon: '📊', color: 'purple' },
   { href: '/dashboard/professionals', label: 'Professionisti', icon: '👨‍⚕️', color: 'indigo' },
   { href: '/dashboard/professional-compliance', label: 'Conformità prof.', icon: '🛡️', color: 'rose' },
+  { href: '/dashboard/medici-competenti', label: 'Medici competenti', icon: '🩺', color: 'teal' },
   { href: '/dashboard/pro-document-log', label: 'Log documenti prof.', icon: '📁', color: 'slate' },
   { href: '/dashboard/referrals', label: 'Referral B2C', icon: '🔗', color: 'orange' },
   { href: '/dashboard/compliance', label: 'Compliance', icon: '✅', color: 'teal' },

@@ -30,6 +30,7 @@ import { createClient } from '@supabase/supabase-js';
 import { rng, dipendenti as generaDipendenti, risposte } from './popolazione.mjs';
 import { computeLevel, BODY_ZONES } from '../../lib/scoring.js';
 import { PROTOCOLLO } from '../../lib/protocollo.mjs';
+import { CONFIG } from '../../lib/config.js';
 
 const env = Object.fromEntries(fs.readFileSync('.env.local', 'utf8').split('\n').filter(l => l.includes('=')).map(l => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^["']|["']$/g, '')]; }));
 const db = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
@@ -198,9 +199,10 @@ async function fase1() {
     data: { step1: { nome: NOME, ref_nome: 'Laura Ferri', ref_ruolo: 'Responsabile HR', ref_email: 'l.ferri@officinedemo.example', ref_tel: '011 000 0000', work_desc: 'Lavorazioni meccaniche, montaggio e magazzino su due turni; uffici tecnici e amministrativi.', sector: 'manufacturing', disturbi: ['Mal di schiena', 'Cervicale', 'Spalle', 'Dolori da movimentazione'], disturbi_altro: '', prev_fatta: 'no', prev_note: '', assenteismo: 'alto', absence_days: 2100, absence_days_msk: 700, premio_inail: 48000, note: 'Molte richieste dal reparto montaggio.' },
       step2: { sedi: [{ nome: 'Stabilimento', employees: 200 }, { nome: 'Uffici', employees: 100 }], capienza: 25, training_mode: 'per_sede', fatturato: 'high', hr_maturity: 'medium', tier_override: null, tier: null, ergonomia_ufficio: 100, ergonomia_ufficio_auto: true, ergonomia_addetti: 40, ergonomia_postazioni: 6 },
       step3: { spazio: 'sala riunioni piano terra', spazio_note: '', fasce: ['Mattina', 'Prima/dopo turno'], mc: 'si', mc_nome: 'Dott. Medico Competente', mc_contatti: '', esg: 'si', refop_nome: 'Marco Villa', refop_ruolo: 'Capo reparto', refop_contatti: '' },
-      params: { l2_mult: 2, vat_exempt: true } } });
+      params: { l2_mult: 2, vat_exempt: true, rates: { ...CONFIG.rates_new } } } });
   // Stima consegnata: il generatore vero scrive la forbice (snapshot) e porta la pipeline a «Stima inviata».
-  await api('POST', '/api/stima', { clientId: C, name: NOME, contact_name: 'Laura Ferri', sector: 'manufacturing', employees: 300, groups: 12, vatExempt: true, l2Mult: 2, store: true, ergonomiaUfficio: 100, ergonomiaAddetti: 40, ergonomiaPostazioni: 6 });
+  // Tariffe esplicite (21/9): la Stima non ripiega più in silenzio su quelle standard.
+  await api('POST', '/api/stima', { clientId: C, name: NOME, contact_name: 'Laura Ferri', sector: 'manufacturing', employees: 300, groups: 12, vatExempt: true, l2Mult: 2, rates: { ...CONFIG.rates_new }, store: true, ergonomiaUfficio: 100, ergonomiaAddetti: 40, ergonomiaPostazioni: 6 });
   const { data: fm } = await db.from('first_meetings').select('id, stima_snapshot').eq('client_id', C).single();
   await upd('first_meetings', { stima_snapshot: { ...fm.stima_snapshot, at: g('2025-07-17', 10) } }, 'id', fm.id);
   log(`   Stima: forbice ${fm.stima_snapshot.forchetta.min.price_y1} – ${fm.stima_snapshot.forchetta.max.price_y1} €`);

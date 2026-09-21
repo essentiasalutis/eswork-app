@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import { requireAuthSsr } from '../../lib/auth';
-import { getClientById } from '../../lib/store';
-import { getPricingSettingsV2 } from '../../lib/pricing/settings';
 import { datiOffertaDaCheckup } from '../../lib/offerta-server';
 import {
   trafficLight, TL_COLOR, TL_BG, TL_BORDER, TYPE_LABELS, generateSummaryText, BODY_ZONES,
 } from '../../lib/scoring';
-import { calculatePricing, fmt } from '../../lib/calculator';
+import { fmt } from '../../lib/calculator';
 import { CONFIG } from '../../lib/config';
 import { nomeLivello } from '../../lib/livelli';
 import { oggiRoma, aggiungiGiorni } from '../../lib/checkup';
@@ -122,7 +120,7 @@ function Page({ children, className = '' }) {
 // del Listino serve la conferma, sotto il costo è rifiutato. Il documento mostra solo
 // il totale finale; l'Anno 2 resta a prezzo pieno.
 
-function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine, sconto, margineFinale, rinnovoPieno, revisioneForbice, personalizzato, posizione, minimoForbice, prezzoFissato, conTetto }) {
+function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine, sconto, margineFinale, rinnovoPieno, revisioneForbice, posizione, minimoForbice, prezzoFissato, conTetto }) {
   const [aperto, setAperto] = useState(false);
   const [prezzo, setPrezzo] = useState('');
   const [motivo, setMotivo] = useState('');
@@ -186,8 +184,6 @@ function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine,
 
       {prezzoFissato ? (
         <div className="mt-1.5 text-gray-500">Il Report di Attivazione è già stato generato: il prezzo dell&apos;Anno 1 è fissato e non si modifica più.</div>
-      ) : personalizzato ? (
-        <div className="mt-1.5 text-gray-500">Con parametri personalizzati nell&apos;indirizzo il prezzo applicato non si registra: apri l&apos;offerta dalla scheda azienda.</div>
       ) : (
         <div className="mt-1.5 flex flex-wrap gap-3">
           <button onClick={() => { setAperto(a => !a); setEsito(null); }} className="underline font-semibold">
@@ -199,7 +195,7 @@ function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine,
         </div>
       )}
 
-      {aperto && !personalizzato && !prezzoFissato && (
+      {aperto && !prezzoFissato && (
         <div className="mt-2 rounded-lg bg-white border border-gray-200 p-3 space-y-2 text-gray-700">
           <label className="block font-semibold text-gray-600">Prezzo Anno 1 applicato (€, IVA esclusa)
             <input inputMode="numeric" value={prezzo} onChange={e => { setPrezzo(e.target.value.replace(/[^0-9]/g, '')); setConferma(false); }}
@@ -255,8 +251,8 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
   async function generaPianoAi() {
     if (!nmq || aiStato === 'attesa') return;
     // Riservatezza: le zone sotto soglia non escono (sarebbero stampate con la loro
-    // percentuale). Il preventivo dal colloquio non ha risposte reali: niente soglie.
-    const r = assessment && !assessment.estimate ? vistaRiservata(nmq) : null;
+    // percentuale).
+    const r = assessment ? vistaRiservata(nmq) : null;
     if (r && !r.pubblicabile) return;
     setAiStato('attesa');
     try {
@@ -288,15 +284,11 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
     );
   }
 
-  // Offerta VERA = dopo il check-up (non il preventivo stimato dalla scheda colloquio):
-  // solo questa ha validità e sposta l'azienda in "Offerta aperta".
-  const offertaVera = !assessment.estimate;
   // Programma completo sul listino v2: le 12 voci di Enrico + le quantità del primo anno.
   // Mai valori in euro accanto alle voci (decisione Enrico): un solo numero, l'investimento.
   const nuovoProgramma = (client.pricing_version || 'v1') === 'v2' && client.tipo_prodotto !== 'pacchetto_prevenzione';
-  // Riservatezza: stesse soglie del Report sulla scheda (lib/kanon.js). Il preventivo
-  // stimato dal colloquio non ha dati del check-up (numeri stimati), quindi niente soglie.
-  const riservata = assessment.estimate ? null : vistaRiservata(nmq);
+  // Riservatezza: stesse soglie del Report sulla scheda (lib/kanon.js).
+  const riservata = vistaRiservata(nmq);
   const nonPubblicabile = !!(riservata && !riservata.pubblicabile);
   const cella = (key) => {
     const l = nmq[{ l1: 'level1', l2: 'level2', l3: 'level3' }[key]];
@@ -383,7 +375,7 @@ In sintesi, il programma anno 1 prevede:
 • Coordinamento completo e documentazione INAIL OT23
 
 Investimento Anno 1: ${prezzoY1} (${DICITURA_IVA_BREVE})
-${offertaVera && scadenza ? `\n${fraseValidita(scadenza)}\n` : ''}
+${scadenza ? `\n${fraseValidita(scadenza)}\n` : ''}
 Il documento allegato contiene tutti i dettagli: dati emersi dal check-up, piano di intervento, analisi ROI e metodologia.
 
 Sono disponibile per qualsiasi domanda o per fissare una call di approfondimento.
@@ -471,32 +463,26 @@ ${FIRMA}`;
           >
             ✉ Invia offerta via email
           </button>
-          {offertaVera && (
-            <>
-              <a href={`/dashboard/presentazione/${client.id}`} className="flex items-center gap-1 text-sm text-white bg-gray-900 px-4 py-2 rounded-xl font-semibold">🖥 Presenta</a>
-              <a href={`/dashboard/sintesi/${client.id}`} className="flex items-center gap-1 text-sm text-gray-700 border border-gray-300 bg-white px-4 py-2 rounded-xl font-semibold">📄 Sintesi</a>
-            </>
-          )}
+          <a href={`/dashboard/presentazione/${client.id}`} className="flex items-center gap-1 text-sm text-white bg-gray-900 px-4 py-2 rounded-xl font-semibold">🖥 Presenta</a>
+          <a href={`/dashboard/sintesi/${client.id}`} className="flex items-center gap-1 text-sm text-gray-700 border border-gray-300 bg-white px-4 py-2 rounded-xl font-semibold">📄 Sintesi</a>
         </div>
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-xs text-amber-800">
           <strong>Per un PDF pulito:</strong> nel dialog di stampa Chrome → <em>Altre impostazioni</em> → deseleziona <strong>&quot;Intestazioni e piè di pagina&quot;</strong> → salva come PDF
         </div>
 
         {/* Validità dell'offerta — scelta qui, stampata nel documento se c'è una data */}
-        {offertaVera && (
-          <div className="mt-2 rounded-xl px-4 py-2.5 text-xs border bg-white border-gray-200 text-gray-700 flex items-center gap-2 flex-wrap">
-            <strong>⏳ Validità dell&apos;offerta</strong>
-            <input type="date" value={scadenza} min={oggiRoma()} onChange={e => setScadenza(e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1" />
-            {scadenza
-              ? <button onClick={() => setScadenza('')} className="text-gray-500 underline">togli la scadenza</button>
-              : <span className="font-semibold text-gray-600">senza scadenza</span>}
-            <span className="text-gray-500">
-              {`Scadenza proposta dal Listino (${offertaGiorni} giorni): cancellala se questa offerta non deve scadere.`}
-              {' '}Con «Invia offerta via email» l&apos;azienda passa in «Offerta aperta» con questa data.
-            </span>
-            {esitoInvio && <span className={`font-semibold ${esitoInvio.ok ? 'text-green-700' : 'text-red-600'}`}>{esitoInvio.testo}</span>}
-          </div>
-        )}
+        <div className="mt-2 rounded-xl px-4 py-2.5 text-xs border bg-white border-gray-200 text-gray-700 flex items-center gap-2 flex-wrap">
+          <strong>⏳ Validità dell&apos;offerta</strong>
+          <input type="date" value={scadenza} min={oggiRoma()} onChange={e => setScadenza(e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1" />
+          {scadenza
+            ? <button onClick={() => setScadenza('')} className="text-gray-500 underline">togli la scadenza</button>
+            : <span className="font-semibold text-gray-600">senza scadenza</span>}
+          <span className="text-gray-500">
+            {`Scadenza proposta dal Listino (${offertaGiorni} giorni): cancellala se questa offerta non deve scadere.`}
+            {' '}Con «Invia offerta via email» l&apos;azienda passa in «Offerta aperta» con questa data.
+          </span>
+          {esitoInvio && <span className={`font-semibold ${esitoInvio.ok ? 'text-green-700' : 'text-red-600'}`}>{esitoInvio.testo}</span>}
+        </div>
 
         {scartoL2 && scartoL2.sopra && (
           <div className="mt-2 rounded-xl px-4 py-2.5 text-xs border bg-amber-50 border-amber-300 text-amber-900">⚠ <strong>Solo per te:</strong> {testoScartoLivello2(scartoL2)}</div>
@@ -508,8 +494,8 @@ ${FIRMA}`;
             «Nessun tetto» e «prezzo dentro il tetto» non sono la stessa cosa quando
             si rilegge un'offerta a settimane di distanza (Enrico, 14/9). */}
         {calc && tetto && (() => {
-          // Modalità preventivo (calcolatore, senza check-up): il tetto non si calcola,
-          // quindi il riquadro non c'è. Prima la pagina andava in errore su tetto.min.
+          // Senza calcolo o senza tetto il riquadro non c'è (prima la pagina andava in
+          // errore su tetto.min).
           const st = tetto.stato;
           const stile = st === 'capato' ? 'bg-amber-50 border-amber-300 text-amber-900'
             : st === 'sopra_autorizzato' ? 'bg-red-50 border-red-200 text-red-800'
@@ -532,10 +518,10 @@ ${FIRMA}`;
             </div>
           );
         })()}
-        {calc && tetto && offertaVera && prezzo && <PrezzoApplicato client={client} query={query} {...prezzo} />}
+        {calc && tetto && prezzo && <PrezzoApplicato client={client} query={query} {...prezzo} />}
       </div>
 
-      {emailModal && <EmailModal modal={emailModal} onClose={() => setEmailModal(null)} onInvia={offertaVera ? (() => registraInvio()) : null} />}
+      {emailModal && <EmailModal modal={emailModal} onClose={() => setEmailModal(null)} onInvia={() => registraInvio()} />}
 
       {/* Conferma consapevole dello sforamento. Non è una spunta sola: senza una
           motivazione scritta l'offerta non parte — l'eccezione deve lasciare
@@ -989,7 +975,7 @@ ${FIRMA}`;
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Accettazione offerta</div>
           <div style={{ fontSize: 11, color: '#374151', lineHeight: 1.7, marginBottom: 20 }}>
             Il/La sottoscritto/a dichiara di accettare integralmente la presente proposta di intervento ES Work per <strong>{client.name}</strong>, nei termini e alle condizioni indicate.
-            {offertaVera && scadenza && <> La presente offerta è valida <strong>{finoAl(scadenza)}</strong>.</>}
+            {scadenza && <> La presente offerta è valida <strong>{finoAl(scadenza)}</strong>.</>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 }}>
             <div>
@@ -1043,81 +1029,23 @@ ${FIRMA}`;
   );
 }
 
-// Parametri custom dalla scheda colloquio (tier, gruppi, tariffe, IVA) → il PDF
-// usa ESATTAMENTE gli stessi numeri della scheda.
-function readPricingParams(q) {
-  const has = q.rs != null || q.tier || q.groups != null || q.vat != null;
-  if (!has) return null;
-  return {
-    tier: q.tier || undefined,
-    groups: q.groups != null ? parseInt(q.groups) : undefined,
-    vatExempt: q.vat != null ? q.vat === '1' : undefined,
-    rates: q.rs != null ? {
-      sportello_sell: +q.rs, sportello_cost: +q.rsc,
-      prevalidation_sell: +q.rps, prevalidation_cost: +q.rpc,
-      training_sell: +q.rts, training_cost: +q.rtc,
-    } : undefined,
-  };
-}
-function syntheticNmq(n, l1, l2) {
-  const l3 = Math.max(0, n - l1 - l2);
-  const pct = c => (n > 0 ? Math.round((c / n) * 100) : 0);
-  const empty = { count: 0, pct: 0 };
-  return {
-    zones: [],
-    level1: { count: l1, pct: pct(l1) },
-    level2: { count: l2, pct: pct(l2) },
-    level3: { count: l3, pct: pct(l3) },
-    prevalence: { count: l1 + l2, pct: pct(l1 + l2) },
-    byRole: { production: { n: 0, level1: empty, level2: empty, level3: empty, zones: [] }, office: { n: 0, level1: empty, level2: empty, level3: empty, zones: [] }, unknown: { n: 0, level1: empty, level2: empty, level3: empty, zones: [] } },
-    n,
-  };
-}
-
 export const getServerSideProps = requireAuthSsr(async (ctx) => {
   const q = ctx.query;
-  const { assessmentId, clientId, n, l1, l2 } = q;
-  const custom = readPricingParams(q);
+  const { assessmentId, n, l1, l2 } = q;
   let offertaGiorni = 10;
   let scartoL2Soglia = 15;
   try { ({ offertaGiorni, scartoL2Soglia } = await (await import('../../lib/org')).getOrgParams()); } catch (_) {}
 
-  // MODALITÀ PREVENTIVO da scheda colloquio: clientId + numeri stimati, nessun assessment
-  if (!assessmentId && clientId) {
-    try {
-      const client = await getClientById(clientId);
-      if (!client) return { notFound: true };
-      const totalN = n ? parseInt(n) : (client.employees || 0);
-      const l1v = l1 != null ? parseInt(l1) : 0;
-      const l2v = l2 != null ? parseInt(l2) : 0;
-      // Versione listino SEMPRE dal record cliente (mai da query); fail-safe v1.
-      const pricingVersion = client.pricing_version || 'v1';
-      const v2Params = pricingVersion === 'v2' ? (await getPricingSettingsV2()).params : null;
-      const calc = calculatePricing({ n: totalN, l1: l1v, l2: l2v, pricingVersion, v2Params, ...(custom || {}) });
-      const nmqStimato = syntheticNmq(totalN, l1v, l2v);
-      return {
-        props: {
-          client,
-          assessment: { type: 'initial', n: totalN, client_id: clientId, estimate: true },
-          nmq: nmqStimato,
-          calc,
-          roi: null,
-          date: today(),
-          offertaGiorni,
-          // Numeri stimati dal colloquio (nessuna risposta reale): niente soglie k-anon.
-          pianoBase: pianoDeterministico(nmqStimato.zones || []),
-        },
-      };
-    } catch (e) { console.error(e); return { notFound: true }; }
-  }
-
+  // Solo dopo un check-up (21/9): tolti la «modalità preventivo» senza check-up e le
+  // tariffe lette dall'indirizzo, un vecchio percorso del calcolatore che nessun link
+  // usava più e che accettava numeri dall'indirizzo e tariffe di riserva silenziose.
   if (!assessmentId) {
     return { props: { client: null, assessment: null, nmq: null, calc: null, roi: null, date: today() } };
   }
 
   try {
     // Numeri dalla fonte unica (lib/offerta-server.js), condivisa con Presentazione e Sintesi.
-    const d = await datiOffertaDaCheckup({ assessmentId, n, l1, l2, custom });
+    const d = await datiOffertaDaCheckup({ assessmentId, n, l1, l2 });
     if (!d) return { notFound: true };
     const { client, assessment, nmq, calc, forchetta, tetto } = d;
     // Solo per il riquadro a video (mai nel documento): prezzo di partenza, costo,
@@ -1125,7 +1053,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     const prezzo = {
       prezzoBase: d.prezzoBase ?? null, costoAnno1: d.costoAnno1 ?? null, sogliaMargine: d.sogliaMargine ?? null,
       sconto: d.sconto || { stato: 'nessuno' }, margineFinale: d.margineFinale || null, rinnovoPieno: d.rinnovoPieno ?? null,
-      revisioneForbice: d.revisioneForbice || null, personalizzato: !!custom,
+      revisioneForbice: d.revisioneForbice || null,
       posizione: d.posizione || null, minimoForbice: forchetta ? forchetta.min ?? null : null,
       conTetto: !!(tetto && tetto.capApplicato),
       // Dopo il Report di Attivazione il prezzo è fissato: il riquadro resta, il modulo no.

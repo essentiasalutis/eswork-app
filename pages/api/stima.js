@@ -14,6 +14,7 @@ import { validatePacchetto, calculatePacchetto } from '../../lib/pricing/v2';
 import { buildStimaSnapshot, writeStimaSnapshotIfOpen, isChainClosed, getStimaSnapshot } from '../../lib/pricing/snapshot';
 import { avanzaPipeline } from '../../lib/pipeline-server';
 import { quantitaStima } from '../../lib/programma';
+import { tariffeMancanti, messaggioTariffe, scenariValidi, MESSAGGIO_IMPORTI_ZERO } from '../../lib/tariffe.mjs';
 
 export const config = { maxDuration: 60 };
 
@@ -46,6 +47,11 @@ export default requireAuth(async function handler(req, res) {
   const employees = parseInt(b.employees) || 0;
   const sector = b.sector || 'services';
 
+  // Tariffe: tutte e sei, numeri, sopra zero. Nessun ripiego su quelle standard.
+  // Prima di tutto il resto: nessun PDF, nessuna forbice impegnata, pipeline ferma.
+  const mancanti = tariffeMancanti(b.rates);
+  if (mancanti.length) return res.status(422).json({ ok: false, error: messaggioTariffe(mancanti), tariffe_mancanti: mancanti });
+
   // Versione listino SEMPRE risolta server-side dal record cliente (mai dal
   // body/query). Prospect senza record → 'v2' (le nuove aziende nascono v2);
   // cliente esistente senza colonna/valore → fail-safe 'v1'.
@@ -70,6 +76,7 @@ export default requireAuth(async function handler(req, res) {
     const check = validatePacchetto({ employees, pricingVersion, v2Params });
     if (!check.ok) return res.status(422).json({ ok: false, error: check.motivo });
     const pacchetto = calculatePacchetto({ n: employees, groups: b.groups, rates: b.rates, vatExempt: b.vatExempt, v2Params, ergonomia });
+    if (!(pacchetto && Number.isFinite(pacchetto.price) && pacchetto.price > 0)) return res.status(422).json({ ok: false, error: MESSAGGIO_IMPORTI_ZERO });
     const { info: snapshot } = await applySnapshot({
       clientId: b.clientId, pricingVersion, store: b.store,
       draftBuilder: () => buildStimaSnapshot({
@@ -107,6 +114,7 @@ export default requireAuth(async function handler(req, res) {
     n: employees, sector, tier: b.tier, groups: b.groups,
     rates: b.rates, vatExempt: b.vatExempt, l2Mult: b.l2Mult, pricingVersion, v2Params, ergonomia,
   });
+  if (!scenariValidi(forchetta)) return res.status(422).json({ ok: false, error: MESSAGGIO_IMPORTI_ZERO });
 
   // Snapshot: congelato (catena chiusa) / scritto (store=true) / anteprima.
   const { info: snapshot, frozenSnap } = await applySnapshot({

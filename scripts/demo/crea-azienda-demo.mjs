@@ -39,11 +39,11 @@ const C = 'dmo_officine';
 const A = 'dmo_checkup_t0';
 const AVVIO = '2025-09-22';
 
-// Sessione admin per le API locali (firmata con il segreto LOCALE: vale solo qui).
-const cookieAdmin = (() => {
-  const data = Buffer.from(JSON.stringify({ email: env.ADMIN_EMAIL, role: 'admin', exp: Date.now() + 6 * 3600e3 })).toString('base64url');
-  return `esw_session=${data}.${crypto.createHmac('sha256', env.SESSION_SECRET).update(data).digest('base64url')}`;
-})();
+// Sessione admin per le API locali (firmata come il server: chiave del ruolo admin,
+// lib/firma-sessione.js, con il segreto LOCALE: vale solo qui).
+process.env.SESSION_SECRET ||= env.SESSION_SECRET;
+const { firma } = await import('../../lib/firma-sessione.js');
+const cookieAdmin = `esw_session=${firma('admin', { email: env.ADMIN_EMAIL, exp: Date.now() + 6 * 3600e3 })}`;
 
 const r = rng(20250922 + Math.max(0, ['fase1', 'fase2', 'fase3', 'fase4'].indexOf(process.argv[2])) * 7919);   // un seme per fase
 const pick = (arr) => arr[Math.floor(r() * arr.length)];

@@ -82,3 +82,9 @@ test('nessun calcolo di prezzo legge i valori dichiarati del Listino', () => {
     if (dalCodice.length) assert.ok(ammessi.has(f), `${f} legge i valori dichiarati del Listino`);
   }
 });
+
+test('listino v1: fuori le voci Enterprise che non esistono (Audit ESG, Roadmap, Whitepaper)', async () => {
+  const { CONFIG_V1 } = await import('../lib/pricing/v1.js');
+  const tutte = Object.values(CONFIG_V1.management_services).flat().map(s => s.label).join(' | ');
+  for (const via of ['Audit ESG', 'Roadmap triennale', 'Whitepaper']) assert.ok(!tutte.includes(via), via);
+});

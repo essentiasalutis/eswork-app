@@ -56,7 +56,11 @@ test('la fascia su benvenuto, consensi e fine; contatti disattivati', () => {
 });
 
 test('interruttore della parte economica: solo per la demo permanente', () => {
-  assert.match(src('pages/api/clients/[id]/generate-activation-report.js'), /const senzaPrezzo = !!client\.demo_permanente && client\.demo_mostra_prezzo === false;/);
+  const gen = src('pages/api/clients/[id]/generate-activation-report.js');
+  assert.match(gen, /const senzaPrezzo = !!client\.demo_permanente && client\.demo_mostra_prezzo === false;/);
+  // Senza parte economica il report non deve annunciarla (camminata 21/9).
+  assert.match(gen, /\$\{quoteBlock \? 'il piano operativo e l\\'investimento sono riportati' : 'il piano operativo è riportato'\} di seguito/);
+  assert.match(gen, /\$\{senzaPrezzo \? '\\nPARTE ECONOMICA: in questo report NON c/);
 });
 
 test('QR generato in casa: nessun servizio esterno', () => {
@@ -79,4 +83,10 @@ test('v78: l\'azzeramento si rifiuta per ogni altra azienda, in banca dati', () 
   assert.match(sql, /IF NOT public\.demo_e_permanente\(p_client\) THEN\s+RAISE EXCEPTION/);
   assert.match(sql, /REVOKE ALL ON FUNCTION public\.azzera_demo_permanente\(TEXT\) FROM PUBLIC, anon, authenticated;/);
   assert.match(sql, /CREATE UNIQUE INDEX IF NOT EXISTS uq_clients_demo_permanente/);
+});
+
+test('evento nuovo: ergonomia d\'ufficio ricalcolata e Stima congelata della demo tolta', () => {
+  const s = src('lib/demo-permanente-server.js');
+  assert.match(s, /ergonomia_ufficio: Math\.max\(0, n - \(parseInt\(s2\.ergonomia_addetti, 10\) \|\| 0\)\)/);
+  assert.match(s, /stima_snapshot: null/);
 });

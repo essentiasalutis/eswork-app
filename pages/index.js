@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { getSessionToken, verifyToken } from '../lib/auth';
+import { getSessionToken, verifyAdminToken } from '../lib/auth';
 
 export default function Login() {
   const router = useRouter();
@@ -86,7 +86,7 @@ export default function Login() {
 
 export function getServerSideProps({ req }) {
   const token = getSessionToken(req);
-  if (verifyToken(token)) {
+  if (verifyAdminToken(token)) {
     return { redirect: { destination: '/dashboard', permanent: false } };
   }
   return { props: {} };

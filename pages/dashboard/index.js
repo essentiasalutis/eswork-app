@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { getSessionToken, verifyToken } from '../../lib/auth';
+import { getSessionToken, verifyAdminToken } from '../../lib/auth';
 import { getClients, getAssessmentCounts } from '../../lib/store';
 import { getDashboardFormazione } from '../../lib/org';
 import NavMenu from '../../components/NavMenu';

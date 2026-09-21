@@ -41,7 +41,7 @@ const AVVIO = '2025-09-22';
 
 // Sessione admin per le API locali (firmata con il segreto LOCALE: vale solo qui).
 const cookieAdmin = (() => {
-  const data = Buffer.from(JSON.stringify({ email: 'admin@essentiasalutis.it', role: 'admin', exp: Date.now() + 6 * 3600e3 })).toString('base64url');
+  const data = Buffer.from(JSON.stringify({ email: env.ADMIN_EMAIL, role: 'admin', exp: Date.now() + 6 * 3600e3 })).toString('base64url');
   return `esw_session=${data}.${crypto.createHmac('sha256', env.SESSION_SECRET).update(data).digest('base64url')}`;
 })();
 

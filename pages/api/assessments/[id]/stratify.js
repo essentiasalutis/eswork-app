@@ -1,4 +1,4 @@
-import { getSessionToken, verifyToken } from '../../../../lib/auth';
+import { getSessionToken, verifyAdminToken } from '../../../../lib/auth';
 import supabase from '../../../../lib/db';
 import { sendEmail } from '../../../../lib/email';
 import { outcomeL1, outcomeL2, outcomeL3 } from '../../../../lib/email-templates';
@@ -18,7 +18,7 @@ function computeCampaignLevel(responses) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   const token = getSessionToken(req);
-  if (!token || !verifyToken(token)) return res.status(401).json({ error: 'Non autorizzato' });
+  if (!token || !verifyAdminToken(token)) return res.status(401).json({ error: 'Non autorizzato' });
 
   const { id } = req.query;
   try {

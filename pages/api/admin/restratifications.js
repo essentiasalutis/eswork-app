@@ -1,9 +1,9 @@
-import { getSessionToken, verifyToken } from '../../../lib/auth';
+import { getSessionToken, verifyAdminToken } from '../../../lib/auth';
 import { getAllRestratAlerts, updateRestratAlertStatus } from '../../../lib/store';
 
 export default async function handler(req, res) {
   const token = getSessionToken(req);
-  const session = verifyToken(token);
+  const session = verifyAdminToken(token);
   if (!session) return res.status(401).json({ error: 'Non autorizzato' });
 
   if (req.method === 'GET') {

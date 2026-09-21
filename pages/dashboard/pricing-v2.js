@@ -259,11 +259,28 @@ export default function PricingV2Page() {
                     <tr key={voce} className="border-b border-gray-50 align-top">
                       <td className="py-2 pr-3 font-medium text-gray-800">
                         {voce}
+                        {(() => {
+                          // Voce OT23 sospesa (lib/ot23-stato.mjs): vale 0 e non si modifica da qui.
+                          const righe = CONFIGS.map(c => byVoceCfg(voce, c)).filter(Boolean);
+                          const sosp = righe.find(r => r.sospesa);
+                          if (!sosp) return null;
+                          const aMano = righe.filter(r => r.valore_in_banca_dati !== undefined);
+                          return (
+                            <div className="mt-1 space-y-1">
+                              <span className="inline-block text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">Sospesa</span>
+                              <p className="text-xs font-normal text-gray-500">{sosp.motivo_sospensione}</p>
+                              {aMano.length > 0 && (
+                                <p className="text-xs font-normal text-red-700">In banca dati c&apos;è {aMano.map(r => `${r.valore_in_banca_dati} (${r.configurazione})`).join(', ')}: ignorato, la voce è sospesa.</p>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       {CONFIGS.map(c => { const row = byVoceCfg(voce, c); return (
                         <td key={c} className="py-2 pr-2">
                           {row ? (
-                            <input type="number" step="any" defaultValue={row.valore_dichiarato} className={inputCls}
+                            <input type="number" step="any" defaultValue={row.valore_dichiarato} className={`${inputCls} ${row.sospesa ? 'bg-gray-100 text-gray-400' : ''}`}
+                              disabled={!!row.sospesa} title={row.sospesa ? row.motivo_sospensione : undefined}
                               onBlur={e => { if (String(row.valore_dichiarato) !== e.target.value && e.target.value !== '') put({ tipo: 'servizio', id: row.id, valore_dichiarato: e.target.value }, 'valore salvato'); }} />
                           ) : '—'}
                         </td>

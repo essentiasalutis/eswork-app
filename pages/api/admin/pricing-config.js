@@ -52,5 +52,5 @@ export default requireAuth(async function handler(req, res) {
       return res.status(400).json({ error: 'tipo non valido' });
     }
     return res.status(405).end();
-  } catch (e) { return res.status(500).json({ error: e.message }); }
+  } catch (e) { return res.status(e.status || 500).json({ error: e.message }); }
 });

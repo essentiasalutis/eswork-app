@@ -92,7 +92,6 @@ export default requireAuth(async function handler(req, res) {
   const stratTotal = daRisposte ? nmqStrat.n : totalPatients;
 
   const sectorLabel = client.sector === 1 ? 'Manifattura/Produzione' : 'Servizi/Uffici';
-  const tier = client.tier || 'core'; // serve per selezionare i servizi deliverable
   // NB: il tier (Core/Plus/Enterprise) è un nome INTERNO e non viene passato all'AI:
   // fornirglielo e poi vietarne l'uso è una trappola — nel primo giro di test è uscito
   // "il modello Core" nel report destinato al cliente. Il dimensionamento del piano si

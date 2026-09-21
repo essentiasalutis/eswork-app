@@ -6,6 +6,7 @@ import { getClientById } from '../../lib/store';
 import { calculatePricing, computeForchetta, calculateROI, getTier, tierIncludesL2Prevention, fmt } from '../../lib/calculator';
 import { CONFIG } from '../../lib/config';
 import NavMenu from '../../components/NavMenu';
+import { tariffeMancanti, messaggioTariffe } from '../../lib/tariffe.mjs';
 
 const TIER_LABELS = { core: 'Core', plus: 'Plus', enterprise: 'Enterprise' };
 const TIER_COLORS = { core: '#6b7280', plus: '#2563eb', enterprise: '#7c3aed' };
@@ -61,9 +62,12 @@ export default function CalculatorPage({ client, prefill }) {
 
   const prev = CONFIG.l1_prevalence[sector] || [0.08, 0.13, 0.19];
   // Forbice unica (stessa funzione di colloquio / pagina Stima / PDF).
-  const forchetta = useMemo(() => computeForchetta({ n, sector, tier, groups, rates, vatExempt, l2Mult }), [n, sector, tier, groups, rates, vatExempt, l2Mult]);
+  // Tariffe mancanti o a zero (un campo svuotato vale 0): niente calcolo, il messaggio
+  // prende il posto degli importi; i campi delle tariffe restano modificabili (21/9).
+  const mancantiTariffe = tariffeMancanti(rates);
+  const forchetta = useMemo(() => (mancantiTariffe.length ? null : computeForchetta({ n, sector, tier, groups, rates, vatExempt, l2Mult })), [n, sector, tier, groups, rates, vatExempt, l2Mult, mancantiTariffe.length]);
   const scen = forchetta;
-  const calcMin = forchetta.min, calcAvg = forchetta.avg, calcMax = forchetta.max;
+  const calcMin = forchetta?.min, calcAvg = forchetta?.avg, calcMax = forchetta?.max;
   const calc = scenario === 'min' ? calcMin : scenario === 'max' ? calcMax : calcAvg;
   const sel = calc;
 
@@ -253,6 +257,9 @@ export default function CalculatorPage({ client, prefill }) {
           )}
         </div>
 
+        {n > 0 && mancantiTariffe.length > 0 && (
+          <div role="alert" className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-800">{messaggioTariffe(mancantiTariffe)}</div>
+        )}
         {n > 0 && calc && (
           <>
             {/* Scenari */}

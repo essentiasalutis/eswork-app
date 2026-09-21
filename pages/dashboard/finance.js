@@ -1,7 +1,8 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
-import { getClients, getPatientsByClient } from '../../lib/store';
+import { getClients, getPatientsByClient, getFirstMeeting } from '../../lib/store';
+import { tariffeMancanti } from '../../lib/tariffe.mjs';
 import { calculatePricing, fmt } from '../../lib/calculator';
 import { tierFromEmployees } from '../../lib/pricing/tier';
 import NavMenu from '../../components/NavMenu';
@@ -20,7 +21,7 @@ function estimateL1(employees, sector) {
   return Math.round(n * (sector === 1 ? 0.17 : 0.12));
 }
 
-export default function FinancePage({ clients, patientCounts }) {
+export default function FinancePage({ clients, patientCounts, tariffe = {} }) {
   // Le aziende DEMO (clients.is_demo, v49) restano VISIBILI in tabella con badge,
   // ma non entrano in NESSUN aggregato economico: ARR, pipeline, forecast, margini
   // e revenue per tier devono riflettere solo clienti reali. Senza questo filtro il
@@ -40,15 +41,17 @@ export default function FinancePage({ clients, patientCounts }) {
   const clientsWithFinance = clients.map(c => {
     const l1 = patientCounts[c.id]?.l1 || estimateL1(c.employees, c.sector);
     const l2 = patientCounts[c.id]?.l2 || Math.round(l1 * 2.2);
-    // Instradato per versione listino del cliente (fail-safe v1): stessi default
-    // della vecchia firma posizionale (tier/tariffe/gruppi da config).
-    const calc = calculatePricing({ n: parseInt(c.employees) || 0, l1, l2, pricingVersion: c.pricing_version || 'v1' });
+    // Instradato per versione listino del cliente (fail-safe v1). Tariffe dell'azienda
+    // (Stima congelata o scheda del colloquio), mai quelle standard di riserva (21/9):
+    // se mancano, la riga lo dice e l'azienda non entra nei totali.
+    const senzaTariffe = tariffeMancanti(tariffe[c.id]).length > 0;
+    const calc = senzaTariffe ? null : calculatePricing({ n: parseInt(c.employees) || 0, l1, l2, pricingVersion: c.pricing_version || 'v1', rates: tariffe[c.id] });
     const isActive = isFirmato(c.pipeline_stage);
     const revenue = calc?.price_y1 || 0;
     const cost = calc?.total_cost_y1 || 0;
     const margin = cost > 0 ? Math.round((1 - cost / revenue) * 100) : 0;
     if (isActive && !c.is_demo) { totalARR += revenue; totalCost += cost; }
-    return { ...c, calc, revenue, cost, margin, l1, l2 };
+    return { ...c, calc, revenue, cost, margin, l1, l2, senzaTariffe };
   });
 
   const totalMargin = totalARR > 0 ? Math.round((1 - totalCost / totalARR) * 100) : 0;
@@ -167,7 +170,7 @@ export default function FinancePage({ clients, patientCounts }) {
                           ); })()}
                         </td>
                         <td className="px-4 py-3 text-gray-600">{c.l1} / {c.l2}</td>
-                        <td className="px-4 py-3 font-semibold text-green-700">{c.revenue > 0 ? fmt(c.revenue) : '—'}</td>
+                        <td className="px-4 py-3 font-semibold text-green-700">{c.senzaTariffe ? <span className="text-xs font-semibold text-red-600">tariffe mancanti</span> : c.revenue > 0 ? fmt(c.revenue) : '—'}</td>
                         <td className="px-4 py-3 text-gray-500">{c.cost > 0 ? fmt(c.cost) : '—'}</td>
                         <td className="px-4 py-3">
                           <span className={`font-bold ${c.margin > 40 ? 'text-green-600' : c.margin > 30 ? 'text-amber-600' : 'text-red-600'}`}>
@@ -209,8 +212,17 @@ export const getServerSideProps = requireAuthSsr(async () => {
       })
     );
 
-    return { props: { clients, patientCounts } };
+    // Tariffe di ogni azienda, dalla stessa fonte dell'Offerta: la Stima congelata se
+    // c'è (solo lei), altrimenti la scheda del colloquio. Nessuna di riserva (21/9).
+    const tariffe = {};
+    await Promise.all(clients.map(async c => {
+      const fm = await getFirstMeeting(c.id).catch(() => null);
+      const snap = fm && fm.stima_snapshot && fm.stima_snapshot.forchetta ? fm.stima_snapshot : null;
+      tariffe[c.id] = snap ? ((snap.inputs && snap.inputs.rates) || null) : ((fm && fm.data && fm.data.params && fm.data.params.rates) || null);
+    }));
+
+    return { props: { clients, patientCounts, tariffe } };
   } catch {
-    return { props: { clients: [], patientCounts: {} } };
+    return { props: { clients: [], patientCounts: {}, tariffe: {} } };
   }
 });

@@ -8,6 +8,7 @@ import { CONFIG } from '../../lib/config';
 import NavMenu from '../../components/NavMenu';
 import { PROTOCOLLO } from '../../lib/protocollo.mjs';
 import { DICITURA_IVA } from '../../lib/iva.mjs';
+import { tariffeMancanti, messaggioTariffeScheda } from '../../lib/tariffe.mjs';
 
 const STEPS = ['Conosciamo l\'azienda', 'I numeri', 'Logistica', 'Preventivo'];
 const SECTORS = [['services', 'Servizi / Uffici'], ['manufacturing', 'Manifattura'], ['mix', 'Mix']];
@@ -173,21 +174,25 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
   const prev = CONFIG.l1_prevalence[sector] || [0.08, 0.13, 0.19];
   // Forbice unica (stessa funzione usata da pagina Stima / PDF / flag STEP 2),
   // instradata per versione listino (v2: parametri admin + ergonomia).
+  // Tariffe mancanti o a zero (un campo svuotato vale 0): niente calcolo — il motore
+  // non ripiega più sulle standard (21/9). Il messaggio prende il posto degli importi.
+  const mancantiTariffe = tariffeMancanti(rates);
   const forchetta = useMemo(() => {
+    if (mancantiTariffe.length) return null;
     const ergonomia = isV2 ? { nUfficio: nErgUfficio, nAddetti: nErgAddetti, nPostazioni: nErgPostazioni } : undefined;
     return computeForchetta({ n, sector, tier, groups, rates, vatExempt, l2Mult, pricingVersion, v2Params, ergonomia });
-  }, [n, sector, tier, groups, rates, vatExempt, l2Mult, pricingVersion, v2Params, nErgUfficio, nErgAddetti, nErgPostazioni, isV2]);
+  }, [n, sector, tier, groups, rates, vatExempt, l2Mult, pricingVersion, v2Params, nErgUfficio, nErgAddetti, nErgPostazioni, isV2, mancantiTariffe.length]);
   // Pacchetto prevenzione (v2, sotto soglia): prezzo dal motore, regole dure lato server.
   // Nessun tetto di dipendenti (decisione Enrico, 12/9): il pacchetto è un prodotto
   // diverso, non una versione ridotta per le piccole. Si può proporre a chiunque sia su listino v2.
   const pacchettoDisponibile = isV2 && n > 0;
   const pacchetto = useMemo(() => {
-    if (!isV2 || tipoProdotto !== 'pacchetto_prevenzione') return null;
+    if (!isV2 || tipoProdotto !== 'pacchetto_prevenzione' || mancantiTariffe.length || !(n > 0)) return null;
     const ergonomia = { nUfficio: nErgUfficio, nAddetti: nErgAddetti, nPostazioni: nErgPostazioni };
     return calculatePacchetto({ n, groups, rates, vatExempt, v2Params, ergonomia });
-  }, [isV2, tipoProdotto, n, groups, rates, vatExempt, v2Params, nErgUfficio, nErgAddetti, nErgPostazioni]);
+  }, [isV2, tipoProdotto, n, groups, rates, vatExempt, v2Params, nErgUfficio, nErgAddetti, nErgPostazioni, mancantiTariffe.length]);
   const scen = forchetta;                 // {min, avg, max}, ognuno {pct, l1, l2, ...calcolo}
-  const calcMin = forchetta.min, calcAvg = forchetta.avg, calcMax = forchetta.max;
+  const calcMin = forchetta?.min, calcAvg = forchetta?.avg, calcMax = forchetta?.max;
   const calc = scenario === 'min' ? calcMin : scenario === 'max' ? calcMax : calcAvg;
   const sel = calc;                       // sel.l1 / sel.l2 invariati
   const roi = useMemo(() => calc ? calculateROI(calc.price_y1, parseInt(absenceDays) || 0) : null, [calc, absenceDays]);
@@ -376,17 +381,19 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
             </div>
             <Field label="Email del referente" hint="serve per inviare la Stima"><input type="email" value={refEmail} onChange={e => setRefEmail(e.target.value)} className={inputCls} /></Field>
 
-            {n > 0 && (
+            {n > 0 && (forchetta ? (
               <div className="bg-green-600 rounded-2xl p-5 text-white">
                 <div className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-1">Stima di investimento — Anno 1</div>
                 <div className="text-3xl font-bold">{fmt(forchetta.min.price_y1)} – {fmt(forchetta.max.price_y1)}</div>
                 <div className="text-sm opacity-90 mt-1">scenario medio {fmt(forchetta.avg.price_y1)} · si aggiorna mentre scrivi</div>
               </div>
-            )}
+            ) : (
+              <div role="alert" className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-800">{messaggioTariffeScheda(mancantiTariffe).replace(' qui sotto,', ' nel colloquio completo,')}</div>
+            ))}
             {isV2 && forchetta?.avg?.y1?.ergonomia_sotto_minimo && (
               <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">⚠ Ergonomia sotto il minimo fatturabile ({v2Params?.ergonomia_minimo_ore ?? 4}h): accorpare ad altra attività in sede.</div>
             )}
-            <button onClick={goToStima} disabled={!nome.trim() || n <= 0}
+            <button onClick={goToStima} disabled={!nome.trim() || n <= 0 || mancantiTariffe.length > 0}
               className="w-full py-3.5 rounded-2xl bg-green-600 text-white font-bold disabled:opacity-50">Genera Stima di investimento →</button>
             <button type="button" onClick={() => { setModo('completo'); setStep(1); window.scrollTo({ top: 0 }); }}
               className="w-full py-3 rounded-2xl border border-gray-300 text-gray-700 font-semibold">Continua col colloquio completo →</button>
@@ -582,6 +589,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                   </>
                 ) : (
                 <>
+                {forchetta ? (<>
                 <div>
                   <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Scenario di prevalenza — Anno 1</div>
                   <div className="flex gap-2">{[['min', 'Min', scen.min, calcMin], ['avg', 'Medio', scen.avg, calcAvg], ['max', 'Max', scen.max, calcMax]].map(([k, lbl, sc, cc]) => cc && (
@@ -632,6 +640,9 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                     <div className="flex justify-between"><span>Riduzione per break-even</span><span className="font-semibold text-amber-700">{roi.breakeven_pct}%</span></div>
                   </div>
                 )}
+                </>) : (
+                  <div role="alert" className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-800">{messaggioTariffeScheda(mancantiTariffe)}</div>
+                )}
 
                 <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
                   <button onClick={() => setShowParams(v => !v)} className="w-full flex items-center justify-between px-4 py-3"><span className="text-sm font-semibold text-gray-700">⚙️ Parametri della Stima</span><span className="text-gray-400">{showParams ? '▲' : '▼'}</span></button>
@@ -659,7 +670,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                 <div className="flex gap-3">
                   <button onClick={() => goStep(3)} className="py-3.5 px-5 rounded-2xl border border-gray-300 text-gray-600 font-semibold">←</button>
                   <button onClick={() => save()} disabled={busy} className="py-3.5 px-5 rounded-2xl border border-gray-300 text-gray-700 font-semibold disabled:opacity-50">{busy ? '…' : 'Salva scheda'}</button>
-                  <button onClick={goToStima} className="flex-1 py-3.5 rounded-2xl bg-green-600 text-white font-bold">Genera Stima →</button>
+                  <button onClick={goToStima} disabled={mancantiTariffe.length > 0} className="flex-1 py-3.5 rounded-2xl bg-green-600 text-white font-bold disabled:opacity-50">Genera Stima →</button>
                 </div>
                 </>
                 )}

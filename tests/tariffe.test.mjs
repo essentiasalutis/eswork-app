@@ -45,3 +45,27 @@ test('l\'Offerta non legge più tariffe né numeri stimati dall\'indirizzo', () 
   for (const via of ['readPricingParams', 'q.rs', 'syntheticNmq', 'estimate: true', 'custom']) assert.ok(!src.includes(via), via);
   assert.ok(!fs.readFileSync('lib/offerta-server.js', 'utf8').includes('custom'));
 });
+
+test('il motore non ripiega più sulle tariffe standard: si ferma e dice quali mancano', async () => {
+  const { calculatePricing, computeForchetta } = await import('../lib/calculator.js');
+  const { calculatePacchetto } = await import('../lib/pricing/v2.js');
+  const { CONFIG } = await import('../lib/config.js');
+  for (const pricingVersion of ['v1', 'v2']) {
+    assert.throws(() => calculatePricing({ n: 100, l1: 12, l2: 24, pricingVersion }), { name: 'TariffeMancanti' });
+    assert.throws(() => calculatePricing({ n: 100, l1: 12, l2: 24, pricingVersion, rates: { ...CONFIG.rates_new, training_cost: 0 } }), /formazione, costo/);
+    assert.throws(() => computeForchetta({ n: 100, sector: 'services', pricingVersion }), { name: 'TariffeMancanti' });
+    assert.equal(calculatePricing({ n: 0, pricingVersion }), null, 'senza dipendenti non si calcola e non si ferma');
+    assert.ok(calculatePricing({ n: 100, l1: 12, l2: 24, pricingVersion, rates: CONFIG.rates_new }).price_y1 > 0);
+  }
+  assert.throws(() => calculatePacchetto({ n: 30 }), { name: 'TariffeMancanti' });
+});
+
+test('report di Attivazione, Offerta e Finanza non chiamano il motore senza tariffe', () => {
+  const report = fs.readFileSync('pages/api/clients/[id]/generate-activation-report.js', 'utf8');
+  assert.match(report, /if \(quoteErrore\) return res\.status\(422\)/);
+  assert.ok(report.indexOf('tariffeMancanti(tariffeQui)') < report.indexOf('computeForchetta({ n: nEmp'), 'controllo prima della forbice live');
+  const offerta = fs.readFileSync('lib/offerta-server.js', 'utf8');
+  assert.ok(offerta.indexOf('tariffeMancanti(condBasis && condBasis.rates)') < offerta.indexOf('const calcPieno = calculatePricing'));
+  assert.match(fs.readFileSync('pages/dashboard/finance.js', 'utf8'), /rates: tariffe\[c\.id\]/);
+  for (const f of ['lib/pricing/v1.js', 'lib/pricing/v2.js']) assert.ok(!/rates \|\| (cfg|CONFIG_V1)\.rates_new|rates = cfg\.rates_new/.test(fs.readFileSync(f, 'utf8')), `${f}: nessun ripiego`);
+});

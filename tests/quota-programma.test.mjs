@@ -7,9 +7,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { calculatePricing, computeForchetta, calculatePacchetto } from '../lib/pricing/v2.js';
 import { DEFAULTS_V2, parametriDaStimaCongelata } from '../lib/pricing/v2-defaults.mjs';
+import { CONFIG } from '../lib/config.js';
+// Tariffe standard passate in modo esplicito: il motore non ripiega più da sé (21/9).
+const TARIFFE_STANDARD = CONFIG.rates_new;
 
 const PRIMA = { quota_programma_fissa: 0, quota_programma_per_dipendente: 0 };
-const cento = (pct, v2Params) => { const l1 = Math.round(100 * pct); return calculatePricing({ n: 100, l1, l2: l1 * 2, v2Params }); };
+const cento = (pct, v2Params) => { const l1 = Math.round(100 * pct); return calculatePricing({ rates: TARIFFE_STANDARD, n: 100, l1, l2: l1 * 2, v2Params }); };
 
 test('azienda da 100 al 3% e al 12%: prima e dopo la quota', () => {
   assert.equal(cento(0.03, PRIMA).price_y1, 5700);
@@ -34,12 +37,12 @@ test('la quota è una voce propria, fuori dal buffer, con costo al 30%', () => {
 
 test('la forbice include la quota in entrambi gli estremi: il definitivo non la supera', () => {
   for (const sector of ['manufacturing', 'services']) {
-    const f = computeForchetta({ n: 100, sector });
-    const fPrima = computeForchetta({ n: 100, sector, v2Params: PRIMA });
+    const f = computeForchetta({ rates: TARIFFE_STANDARD, n: 100, sector });
+    const fPrima = computeForchetta({ rates: TARIFFE_STANDARD, n: 100, sector, v2Params: PRIMA });
     assert.equal(f.min.price_y1 - fPrima.min.price_y1, 3000);
     assert.equal(f.max.price_y1 - fPrima.max.price_y1, 3000);
     for (const s of [f.min, f.avg, f.max]) {
-      const definitivo = calculatePricing({ n: 100, l1: s.l1, l2: s.l2 }).price_y1;
+      const definitivo = calculatePricing({ rates: TARIFFE_STANDARD, n: 100, l1: s.l1, l2: s.l2 }).price_y1;
       assert.ok(definitivo >= f.min.price_y1 && definitivo <= f.max.price_y1, `${sector} ${s.pct}: ${definitivo} dentro ${f.min.price_y1}–${f.max.price_y1}`);
       // senza la quota nella forbice, lo stesso definitivo sfonderebbe il massimo
       if (s === f.max) assert.ok(definitivo > fPrima.max.price_y1);
@@ -48,7 +51,7 @@ test('la forbice include la quota in entrambi gli estremi: il definitivo non la 
 });
 
 test('Pacchetto da 30: invariato, il check-up è la quota per dipendente, niente quota fissa', () => {
-  const p = calculatePacchetto({ n: 30 });
+  const p = calculatePacchetto({ rates: TARIFFE_STANDARD, n: 30 });
   assert.equal(p.price, 1750);
   assert.equal(p.assessment.sell, 450);
   assert.equal(p.training.sell, 1000);
@@ -59,9 +62,9 @@ test('Pacchetto da 30: invariato, il check-up è la quota per dipendente, niente
 test('Stima congelata prima della quota: il prezzo non cambia di un euro', () => {
   const { quota_programma_fissa, quota_programma_per_dipendente, quota_programma_costo_pct, ...vecchi } = DEFAULTS_V2;
   const congelati = parametriDaStimaCongelata(vecchi);
-  assert.equal(calculatePricing({ n: 300, l1: 51, l2: 102, v2Params: congelati }).price_y1, calculatePricing({ n: 300, l1: 51, l2: 102, v2Params: PRIMA }).price_y1);
-  const f = computeForchetta({ n: 300, sector: 'manufacturing', v2Params: congelati });
-  assert.equal(f.max.price_y1, computeForchetta({ n: 300, sector: 'manufacturing', v2Params: PRIMA }).max.price_y1);
+  assert.equal(calculatePricing({ rates: TARIFFE_STANDARD, n: 300, l1: 51, l2: 102, v2Params: congelati }).price_y1, calculatePricing({ rates: TARIFFE_STANDARD, n: 300, l1: 51, l2: 102, v2Params: PRIMA }).price_y1);
+  const f = computeForchetta({ rates: TARIFFE_STANDARD, n: 300, sector: 'manufacturing', v2Params: congelati });
+  assert.equal(f.max.price_y1, computeForchetta({ rates: TARIFFE_STANDARD, n: 300, sector: 'manufacturing', v2Params: PRIMA }).max.price_y1);
   // una Stima nuova porta la quota con sé
   assert.equal(parametriDaStimaCongelata(DEFAULTS_V2).quota_programma_fissa, 1500);
 });

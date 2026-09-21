@@ -234,7 +234,7 @@ function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine,
 
 // ─── Offer Document ───────────────────────────────────────────────────────────
 
-export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, tetto = null, query = null, date, offertaGiorni = 10, scartoL2 = null, pianoBase = [], prezzo = null }) {
+export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, tetto = null, query = null, date, offertaGiorni = 10, scartoL2 = null, pianoBase = [], prezzo = null, errore = null }) {
   const [emailModal, setEmailModal] = useState(null);
   const [scadenza, setScadenza] = useState(() => scadenzaIniziale(client, offertaGiorni));
   const [esitoInvio, setEsitoInvio] = useState(null); // { ok, testo }
@@ -276,6 +276,15 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
     } catch { setAiStato('non_riuscito'); }
   }
 
+  if (errore) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div role="alert" className="max-w-lg bg-red-50 border border-red-200 rounded-2xl p-5 text-sm text-red-800">
+          <strong>Offerta non generata.</strong> {errore}
+        </div>
+      </div>
+    );
+  }
   if (!client || !assessment) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-400">
@@ -1047,6 +1056,8 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     // Numeri dalla fonte unica (lib/offerta-server.js), condivisa con Presentazione e Sintesi.
     const d = await datiOffertaDaCheckup({ assessmentId, n, l1, l2 });
     if (!d) return { notFound: true };
+    // Tariffe mancanti (21/9): nessun documento, il messaggio dice dove mancano.
+    if (d.errore) return { props: { client: d.client ? { id: d.client.id, name: d.client.name } : null, assessment: null, nmq: null, calc: null, roi: null, date: today(), errore: d.errore } };
     const { client, assessment, nmq, calc, forchetta, tetto } = d;
     // Solo per il riquadro a video (mai nel documento): prezzo di partenza, costo,
     // margine, stato del prezzo applicato, rinnovo, avviso di revisione della forbice.

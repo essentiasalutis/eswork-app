@@ -14,6 +14,8 @@ import {
   getFirstMeeting,
   insertGeneratedReport,
   insertDocument,
+  contaSchedeColloquio,
+  messaggioSchedeDoppie,
 } from '../../../../lib/store';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { calculatePricing, computeForchetta, realL1L2FromAssessment } from '../../../../lib/calculator';
@@ -29,6 +31,7 @@ import { CONFIG } from '../../../../lib/config';
 import { kAnonPartition, tooSmall, K_ANON } from '../../../../lib/kanon';
 import { dataIt } from '../../../../lib/date-it.mjs';
 import { conProtocollo, PROTOCOLLO } from '../../../../lib/protocollo.mjs';
+import { tariffeMancanti, messaggioTariffeDove } from '../../../../lib/tariffe.mjs';
 
 export const config = { maxDuration: 60 };
 
@@ -97,7 +100,9 @@ export default requireAuth(async function handler(req, res) {
 
   // Rapporto col preventivo: condizioni della scheda colloquio + numeri REALI
   // della stratificazione (prezzo cliente; mai margini/costi nel report).
-  const { block: quoteBlock, compliance: quoteCompliance, calc: quoteCalc } = await buildQuoteBlock(id, client, answers);
+  const { block: quoteBlock, compliance: quoteCompliance, calc: quoteCalc, errore: quoteErrore } = await buildQuoteBlock(id, client, answers);
+  // Tariffe mancanti (21/9): il report non si genera, niente catena chiusa, niente PDF.
+  if (quoteErrore) return res.status(422).json({ error: quoteErrore });
   // La generazione del Report CHIUDE la catena Stima→Report → timbra frozen_at
   // sullo snapshot (se esiste). Fatto qui, NON in buildQuoteBlock (usata anche
   // dall'endpoint read-only di regressione).
@@ -379,7 +384,13 @@ export async function buildQuoteBlock(client_id, client, answers) {
     const fmd = fm?.data;
     const snap = getForchettaSnapshot(fm);      // risolve anche la forbice conservata
     const usableSnap = snap && snap.forchetta;  // snapshot programma completo con forbice
-    if (!fmd && !usableSnap) return { block: '', compliance: null };
+    if (!fmd && !usableSnap) {
+      // Schede del colloquio doppie: la scheda c'è ma non si legge. Il report non esce
+      // senza prezzo in silenzio (21/9); senza nessuna scheda resta com'era.
+      const nSchede = await contaSchedeColloquio(client_id).catch(() => 0);
+      if (nSchede > 1) return { block: '', compliance: null, errore: messaggioSchedeDoppie(nSchede, client.name) };
+      return { block: '', compliance: null };
+    }
     const s2 = fmd?.step2 || {};
     const sp = fmd?.params || {};
     const responders = (answers || []).length;
@@ -389,6 +400,13 @@ export async function buildQuoteBlock(client_id, client, answers) {
     // ── Precedenza: SNAPSHOT (promessa congelata) → LIVE (colloquio + config) ──
     // Prezzo reale coi parametri SNAPSHOTTATI, forbice = quella PERSISTITA.
     let source, nEmp, l2Mult, conditions, min, avg, max;
+    // Tariffe (Enrico, 21/9): dalla Stima congelata o dalla scheda del colloquio, mai di
+    // riserva. Se mancano, il report non si genera e il messaggio dice dove mancano.
+    const tariffeQui = usableSnap ? (snap.inputs || {}).rates : sp.rates;
+    const mancantiTariffe = tariffeMancanti(tariffeQui);
+    if (mancantiTariffe.length) {
+      return { block: '', compliance: null, errore: messaggioTariffeDove(mancantiTariffe, `${usableSnap ? 'nella Stima congelata' : 'nella scheda del colloquio'} di ${client.name}`) };
+    }
     if (usableSnap) {
       source = 'snapshot';
       const si = snap.inputs || {};
@@ -493,7 +511,9 @@ export async function buildQuoteBlock(client_id, client, answers) {
     // `calc` con il tetto già applicato: la sezione «Cosa comprende» stampa
     // l'investimento e deve dire il prezzo proposto, non il calcolato.
     return { block, compliance, calc: calcFinale };
-  } catch {
+  } catch (e) {
+    // Il motore si ferma senza tariffe: il report non deve uscire senza prezzo in silenzio.
+    if (e && e.name === 'TariffeMancanti') return { block: '', compliance: null, errore: e.message };
     return { block: '', compliance: null };
   }
 }

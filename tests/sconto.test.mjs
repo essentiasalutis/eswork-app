@@ -9,8 +9,11 @@ import { calculatePricing } from '../lib/pricing/v2.js';
 import { DEFAULTS_V2 } from '../lib/pricing/v2-defaults.mjs';
 import { valutaSconto, statoScontoCliente, applicaScontoAlCalcolo, avvisoRevisioneForbice, rigaRinnovo, margine, MARGINE_MINIMO_PCT, conArticolo } from '../lib/sconto.mjs';
 import { prezzoConTetto, applicaTettoAlCalcolo, posizioneNellaForbice, POSIZIONE } from '../lib/forbice.mjs';
+import { CONFIG } from '../lib/config.js';
+// Tariffe standard passate in modo esplicito: il motore non ripiega più da sé (21/9).
+const TARIFFE_STANDARD = CONFIG.rates_new;
 
-const calc = calculatePricing({ n: 100, l1: 12, l2: 24 });
+const calc = calculatePricing({ rates: TARIFFE_STANDARD, n: 100, l1: 12, l2: 24 });
 const base = { prezzoBase: calc.price_y1, costo: calc.y1.total_cost, sogliaPct: DEFAULTS_V2.sconto_margine_avviso_pct, motivo: 'Prima azienda del distretto, concordato col titolare' };
 
 test('il caso di riferimento: 100 dipendenti al 12%', () => {

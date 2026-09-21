@@ -21,6 +21,11 @@ export default requireAuth(async function handler(req, res) {
     // Array piatto di answers: stessa forma di generate-activation-report.js
     const answers = Object.values((responses && responses.responses) || {}).flat();
 
+    // Prima il percorso vero del report: se rifiuta (tariffe mancanti, schede doppie),
+    // la verifica dice il suo stesso motivo invece di fermarsi su un calcolo replicato.
+    const { block, compliance, errore } = await buildQuoteBlock(clientId, client, answers);
+    if (errore) return res.status(422).json({ error: errore });
+
     // Risoluzione condizioni IDENTICA a buildQuoteBlock (il percorso che
     // persiste il flag) — replicata qui SOLO per esporre gli oggetti completi;
     // il compliance confrontato come autoritativo esce da buildQuoteBlock vero.
@@ -46,8 +51,6 @@ export default requireAuth(async function handler(req, res) {
     const real = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: nEmp, l2Mult, pricingVersion });
     const calc = calculatePricing({ n: nEmp, l1: real.l1, l2: real.l2, pricingVersion, ...conditions });
     const forchetta = computeForchetta({ n: nEmp, sector: sectorKey, l2Mult, pricingVersion, ...conditions });
-    const { block, compliance } = await buildQuoteBlock(clientId, client, answers);
-
     return res.json({
       meta: { clientId, generatedAt: new Date().toISOString() }, // esclusa dal confronto
       computed: {
@@ -55,5 +58,5 @@ export default requireAuth(async function handler(req, res) {
         real, calc, forchetta, compliance, block,
       },
     });
-  } catch (e) { return res.status(500).json({ error: e.message }); }
+  } catch (e) { return res.status(e && e.name === 'TariffeMancanti' ? 422 : 500).json({ error: e.message }); }
 });

@@ -85,3 +85,9 @@ test('Finanza: costo e margine dal motore', () => {
   assert.ok(!f.includes('total_cost_y1'));
   assert.match(f, /calc\.y1\.total_cost/);
 });
+
+test('colloquio senza scheda: il settore parte dall\'anagrafica, non da «servizi»', () => {
+  const src = fs.readFileSync('pages/dashboard/first-meeting.js', 'utf8');
+  assert.match(src, /useState\(s1\.sector \|\| INT_TO_SECTOR\[initialClient\?\.sector\] \|\| 'services'\)/);
+  assert.match(src, /const INT_TO_SECTOR = \{ 1: 'manufacturing', 2: 'services' \}/);
+});

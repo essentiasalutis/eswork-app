@@ -13,6 +13,11 @@ import { tariffeMancanti, messaggioTariffeScheda } from '../../lib/tariffe.mjs';
 const STEPS = ['Conosciamo l\'azienda', 'I numeri', 'Logistica', 'Preventivo'];
 const SECTORS = [['services', 'Servizi / Uffici'], ['manufacturing', 'Manifattura'], ['mix', 'Mix']];
 const SECTOR_TO_INT = { services: 2, manufacturing: 1, mix: 1 };
+// Anagrafica → scheda. Senza scheda il settore parte da quello dell'azienda, non da
+// «servizi»: prima ogni salvataggio automatico lo riscriveva nell'anagrafica (così
+// Industrie Lisa, manifattura, è diventata «servizi» il 13/9). L'anagrafica ha solo
+// due valori: «mix» salvato come manifattura torna manifattura.
+const INT_TO_SECTOR = { 1: 'manufacturing', 2: 'services' };
 const DISTURBI = ['Mal di schiena', 'Cervicale', 'Spalle', 'Tunnel carpale', 'Dolori da postura prolungata', 'Dolori da movimentazione'];
 const FATTURATO = [['low', '< 2 M€'], ['mid', '2–10 M€'], ['high', '> 10 M€']];
 const HR = [['low', 'Bassa'], ['medium', 'Media'], ['high', 'Alta']];
@@ -102,7 +107,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
   const [refEmail, setRefEmail] = useState(s1.ref_email || initialClient?.contact_email || '');
   const [refTel, setRefTel] = useState(s1.ref_tel || initialClient?.contact_phone || '');
   const [workDesc, setWorkDesc] = useState(s1.work_desc || '');
-  const [sector, setSector] = useState(s1.sector || 'services');
+  const [sector, setSector] = useState(s1.sector || INT_TO_SECTOR[initialClient?.sector] || 'services');
   const [disturbi, setDisturbi] = useState(s1.disturbi || []);
   const [disturbiAltro, setDisturbiAltro] = useState(s1.disturbi_altro || '');
   const [prevFatta, setPrevFatta] = useState(s1.prev_fatta || false);

@@ -88,3 +88,7 @@ test('listino v1: fuori le voci Enterprise che non esistono (Audit ESG, Roadmap,
   const tutte = Object.values(CONFIG_V1.management_services).flat().map(s => s.label).join(' | ');
   for (const via of ['Audit ESG', 'Roadmap triennale', 'Whitepaper']) assert.ok(!tutte.includes(via), via);
 });
+
+test('colloquio: avviso sui programmi dei corsi da firmare a mano entro l\'anno (Enrico, 21/9)', () => {
+  assert.match(src('pages/dashboard/first-meeting.js'), /Se la formazione si svolge entro il 31\/12, i programmi dei corsi vanno datati e firmati a mano entro l’anno\./);
+});

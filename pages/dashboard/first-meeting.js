@@ -11,7 +11,7 @@ import { DICITURA_IVA } from '../../lib/iva.mjs';
 import { tariffeMancanti, messaggioTariffeScheda } from '../../lib/tariffe.mjs';
 
 // OT23 in verifica con l'INAIL (Enrico, 21/9): la nota per te nel colloquio, in entrambe le modalità.
-const NOTA_PREMIO_INAIL = 'Quanto versano all’INAIL in un anno. Per ora non entra in nessun documento: finché l’INAIL non risponde per iscritto sull’ammissibilità del programma, niente percentuali né cifre di riduzione OT23. A chi firma in autunno va detto che la documentazione dell’anno in corso copre solo gli interventi fatti entro il 31/12: chi firma a ottobre ne ha due o tre mesi.';
+const NOTA_PREMIO_INAIL = 'Quanto versano all’INAIL in un anno. Per ora non entra in nessun documento: finché l’INAIL non risponde per iscritto sull’ammissibilità del programma, niente percentuali né cifre di riduzione OT23. A chi firma in autunno va detto che la documentazione dell’anno in corso copre solo gli interventi fatti entro il 31/12: chi firma a ottobre ne ha due o tre mesi. Se la formazione si svolge entro il 31/12, i programmi dei corsi vanno datati e firmati a mano entro l’anno.';
 
 const STEPS = ['Conosciamo l\'azienda', 'I numeri', 'Logistica', 'Preventivo'];
 const SECTORS = [['services', 'Servizi / Uffici'], ['manufacturing', 'Manifattura'], ['mix', 'Mix']];

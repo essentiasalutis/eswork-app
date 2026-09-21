@@ -9,6 +9,7 @@ import {
   proCanAccessPatientClinical,
   logAccess,
 } from '../../../../lib/store';
+import { vistaSchedaSintetica } from '../../../../lib/vista';
 
 export default requireProAuth(async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
@@ -45,13 +46,7 @@ export default requireProAuth(async function handler(req, res) {
       nrs_post: s.nrs_post,
     }));
 
-  return res.json({
-    patient,
-    sessions,
-    cycles,
-    preValidation,
-    reassessmentT12,
-    miniChecks,
-    nrsSeries,
-  });
+  // Stessa proiezione della pagina gemella (21/9): prima usciva la riga intera del
+  // paziente, care_token compreso.
+  return res.json({ ...vistaSchedaSintetica({ patient, sessions, cycles, preValidation, reassessmentT12, miniChecks }), nrsSeries });
 });

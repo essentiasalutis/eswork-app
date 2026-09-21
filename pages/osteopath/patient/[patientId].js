@@ -2,7 +2,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { requireProAuthSsr } from '../../../lib/pro-auth';
 import { registraLettura, AZIONI } from '../../../lib/audit';
-import { senzaCredenziali } from '../../../lib/vista';
+import { vistaSchedaSintetica } from '../../../lib/vista';
 import { dataIt } from '../../../lib/date-it.mjs';
 import {
   getPatientById,
@@ -299,8 +299,9 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
     .map((s, i) => ({ session: i + 1, date: s.date || s.created_at, nrs_pre: s.nrs_pre, nrs_post: s.nrs_post }));
 
   return {
-    // La cartella la disegna davvero (è il curante), ma il care_token no: questa pagina
-    // non consegna il link personale, quindi la credenziale non esce (12/9).
-    props: { patient: senzaCredenziali(patient), sessions, cycles, preValidation: preValidation || null, reassessmentT12: reassessmentT12 || null, miniChecks, nrsSeries },
+    // Solo i campi che questa scheda disegna (21/9): la cartella completa resta in
+    // /pro/patients. Prima viaggiavano anamnesi, red flag, contatti, note di
+    // trattamento, risposte del questionario e testo libero dei mini-check.
+    props: { ...vistaSchedaSintetica({ patient, sessions, cycles, preValidation, reassessmentT12, miniChecks }), nrsSeries },
   };
 });

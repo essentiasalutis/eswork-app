@@ -8,7 +8,7 @@ import {
 } from '../../../../../lib/store';
 import { hashIp, hashContent } from '../../../../../lib/crypto-utils';
 import { getClientIp } from '../../../../../lib/rate-limit';
-import { vistaDocumentoPaziente } from '../../../../../lib/vista';
+import { vistaDocumentoCartella } from '../../../../../lib/vista';
 import { anamnesiGiaCompilata, MESSAGGIO_BLOCCO_ANAMNESI } from '../../../../../lib/anamnesi.mjs';
 
 // GET  /api/pro/patients/documents?patientId=xxx
@@ -32,7 +32,7 @@ export default requireProAuth(async function handler(req, res) {
       // Proiezione (12/9): tipo, stato, data e impronta. Mai l'immagine della firma
       // autografa né il contenuto del modulo: la pagina mostra solo se esistono e se
       // sono validi (la pagina gemella SSR la firma la toglieva già).
-      return res.json((docs || []).map(vistaDocumentoPaziente));
+      return res.json((docs || []).map(vistaDocumentoCartella));
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
@@ -71,7 +71,7 @@ export default requireProAuth(async function handler(req, res) {
       // L'azienda si legge dal paziente, non dal corpo della richiesta.
       const doc = await upsertPatientDocument(patientId, patient.client_id, 'anamnesi', fields);
       await logAccess({ professional_id: proId, action: 'sign_document', patient_id: patientId, ip, user_agent: req.headers['user-agent'], details: 'Documento anamnesi compilato' }).catch(() => {});
-      return res.json(vistaDocumentoPaziente(doc));
+      return res.json(vistaDocumentoCartella(doc));
     } catch (e) {
       console.error('[patient-docs] save error:', e.message);
       return res.status(500).json({ error: e.message });

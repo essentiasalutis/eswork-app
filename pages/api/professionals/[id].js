@@ -21,7 +21,9 @@ export default requireAuth(async function handler(req, res) {
         fields.must_reset_password = true;
       }
       const updated = await updateProfessional(id, fields);
-      return res.json(updated);
+      // Mai l'hash della password verso il browser, nemmeno dell'amministratore (21/9).
+      const { password_hash, ...senzaHash } = updated || {};
+      return res.json(senzaHash);
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }

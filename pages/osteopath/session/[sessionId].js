@@ -7,6 +7,7 @@ import { registraLettura, AZIONI } from '../../../lib/audit';
 import { getSessionById, getPatientById, proCanAccessPatientClinical } from '../../../lib/store';
 import { validaNrsChiusura } from '../../../lib/nrs';
 import { dataIt } from '../../../lib/date-it.mjs';
+import { vistaSedutaDaModificare } from '../../../lib/vista';
 
 export default function SessionForm({ session }) {
   const router = useRouter();
@@ -235,5 +236,5 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   const patient = patientId ? await getPatientById(patientId).catch(() => null) : null;
   if (!(await proCanAccessPatientClinical(proId, patient))) return { notFound: true };
   await registraLettura(ctx.req, { proId, azione: AZIONI.SEDUTA, patientId, dettaglio: `Apertura seduta ${sessionId}` });
-  return { props: { session } };
+  return { props: { session: vistaSedutaDaModificare(session) } };
 });

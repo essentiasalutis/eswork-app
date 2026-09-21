@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { requireProAuthSsr } from '../../lib/pro-auth';
 import { getAssignmentsByProfessional, getPatientsByClient, getReferralLeadsByProfessional } from '../../lib/store';
 import AvvisoAccordo from '../../components/AvvisoAccordo';
+import { vistaLeadBuono } from '../../lib/vista';
 
 // ── Redenzione buono visita B2C ────────────────────────────────────────────────
 function RedeemVoucher() {
@@ -212,7 +213,8 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
     })
   );
 
-  const leads = await getReferralLeadsByProfessional(proId).catch(() => []);
+  // Solo ciò che la lista disegna (21/9): prima usciva anche l'IP di chi ha chiesto il buono.
+  const leads = (await getReferralLeadsByProfessional(proId).catch(() => [])).map(vistaLeadBuono);
 
   // Accordo sul trattamento dei dati: avviso a ogni accesso finché non è in regola.
   let accordo = null;

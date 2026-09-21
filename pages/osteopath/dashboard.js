@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { requireProAuthSsr } from '../../lib/pro-auth';
-import { vistaPazienteLista } from '../../lib/vista';
+import { vistaPazienteLista, vistaCodaPrevalidazione } from '../../lib/vista';
 import {
   getPatientsByProfessional,
   getWaitlistByProfessional,
@@ -181,7 +181,7 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
     stati.set(cid, programmaAttivo(await getClientById(cid).catch(() => null)));
   }
   const codaEtichettata = (waitlist || []).map(w => ({
-    ...w,
+    ...vistaCodaPrevalidazione(w),
     programma_non_attivo: w.client_id ? !stati.get(w.client_id) : false,
   }));
 

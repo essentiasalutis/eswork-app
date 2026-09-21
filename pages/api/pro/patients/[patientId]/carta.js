@@ -9,6 +9,7 @@ import { getPatientById, getPatientDocuments, proCanAccessPatientClinical } from
 import { getClientIp } from '../../../../../lib/rate-limit';
 import { preparaCaricamento, accettaCopia, linkCopia } from '../../../../../lib/copia-cartacea-server';
 import { MESSAGGI } from '../../../../../lib/copia-cartacea.mjs';
+import { vistaDocumentoCartella } from '../../../../../lib/vista';
 
 export const config = { api: { bodyParser: { sizeLimit: '32kb' } } };
 
@@ -51,7 +52,7 @@ export default requireProAuth(async function handler(req, res) {
           return res.status(400).json({ errori: r.errori, messaggi: r.errori.map(e => MESSAGGI[e] || e), error: r.errori.map(e => MESSAGGI[e] || e).join(' ') });
         }
         // Mai l'immagine della firma autografa verso il browser.
-        return res.status(201).json({ documenti: r.documenti.map(d => ({ ...d, signature_image: undefined })) });
+        return res.status(201).json({ documenti: r.documenti.map(vistaDocumentoCartella) });
       }
       return res.status(400).json({ error: 'azione non valida' });
     }

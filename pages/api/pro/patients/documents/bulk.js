@@ -3,6 +3,7 @@ import { upsertPatientDocument, getPatientById, getPatientDocuments, proCanAcces
 import { anamnesiGiaCompilata } from '../../../../../lib/anamnesi.mjs';
 import { hashIp, hashContent } from '../../../../../lib/crypto-utils';
 import { getClientIp } from '../../../../../lib/rate-limit';
+import { vistaDocumentoCartella } from '../../../../../lib/vista';
 import { testoAccettabile, registraConsensoSoggetto } from '../../../../../lib/testi-legali-server';
 
 // POST /api/pro/patients/documents/bulk?patientId=xxx
@@ -103,7 +104,7 @@ export default requireProAuth(async function handler(req, res) {
 
     console.log(`[bulk-docs] patient=${patientId} signed at ${now} — consent=${docConsent.id} privacy=${docPrivacy.id} anamnesi=${docAnamnesi.id}`);
     // Mai l'immagine della firma autografa verso il browser (come la pagina SSR).
-    return res.json([docConsent, docPrivacy, docAnamnesi].map(d => ({ ...d, signature_image: undefined })));
+    return res.json([docConsent, docPrivacy, docAnamnesi].map(vistaDocumentoCartella));
 
   } catch (e) {
     console.error('[bulk-docs] error:', e.message);

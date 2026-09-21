@@ -5,7 +5,7 @@ import {
   getWaitlistByProfessional,
   getAllRestratAlerts,
 } from '../../../lib/store';
-import { vistaPazienteLista } from '../../../lib/vista';
+import { vistaPazienteLista, vistaCodaPrevalidazione } from '../../../lib/vista';
 
 export default requireProAuth(async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end();
@@ -38,7 +38,7 @@ export default requireProAuth(async function handler(req, res) {
     patients: elenco,
     l1Patients,
     cyclesMap,
-    waitlist,
+    waitlist: (waitlist || []).map(vistaCodaPrevalidazione),
     proId,
   });
 });

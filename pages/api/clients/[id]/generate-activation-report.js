@@ -100,7 +100,12 @@ export default requireAuth(async function handler(req, res) {
 
   // Rapporto col preventivo: condizioni della scheda colloquio + numeri REALI
   // della stratificazione (prezzo cliente; mai margini/costi nel report).
-  const { block: quoteBlock, compliance: quoteCompliance, calc: quoteCalc, errore: quoteErrore } = await buildQuoteBlock(id, client, answers);
+  // Demo permanente con la parte economica spenta (v78, interruttore deciso a ogni
+  // evento): nessun blocco prezzo, nessun importo nel documento.
+  const senzaPrezzo = !!client.demo_permanente && client.demo_mostra_prezzo === false;
+  const { block: quoteBlock, compliance: quoteCompliance, calc: quoteCalc, errore: quoteErrore } = senzaPrezzo
+    ? { block: '', compliance: null, calc: null, errore: null }
+    : await buildQuoteBlock(id, client, answers);
   // Tariffe mancanti (21/9): il report non si genera, niente catena chiusa, niente PDF.
   if (quoteErrore) return res.status(422).json({ error: quoteErrore });
   // La generazione del Report CHIUDE la catena Stima→Report → timbra frozen_at

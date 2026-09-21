@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { href: '/dashboard', label: 'Clienti', icon: '🏢', color: 'gray' },
   { href: '/dashboard/comunicazioni', label: 'Comunicazioni', icon: '✉️', color: 'blue', badgeComunicazioni: true },
   { href: '/dashboard/pipeline', label: 'Pipeline', icon: '📊', color: 'purple' },
+  { href: '/dashboard/demo-permanente', label: 'Demo convegni', icon: '🎤', color: 'amber' },
   { href: '/dashboard/professionals', label: 'Professionisti', icon: '👨‍⚕️', color: 'indigo' },
   { href: '/dashboard/professional-compliance', label: 'Conformità prof.', icon: '🛡️', color: 'rose' },
   { href: '/dashboard/medici-competenti', label: 'Medici competenti', icon: '🩺', color: 'teal' },

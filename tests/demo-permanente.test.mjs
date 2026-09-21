@@ -1,0 +1,66 @@
+// Azienda demo permanente per i convegni (v78, Enrico 21/9) e limite del check-up.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { FASCIA_DEMO, CONTATTI_DEMO } from '../lib/demo.mjs';
+import { LIMITE_CHECKUP } from '../lib/limite-checkup.js';
+
+const src = f => fs.readFileSync(f, 'utf8');
+
+test('i testi di Enrico, parola per parola', () => {
+  assert.equal(FASCIA_DEMO, 'Modalità dimostrativa: le tue risposte sono anonime e verranno cancellate al termine della presentazione.');
+  assert.equal(CONTATTI_DEMO, 'In un programma reale qui inseriresti nome, email e telefono, per essere ricontattato. In questa dimostrazione non servono.');
+});
+
+test('limite del check-up: 100 in 10 minuti per le aziende, 300 per la demo', () => {
+  assert.deepEqual({ ...LIMITE_CHECKUP }, { azienda: 100, demo: 300, finestraMs: 600000 });
+  assert.match(src('pages/api/self-declare/[client_code].js'), /limiteCheckup\(req, \{ fase: 'invio'/);
+  assert.match(src('pages/api/consensi/sessione.js'), /limiteCheckup\(req, \{ fase: 'consensi'/);
+});
+
+test('demo anonima per costruzione: lo decide il server, non il browser', () => {
+  const invio = src('pages/api/self-declare/[client_code].js');
+  assert.match(invio, /const demo = !!client\.demo_permanente;/);
+  assert.match(invio, /const contatto = !!wants_to_be_contacted && !demo;/);
+  assert.match(invio, /ip_hash: demo \? null/);
+  assert.ok(!/if \(wants_to_be_contacted && computed_level/.test(invio), 'lista d\'attesa solo con contatto deciso dal server');
+  assert.match(invio, /\(r\.canale === 'checkup_demo'\) !== demo/, 'consensi della demo solo per la demo');
+  const consensi = src('pages/api/consensi/sessione.js');
+  assert.match(consensi, /ipHash: demo \? null/);
+  assert.match(consensi, /userAgent: demo \? null/);
+  assert.ok(!/b\.canale === 'checkup_demo'/.test(consensi), 'il canale della demo non si sceglie dal browser');
+});
+
+test('la fascia su benvenuto, consensi e fine; contatti disattivati', () => {
+  const pagina = src('pages/q/c/[client_code].js');
+  assert.match(pagina, /\{demo && <FasciaDemo \/>\}/);
+  assert.match(pagina, /fascia=\{demo \? <FasciaDemo \/> : null\}/);
+  assert.match(pagina, /<fieldset disabled=\{demo\}/);
+  assert.match(pagina, /demo: !!client\.demo_permanente/);
+});
+
+test('interruttore della parte economica: solo per la demo permanente', () => {
+  assert.match(src('pages/api/clients/[id]/generate-activation-report.js'), /const senzaPrezzo = !!client\.demo_permanente && client\.demo_mostra_prezzo === false;/);
+});
+
+test('QR generato in casa: nessun servizio esterno', () => {
+  const file = [];
+  const giro = d => { for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = `${d}/${f.name}`; f.isDirectory() ? giro(p) : /\.(m?js|jsx)$/.test(f.name) && file.push(p); } };
+  giro('pages'); giro('components'); giro('lib');
+  assert.deepEqual(file.filter(f => /https:\/\/api\.qrserver\.com/.test(src(f))), []);
+});
+
+test('elenchi di conformità, ri-stratificazioni, conservazione e registro: senza la demo', () => {
+  const store = src('lib/store.js');
+  for (const fn of ['getAllPatients', 'getAllRestratAlerts', 'getRetentionReview', 'getAccessLogs']) {
+    const corpo = store.slice(store.indexOf(`export async function ${fn}`), store.indexOf('\n}\n', store.indexOf(`export async function ${fn}`)));
+    assert.match(corpo, /idDemoPermanente\(\)/, fn);
+  }
+});
+
+test('v78: l\'azzeramento si rifiuta per ogni altra azienda, in banca dati', () => {
+  const sql = src('supabase-schema-v78-demo-permanente.sql');
+  assert.match(sql, /IF NOT public\.demo_e_permanente\(p_client\) THEN\s+RAISE EXCEPTION/);
+  assert.match(sql, /REVOKE ALL ON FUNCTION public\.azzera_demo_permanente\(TEXT\) FROM PUBLIC, anon, authenticated;/);
+  assert.match(sql, /CREATE UNIQUE INDEX IF NOT EXISTS uq_clients_demo_permanente/);
+});

@@ -16,6 +16,7 @@ import { nomeLivello } from '../../lib/livelli';
 import { dataIt } from '../../lib/date-it.mjs';
 import { PROTOCOLLO } from '../../lib/protocollo.mjs';
 import { rigaRinnovo } from '../../lib/sconto.mjs';
+import QrCheckup from '../../components/QrCheckup';
 
 
 
@@ -983,7 +984,6 @@ ${FIRMA}`,
           {/* 🔗 Link assessment generico (nuovo modello auto-dichiarazione) */}
           {client.assessment_share_code && (() => {
             const selfDeclareUrl = `${baseUrl}/q/c/${client.assessment_share_code}`;
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(selfDeclareUrl)}`;
             return (
               <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
                 <div className="text-xs font-bold text-green-700 uppercase tracking-widest mb-2">🔗 Link questionario (distribuisci internamente)</div>
@@ -1008,13 +1008,7 @@ ${FIRMA}`,
                   </button>
                 </div>
                 <div className="flex items-center gap-3">
-                  <a
-                    href={qrUrl}
-                    download={`qr-assessment-${client.name}.png`}
-                    className="text-xs font-semibold text-green-700 bg-white border border-green-300 px-3 py-2 rounded-xl hover:bg-green-50"
-                  >
-                    📱 Scarica QR Code
-                  </a>
+                  <QrCheckup url={selfDeclareUrl} nomeFile={`qr-checkup-${client.name}`} />
                   <span className="text-xs text-gray-400">Il dipendente scansiona e compila autonomamente</span>
                 </div>
               </div>

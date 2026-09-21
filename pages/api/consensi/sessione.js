@@ -6,19 +6,29 @@
 import { registraConsensiSessione } from '../../../lib/testi-legali-server';
 import { hashIp } from '../../../lib/crypto-utils';
 import { getClientIp } from '../../../lib/rate-limit';
+import { getClientByAssessmentShareCode } from '../../../lib/store';
+import { limiteCheckup, MESSAGGIO_LIMITE } from '../../../lib/limite-checkup';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   const b = req.body || {};
-  const canale = b.canale === 'invito' ? 'invito' : 'checkup';
+  // Azienda del check-up (dal suo codice): decide il SERVER se è la demo permanente,
+  // mai il browser. In demo: canale 'checkup_demo' (si cancella all'azzeramento) e
+  // nessuna impronta dell'indirizzo né del browser — la fascia dice «anonime» (21/9).
+  const client = b.canale !== 'invito' && typeof b.codice === 'string' && b.codice
+    ? await getClientByAssessmentShareCode(b.codice).catch(() => null) : null;
+  const demo = !!(client && client.demo_permanente);
+  const canale = b.canale === 'invito' ? 'invito' : demo ? 'checkup_demo' : 'checkup';
+  const limite = limiteCheckup(req, { fase: 'consensi', clientId: client && client.id, demo });
+  if (!limite.ok) return res.status(429).json({ error: MESSAGGIO_LIMITE });
   try {
     const r = await registraConsensiSessione({
       codice: 'informativa_checkup',
       testoId: b.testo_id,
       valori: b.valori || {},
       canale,
-      ipHash: hashIp(getClientIp(req)),
-      userAgent: (req.headers['user-agent'] || '').slice(0, 200) || null,
+      ipHash: demo ? null : hashIp(getClientIp(req)),
+      userAgent: demo ? null : ((req.headers['user-agent'] || '').slice(0, 200) || null),
     });
     if (!r.ok) {
       const msg = r.errore === 'versione_non_valida'

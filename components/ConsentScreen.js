@@ -7,7 +7,7 @@
 // Usato da /q/c/[client_code] e da /invito/[token].
 import { useState, useRef, useEffect } from 'react';
 
-export function ConsentScreen({ testo, canale = 'checkup', onComplete }) {
+export function ConsentScreen({ testo, canale = 'checkup', onComplete, codiceAzienda = null, fascia = null }) {
   const [privacyOk, setPrivacyOk] = useState(false);
   const [invio, setInvio] = useState(false);
   const [errore, setErrore] = useState('');
@@ -35,7 +35,8 @@ export function ConsentScreen({ testo, canale = 'checkup', onComplete }) {
     try {
       const r = await fetch('/api/consensi/sessione', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ testo_id: testo.id, canale, valori: { privacy: privacyOk, salute: healthOk } }),
+        // Il codice dell'azienda serve al server per riconoscere la demo permanente (v78).
+        body: JSON.stringify({ testo_id: testo.id, canale, codice: codiceAzienda, valori: { privacy: privacyOk, salute: healthOk } }),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.sessione_id) { setErrore(j.error || 'Non è stato possibile registrare i consensi: riprova.'); setInvio(false); return; }
@@ -56,6 +57,7 @@ export function ConsentScreen({ testo, canale = 'checkup', onComplete }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {fascia}
       <div className="max-w-lg mx-auto px-4 py-6">
         <div className="mb-5">
           <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Fase 1 di 2</div>

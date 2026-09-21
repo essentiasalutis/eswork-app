@@ -15,6 +15,7 @@ import { BODY_ZONES } from '../../../lib/scoring';
 import { ConsentScreen } from '../../../components/ConsentScreen';
 import { NmqQuestionnaire } from '../../../components/NmqQuestionnaire';
 import { PROTOCOLLO } from '../../../lib/protocollo.mjs';
+import { FASCIA_DEMO, CONTATTI_DEMO, BENVENUTO_DEMO, RISERVATEZZA_DEMO, FINE_DEMO } from '../../../lib/demo.mjs';
 
 // ─── Logo ES Work ─────────────────────────────────────────────────────────────
 
@@ -28,11 +29,19 @@ function ESLogo({ size = 56 }) {
 
 // ─── Fase 0: Welcome screen ───────────────────────────────────────────────────
 
-function WelcomeScreen({ clientName, chiudeFrase, firmato, testoInformativa, onIdentified }) {
+// Fascia della demo permanente (v78): su benvenuto, informativa e consensi. Il testo
+// dell'informativa resta quello vero (è il modello legale da mostrare); la fascia
+// impedisce che prometta ciò che la demo non fa.
+function FasciaDemo() {
+  return <div role="note" className="sticky top-0 z-40 bg-amber-100 border-b border-amber-300 text-amber-900 text-sm font-semibold text-center px-4 py-2.5">{FASCIA_DEMO}</div>;
+}
+
+function WelcomeScreen({ clientName, chiudeFrase, firmato, testoInformativa, onIdentified, demo = false }) {
   const [informativa, setInformativa] = useState(false);
   const [altroSotto, setAltroSotto] = useState(true);   // il testo è lungo: all'apertura c'è sempre altro sotto
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col">
+      {demo && <FasciaDemo />}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 max-w-lg mx-auto w-full">
         {/* Logo grande e azienda in evidenza: chi apre il link deve capire in un colpo
             d'occhio da chi arriva e per quale azienda (Enrico, 13/9). */}
@@ -50,7 +59,7 @@ function WelcomeScreen({ clientName, chiudeFrase, firmato, testoInformativa, onI
 
         <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-5 w-full">
           <p className="text-sm text-gray-700 leading-relaxed mb-3">
-            {firmato
+            {demo ? BENVENUTO_DEMO : firmato
               ? <><strong>La tua azienda ha attivato ES Work</strong>, un programma di prevenzione e trattamento dei disturbi muscolo-scheletrici, e ti chiede di partecipare a un breve check-up.</>
               : <><strong>La tua azienda sta valutando la possibilità di attivare ES Work</strong>, un programma di prevenzione e trattamento dei disturbi muscolo-scheletrici, e ti chiede di partecipare a un breve check-up.</>}
           </p>
@@ -58,7 +67,7 @@ function WelcomeScreen({ clientName, chiudeFrase, firmato, testoInformativa, onI
             Il questionario che segue raccoglie informazioni sugli eventuali disturbi fisici nelle varie zone del corpo. Si compila in circa 5 minuti.
           </p>
           <p className="text-sm text-gray-700 leading-relaxed">
-            I tuoi dati sono trattati in modo riservato da Essentia Salutis, nel rispetto del segreto professionale: <strong>la tua azienda non vedrà mai le tue risposte individuali</strong>, solo risultati aggregati.
+            {demo ? RISERVATEZZA_DEMO : <>I tuoi dati sono trattati in modo riservato da Essentia Salutis, nel rispetto del segreto professionale: <strong>la tua azienda non vedrà mai le tue risposte individuali</strong>, solo risultati aggregati.</>}
           </p>
         </div>
 
@@ -138,7 +147,7 @@ function ContactField({ name, label, type, placeholder, required, value, error, 
 
 // ─── Fase 3: Raccolta dati contatto ──────────────────────────────────────────
 
-function ContactForm({ onSubmit, sedi = [] }) {
+function ContactForm({ onSubmit, sedi = [], demo = false }) {
   // Una sola sede (o nessuna dichiarata): il campo non si chiede — si compila da sé
   // con quella dichiarata dall'azienda, che è l'unica possibile.
   // Un campo solo: si scrive «Mario Rossi» come viene. Alla consegna si divide —
@@ -164,6 +173,8 @@ function ContactForm({ onSubmit, sedi = [] }) {
 
   function handleSubmit(ev) {
     ev.preventDefault();
+    // Demo: i campi sono disattivati e non si inviano (il server li ignorerebbe comunque).
+    if (demo) { onSubmit(null); return; }
     const e = validate();
     if (Object.keys(e).length > 0) { setErrors(e); return; }
     const parti = form.nome_completo.trim().split(/\s+/).filter(Boolean);
@@ -193,6 +204,9 @@ function ContactForm({ onSubmit, sedi = [] }) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {demo && <p className="text-sm font-medium text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-3">{CONTATTI_DEMO}</p>}
+          {/* In demo la pagina resta visibile, con i campi disattivati (Enrico, 21/9). */}
+          <fieldset disabled={demo} className={`space-y-4 ${demo ? 'opacity-50' : ''}`}>
           <ContactField name="nome_completo" label="Nome e cognome" placeholder="Mario Rossi" required value={form.nome_completo} error={errors.nome_completo} onChange={handleChange('nome_completo')} />
           <ContactField name="email" label="Email" type="email" placeholder="mario.rossi@email.com" required value={form.email} error={errors.email} onChange={handleChange('email')} />
           <ContactField name="phone" label="Telefono" type="tel" placeholder="3331234567" required value={form.phone} error={errors.phone} onChange={handleChange('phone')} />
@@ -238,6 +252,8 @@ function ContactForm({ onSubmit, sedi = [] }) {
             </div>
           )}
 
+          </fieldset>
+
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
             <p className="text-xs text-blue-700">
               🔒 I tuoi dati di contatto servono al professionista osteopata per contattarti e prenderti in carico. Sono trattati da Essentia Salutis come titolare autonomo, nel rispetto del segreto professionale: la tua azienda non vi ha accesso.
@@ -257,6 +273,23 @@ function ContactForm({ onSubmit, sedi = [] }) {
 }
 
 // ─── Schermata completamento ──────────────────────────────────────────────────
+
+// Schermata finale della demo: il livello, detto senza promettere un percorso che
+// non partirà (nessun contatto, nessun osteopata).
+function CompletionDemo({ level }) {
+  const n = { level1: 1, level2: 2, level3: 3 }[level] || 3;
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex flex-col">
+      <FasciaDemo />
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-10 text-center max-w-lg mx-auto">
+        <ESLogo size={140} />
+        <h2 className="text-2xl font-bold text-gray-900 mb-3 mt-4">Grazie!</h2>
+        <p className="text-gray-700 mb-3">Le tue risposte ti collocano nel <strong>Livello {n}</strong>: le vedremo tra poco, insieme a quelle della sala, nel report.</p>
+        <p className="text-sm text-gray-500">{FINE_DEMO}</p>
+      </div>
+    </div>
+  );
+}
 
 function CompletionScreen({ level, wantsContact, careToken, firmato = false, emailAttiva = false, email = '' }) {
   const isL1 = level === 'level1';
@@ -406,7 +439,7 @@ const PHASES = {
   DONE: 'done',
 };
 
-export default function SelfDeclarePage({ client, error: serverError, checkup, sedi = [], emailAttiva = false, informativa = null }) {
+export default function SelfDeclarePage({ client, error: serverError, checkup, sedi = [], emailAttiva = false, informativa = null, demo = false }) {
   const [phase, setPhase] = useState(PHASES.WELCOME);
   const [wantsContact, setWantsContact] = useState(true);
   const [contactData, setContactData] = useState(null);
@@ -525,19 +558,22 @@ export default function SelfDeclarePage({ client, error: serverError, checkup, s
           chiudeFrase={checkup?.chiudeFrase || null}
           firmato={!!checkup?.firmato}
           onIdentified={() => setPhase(PHASES.CONSENT)}
+          demo={demo}
         />
       )}
 
       {phase === PHASES.CONSENT && (
-        <ConsentScreen testo={informativa} canale="checkup" onComplete={(sessioneId) => { setConsensiSessione(sessioneId); setPhase(PHASES.CONTACT); }} />
+        <ConsentScreen testo={informativa} canale="checkup" codiceAzienda={client.share_code} fascia={demo ? <FasciaDemo /> : null}
+          onComplete={(sessioneId) => { setConsensiSessione(sessioneId); setPhase(PHASES.CONTACT); }} />
       )}
 
       {phase === PHASES.CONTACT && (
         <ContactForm
           sedi={sedi}
+          demo={demo}
           onSubmit={data => {
             setContactData(data);
-            setWantsContact(true);
+            setWantsContact(!demo);
             setPhase(PHASES.NMQ);
           }}
         />
@@ -563,7 +599,8 @@ export default function SelfDeclarePage({ client, error: serverError, checkup, s
         />
       )}
 
-      {phase === PHASES.DONE && (
+      {phase === PHASES.DONE && demo && <CompletionDemo level={level} />}
+      {phase === PHASES.DONE && !demo && (
         <CompletionScreen level={level} wantsContact={wantsContact} careToken={careToken} firmato={!!checkup?.firmato} emailAttiva={!!emailAttiva} email={contactData?.email || ''} />
       )}
     </>
@@ -616,7 +653,8 @@ export async function getServerSideProps({ params }) {
       const { testoInVigore, perIlBrowser } = await import('../../../lib/testi-legali-server');
       informativa = perIlBrowser(await testoInVigore('informativa_checkup'));
     } catch (e) { console.error('[q/c] informativa:', e.message); }
-    return { props: { client: { id: client.id, name: client.name, share_code: client_code, tier }, checkup, sedi, emailAttiva: invioEmailAttivo(), informativa } };
+    // demo: la decide il server dall'azienda (v78); senza la colonna vale false.
+    return { props: { client: { id: client.id, name: client.name, share_code: client_code, tier }, checkup, sedi, emailAttiva: invioEmailAttivo(), informativa, demo: !!client.demo_permanente } };
   } catch (e) {
     return { props: { client: null, error: 'Errore interno: ' + e.message } };
   }

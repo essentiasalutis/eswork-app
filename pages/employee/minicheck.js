@@ -164,13 +164,19 @@ export default function MiniCheck() {
                   </button>
                 ))}
               </div>
+              {/* Chi leggerà la nota, detto PRIMA che la scriva (Enrico, 21/9): la legge
+                  l'osteopata che lo segue, nella sua cartella. Al mini-check arriva solo
+                  chi ha iniziato un ciclo, quindi ha sempre un osteopata assegnato. */}
+              {wantsContact !== null && (
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 12 }}>Lo leggerà il professionista che ti segue.</div>
+              )}
               {wantsContact !== null && (
                 <textarea
                   value={freeText}
                   onChange={e => setFreeText(e.target.value.slice(0, 300))}
                   placeholder="Aggiungi una nota (facoltativo)..."
                   rows={2}
-                  style={{ width: '100%', marginTop: 12, borderRadius: 10, border: '1.5px solid #e2e8f0', padding: '10px 12px', fontSize: 13, resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                  style={{ width: '100%', marginTop: 6, borderRadius: 10, border: '1.5px solid #e2e8f0', padding: '10px 12px', fontSize: 13, resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
                 />
               )}
             </div>

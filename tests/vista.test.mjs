@@ -34,7 +34,8 @@ test('cartella del curante: pre-validazione, mini-check, rivalutazione annuale',
   nessuno(v, ['professional_id', 'client_id', 'patient_id'], 'pre-validazione');
   const [m] = vistaMiniCheckCartella([{ id: 'm1', check_type: 't3', pgic: 4, has_limitations: true, wants_contact: false, triage_outcome: 'needs_contact', free_text: 'scritto dal lavoratore', client_id: 'c1', patient_id: 'p1' }]);
   assert.equal(m.pgic, 4);
-  nessuno(m, ['free_text', 'client_id', 'patient_id'], 'mini-check');
+  assert.equal(m.free_text, 'scritto dal lavoratore', 'la nota la legge l\'osteopata assegnato (Enrico, 21/9)');
+  nessuno(m, ['client_id', 'patient_id'], 'mini-check');
   nessuno(vistaRivalutazioneCartella({ completed_at: 'x', computed_level: 'level2', pgic: 4, nmq_data: { a: 1 }, client_id: 'c1' }), ['nmq_data', 'client_id'], 'rivalutazione');
   assert.equal(vistaRivalutazioneCartella(null), null);
 });
@@ -51,4 +52,11 @@ test('ogni campo di note dell\'osteopata dice, prima di scrivere, che il pazient
 test('la pre-validazione entra nelle due copie dei dati', () => {
   assert.match(fs.readFileSync('pages/api/employee/[token]/export.js', 'utf8'), /pre_validazioni: preValidazioni/);
   assert.match(fs.readFileSync('pages/dashboard/patients/[patientId]/export.js', 'utf8'), /Pre-validazione clinica/);
+});
+
+test('il mini-check dice al lavoratore chi leggerà la sua nota, prima del campo', () => {
+  const src = fs.readFileSync('pages/employee/minicheck.js', 'utf8');
+  const frase = src.indexOf('Lo leggerà il professionista che ti segue.');
+  assert.ok(frase > 0);
+  assert.ok(frase < src.indexOf('<textarea'), 'la frase viene prima del campo');
 });

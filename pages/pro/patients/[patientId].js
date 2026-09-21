@@ -136,6 +136,7 @@ function MiniCheckRicevuti({ lista }) {
           <span className={`font-semibold px-2 py-0.5 rounded-full ${m.triage_outcome === 'needs_contact' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
             {m.triage_outcome === 'needs_contact' ? 'Da contattare' : 'Nessun contatto necessario'}
           </span>
+          {m.free_text && <div className="basis-full text-gray-700 bg-gray-50 rounded-lg px-3 py-2 whitespace-pre-wrap"><span className="text-gray-500">Nota del paziente: </span>{m.free_text}</div>}
         </div>
       ))}
     </div>

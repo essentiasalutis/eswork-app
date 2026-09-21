@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { calculatePricing } from '../lib/pricing/v2.js';
 import { DEFAULTS_V2 } from '../lib/pricing/v2-defaults.mjs';
-import { valutaSconto, statoScontoCliente, applicaScontoAlCalcolo, avvisoRevisioneForbice, rigaRinnovo, margine, MARGINE_MINIMO_PCT } from '../lib/sconto.mjs';
+import { valutaSconto, statoScontoCliente, applicaScontoAlCalcolo, avvisoRevisioneForbice, rigaRinnovo, margine, MARGINE_MINIMO_PCT, conArticolo } from '../lib/sconto.mjs';
 import { prezzoConTetto, applicaTettoAlCalcolo, posizioneNellaForbice, POSIZIONE } from '../lib/forbice.mjs';
 
 const calc = calculatePricing({ n: 100, l1: 12, l2: 24 });
@@ -137,4 +137,17 @@ test('nei documenti del cliente non entra la parola «sconto» né la motivazion
     const src = fs.readFileSync(f, 'utf8');
     assert.doesNotMatch(src, /sconto_motivo|registrato\.motivo|calc\.sconto/, `${f} non deve leggere la traccia dello sconto`);
   }
+});
+
+test('percentuali con la preposizione giusta', () => {
+  assert.equal(conArticolo(40), 'del 40%');
+  assert.equal(conArticolo(0), 'dello 0%');
+  assert.equal(conArticolo(8.5), "dell'8,5%");
+  assert.equal(conArticolo(11), "dell'11%");
+  assert.equal(conArticolo(85), "dell'85%");
+  assert.equal(conArticolo(18), 'del 18%');
+  assert.equal(conArticolo(1), "dell'1%");
+  assert.equal(conArticolo(0, 'a'), 'allo 0%');
+  assert.equal(conArticolo(36.7, 'a'), 'al 36,7%');
+  assert.match(valutaSconto({ ...base, prezzoScontato: 7600, conferma: true }).messaggio, /^Margine dello 0%, sotto la soglia del 40%/);
 });

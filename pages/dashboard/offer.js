@@ -20,7 +20,7 @@ import { legendaLivelli } from '../../lib/livelli';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
 import { dataIt } from '../../lib/date-it.mjs';
 import { DICITURA_IVA } from '../../lib/iva.mjs';
-import { valutaSconto, rigaRinnovo, MOTIVO_MIN, pctIt } from '../../lib/sconto.mjs';
+import { valutaSconto, rigaRinnovo, MOTIVO_MIN, pctIt, conArticolo } from '../../lib/sconto.mjs';
 import { ETICHETTA_POSIZIONE } from '../../lib/forbice.mjs';
 
 // ─── Firma standard ───────────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ function Page({ children, className = '' }) {
 // del Listino serve la conferma, sotto il costo è rifiutato. Il documento mostra solo
 // il totale finale; l'Anno 2 resta a prezzo pieno.
 
-function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine, sconto, margineFinale, rinnovoPieno, revisioneForbice, personalizzato, posizione, minimoForbice, prezzoFissato }) {
+function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine, sconto, margineFinale, rinnovoPieno, revisioneForbice, personalizzato, posizione, minimoForbice, prezzoFissato, conTetto }) {
   const [aperto, setAperto] = useState(false);
   const [prezzo, setPrezzo] = useState('');
   const [motivo, setMotivo] = useState('');
@@ -165,11 +165,11 @@ function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine,
     <div className={`mt-2 rounded-xl px-4 py-2.5 text-xs border ${colore}`}>
       <div className="flex flex-wrap items-baseline gap-x-2">
         <strong>Prezzo Anno 1 · solo per te</strong>
-        <span>calcolato {fmt(prezzoBase)} · costo Anno 1 {fmt(costoAnno1)} (professionisti e 30% della quota) · margine {pctIt(margineFinale && margineFinale.marginePct)}{stato === 'attivo' ? ' sul prezzo applicato' : ''}</span>
+        <span>calcolato {fmt(prezzoBase)}{conTetto ? ' (con il tetto della forbice)' : ''} · costo Anno 1 {fmt(costoAnno1)} (professionisti e 30% della quota) · margine {pctIt(margineFinale && margineFinale.marginePct)}{stato === 'attivo' ? ' sul prezzo applicato' : ''}</span>
       </div>
 
       {revisioneForbice && (
-        <div className="mt-1.5">⚠ <strong>Il massimo della forbice porta il margine al {pctIt(revisioneForbice.marginePct)}</strong> ({fmt(revisioneForbice.margineEur)}), sotto la soglia del {pctIt(revisioneForbice.sogliaPct)}. Il tetto resta: è una promessa scritta. All&apos;invio dell&apos;offerta si registra come <strong>avviso di revisione dei parametri della forbice</strong> (lo trovi nel Listino).</div>
+        <div className="mt-1.5">⚠ <strong>Il massimo della forbice porta il margine {conArticolo(revisioneForbice.marginePct, 'a')}</strong> ({fmt(revisioneForbice.margineEur)}), sotto la soglia {conArticolo(revisioneForbice.sogliaPct)}. Il tetto resta: è una promessa scritta. All&apos;invio dell&apos;offerta si registra come <strong>avviso di revisione dei parametri della forbice</strong> (lo trovi nel Listino).</div>
       )}
 
       {stato === 'attivo' && (
@@ -210,10 +210,12 @@ function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine,
               {v.scontoEur > 0 && <>Sconto {fmt(v.scontoEur)} ({pctIt(v.scontoPct)}) · </>}{v.messaggio}
             </div>
           )}
-          {v && v.stato === 'serve_conferma' && (
+          {/* Resta visibile anche dopo la spunta (allora la valutazione è «valido»):
+              la conferma si deve poter togliere. */}
+          {v && (v.stato === 'serve_conferma' || (v.ok && v.sottoSoglia)) && (
             <label className="flex items-start gap-2 text-amber-900">
               <input type="checkbox" checked={conferma} onChange={e => setConferma(e.target.checked)} className="mt-0.5" />
-              <span>Confermo il prezzo con un margine del {pctIt(v.marginePct)} ({fmt(v.margineEur)}), sotto la soglia del {pctIt(sogliaPct)}.</span>
+              <span>Confermo il prezzo con un margine {conArticolo(v.marginePct)} ({fmt(v.margineEur)}), sotto la soglia {conArticolo(sogliaPct)}.</span>
             </label>
           )}
           <label className="block font-semibold text-gray-600">Motivazione (obbligatoria, interna: non compare in nessun documento del cliente)
@@ -1125,6 +1127,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       sconto: d.sconto || { stato: 'nessuno' }, margineFinale: d.margineFinale || null, rinnovoPieno: d.rinnovoPieno ?? null,
       revisioneForbice: d.revisioneForbice || null, personalizzato: !!custom,
       posizione: d.posizione || null, minimoForbice: forchetta ? forchetta.min ?? null : null,
+      conTetto: !!(tetto && tetto.capApplicato),
       // Dopo il Report di Attivazione il prezzo è fissato: il riquadro resta, il modulo no.
       prezzoFissato: await (await import('../../lib/pricing/snapshot')).isChainClosed(client.id),
     };

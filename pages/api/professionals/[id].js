@@ -2,6 +2,7 @@ import { requireAuth } from '../../../lib/auth';
 import { getProfessionalById, updateProfessional } from '../../../lib/store';
 import { hashPassword } from '../../../lib/pro-auth';
 import supabase from '../../../lib/db';
+import { TABELLE_TRACCE, esitoTracce, messaggioTracce } from '../../../lib/eliminazione-professionista.mjs';
 
 export default requireAuth(async function handler(req, res) {
   const { id } = req.query;
@@ -29,13 +30,29 @@ export default requireAuth(async function handler(req, res) {
     }
   }
 
-  // Elimina professionista
+  // Elimina professionista — solo se non ha lasciato alcuna traccia (Enrico, 21/9).
+  // Non si cancella mai nulla di collegato: sedute e registro degli accessi restano.
+  // Per chiunque sia entrato almeno una volta c'è solo la disattivazione (PATCH).
   if (req.method === 'DELETE') {
     try {
-      // Rimuove tutte le righe collegate prima di eliminare il professionista
-      await supabase.from('sessions').delete().eq('professional_id', id);
-      await supabase.from('professional_assignments').delete().eq('professional_id', id);
-      await supabase.from('access_logs').delete().eq('professional_id', id);
+      const conteggi = {};
+      for (const { tabella, colonna } of TABELLE_TRACCE) {
+        const { count, error } = await supabase.from(tabella)
+          .select(colonna, { count: 'exact', head: true }).eq(colonna, id);
+        // Lettura fallita: il conteggio resta vuoto e la regola non elimina.
+        if (error) console.error(`[elimina professionista] verifica su ${tabella} non riuscita: ${error.message}`);
+        else conteggi[tabella] = count;
+      }
+      const esito = esitoTracce(conteggi);
+      if (!esito.eliminabile) {
+        return res.status(409).json({
+          codice: 'tracce',
+          error: messaggioTracce(esito, { nome: pro.name || 'Il professionista', attivo: !!pro.active }),
+          elementi: esito.elementi,
+        });
+      }
+      // Le assegnazioni alle aziende seguono il professionista (ON DELETE CASCADE).
+      // Se nel frattempo è entrato, la chiave esterna del registro rifiuta l'eliminazione.
       const { error } = await supabase.from('professionals').delete().eq('id', id);
       if (error) throw error;
       return res.json({ ok: true });

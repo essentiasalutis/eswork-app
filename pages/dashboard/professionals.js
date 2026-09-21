@@ -64,11 +64,15 @@ info@essentiasalutis.it`;
   }
 
   async function deletePro(id, name) {
-    if (!confirm(`Eliminare definitivamente ${name}? Questa azione non è reversibile.`)) return;
+    if (!confirm(`Eliminare definitivamente ${name}?\n\nSi elimina solo un professionista che non ha lasciato traccia (mai entrato, nessun paziente): per tutti gli altri resta la disattivazione.`)) return;
     const res = await fetch(`/api/professionals/${id}`, { method: 'DELETE' });
     if (res.ok) {
       setProfessionals(prev => prev.filter(p => p.id !== id));
+      return;
     }
+    // 409: ha lasciato traccia (il messaggio dice quale). Mai più un rifiuto muto.
+    const d = await res.json().catch(() => ({}));
+    alert(d.error || 'Eliminazione non riuscita.');
   }
 
   async function toggleActive(id, current) {

@@ -16,6 +16,7 @@ test('i valori del protocollo sono quelli contrattuali', () => {
     formazione_moduli_primo_anno: 2, formazione_moduli_anni_successivi: 1, formazione_ore_modulo: 1,
     recupero_finestra_mesi: 6,
     recupero_soglie: [{ max: 50, soglia: 5 }, { max: 200, soglia: 10 }, { max: Infinity, soglia: 20 }],
+    anni_conservazione: 10,
   });
   assert.equal(Object.isFrozen(PROTOCOLLO), true);
 });

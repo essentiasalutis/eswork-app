@@ -456,7 +456,7 @@ function RightsSection({ token, patient }) {
         {openForm === 'erasure' && (
           <div>
             <div style={{ fontSize: 12, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '8px 10px', margin: '0 0 8px', lineHeight: 1.5 }}>
-              Nota: la documentazione clinica è conservata per l'obbligo legale di documentazione sanitaria (10 anni) e viene cancellata dal titolare alla scadenza. Gli altri dati possono essere cancellati su tua richiesta.
+              Nota: la documentazione clinica è conservata per l'obbligo legale di documentazione sanitaria ({PROTOCOLLO.anni_conservazione} anni) e viene cancellata dal titolare alla scadenza. Gli altri dati possono essere cancellati su tua richiesta.
             </div>
             <RequestForm note={note} setNote={setNote} busy={busy} placeholder="Motivo della richiesta (facoltativo)…" onSend={() => submit('erasure')} />
           </div>

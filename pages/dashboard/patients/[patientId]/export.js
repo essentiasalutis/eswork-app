@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import { requireAuthSsr } from '../../../../lib/auth';
 import { dataIt, dataOraIt } from '../../../../lib/date-it.mjs';
+import { PROTOCOLLO } from '../../../../lib/protocollo.mjs';
 import {
   getPatientById,
   getPatientDocuments,
@@ -306,7 +307,7 @@ export default function PatientExport({ patient, client, documents, sessions, as
         {/* ── WATERMARK ── */}
         <div className="watermark">
           Documento generato da ES Work — Essentia Salutis · info@essentiasalutis.it · Via Salbertrand 9, Torino<br />
-          Conservazione 10 anni dall'ultima seduta ai sensi degli obblighi normativi sulle cartelle cliniche
+          Conservazione {PROTOCOLLO.anni_conservazione} anni dall'ultima seduta ai sensi degli obblighi normativi sulle cartelle cliniche
         </div>
       </div>
     </>

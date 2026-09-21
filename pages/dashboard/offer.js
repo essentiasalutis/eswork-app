@@ -1071,7 +1071,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       prezzoFissato: await (await import('../../lib/pricing/snapshot')).isChainClosed(client.id),
     };
     const scartoL2 = scartoLivello2({ nmq, calc, dipendenti: client && client.employees, l2Mult: d.l2Mult, soglia: scartoL2Soglia });
-    const roi = null; // ROI only from calculator (requires absence days input)
+    const roi = null; // il ROI si calcola nel colloquio (serve il numero di giorni di assenza)
     // Piano della piattaforma, calcolato qui: la tabella c'è già all'apertura e nessun
     // dato esce. Stesse soglie di riservatezza del resto della pagina (lib/kanon.js).
     const vista = vistaRiservata(nmq);

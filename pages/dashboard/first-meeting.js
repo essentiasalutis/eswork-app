@@ -76,7 +76,7 @@ function vatExemptPacchetto(esente) {
   return <div className="text-xs opacity-80 mt-1">{esente ? DICITURA_IVA : 'IVA da applicare sul totale'}</div>;
 }
 
-export default function FirstMeetingScheda({ client: initialClient, meeting, v2Params, modoIniziale = 'completo' }) {
+export default function FirstMeetingScheda({ client: initialClient, meeting, v2Params, modoIniziale = 'completo', schedeDoppie = 0 }) {
   const router = useRouter();
   const d = meeting?.data || {};
   const s1 = d.step1 || {}, s2 = d.step2 || {}, s3 = d.step3 || {}, sp = d.params || {};
@@ -221,6 +221,9 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
   }
 
   async function save({ silent } = {}) {
+    // Più schede per questa azienda (21/9): non si salva, né in automatico né a mano —
+    // il server lo rifiuterebbe comunque, e una scheda vuota coprirebbe le altre.
+    if (schedeDoppie > 1) return false;
     const id = await ensureClient();
     if (!id) return false;
     if (!silent) setBusy(true);
@@ -327,6 +330,11 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
       </header>
 
       <main className="max-w-4xl mx-auto px-5 py-5 space-y-5">
+        {schedeDoppie > 1 && (
+          <div role="alert" className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-800">
+            <strong>Scheda non modificabile.</strong> Questa azienda ha {schedeDoppie} schede del colloquio invece di una: la piattaforma non ne legge nessuna, quindi qui non vedi i dati salvati, e non salva finché non se ne tiene una sola.
+          </div>
+        )}
         {modo === 'rapido' && (
           <div className="space-y-5">
             <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
@@ -695,5 +703,8 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
   if (!clientId) return { props: { client: null, meeting: null, v2Params, modoIniziale } };
   const [client, meeting] = await Promise.all([getClientById(clientId), getFirstMeeting(clientId)]);
   if (!client) return { notFound: true };
-  return { props: { client, meeting: meeting || null, v2Params, modoIniziale } };
+  // Nessuna scheda letta: può voler dire che ce ne sono più d'una (21/9).
+  const { contaSchedeColloquio } = require('../../lib/store');
+  const schedeDoppie = meeting ? 0 : await contaSchedeColloquio(clientId).catch(() => 0);
+  return { props: { client, meeting: meeting || null, v2Params, modoIniziale, schedeDoppie } };
 });

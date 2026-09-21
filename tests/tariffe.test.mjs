@@ -69,3 +69,19 @@ test('report di Attivazione, Offerta e Finanza non chiamano il motore senza tari
   assert.match(fs.readFileSync('pages/dashboard/finance.js', 'utf8'), /rates: tariffe\[c\.id\]/);
   for (const f of ['lib/pricing/v1.js', 'lib/pricing/v2.js']) assert.ok(!/rates \|\| (cfg|CONFIG_V1)\.rates_new|rates = cfg\.rates_new/.test(fs.readFileSync(f, 'utf8')), `${f}: nessun ripiego`);
 });
+
+test('schede del colloquio: una per azienda, con più d\'una il salvataggio si ferma', () => {
+  const store = fs.readFileSync('lib/store.js', 'utf8');
+  const upsert = store.slice(store.indexOf('export async function upsertFirstMeeting'));
+  assert.ok(upsert.indexOf('if (n > 1) throw new SchedeDoppie(n)') < upsert.indexOf('.update('), 'con più schede non si aggiorna niente');
+  assert.match(upsert, /error\.code === '23505'\) return aggiorna\(\)/, 'la corsa si chiude sull\'indice unico');
+  assert.match(fs.readFileSync('lib/pricing/snapshot.js', 'utf8'), /if \(count > 0\) throw new Error/);
+  assert.match(fs.readFileSync('pages/dashboard/first-meeting.js', 'utf8'), /if \(schedeDoppie > 1\) return false;/);
+  assert.ok(!fs.existsSync('pages/dashboard/calculator.js'), 'il calcolatore non esiste più');
+});
+
+test('Finanza: costo e margine dal motore', () => {
+  const f = fs.readFileSync('pages/dashboard/finance.js', 'utf8');
+  assert.ok(!f.includes('total_cost_y1'));
+  assert.match(f, /calc\.y1\.total_cost/);
+});

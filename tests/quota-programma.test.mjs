@@ -73,9 +73,9 @@ test('dicitura IVA: un solo punto nel codice, la vecchia non c\'è più', () => 
   const file = [];
   const giro = d => { for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); f.isDirectory() ? giro(p) : /\.(m?js|jsx)$/.test(f.name) && file.push(p); } };
   giro('lib'); giro('pages'); giro('components');
-  // Il calcolatore v1 resta fermo (decisione di Enrico): è solo interno.
+  // Il calcolatore (unico file con la dicitura vecchia) è stato tolto il 21/9: nessuna eccezione.
   const senzaCommenti = f => fs.readFileSync(f, 'utf8').split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
-  const vecchia = file.filter(f => f !== path.join('pages', 'dashboard', 'calculator.js') && /esente IVA|art\. ?10, n\. ?18|633\/72/i.test(senzaCommenti(f)));
+  const vecchia = file.filter(f => /esente IVA|art\. ?10, n\. ?18|633\/72/i.test(senzaCommenti(f)));
   assert.deepEqual(vecchia, []);
   const nuova = file.filter(f => /L\. 190\/2014/.test(fs.readFileSync(f, 'utf8')));
   assert.deepEqual(nuova, [path.join('lib', 'iva.mjs')]);

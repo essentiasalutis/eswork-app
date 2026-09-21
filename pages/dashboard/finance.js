@@ -48,8 +48,10 @@ export default function FinancePage({ clients, patientCounts, tariffe = {} }) {
     const calc = senzaTariffe ? null : calculatePricing({ n: parseInt(c.employees) || 0, l1, l2, pricingVersion: c.pricing_version || 'v1', rates: tariffe[c.id] });
     const isActive = isFirmato(c.pipeline_stage);
     const revenue = calc?.price_y1 || 0;
-    const cost = calc?.total_cost_y1 || 0;
-    const margin = cost > 0 ? Math.round((1 - cost / revenue) * 100) : 0;
+    // Costo dal motore (y1.total_cost: professionisti + quota al 30%). Fino al 21/9 si
+    // leggeva un campo che il motore non produce: costo sempre vuoto e margine 0%.
+    const cost = calc?.y1 ? Math.round(calc.y1.total_cost) : 0;
+    const margin = revenue > 0 && cost > 0 ? Math.round(((revenue - cost) / revenue) * 100) : 0;
     if (isActive && !c.is_demo) { totalARR += revenue; totalCost += cost; }
     return { ...c, calc, revenue, cost, margin, l1, l2, senzaTariffe };
   });

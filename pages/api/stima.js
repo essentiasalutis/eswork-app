@@ -8,7 +8,7 @@
 import { requireAuth } from '../../lib/auth';
 import { generateAndStorePdf, buildQuoteHtml, buildPacchettoHtml } from '../../lib/pdf';
 import { computeForchetta } from '../../lib/calculator';
-import { getClientById, getFirstMeeting } from '../../lib/store';
+import { getClientById, getFirstMeeting, contaSchedeColloquio, messaggioSchedeDoppie } from '../../lib/store';
 import { getPricingSettingsV2 } from '../../lib/pricing/settings';
 import { validatePacchetto, calculatePacchetto } from '../../lib/pricing/v2';
 import { buildStimaSnapshot, writeStimaSnapshotIfOpen, isChainClosed, getStimaSnapshot } from '../../lib/pricing/snapshot';
@@ -51,6 +51,11 @@ export default requireAuth(async function handler(req, res) {
   // Prima di tutto il resto: nessun PDF, nessuna forbice impegnata, pipeline ferma.
   const mancanti = tariffeMancanti(b.rates);
   if (mancanti.length) return res.status(422).json({ ok: false, error: messaggioTariffe(mancanti), tariffe_mancanti: mancanti });
+  // Schede del colloquio doppie: nessuna Stima su una scheda che non si legge (21/9).
+  if (b.clientId) {
+    const nSchede = await contaSchedeColloquio(b.clientId).catch(() => 0);
+    if (nSchede > 1) return res.status(409).json({ ok: false, error: messaggioSchedeDoppie(nSchede) });
+  }
 
   // Versione listino SEMPRE risolta server-side dal record cliente (mai dal
   // body/query). Prospect senza record → 'v2' (le nuove aziende nascono v2);

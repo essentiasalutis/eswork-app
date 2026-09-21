@@ -20,6 +20,8 @@ import { legendaLivelli } from '../../lib/livelli';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
 import { dataIt } from '../../lib/date-it.mjs';
 import { DICITURA_IVA } from '../../lib/iva.mjs';
+import { valutaSconto, rigaRinnovo, MOTIVO_MIN, pctIt } from '../../lib/sconto.mjs';
+import { ETICHETTA_POSIZIONE } from '../../lib/forbice.mjs';
 
 // ─── Firma standard ───────────────────────────────────────────────────────────
 
@@ -115,9 +117,126 @@ function Page({ children, className = '' }) {
   );
 }
 
+// ─── Prezzo Anno 1 applicato (sconto) — SOLO vista admin, mai nel PDF ──────────
+// Regole in lib/sconto.mjs (Enrico, 21/9): motivazione obbligatoria, sotto la soglia
+// del Listino serve la conferma, sotto il costo è rifiutato. Il documento mostra solo
+// il totale finale; l'Anno 2 resta a prezzo pieno.
+
+function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine, sconto, margineFinale, rinnovoPieno, revisioneForbice, personalizzato, posizione, minimoForbice, prezzoFissato }) {
+  const [aperto, setAperto] = useState(false);
+  const [prezzo, setPrezzo] = useState('');
+  const [motivo, setMotivo] = useState('');
+  const [conferma, setConferma] = useState(false);
+  const [esito, setEsito] = useState(null);
+  const [lavoro, setLavoro] = useState(false);
+  if (prezzoBase == null || costoAnno1 == null) return null;
+
+  const stato = sconto ? sconto.stato : 'nessuno';
+  const reg = sconto && sconto.registrato;
+  const sogliaPct = Math.round((sogliaMargine ?? 0.4) * 1000) / 10;
+  const p = prezzo === '' ? null : Number(prezzo);
+  const v = p == null ? null : valutaSconto({ prezzoBase, prezzoScontato: p, costo: costoAnno1, sogliaPct: sogliaMargine, conferma, controllaMotivo: false });
+  const motivoOk = motivo.trim().length >= MOTIVO_MIN;
+  const puoi = v && (v.ok || (v.stato === 'serve_conferma' && conferma)) && motivoOk && !lavoro;
+
+  async function invia(corpo) {
+    setLavoro(true); setEsito(null);
+    const r = await fetch(`/api/clients/${client.id}/offerta`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...corpo,
+        assessment_id: query?.assessmentId || null,
+        ...(query?.n ? { n: query.n } : {}),
+        ...(query?.l1 ? { l1: query.l1 } : {}),
+        ...(query?.l2 ? { l2: query.l2 } : {}),
+      }),
+    }).catch(() => null);
+    const j = r ? await r.json().catch(() => ({})) : {};
+    setLavoro(false);
+    if (!r || !r.ok) { setEsito({ ok: false, testo: j.error || 'Operazione non riuscita: riprova.' }); return; }
+    window.location.reload();   // il documento deve ricalcolarsi col prezzo applicato
+  }
+
+  const colore = stato === 'attivo' ? 'bg-sky-50 border-sky-200 text-sky-900'
+    : stato === 'sospeso' ? 'bg-amber-50 border-amber-300 text-amber-900'
+    : 'bg-gray-50 border-gray-200 text-gray-700';
+
+  return (
+    <div className={`mt-2 rounded-xl px-4 py-2.5 text-xs border ${colore}`}>
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <strong>Prezzo Anno 1 · solo per te</strong>
+        <span>calcolato {fmt(prezzoBase)} · costo Anno 1 {fmt(costoAnno1)} (professionisti e 30% della quota) · margine {pctIt(margineFinale && margineFinale.marginePct)}{stato === 'attivo' ? ' sul prezzo applicato' : ''}</span>
+      </div>
+
+      {revisioneForbice && (
+        <div className="mt-1.5">⚠ <strong>Il massimo della forbice porta il margine al {pctIt(revisioneForbice.marginePct)}</strong> ({fmt(revisioneForbice.margineEur)}), sotto la soglia del {pctIt(revisioneForbice.sogliaPct)}. Il tetto resta: è una promessa scritta. All&apos;invio dell&apos;offerta si registra come <strong>avviso di revisione dei parametri della forbice</strong> (lo trovi nel Listino).</div>
+      )}
+
+      {stato === 'attivo' && (
+        <div className="mt-1.5 space-y-1">
+          <div>✓ {rigaRinnovo(sconto)}</div>
+          <div className="text-sky-800">Registrato il {dataIt(reg.at)}{reg.conferma ? ' · margine sotto la soglia, confermato' : ''} · motivazione: {reg.motivo}</div>
+          {posizione === 'sotto_per_sconto' && <div>{ETICHETTA_POSIZIONE.sotto_per_sconto}: il prezzo applicato è sotto il minimo della Stima ({fmt(minimoForbice)}), per questa scelta registrata.</div>}
+          <div className="text-sky-800">Il documento mostra solo il totale finale; l&apos;Anno 2 resta a prezzo pieno ({fmt(rinnovoPieno)}).</div>
+        </div>
+      )}
+      {stato === 'sospeso' && (
+        <div className="mt-1.5">⚠ <strong>Prezzo applicato sospeso</strong>: {fmt(reg.prezzo)} era stato deciso il {dataIt(reg.at)} su un calcolato di {fmt(reg.calcolato)}; il calcolato ora è {fmt(prezzoBase)}. Il documento mostra il prezzo calcolato finché non lo registri di nuovo o lo revochi.</div>
+      )}
+
+      {prezzoFissato ? (
+        <div className="mt-1.5 text-gray-500">Il Report di Attivazione è già stato generato: il prezzo dell&apos;Anno 1 è fissato e non si modifica più.</div>
+      ) : personalizzato ? (
+        <div className="mt-1.5 text-gray-500">Con parametri personalizzati nell&apos;indirizzo il prezzo applicato non si registra: apri l&apos;offerta dalla scheda azienda.</div>
+      ) : (
+        <div className="mt-1.5 flex flex-wrap gap-3">
+          <button onClick={() => { setAperto(a => !a); setEsito(null); }} className="underline font-semibold">
+            {stato === 'nessuno' ? 'Applica un prezzo più basso…' : 'Registra un altro prezzo…'}
+          </button>
+          {stato !== 'nessuno' && (
+            <button disabled={lavoro} onClick={() => invia({ azione: 'revoca_sconto' })} className="underline font-semibold disabled:opacity-40">Revoca: torna al prezzo calcolato</button>
+          )}
+        </div>
+      )}
+
+      {aperto && !personalizzato && !prezzoFissato && (
+        <div className="mt-2 rounded-lg bg-white border border-gray-200 p-3 space-y-2 text-gray-700">
+          <label className="block font-semibold text-gray-600">Prezzo Anno 1 applicato (€, IVA esclusa)
+            <input inputMode="numeric" value={prezzo} onChange={e => { setPrezzo(e.target.value.replace(/[^0-9]/g, '')); setConferma(false); }}
+              placeholder={String(prezzoBase)} className="mt-1 w-40 block px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-normal" />
+          </label>
+          {v && (
+            <div className={v.ok ? 'text-green-700' : v.stato === 'serve_conferma' ? 'text-amber-800' : 'text-red-700'}>
+              {v.scontoEur > 0 && <>Sconto {fmt(v.scontoEur)} ({pctIt(v.scontoPct)}) · </>}{v.messaggio}
+            </div>
+          )}
+          {v && v.stato === 'serve_conferma' && (
+            <label className="flex items-start gap-2 text-amber-900">
+              <input type="checkbox" checked={conferma} onChange={e => setConferma(e.target.checked)} className="mt-0.5" />
+              <span>Confermo il prezzo con un margine del {pctIt(v.marginePct)} ({fmt(v.margineEur)}), sotto la soglia del {pctIt(sogliaPct)}.</span>
+            </label>
+          )}
+          <label className="block font-semibold text-gray-600">Motivazione (obbligatoria, interna: non compare in nessun documento del cliente)
+            <textarea value={motivo} onChange={e => setMotivo(e.target.value)} rows={2}
+              placeholder="Es. prima azienda del distretto, concordato con il titolare per l'ingresso nel programma"
+              className="mt-1 w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-normal" />
+          </label>
+          {!motivoOk && motivo.length > 0 && <div className="text-gray-500">Almeno {MOTIVO_MIN} caratteri ({motivo.trim().length}).</div>}
+          <div className="text-gray-500">Vale solo per l&apos;Anno 1: il rinnovo resta a prezzo pieno ({fmt(rinnovoPieno)}). Si modifica fino al Report di Attivazione.</div>
+          <button disabled={!puoi} onClick={() => invia({ azione: 'registra_sconto', prezzo: p, motivo: motivo.trim(), conferma_margine: conferma })}
+            className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold disabled:opacity-40">
+            {lavoro ? 'Registrazione…' : 'Registra il prezzo applicato'}
+          </button>
+        </div>
+      )}
+      {esito && <div className={`mt-1.5 font-semibold ${esito.ok ? 'text-green-700' : 'text-red-700'}`}>{esito.testo}</div>}
+    </div>
+  );
+}
+
 // ─── Offer Document ───────────────────────────────────────────────────────────
 
-export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, tetto = null, query = null, date, offertaGiorni = 10, scartoL2 = null, pianoBase = [] }) {
+export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, tetto = null, query = null, date, offertaGiorni = 10, scartoL2 = null, pianoBase = [], prezzo = null }) {
   const [emailModal, setEmailModal] = useState(null);
   const [scadenza, setScadenza] = useState(() => scadenzaIniziale(client, offertaGiorni));
   const [esitoInvio, setEsitoInvio] = useState(null); // { ok, testo }
@@ -397,10 +516,10 @@ ${FIRMA}`;
           return (
             <div className={`mt-2 rounded-xl px-4 py-2.5 text-xs border ${stile}`}>
               {st === 'nessuna_forbice' ? (
-                <>📐 <strong>Nessuna forbice di riferimento</strong>: per questa azienda non è stata emessa una Stima, quindi nessuna promessa economica e <strong>nessun tetto applicato</strong>. Prezzo dai dati reali: <strong>{fmt(calc.price_y1)}</strong>.</>
+                <>📐 <strong>Nessuna forbice di riferimento</strong>: per questa azienda non è stata emessa una Stima, quindi nessuna promessa economica e <strong>nessun tetto applicato</strong>. Prezzo dai dati reali: <strong>{fmt(tetto.prezzo)}</strong>.</>
               ) : (
                 <>📐 <strong>Forbice della Stima</strong>: {fmt(tetto.min)} – {fmt(tetto.max)}{forchetta?.avg ? ` (medio ${fmt(forchetta.avg)})` : ''} ·{' '}
-                {st === 'dentro' && <><strong>preventivo dai dati reali {fmt(calc.price_y1)}</strong> ✓ dentro la forbice, nessun tetto applicato.</>}
+                {st === 'dentro' && <><strong>preventivo dai dati reali {fmt(tetto.prezzo)}</strong> ✓ dentro la forbice, nessun tetto applicato.</>}
                 {st === 'capato' && <><strong>tetto applicato</strong>: il dimensionamento reale vale {fmt(tetto.calcolato)}, si propone il massimo promesso <strong>{fmt(tetto.max)}</strong> ({fmt(tetto.scostamento)} assorbiti). L&apos;offerta si invia così com&apos;è; lo scostamento resta registrato per la trattativa dell&apos;Anno 2.{' '}
                   <button onClick={() => setSforamento({ calcolato: tetto.calcolato, massimo: tetto.max, scostamento: tetto.scostamento })}
                     className="underline font-semibold">Superare il massimo promesso…</button></>}
@@ -411,6 +530,7 @@ ${FIRMA}`;
             </div>
           );
         })()}
+        {calc && tetto && offertaVera && prezzo && <PrezzoApplicato client={client} query={query} {...prezzo} />}
       </div>
 
       {emailModal && <EmailModal modal={emailModal} onClose={() => setEmailModal(null)} onInvia={offertaVera ? (() => registraInvio()) : null} />}
@@ -765,7 +885,10 @@ ${FIRMA}`;
               <div style={{ fontSize: 20, fontWeight: 800, color: '#1d4ed8' }}>{fmt(calc.price_y2)}/anno</div>
             </div>
             <div style={{ fontSize: 9.5, color: '#1e3a8a', lineHeight: 1.5, marginTop: 4 }}>
-              Dal secondo anno il programma entra nella fase di <strong>mantenimento e prevenzione</strong>, estesa ai dipendenti di Livello 1 e Livello 2 ({calc.pop_y2} persone): sportello osteopatico per consolidare i risultati, prevenzione attiva, un modulo formativo avanzato, Piattaforma digitale ES Work, monitoraggio continuo e Report Annuale. L&apos;investimento si riduce rispetto all&apos;Anno 1 perché la fase intensiva iniziale di trattamento è già stata completata: si protegge il risultato raggiunto e si previene la ricaduta.
+              Dal secondo anno il programma entra nella fase di <strong>mantenimento e prevenzione</strong>, estesa ai dipendenti di Livello 1 e Livello 2 ({calc.pop_y2} persone): sportello osteopatico per consolidare i risultati, prevenzione attiva, un modulo formativo avanzato, Piattaforma digitale ES Work, monitoraggio continuo e Report Annuale.
+              {/* Vero solo se l'Anno 2 costa davvero meno dell'Anno 1 proposto: con un
+                  prezzo applicato più basso (sconto) può non esserlo, e la frase sparisce. */}
+              {calc.price_y2 < calc.price_y1 && <> L&apos;investimento si riduce rispetto all&apos;Anno 1 perché la fase intensiva iniziale di trattamento è già stata completata: si protegge il risultato raggiunto e si previene la ricaduta.</>}
             </div>
           </div>
 
@@ -995,6 +1118,16 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     const d = await datiOffertaDaCheckup({ assessmentId, n, l1, l2, custom });
     if (!d) return { notFound: true };
     const { client, assessment, nmq, calc, forchetta, tetto } = d;
+    // Solo per il riquadro a video (mai nel documento): prezzo di partenza, costo,
+    // margine, stato del prezzo applicato, rinnovo, avviso di revisione della forbice.
+    const prezzo = {
+      prezzoBase: d.prezzoBase ?? null, costoAnno1: d.costoAnno1 ?? null, sogliaMargine: d.sogliaMargine ?? null,
+      sconto: d.sconto || { stato: 'nessuno' }, margineFinale: d.margineFinale || null, rinnovoPieno: d.rinnovoPieno ?? null,
+      revisioneForbice: d.revisioneForbice || null, personalizzato: !!custom,
+      posizione: d.posizione || null, minimoForbice: forchetta ? forchetta.min ?? null : null,
+      // Dopo il Report di Attivazione il prezzo è fissato: il riquadro resta, il modulo no.
+      prezzoFissato: await (await import('../../lib/pricing/snapshot')).isChainClosed(client.id),
+    };
     const scartoL2 = scartoLivello2({ nmq, calc, dipendenti: client && client.employees, l2Mult: d.l2Mult, soglia: scartoL2Soglia });
     const roi = null; // ROI only from calculator (requires absence days input)
     // Piano della piattaforma, calcolato qui: la tabella c'è già all'apertura e nessun
@@ -1018,6 +1151,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         offertaGiorni,
         scartoL2,
         pianoBase,
+        prezzo: JSON.parse(JSON.stringify(prezzo)),
       },
     };
   } catch (e) {

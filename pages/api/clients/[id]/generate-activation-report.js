@@ -1,6 +1,9 @@
 import { DEFINIZIONE_LIVELLI, IDENTITA_PROFESSIONALE } from '../../../../lib/regole-report.mjs';
 import { generaConControllo } from '../../../../lib/controllo-report.mjs';
 import { parametriDaStimaCongelata } from '../../../../lib/pricing/v2-defaults.mjs';
+import { statoScontoCliente, applicaScontoAlCalcolo, avvisoRevisioneForbice, margine } from '../../../../lib/sconto.mjs';
+import { posizioneNellaForbice } from '../../../../lib/forbice.mjs';
+import { DEFAULTS_V2 } from '../../../../lib/pricing/v2-defaults.mjs';
 import Anthropic from '@anthropic-ai/sdk';
 import { requireAuth } from '../../../../lib/auth';
 import {
@@ -99,6 +102,11 @@ export default requireAuth(async function handler(req, res) {
   // sullo snapshot (se esiste). Fatto qui, NON in buildQuoteBlock (usata anche
   // dall'endpoint read-only di regressione).
   await freezeStimaSnapshot(id).catch(() => {});
+  // Il tetto ha portato il margine sotto la soglia: avviso di revisione della forbice.
+  if (quoteCompliance && quoteCompliance.revisione_forbice) {
+    const { registraRevisioneForbice } = await import('../../../../lib/sconto-server');
+    await registraRevisioneForbice({ d: { client, revisioneForbice: quoteCompliance.revisione_forbice }, fonte: 'report' }).catch(() => null);
+  }
 
   // ── v2: tabella servizi ("Cosa include il programma") + testi parametrici ──
   // SOLO listino v2: per i clienti v1 il report resta ESATTAMENTE quello attuale.
@@ -418,9 +426,18 @@ export async function buildQuoteBlock(client_id, client, answers) {
     // la motivazione già registrata al momento dell'emissione dell'offerta.
     const autorizzato = !!(client && client.sforamento_forbice_motivo);
     const tetto = prezzoConTetto({ calcolato: calc.price_y1, min, max, autorizzato });
-    const calcFinale = applicaTettoAlCalcolo(calc, tetto);
+    const calcDopoTetto = applicaTettoAlCalcolo(calc, tetto);
+    // PREZZO APPLICATO PIÙ BASSO (lib/sconto.mjs): stessa funzione dell'Offerta. Si
+    // applica solo se deciso su questo prezzo di partenza; il rinnovo resta pieno.
+    let soglia = DEFAULTS_V2.sconto_margine_avviso_pct;
+    try { const pv = (await getPricingSettingsV2()).params; if (pv && pv.sconto_margine_avviso_pct != null) soglia = pv.sconto_margine_avviso_pct; } catch (_) {}
+    const costoAnno1 = calc.y1 ? Math.round(calc.y1.total_cost) : null;
+    const statoSconto = statoScontoCliente(client, calcDopoTetto.price_y1);
+    const calcFinale = applicaScontoAlCalcolo(calcDopoTetto, statoSconto);
     const realPrice = calcFinale.price_y1;
     const inRange = (min != null && max != null) ? (realPrice >= min && realPrice <= max) : null;
+    const posizione = posizioneNellaForbice({ prezzo: realPrice, min, max, conSconto: statoSconto.stato === 'attivo' });
+    const revisione = avvisoRevisioneForbice(tetto, costoAnno1, soglia);
     // source: 'snapshot' = confronto contro la forbice promessa; 'live' = ricalcolata
     // (nessuna Stima emessa). pricing_version: mai confronti incrociati tra versioni.
     // `tetto`: traccia INTERNA dello scostamento — quanto vale il dimensionamento
@@ -429,6 +446,11 @@ export async function buildQuoteBlock(client_id, client, answers) {
       in_range: inRange, min, avg, max, real_price: realPrice,
       pricing_version: pricingVersion, source,
       tetto: { stato: tetto.stato, calcolato: tetto.calcolato, massimo: tetto.max, scostamento: tetto.scostamento },
+      // Interni (mai al cliente): posizione nella forbice, margine, sconto copiato e
+      // fermato qui con la sua motivazione, avviso di revisione della forbice.
+      posizione, costo_anno1: costoAnno1, margine: margine(realPrice, costoAnno1), rinnovo_pieno: calc.price_y2,
+      sconto: statoSconto.stato === 'nessuno' ? null : { stato: statoSconto.stato, ...statoSconto.registrato },
+      revisione_forbice: revisione,
     };
     // NB: nessun side-effect qui (buildQuoteBlock è usata anche dall'endpoint
     // read-only di regressione). Il freeze avviene nel handler del Report.

@@ -7,6 +7,7 @@ import { isYmd, oggiRoma } from '../../../../lib/checkup';
 import { registraOffertaInviata, aggiornaClienteTollerante } from '../../../../lib/pipeline-server';
 import { datiOffertaDaCheckup } from '../../../../lib/offerta-server';
 import { STATI } from '../../../../lib/forbice.mjs';
+import { registraSconto, revocaSconto, registraRevisioneForbice } from '../../../../lib/sconto-server';
 
 export default requireAuth(async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -33,6 +34,8 @@ export default requireAuth(async function handler(req, res) {
           n: b.n, l1: b.l1, l2: b.l2,
         }).catch(() => null);
         const t = d && d.tetto;
+        // Il tetto porta il margine sotto la soglia: avviso di revisione della forbice.
+        if (d && d.revisioneForbice) await registraRevisioneForbice({ d, fonte: 'offerta' }).catch(() => null);
         if (t && (t.stato === STATI.CAPATO || t.stato === STATI.SOPRA_AUTORIZZATO)) {
           await aggiornaClienteTollerante(id, {
             sforamento_forbice_calcolato: Math.round(t.calcolato),
@@ -64,6 +67,17 @@ export default requireAuth(async function handler(req, res) {
       return res.json({ ok: true, motivo });
     }
 
+    // PREZZO APPLICATO PIÙ BASSO (sconto sull'Anno 1, lib/sconto.mjs). Motivazione
+    // obbligatoria; sotto la soglia del Listino serve la conferma; sotto il costo è
+    // rifiutato comunque. Il cliente vede solo il totale finale.
+    if (b.azione === 'registra_sconto') {
+      const r = await registraSconto({ clientId: id, assessmentId: b.assessment_id, n: b.n, l1: b.l1, l2: b.l2, prezzo: b.prezzo, motivo: b.motivo, conferma: b.conferma_margine, admin: req.session.email });
+      return r.ok ? res.json({ ok: true, valutazione: r.valutazione }) : res.status(r.status || 422).json({ error: r.errore, valutazione: r.valutazione || null });
+    }
+    if (b.azione === 'revoca_sconto') {
+      const r = await revocaSconto({ clientId: id, admin: req.session.email });
+      return r.ok ? res.json({ ok: true }) : res.status(r.status || 409).json({ error: r.errore });
+    }
     // Revoca dell'autorizzazione: si torna al massimo promesso.
     if (b.azione === 'revoca_sforamento') {
       await aggiornaClienteTollerante(id, { sforamento_forbice_motivo: null, sforamento_forbice_at: null }).catch(() => null);

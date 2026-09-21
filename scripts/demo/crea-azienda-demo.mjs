@@ -456,8 +456,9 @@ async function pulisci() {
   const { data: dips } = await db.from('org_dipendente').select('id').eq('client_id', C);
   const didi = (dips || []).map(d => d.id);
   for (let i = 0; i < didi.length; i += 200) await db.from('org_partecipazione_formativa').delete().in('dipendente_id', didi.slice(i, i + 200));
-  for (const t of ['org_sessione_formativa', 'org_comunicazione', 'org_dipendente', 'sessions', 'treatment_cycles', 'mini_checks', 'pre_validations', 'self_triggers', 'waitlist', 'restratification_alerts', 'reassessments_t12', 'patient_documents', 'generated_reports', 'first_meetings', 'professional_assignments']) {
-    const { error } = await db.from(t).delete().eq('client_id', C); if (error) log('  ', t, error.message);
+  for (const t of ['org_sessione_formativa', 'org_comunicazione', 'org_dipendente', 'sessions', 'treatment_cycles', 'mini_checks', 'pre_validations', 'self_triggers', 'waitlist', 'restratification_alerts', 'reassessments_t12', 'patient_documents', 'generated_reports', 'first_meetings', 'professional_assignments', 'forbice_revisioni']) {
+    const { error } = await db.from(t).delete().eq('client_id', C);
+    if (error && !(t === 'forbice_revisioni' && /Could not find the table/.test(error.message))) log('  ', t, error.message);   // senza v75 la tabella non c'è
   }
   for (let i = 0; i < ids.length; i += 200) { await db.from('assessment_consents').delete().in('patient_id', ids.slice(i, i + 200)); await db.from('access_logs').delete().in('patient_id', ids.slice(i, i + 200)); }
   await db.from('responses').delete().eq('assessment_id', A);

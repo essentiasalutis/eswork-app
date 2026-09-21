@@ -210,10 +210,12 @@ export default function PresentazionePage({ d }) {
   if (i < 0) {
     const righe = [];
     if (d.inRange === true) righe.push(['ok', `Prezzo dentro la forbice presentata al colloquio (${eur(d.forchetta.min)} – ${eur(d.forchetta.max)}).`]);
+    else if (d.posizione === 'sotto_per_sconto') righe.push(['info', `Sotto la forbice per il prezzo applicato che hai registrato: ${eur(d.prezzo.y1)} contro ${eur(d.forchetta.min)} – ${eur(d.forchetta.max)}. Il cliente vede solo il totale.`]);
     else if (d.inRange === false) righe.push(['warn', `Fuori forbice: ${eur(d.prezzo.y1)} contro ${eur(d.forchetta.min)} – ${eur(d.forchetta.max)}. Prepara la motivazione: la schermata del preventivo lo mostra.`]);
     else righe.push(['info', 'Nessuna Stima di riferimento: la schermata del preventivo mostra solo il prezzo.']);
     righe.push(d.vista.pubblicabile ? ['ok', `${d.checkup.risposte} risposte al check-up.`] : ['warn', `Meno di ${K_ANON} risposte: fotografia e stratificazione non mostrano dati.`]);
     if (d.scartoL2) righe.push([d.scartoL2.sopra ? 'warn' : 'info', testoScartoLivello2(d.scartoL2)]);
+    if (d.scontoStato === 'sospeso') righe.push(['warn', 'Il prezzo applicato registrato è sospeso: i dati sono cambiati. Riconfermalo dall\'Offerta, altrimenti vale il prezzo pieno.']);
     if (d.checkup.stato === 'aperto') righe.push(['warn', `Il check-up è ancora aperto${d.checkup.chiude_il ? ` (chiude il ${etichettaData(d.checkup.chiude_il)})` : ''}: i numeri possono ancora cambiare.`]);
 
     const icona = { ok: '✓', warn: '⚠', info: 'ℹ' };

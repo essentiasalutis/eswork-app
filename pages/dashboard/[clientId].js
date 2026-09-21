@@ -15,6 +15,7 @@ import NavMenu from '../../components/NavMenu';
 import { nomeLivello } from '../../lib/livelli';
 import { dataIt } from '../../lib/date-it.mjs';
 import { PROTOCOLLO } from '../../lib/protocollo.mjs';
+import { rigaRinnovo } from '../../lib/sconto.mjs';
 
 
 
@@ -1507,6 +1508,15 @@ ${FIRMA}`,
               );
             })}
           </div>
+          {/* Prezzo applicato più basso e rinnovo (Enrico, 21/9): solo per te, mai al
+              cliente. Lo sconto vale un anno: qui si vede quanto sale il rinnovo. */}
+          {client.sconto_prezzo_applicato != null && (
+            <div className="border-t border-gray-100 pt-3 mb-3 text-xs text-gray-700">
+              <div className="font-semibold text-gray-900 mb-1">Prezzo Anno 1 applicato · uso interno</div>
+              <div>{rigaRinnovo({ stato: 'attivo', registrato: { prezzo: client.sconto_prezzo_applicato, calcolato: client.sconto_calcolato, marginePct: Number(client.sconto_margine_pct), rinnovoPieno: client.sconto_rinnovo_pieno } })}</div>
+              <div className="text-gray-500 mt-1">Registrato il {dataIt(client.sconto_at)} · motivazione: {client.sconto_motivo}{client.sconto_conferma_margine ? ' · margine sotto la soglia, confermato' : ''}</div>
+            </div>
+          )}
           {generatedReports.length > 0 && (
             <div className="border-t border-gray-100 pt-3">
               <div className="text-xs text-gray-400 mb-2">Report generati di recente</div>
@@ -1519,8 +1529,8 @@ ${FIRMA}`,
                     {isValidato(r) && <span title={rigaValidazione(r)} className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-700">✓ validato</span>}
                     {r.report_type === 'activation' && r.quote_compliance && r.quote_compliance.in_range != null && (
                       <span title={`Forbice colloquio €${Math.round(r.quote_compliance.min || 0).toLocaleString('it-IT')}–€${Math.round(r.quote_compliance.max || 0).toLocaleString('it-IT')} · prezzo definitivo €${Math.round(r.quote_compliance.real_price || 0).toLocaleString('it-IT')} (uso interno)`}
-                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.quote_compliance.in_range ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {r.quote_compliance.in_range ? '✓ in forbice' : '⚠ fuori'}
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.quote_compliance.in_range ? 'bg-green-100 text-green-700' : r.quote_compliance.posizione === 'sotto_per_sconto' ? 'bg-sky-100 text-sky-800' : 'bg-red-100 text-red-700'}`}>
+                        {r.quote_compliance.in_range ? '✓ in forbice' : r.quote_compliance.posizione === 'sotto_per_sconto' ? '↓ sotto la forbice per sconto' : '⚠ fuori'}
                       </span>
                     )}
                     <span className="text-gray-400">{dataIt(r.created_at)}</span>

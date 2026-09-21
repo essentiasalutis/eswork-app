@@ -14,7 +14,7 @@ import {
 } from '../../../lib/store';
 import PatientDocuments from '../../../components/PatientDocuments';
 import { validaNrsChiusura } from '../../../lib/nrs';
-import { vistaCartellaCurante } from '../../../lib/vista';
+import { vistaCartellaCurante, vistaAziendaPerPro } from '../../../lib/vista';
 import { nomeLivello } from '../../../lib/livelli';
 import { documentiMancanti, prevedeSedute } from '../../../lib/documenti-seduta.mjs';
 import { dirittoCicli } from '../../../lib/anno-programma.mjs';
@@ -804,7 +804,9 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
       // consegna il link — ma email, telefono e i campi di servizio no.
       patient: vistaCartellaCurante(patient),
       sessions: sessions.map(s => ({ ...s, professionals: undefined })),
-      client,
+      // Solo id e nome: la riga dell'azienda porta anche prezzi, motivazioni interne
+      // (sforamento, prezzo applicato) e contatti, che al curante non servono.
+      client: vistaAziendaPerPro(client),
       documents: documents.map(d => ({ ...d, signature_image: undefined, file_path: undefined })), // né la firma né il percorso del file
       cycles,
       testiFirma,

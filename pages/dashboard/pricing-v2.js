@@ -26,6 +26,7 @@ const PARAM_LABELS = {
   quota_programma_fissa: 'Programma, misurazione e regia: quota fissa per anno di programma (€)',
   quota_programma_per_dipendente: 'Programma, misurazione e regia: € per dipendente dichiarato, per anno (vale anche come check-up del Pacchetto)',
   quota_programma_costo_pct: 'Programma, misurazione e regia: costo, frazione della quota (0.30 = 30%) — solo per il margine interno',
+  sconto_margine_avviso_pct: 'Prezzo Anno 1 più basso del calcolato: margine sotto cui serve la tua conferma (0.40 = 40%). Sotto il costo è rifiutato sempre',
 };
 
 const TEXT_LABELS = {
@@ -67,6 +68,12 @@ export default function PricingV2Page() {
     setCfg(await r.json());
   }, []);
   useEffect(() => { load(); }, [load]);
+  // Avvisi di revisione della forbice (v75): il tetto ha portato un'azienda sotto la
+  // soglia di margine. Solo lettura: sono la prova per rivedere i parametri del settore.
+  const [revisioni, setRevisioni] = useState(null);
+  useEffect(() => {
+    fetch('/api/admin/revisioni-forbice').then(r => r.json()).then(setRevisioni).catch(() => setRevisioni({ righe: [], errore: true }));
+  }, []);
 
   async function put(body, okMsg) {
     setErr('');
@@ -195,6 +202,40 @@ export default function PricingV2Page() {
                 onBlur={e => { const v = e.target.value; if ((texts.offerta_giorni_a ?? '') !== v && /^\d+$/.test(v) && +v >= 1 && +v <= 90) put({ tipo: 'setting', key: 'offerta_giorni_a', value: v }, 'validità dell\'offerta salvata'); }} />
             </label>
             <p className="text-[11px] text-gray-400 mt-2">Quando sposti un&apos;azienda in &laquo;Offerta aperta&raquo; la scadenza viene proposta a oggi + questi giorni: puoi modificarla o cancellarla caso per caso. Per un&apos;azienda strutturata si alza (30 giorni).</p>
+          </div>
+
+          {/* Avvisi di revisione della forbice — il tetto porta il margine sotto la soglia */}
+          <div className={box}>
+            <h2 className="font-semibold text-gray-800 mb-1">Avvisi di revisione della forbice</h2>
+            <p className="text-xs text-gray-500 mb-3">Aziende in cui il massimo promesso nella Stima ha portato il margine dell&apos;Anno 1 sotto la soglia qui sopra. Il tetto non si tocca (è una promessa scritta): questi casi dicono che i parametri della forbice di quel settore sono bassi. Si registrano all&apos;invio dell&apos;offerta e alla generazione del Report di Attivazione.</p>
+            {revisioni == null ? <p className="text-xs text-gray-400">Caricamento…</p>
+              : revisioni.mancante ? <p className="text-xs text-amber-700">Serve la migration v75: applicala in Supabase.</p>
+              : revisioni.errore ? <p className="text-xs text-red-700">Avvisi non disponibili.</p>
+              : revisioni.righe.length === 0 ? <p className="text-xs text-gray-500">Nessun avviso finora.</p>
+              : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs min-w-[640px] tabular-nums">
+                    <thead><tr className="text-left uppercase tracking-wide text-gray-400 border-b border-gray-100">
+                      <th className="py-2">Data</th><th>Azienda</th><th>Settore</th><th className="text-right">Dipendenti</th><th className="text-right">Calcolato</th><th className="text-right">Massimo applicato</th><th className="text-right">Costo</th><th className="text-right">Margine</th><th>Da</th>
+                    </tr></thead>
+                    <tbody>
+                      {revisioni.righe.map(r => (
+                        <tr key={r.id} className="border-b border-gray-50">
+                          <td className="py-1.5">{new Date(r.creato_il).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' })}</td>
+                          <td>{r.azienda || r.client_id}{r.demo ? ' (demo)' : ''}</td>
+                          <td>{r.settore || '—'}</td>
+                          <td className="text-right">{r.dipendenti ?? '—'}</td>
+                          <td className="text-right">€{Number(r.calcolato).toLocaleString('it-IT', { useGrouping: 'always' })}</td>
+                          <td className="text-right">€{Number(r.massimo).toLocaleString('it-IT', { useGrouping: 'always' })}</td>
+                          <td className="text-right">€{Number(r.costo).toLocaleString('it-IT', { useGrouping: 'always' })}</td>
+                          <td className="text-right font-semibold text-amber-700">{String(Number(r.margine_pct)).replace('.', ',')}% <span className="font-normal text-gray-400">(soglia {String(Number(r.soglia_pct)).replace('.', ',')}%)</span></td>
+                          <td>{r.fonte === 'report' ? 'Report di Attivazione' : 'Offerta'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
           </div>
 
           {/* Argomentario delle 12 voci (testi di Enrico, sola lettura: stessi di Stima e Offerta) */}

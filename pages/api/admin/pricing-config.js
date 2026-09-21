@@ -28,6 +28,11 @@ export default requireAuth(async function handler(req, res) {
         if (Object.prototype.hasOwnProperty.call(DEFAULTS_V2, b.key) && !Number.isFinite(Number(b.value))) {
           return res.status(422).json({ error: `"${b.key}" deve essere un numero` });
         }
+        // Soglia di avviso del margine: una frazione (0.40 = 40%). Lo zero, il limite
+        // che non si sposta, vive nel codice (lib/sconto.mjs), non qui.
+        if (b.key === 'sconto_margine_avviso_pct' && !(Number(b.value) > 0 && Number(b.value) < 1)) {
+          return res.status(422).json({ error: 'Soglia del margine: scrivi una frazione tra 0 e 1 (0.40 = 40%).' });
+        }
         await updatePricingSettingV2(b.key, b.value);
         return res.json({ ok: true });
       }

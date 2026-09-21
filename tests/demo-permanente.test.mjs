@@ -82,3 +82,13 @@ test('evento nuovo: ergonomia d\'ufficio ricalcolata e Stima congelata della dem
   assert.match(s, /ergonomia_ufficio: Math\.max\(0, n - \(parseInt\(s2\.ergonomia_addetti, 10\) \|\| 0\)\)/);
   assert.match(s, /stima_snapshot: null/);
 });
+
+test('report della demo: niente «colloquio»; la riga per l\'AI non finisce mai stampata (21/9)', () => {
+  const gen = src('pages/api/clients/[id]/generate-activation-report.js');
+  assert.match(gen, /const TESTA_STAMPATA_DEMO = 'Investimento calcolato sulla popolazione indicata e sulla stratificazione della sala:';/);
+  assert.match(gen, /const inLinea = inRange && !demo \?/);
+  assert.match(gen, /\$\{demo \? TESTA_BLOCCO_DEMO : TESTA_BLOCCO\}/);
+  // l'istruzione resta nel blocco che legge l'AI e si toglie dal testo stampato
+  assert.match(gen, /\.\$\{ISTRUZIONE_DIMENSIONAMENTO\}`/);
+  assert.match(gen, /\.replace\(ISTRUZIONE_DIMENSIONAMENTO, ''\)/);
+});

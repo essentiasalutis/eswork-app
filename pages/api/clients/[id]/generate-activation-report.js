@@ -345,7 +345,7 @@ ${isPacchetto
   : `Il piano prevede la presa in carico dei pazienti L1 distribuiti in turni di avvio mensili, con sportello osteopatico in sede. La formazione collettiva copre l'intera popolazione aziendale con moduli su ergonomia e postura.`}
 ${!isPacchetto && quoteBlock ? `
 ## Proposta economica collegata
-${quoteBlock.replace('PROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):', 'Investimento calcolato con le condizioni concordate al colloquio e la stratificazione reale:')}` : ''}${sezioneComprende ? `
+${quoteBlock.replace(TESTA_BLOCCO, TESTA_STAMPATA).replace(TESTA_BLOCCO_DEMO, TESTA_STAMPATA_DEMO).replace(ISTRUZIONE_DIMENSIONAMENTO, '')}` : ''}${sezioneComprende ? `
 
 ${sezioneComprende}` : ''}${isPacchetto && testoEvoluzione && !testoEvoluzione.startsWith('Segnaposto') ? `
 ## Evoluzione possibile
@@ -382,6 +382,16 @@ ${isPacchetto ? `## Raccomandazioni
 // Blocco "proposta economica" per il report: condizioni della scheda colloquio
 // applicate alla stratificazione REALE (solo prezzo cliente, mai margini).
 // Esportata (solo lettura) anche per la baseline di regressione pricing v1/v2.
+// Intestazioni del blocco economico: quella che legge l'AI e quella stampata nella versione
+// di sistema. Demo permanente (Enrico, 21/9): al convegno non c'è stato nessun colloquio.
+const TESTA_BLOCCO = 'PROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):';
+const TESTA_BLOCCO_DEMO = 'PROPOSTA ECONOMICA COLLEGATA (popolazione indicata + stratificazione della sala):';
+const TESTA_STAMPATA = 'Investimento calcolato con le condizioni concordate al colloquio e la stratificazione reale:';
+const TESTA_STAMPATA_DEMO = 'Investimento calcolato sulla popolazione indicata e sulla stratificazione della sala:';
+// Istruzione per l'AI dentro la riga del dimensionamento: resta nel testo che va all'AI,
+// non nel documento (Enrico, 21/9: nella versione di sistema finiva stampata).
+export const ISTRUZIONE_DIMENSIONAMENTO = ' Sono gli UNICI numeri di persone sull\'intera popolazione: non proiettare altri livelli';
+
 export async function buildQuoteBlock(client_id, client, answers) {
   try {
     const fm = await getFirstMeeting(client_id);
@@ -480,7 +490,8 @@ export async function buildQuoteBlock(client_id, client, answers) {
     const eur = v => v.toLocaleString('it-IT', { useGrouping: 'always' });
     // Testo CLIENTE: prezzo + framing positivo "in linea con la stima" se rientra.
     // MAI il flag grezzo dentro/fuori (resta dato interno persistito).
-    const inLinea = inRange ? ', in linea con la Stima di investimento presentata al colloquio' : '';
+    const demo = !!(client && client.demo_permanente);
+    const inLinea = inRange && !demo ? ', in linea con la Stima di investimento presentata al colloquio' : '';
 
     // PONTE rispondenti -> popolazione. Il prezzo NON si dimensiona sui soli
     // rispondenti: la prevalenza osservata viene riportata sull'intera forza
@@ -489,7 +500,7 @@ export async function buildQuoteBlock(client_id, client, answers) {
     // entrambi giusti, ma il passaggio non era spiegato da nessuna parte.
     const obsPct = responders > 0 ? Math.round((nmq.level1.count / responders) * 100) : null;
     const rigaDimensionamento = (pricingVersion === 'v2' && obsPct != null && nEmp > responders)
-      ? `\n- Dimensionamento: la quota in Livello 1 osservata sui ${responders} questionari (${obsPct}%) è riportata sull'intera popolazione di ${nEmp} dipendenti (${real.l1} persone attese), così il programma copre anche chi non ha compilato il questionario${real.l2 != null ? `; per la prevenzione il programma è dimensionato su ${real.l2} persone in Livello 2` : ''}. Sono gli UNICI numeri di persone sull'intera popolazione: non proiettare altri livelli`
+      ? `\n- Dimensionamento: la quota in Livello 1 osservata sui ${responders} questionari (${obsPct}%) è riportata sull'intera popolazione di ${nEmp} dipendenti (${real.l1} persone attese), così il programma copre anche chi non ha compilato il questionario${real.l2 != null ? `; per la prevenzione il programma è dimensionato su ${real.l2} persone in Livello 2` : ''}.${ISTRUZIONE_DIMENSIONAMENTO}`
       : '';
 
     // ERGONOMIA: e' una voce PAGATA (fino a qui invisibile nel documento). Senza
@@ -511,7 +522,7 @@ export async function buildQuoteBlock(client_id, client, answers) {
       ? `\n- Include la consulenza ergonomico-posturale — osservazione delle postazioni di lavoro e del gesto, con raccomandazioni di adeguamento e indicazioni personalizzate — ${pezzi.join('; ')}. È già compresa nell'investimento, non è un'attività da acquistare a parte. Non sostituisce la valutazione dei rischi ai sensi del D.Lgs. 81/2008, che resta di competenza del datore di lavoro e dell'RSPP.`
       : '';
 
-    const block = `\nPROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):\n- Programma Anno 1: €${eur(realPrice)}${inLinea} (${calc.days_osteo_y1} giornate sportello, ${calc.training_sessions_y1} sessioni formative)\n- Anno 2 e successivi (indicativo): €${eur(calc.price_y2)}${rigaDimensionamento}${rigaErgonomia}`;
+    const block = `\n${demo ? TESTA_BLOCCO_DEMO : TESTA_BLOCCO}\n- Programma Anno 1: €${eur(realPrice)}${inLinea} (${calc.days_osteo_y1} giornate sportello, ${calc.training_sessions_y1} sessioni formative)\n- Anno 2 e successivi (indicativo): €${eur(calc.price_y2)}${rigaDimensionamento}${rigaErgonomia}`;
     // `calc` con il tetto già applicato: la sezione «Cosa comprende» stampa
     // l'investimento e deve dire il prezzo proposto, non il calcolato.
     return { block, compliance, calc: calcFinale };

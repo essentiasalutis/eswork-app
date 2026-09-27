@@ -22,7 +22,7 @@ test('i difetti visti nella demo del 18/9 vengono riconosciuti', () => {
 });
 
 test('un testo che usa solo i dati passa', () => {
-  const t = '## Sintesi\n1. 352 sedute su 352 pianificate, 176 ore.\n2. Il Livello 1 scende dal 17% all\'8%: un miglioramento. PGIC medio 4,0/5; 68% riferisce un miglioramento (PGIC 4-5). Mini-check T3 e T6, modello OT23.';
+  const t = '## Sintesi\n1. 352 trattamenti su 352 pianificati, 176 ore.\n2. Il Livello 1 scende dal 17% all\'8%: un miglioramento. PGIC medio 4,0/5; 68% riferisce un miglioramento (PGIC 4-5). Mini-check T3 e T6, modello OT23.';
   assert.deepEqual(controllaTesto(t, { dati }), []);
 });
 
@@ -32,7 +32,7 @@ test('numeri: virgola e punto sono lo stesso numero, le sigle non contano', () =
 
 test('il programma descritto viene dal protocollo', () => {
   const t = programmaPrevisto();
-  assert.ok(t.includes(`${PROTOCOLLO.sedute_per_ciclo} sedute da ${PROTOCOLLO.durata_seduta_min} minuti`));
+  assert.ok(t.includes(`${PROTOCOLLO.sedute_per_ciclo} trattamenti da ${PROTOCOLLO.durata_seduta_min} minuti`));
   assert.ok(t.includes(`${PROTOCOLLO.formazione_moduli_primo_anno} moduli nel primo anno`));
 });
 
@@ -72,7 +72,7 @@ test('generaConControllo: riscrive una volta, poi segna da rivedere', async () =
   const { generaConControllo } = await import('../lib/controllo-report.mjs');
   const dati = 'Sedute: 352';
   let chiamate = 0;
-  const buono = await generaConControllo(async () => (++chiamate === 1 ? { testo: 'interventi fisioterapici' } : { testo: '352 sedute osteopatiche' }), dati);
+  const buono = await generaConControllo(async () => (++chiamate === 1 ? { testo: 'interventi fisioterapici' } : { testo: '352 trattamenti osteopatici' }), dati);
   assert.equal(buono.aiStatus, 'ai');
   assert.equal(chiamate, 2);
   const cattivo = await generaConControllo(async () => ({ testo: 'in linea con gli standard' }), dati);
@@ -101,4 +101,10 @@ test('«persone attese» del dimensionamento non è un paragone', () => {
 test('«lista d\'attesa» non è un paragone, ma «senza liste d\'attesa» è un fatto non fornito', () => {
   assert.deepEqual(controllaTesto('La lista d\'attesa è gestita dalla piattaforma.'), []);
   assert.ok(controllaTesto('352 sedute, senza liste d\'attesa.', { dati: '352' }).some(p => p.includes('lista d\'attesa')));
+});
+
+test('lessico (Enrico, 27/9): nei report si dice «trattamento», mai «seduta»', () => {
+  assert.ok(controllaTesto('Sono state erogate 12 sedute.').some(p => /trattamento/.test(p)));
+  assert.ok(controllaTesto('Una seduta da 30 minuti.').some(p => /trattamento/.test(p)));
+  assert.deepEqual(controllaTesto('Sono stati erogati 12 trattamenti di prevenzione.'), []);
 });

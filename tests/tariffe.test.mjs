@@ -63,7 +63,7 @@ test('il motore non ripiega più sulle tariffe standard: si ferma e dice quali m
 test('report di Attivazione, Offerta e Finanza non chiamano il motore senza tariffe', () => {
   const report = fs.readFileSync('pages/api/clients/[id]/generate-activation-report.js', 'utf8');
   assert.match(report, /if \(quoteErrore\) return res\.status\(422\)/);
-  assert.ok(report.indexOf('tariffeMancanti(tariffeQui)') < report.indexOf('computeForchetta({ n: nEmp'), 'controllo prima della forbice live');
+  assert.ok(report.indexOf('tariffeMancanti(tariffeQui)') < report.indexOf('const calc = calculatePricing({ n: nEmp'), 'controllo prima del motore');
   const offerta = fs.readFileSync('lib/offerta-server.js', 'utf8');
   assert.ok(offerta.indexOf('tariffeMancanti(condBasis && condBasis.rates)') < offerta.indexOf('const calcPieno = calculatePricing'));
   assert.match(fs.readFileSync('pages/dashboard/finance.js', 'utf8'), /rates: tariffe\[c\.id\]/);

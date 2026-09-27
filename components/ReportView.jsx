@@ -5,7 +5,7 @@ import {
   TYPE_LABELS, generateSummaryText,
 } from '../lib/scoring';
 import { CONFIG } from '../lib/config';
-import { kAnonPartition, maskCount, tooSmall, K_ANON, K_ANON_INCROCIO, SUPPRESSED } from '../lib/kanon';
+import { kAnonPartition, maskCount, tooSmall, K_ANON, K_ANON_INCROCIO, SUPPRESSED, livelliLeggibili, nomeCella, NOTA_LIVELLI_UNITI, NOTA_NESSUNA_DISTRIBUZIONE } from '../lib/kanon';
 import { convieneAggregare, NOTA_DISTRETTI } from '../lib/distretti';
 import { nomeLivello } from '../lib/livelli';
 import { dataIt } from '../lib/date-it.mjs';
@@ -206,25 +206,32 @@ function LevelBoxes({ nmq }) {
     { key: 'l3', count: nmq.level3.count },
   ], nmq.n);
   const prevShown = maskCount(nmq.prevalence.count) != null;
+  // Livelli sotto soglia UNITI in un solo dato (Enrico, 27/9): mai «n.d.» livello per livello.
+  const LL = livelliLeggibili(part, nmq.n);
   return (
     <div className="mb-2">
-      <div className="grid grid-cols-3 gap-2 mb-2">
-        {part.map((l) => {
-          const m = LEVEL_META[l.key];
+      {LL.nessunaDistribuzione
+        ? <div className="text-xs text-gray-500 text-center mb-2">{NOTA_NESSUNA_DISTRIBUZIONE}</div>
+        : <div className={`grid gap-2 mb-2 ${LL.celle.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        {LL.celle.map((l) => {
+          const m = l.unite
+            ? { label: nomeCella(l), subtitle: `${l.keys.map(k => LEVEL_META[k].subtitle).join(' · ')} — insieme, a tutela della riservatezza`, bg: '#F8FAFC', border: '#94A3B8', color: '#475569' }
+            : LEVEL_META[l.key];
           return (
             <div
               key={l.key}
               className="rounded-2xl p-3 text-center print-page"
               style={{ background: m.bg, border: `1.5px solid ${m.border}`, printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
             >
-              <div className="text-2xl font-bold" style={{ color: m.color }}>{l.suppressed ? SUPPRESSED : l.count}</div>
-              <div className="text-xs text-gray-600 mt-0.5">{l.suppressed ? `gruppo < ${K_ANON}` : `dip. (${l.pct}%)`}</div>
+              <div className="text-2xl font-bold" style={{ color: m.color }}>{l.count}</div>
+              <div className="text-xs text-gray-600 mt-0.5">{`dip. (${l.pct}%)`}</div>
               <div className="text-xs font-semibold mt-2 leading-tight" style={{ color: m.color }}>{m.label}</div>
               <div className="text-xs text-gray-400 mt-1 leading-tight hidden sm:block">{m.subtitle}</div>
             </div>
           );
         })}
-      </div>
+      </div>}
+      {LL.unite && <div className="text-xs text-gray-400 text-center mb-2">{NOTA_LIVELLI_UNITI}</div>}
       <div className="text-xs text-gray-400 text-center mb-2">
         Prevalenza generica: <strong>{prevShown ? `${nmq.prevalence.pct}%` : SUPPRESSED}</strong> ha riportato almeno un fastidio negli ultimi 12 mesi (dato informativo)
       </div>
@@ -421,28 +428,42 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         </div>
         <p className="text-sm text-gray-700 leading-relaxed">
           {anyLevelSuppressed
-            ? `Su ${n} risposte raccolte, la distribuzione di dettaglio per livello non è mostrata: uno o più gruppi contano meno di ${K_ANON} persone e vengono soppressi a tutela della riservatezza (k-anonymity).`
+            ? `Su ${n} risposte raccolte, ${livelliLeggibili(levelPart, n).nessunaDistribuzione ? NOTA_NESSUNA_DISTRIBUZIONE.charAt(0).toLowerCase() + NOTA_NESSUNA_DISTRIBUZIONE.slice(1) : NOTA_LIVELLI_UNITI.charAt(0).toLowerCase() + NOTA_LIVELLI_UNITI.slice(1)}`
             : generateSummaryText(nmq)}
         </p>
       </div>
 
       {/* KPI Dashboard */}
       <SectionTitle>Cruscotto sintetico</SectionTitle>
-      <div className="grid gap-3 mb-2 grid-cols-3">
-        {L.l1.suppressed
-          ? <div className="rounded-2xl p-3 text-center bg-gray-50 border border-gray-200"><div className="text-xs text-gray-600 mb-0.5">Livello 1</div><div className="text-xl font-bold text-gray-400">{SUPPRESSED}</div><div className="text-xs text-gray-400 mt-0.5">{nomeLivello('level1')}</div></div>
-          : <Semaphore type="nmq" score={L.l1.pct} value={`${L.l1.pct}%`} label="Livello 1" subtitle={nomeLivello('level1')} />}
-        <div className="rounded-2xl p-3 text-center bg-yellow-50 border border-yellow-100">
-          <div className="text-xs text-gray-600 mb-0.5">Livello 2</div>
-          <div className="text-xl font-bold text-yellow-600">{L.l2.suppressed ? SUPPRESSED : `${L.l2.pct}%`}</div>
-          <div className="text-xs text-gray-400 mt-0.5">{nomeLivello('level2')}</div>
-        </div>
-        <div className="rounded-2xl p-3 text-center bg-green-50 border border-green-100">
-          <div className="text-xs text-gray-600 mb-0.5">Livello 3</div>
-          <div className="text-xl font-bold text-green-600">{L.l3.suppressed ? SUPPRESSED : `${L.l3.pct}%`}</div>
-          <div className="text-xs text-gray-400 mt-0.5">{nomeLivello('level3')}</div>
-        </div>
-      </div>
+      {(() => {
+        // Livelli sotto soglia UNITI in un solo dato (Enrico, 27/9).
+        const LL = livelliLeggibili(levelPart, n);
+        if (LL.nessunaDistribuzione) return <div className="text-xs text-gray-500 mb-2">{NOTA_NESSUNA_DISTRIBUZIONE}</div>;
+        const box = (c) => {
+          if (c.unite) return (
+            <div key={c.key} className="rounded-2xl p-3 text-center bg-slate-50 border border-slate-300">
+              <div className="text-xs text-gray-600 mb-0.5">{nomeCella(c)}</div>
+              <div className="text-xl font-bold text-slate-600">{c.pct}%</div>
+              <div className="text-xs text-gray-400 mt-0.5">insieme, a tutela della riservatezza</div>
+            </div>
+          );
+          if (c.key === 'l1') return <Semaphore key="l1" type="nmq" score={c.pct} value={`${c.pct}%`} label="Livello 1" subtitle={nomeLivello('level1')} />;
+          const stile = c.key === 'l2' ? ['bg-yellow-50 border-yellow-100', 'text-yellow-600'] : ['bg-green-50 border-green-100', 'text-green-600'];
+          return (
+            <div key={c.key} className={`rounded-2xl p-3 text-center border ${stile[0]}`}>
+              <div className="text-xs text-gray-600 mb-0.5">{nomeCella(c)}</div>
+              <div className={`text-xl font-bold ${stile[1]}`}>{c.pct}%</div>
+              <div className="text-xs text-gray-400 mt-0.5">{nomeLivello(c.key === 'l2' ? 'level2' : 'level3')}</div>
+            </div>
+          );
+        };
+        return (
+          <>
+            <div className={`grid gap-3 mb-2 ${LL.celle.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>{LL.celle.map(box)}</div>
+            {LL.unite && <div className="text-xs text-gray-400 mb-2">{NOTA_LIVELLI_UNITI}</div>}
+          </>
+        );
+      })()}
 
       {/* Legenda semafori */}
       <LegendBox>

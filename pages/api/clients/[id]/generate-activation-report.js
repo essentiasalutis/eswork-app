@@ -18,7 +18,7 @@ import {
   messaggioSchedeDoppie,
 } from '../../../../lib/store';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
-import { calculatePricing, computeForchetta, realL1L2FromAssessment } from '../../../../lib/calculator';
+import { calculatePricing, realL1L2FromAssessment } from '../../../../lib/calculator';
 import { getPricingSettingsV2, getNoteReport } from '../../../../lib/pricing/settings';
 import { ergonomiaDaColloquio } from '../../../../lib/pricing/v2';
 import { isFirmato } from '../../../../lib/checkup-server';
@@ -28,7 +28,7 @@ import { cosaComprendeMarkdown, inserisciCosaComprende, VOCI_PROGRAMMA, quantita
 import { getForchettaSnapshot, freezeStimaSnapshot } from '../../../../lib/pricing/snapshot';
 import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
-import { kAnonPartition, tooSmall, K_ANON } from '../../../../lib/kanon';
+import { kAnonPartition, tooSmall, K_ANON, livelliLeggibili, nomeCella } from '../../../../lib/kanon';
 import { dataIt } from '../../../../lib/date-it.mjs';
 import { conProtocollo, PROTOCOLLO } from '../../../../lib/protocollo.mjs';
 import { tariffeMancanti, messaggioTariffeDove } from '../../../../lib/tariffe.mjs';
@@ -40,15 +40,19 @@ function stratLines(l1, l2, l3, total) {
   if (tooSmall(total)) {
     return `- Popolazione totale < ${K_ANON}: distribuzione per livello NON pubblicabile (tutela della riservatezza, k-anonymity)`;
   }
-  const P = Object.fromEntries(kAnonPartition([
+  // Livelli sotto soglia UNITI in un solo dato (Enrico, 27/9): all'AI arriva lo stesso
+  // dato che vede il cliente, mai due «n.d.».
+  const LL = livelliLeggibili(kAnonPartition([
     { key: 'l1', count: l1 }, { key: 'l2', count: l2 }, { key: 'l3', count: l3 },
-  ], total).map(c => [c.key, c]));
-  const cell = c => c.suppressed ? `n.d. (gruppo < ${K_ANON}, soppresso per riservatezza)` : `${c.count} (${c.pct}%)`;
+  ], total), total);
+  if (LL.nessunaDistribuzione) return `- Distribuzione per livello NON pubblicabile: con ${total} questionari ogni livello conta meno di ${K_ANON} persone (tutela della riservatezza)`;
   // I nomi vengono dalla fonte unica (lib/livelli): se l'AI li riceve sfalsati li
   // scrive nel report, qualunque cosa dica l'interfaccia. Fino al 13/9 qui passavano
   // «Livello 2 (monitoraggio)» e «Livello 3 (prevenzione)».
-  const n = l => nomeLivello(l).toLowerCase();
-  return `- Livello 1 (${n('level1')}): ${cell(P.l1)}\n- Livello 2 (${n('level2')}): ${cell(P.l2)}\n- Livello 3 (${n('level3')}): ${cell(P.l3)}`;
+  const n = k => nomeLivello({ l1: 'level1', l2: 'level2', l3: 'level3' }[k]).toLowerCase();
+  return LL.celle.map(c => (c.unite
+    ? `- ${nomeCella(c)} INSIEME (${c.keys.map(n).join(' e ')}): ${c.count} (${c.pct}%) — livelli non distinti a tutela della riservatezza`
+    : `- ${nomeCella(c)} (${n(c.key)}): ${c.count} (${c.pct}%)`)).join('\n');
 }
 
 export default requireAuth(async function handler(req, res) {
@@ -181,7 +185,7 @@ ${stratLines(l1Count, l2Count, l3Count, stratTotal)}
 
 ${DEFINIZIONE_LIVELLI}
 
-NOTA PRIVACY: dove un gruppo è "n.d." è stato soppresso per riservatezza (k-anonymity). NON dedurre, stimare o ricostruire i valori soppressi. ATTENZIONE: un gruppo può risultare soppresso ANCHE se conta ${K_ANON} persone o più — è la soppressione secondaria, che impedisce di ricavarlo per differenza dagli altri. Quindi NON affermare che i gruppi soppressi siano "inferiori a ${K_ANON}": di' solo che non sono pubblicabili per tutela della riservatezza. I dati dei dipendenti si dicono RISERVATI, mai «anonimi»: il dato individuale esiste ed è protetto.
+NOTA PRIVACY: quando due livelli sono indicati INSIEME è per riservatezza (k-anonymity): da soli, uno dei due gruppi conterebbe meno di ${K_ANON} persone. Riporta il dato così com'è, INSIEME. VIETATO attribuire quel numero a uno solo dei due livelli, stimare come si divide, dedurre che uno dei due livelli esista o manchi, o trarne conclusioni cliniche su uno dei due. Di' solo che quei livelli non si mostrano separati a tutela della riservatezza. I dati dei dipendenti si dicono RISERVATI, mai «anonimi»: il dato individuale esiste ed è protetto.
 ${clinicoBlock}
 CHECK-UP: ${stratTotal > 0 ? `${stratTotal} questionari raccolti${client.employees ? ` su ${client.employees} dipendenti (adesione ${Math.round(stratTotal / client.employees * 100)}%)` : ''}` : 'nessun questionario ancora raccolto'}
 NUMERI (tassativo): usa SOLO i numeri presenti in questi dati. VIETATO calcolarne di nuovi (somme, differenze, percentuali, proiezioni sulla popolazione): se un numero non c'è, descrivi senza numero.
@@ -195,11 +199,11 @@ ${isPacchetto ? '' : quoteBlock}${senzaPrezzo ? '\nPARTE ECONOMICA: in questo re
   const pOp = conProtocollo(v2Params || {});   // i numeri del protocollo, non scritti a mano
   const parametriOperativi = (!isV2 || isPacchetto) ? '' : `
 PARAMETRI OPERATIVI REALI (usa ESATTAMENTE questi, non altri):
-- Seduta osteopatica individuale: ${pOp.session_duration_min} minuti
-- Ciclo per persona in Livello 1: ${pOp.sessions_per_l1} sedute
-- Prevenzione attiva per persona in Livello 2: ${pOp.prevention_sessions_per_l2} sessioni
+- Trattamento osteopatico individuale: ${pOp.session_duration_min} minuti
+- Ciclo per persona in Livello 1: ${pOp.sessions_per_l1} trattamenti
+- Prevenzione attiva per persona in Livello 2: ${pOp.prevention_sessions_per_l2} trattamenti di prevenzione
 - Una giornata di sportello in sede vale ${CONFIG.hours_per_day} ore di erogazione
-VIETATO inventare dettagli di erogazione che non trovi qui sopra: quante sedute stanno in una giornata, la cadenza degli accessi (settimanale, quindicinale, mensile), durate, calendari, orari. Se un dato non ti è stato fornito, NON scriverlo: il report fissa il prezzo, ogni numero che scrivi diventa un impegno.
+VIETATO inventare dettagli di erogazione che non trovi qui sopra: quanti trattamenti stanno in una giornata, la cadenza degli accessi (settimanale, quindicinale, mensile), durate, calendari, orari. Se un dato non ti è stato fornito, NON scriverlo: il report fissa il prezzo, ogni numero che scrivi diventa un impegno.
 VIETATO attribuire alla Piattaforma digitale ES Work funzioni che non ti sono state elencate (alert automatici, contenuti educativi personalizzati, questionari periodici, notifiche, tracciamento in tempo reale): è lo strumento con cui il programma viene gestito e i report prodotti, nient'altro.
 ERGONOMIA: descrivila SOLO con le voci e i numeri della riga «consulenza ergonomico-posturale» della PROPOSTA ECONOMICA COLLEGATA, senza aggiungerne. Se lì non compaiono addetti di reparto, NON citare alcuna formazione degli addetti; se non compaiono postazioni tipo di produzione, NON parlare di «studio delle postazioni». In ufficio l'intervento è per persona. Se la PROPOSTA ECONOMICA COLLEGATA manca o non ha quella riga, descrivila solo in termini generali (osservazione delle postazioni e del gesto, raccomandazioni di adeguamento), senza addetti e senza elenchi di interventi tecnici.
 COMPONENTI DEL PROGRAMMA (le SOLE che esistono; la sezione con i loro testi la inserisce il sistema): ${VOCI_PROGRAMMA.map(v => v.nome).join('; ')}.
@@ -211,7 +215,7 @@ VIETATO raccomandare al cliente attività che sono GIÀ comprese nell'investimen
   const vincoliV2 = isV2 ? `
 VINCOLI TASSATIVI SUL TESTO:
 - MAI cifre in euro accanto alle singole voci o componenti del programma: le uniche cifre in euro sono l'investimento (Anno 1 e Anno 2 indicativo).
-- MAI inventare quantità (giornate, sessioni, cicli, sedute, postazioni, addetti, report) che non trovi nei dati forniti: usa SOLO quelle che ti vengono passate, con la LORO unità (persone in ufficio restano persone, postazioni tipo restano postazioni: mai «40 postazioni» se il dato è «40 persone»).
+- MAI inventare quantità (giornate, sessioni di formazione, cicli, trattamenti, postazioni, addetti, report) che non trovi nei dati forniti: usa SOLO quelle che ti vengono passate, con la LORO unità (persone in ufficio restano persone, postazioni tipo restano postazioni: mai «40 postazioni» se il dato è «40 persone»).
 - MAI espressioni come "in omaggio", "compreso gratuitamente", "gratis".
 - MAI "AI" o "intelligenza artificiale" nel nome della piattaforma (si chiama solo "Piattaforma digitale ES Work").
 - MAI i termini Core, Plus, Enterprise, "tier", "modello Core/Plus/Enterprise": sono nomi INTERNI, non ti vengono forniti e non vanno inventati. Il prodotto si chiama SOLO "${nomeProdotto}".` : '';
@@ -267,9 +271,9 @@ ${isPacchetto
   ? '(SOLO gli step del pacchetto: restituzione dei risultati alla direzione, formazione collettiva, sopralluogo ergonomico e conferma delle postazioni, consulenza ergonomico-posturale; NIENTE monitoraggio, follow-up clinici o trattamenti)'
   : '(5 step operativi con timeframe indicativo)'}
 ${parametriOperativi}${vincoliV2}${istruzioniPacchetto}
-${firmato ? '' : 'STATO (tassativo): il contratto NON è ancora firmato, questo report PROPONE il programma. VIETATO scrivere che il programma è stato attivato, avviato, erogato o che è operativo, e VIETATO citare sessioni già svolte: scrivi «programma proposto», «si propone di attivare».\n'}${IDENTITA_PROFESSIONALE}
+${firmato ? '' : 'STATO (tassativo): il contratto NON è ancora firmato, questo report PROPONE il programma. VIETATO scrivere che il programma è stato attivato, avviato, erogato o che è operativo, e VIETATO citare trattamenti già svolti: scrivi «programma proposto», «si propone di attivare».\n'}${IDENTITA_PROFESSIONALE}
 RISULTATI CLINICI (tassativo): MAI promettere risultati clinici — niente «risolvere», «eliminare», «guarire» il dolore o la sintomatologia. Il programma promette presa in carico e misura: scrivi «trattare», «prendere in carico», «monitorare».
-LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
+LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento». TRATTAMENTI (tassativo, Enrico 27/9): l'attività dell'osteopata si chiama «trattamento» — ciclo di trattamenti per il Livello 1, «trattamenti di prevenzione» per il Livello 2 — MAI «seduta/sedute» né «sessione/sessioni» (le «sessioni» sono solo quelle di formazione).
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.${sezioneComprende ? '\nCOMPONENTI: NON scrivere una sezione con l\'elenco delle componenti del programma né le loro quantità (niente «Cosa include» / «Cosa comprende»): la inserisce il sistema con i testi approvati.' : ''}
 DATA: se includi un'intestazione con il riepilogo del cliente, riporta "Data: ${dataOggi}". Usa ESATTAMENTE questa data; non inventarne altre né citare altre date nel testo.
 Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole totali.`;
@@ -300,37 +304,45 @@ function generateFallbackReport(client, l1, l2, l3, total, sessioni, settore, qu
   const P = small ? null : Object.fromEntries(kAnonPartition([
     { key: 'l1', count: l1 }, { key: 'l2', count: l2 }, { key: 'l3', count: l3 },
   ], total).map(c => [c.key, c]));
-  const dip = c => c.suppressed ? `n.d. (gruppo < ${K_ANON})` : `${c.count} dipendenti (${c.pct}%)`;
-  const pctL1txt = small || P.l1.suppressed ? 'non pubblicata per riservatezza' : `${P.l1.pct}%`;
-  const riskTxt = small || P.l1.suppressed ? 'non determinabile nel rispetto della riservatezza' : (P.l1.pct > 20 ? 'elevato' : P.l1.pct > 10 ? 'moderato' : 'contenuto');
+  // Livelli sotto soglia UNITI in un solo dato (Enrico, 27/9): mai «n.d.» livello per livello.
+  const LL = small ? null : livelliLeggibili(Object.values(P), total);
+  const l1Solo = !small && !P.l1.suppressed;
+  const pctL1txt = l1Solo ? `${P.l1.pct}%` : null;
+  const riskTxt = !l1Solo ? null : (P.l1.pct > 20 ? 'elevato' : P.l1.pct > 10 ? 'moderato' : 'contenuto');
+  // Frase sul Livello 1: con il livello nascosto si dice perché, senza lasciare un buco.
+  const fraseL1 = (conRischio) => (l1Solo
+    ? `una quota in Livello 1 (trattamento) pari a ${pctL1txt}${conRischio ? `, profilo di rischio ${riskTxt}` : ''}`
+    : 'una quota in Livello 1 (trattamento) che non si mostra da sola, a tutela della riservatezza');
+  const DESCR = isPacchetto
+    // Pacchetto: FOTOGRAFIA NEUTRA del questionario — niente "richiedono
+    // protocollo", niente riferimenti a mini-check/prese in carico (non incluse).
+    ? { l1: ['Livello 1', 'dolore con impatto funzionale riportato nel questionario'], l2: ['Livello 2', 'sintomatologia presente, senza impatto funzionale rilevante'], l3: ['Livello 3', 'nessuna sintomatologia rilevante'] }
+    : { l1: ['Livello 1 (Trattamento)', 'dolore con impatto funzionale, richiedono protocollo individuale'], l2: ['Livello 2 (Prevenzione)', 'sintomatologia presente, seguiti con la prevenzione attiva'], l3: ['Livello 3 (Formazione)', 'nessuna sintomatologia rilevante, inclusi nella formazione collettiva'] };
+  const riga = c => (c.unite
+    ? `- **${nomeCella(c)}, insieme:** ${c.count} dipendenti (${c.pct}%) — non distinti a tutela della riservatezza`
+    : `- **${DESCR[c.key][0]}:** ${c.count} dipendenti (${c.pct}%) — ${DESCR[c.key][1]}`);
   const mappa = small
     ? `La popolazione valutata è inferiore alla soglia minima di aggregazione (${K_ANON}): la distribuzione per livello non viene pubblicata a tutela della riservatezza dei dipendenti (k-anonymity).`
-    : isPacchetto
-      // Pacchetto: FOTOGRAFIA NEUTRA del questionario — niente "richiedono
-      // protocollo", niente riferimenti a mini-check/prese in carico (non incluse).
-      ? `- **Livello 1:** ${dip(P.l1)} — dolore con impatto funzionale riportato nel questionario
-- **Livello 2:** ${dip(P.l2)} — sintomatologia presente, senza impatto funzionale rilevante
-- **Livello 3:** ${dip(P.l3)} — nessuna sintomatologia rilevante`
-      : `- **Livello 1 (Trattamento):** ${dip(P.l1)} — dolore con impatto funzionale, richiedono protocollo individuale
-- **Livello 2 (Prevenzione):** ${dip(P.l2)} — sintomatologia presente, seguiti con la prevenzione attiva
-- **Livello 3 (Formazione):** ${dip(P.l3)} — nessuna sintomatologia rilevante, inclusi nella formazione collettiva`;
+    : LL.nessunaDistribuzione
+      ? `Con ${total} questionari ogni livello conta meno di ${K_ANON} persone: la distribuzione per livello non viene pubblicata a tutela della riservatezza dei dipendenti.`
+      : LL.celle.map(riga).join('\n');
   return `## Executive Summary
 
 ${isPacchetto
   ? `Il percorso ${nomeProdotto || 'd\'ingresso'} per **${client.name}** (${settore}, ${client.employees || 'n.d.'} dipendenti) ha completato il check-up della popolazione con ${total} dipendenti valutati.
 
-La fotografia raccolta indica una quota in Livello 1 pari a ${pctL1txt}: il dettaglio per livello è riportato nella Mappa Clinica.
+La fotografia raccolta indica ${fraseL1(false)}: il dettaglio per livello è riportato nella Mappa Clinica.
 
 ${firmato ? 'Il percorso prosegue con le attività previste' : 'Il percorso proposto prevede'}: formazione collettiva e consulenza ergonomico-posturale.`
   : firmato
   ? `Il programma ES Work per **${client.name}** (${settore}, ${client.employees || 'n.d.'} dipendenti) ha completato il check-up iniziale con ${total} dipendenti valutati.
 
-La distribuzione clinica evidenzia una quota in Livello 1 (trattamento) pari a ${pctL1txt}, profilo di rischio ${riskTxt}.${sessioni > 0 ? ` Sono state erogate ${sessioni} sessioni osteopatiche ad oggi.` : ''}
+La distribuzione clinica evidenzia ${fraseL1(true)}.${sessioni > 0 ? ` Sono stati erogati ${sessioni} trattamenti osteopatici ad oggi.` : ''}
 
 Il programma è attivo: il piano operativo è riportato di seguito.`
   : `Il check-up per **${client.name}** (${settore}, ${client.employees || 'n.d.'} dipendenti) ha coinvolto ${total} dipendenti.
 
-La distribuzione clinica evidenzia una quota in Livello 1 (trattamento) pari a ${pctL1txt}, profilo di rischio ${riskTxt}.
+La distribuzione clinica evidenzia ${fraseL1(true)}.
 
 Il programma proposto è dimensionato su questi dati: ${quoteBlock ? 'il piano operativo e l\'investimento sono riportati' : 'il piano operativo è riportato'} di seguito.`}
 
@@ -411,8 +423,9 @@ export async function buildQuoteBlock(client_id, client, answers) {
     const pricingVersion = client.pricing_version || 'v1';
     const nmq = aggregateNMQ(answers || []);
 
-    // ── Precedenza: SNAPSHOT (promessa congelata) → LIVE (colloquio + config) ──
-    // Prezzo reale coi parametri SNAPSHOTTATI, forbice = quella PERSISTITA.
+    // ── Precedenza: SNAPSHOT (Stima registrata) → LIVE (colloquio + Listino) ──
+    // Prezzo reale coi parametri SNAPSHOTTATI, forbice = quella PERSISTITA. Senza Stima
+    // registrata nessuna forbice e nessun tetto: prezzo pieno (Enrico, 27/9).
     let source, nEmp, l2Mult, conditions, min, avg, max;
     // Tariffe (Enrico, 21/9): dalla Stima congelata o dalla scheda del colloquio, mai di
     // riserva. Se mancano, il report non si genera e il messaggio dice dove mancano.
@@ -441,15 +454,15 @@ export async function buildQuoteBlock(client_id, client, answers) {
       // Lettura unica degli input del colloquio (lib/pricing/v2): stessi numeri della Stima.
       const ergonomiaV2 = pricingVersion === 'v2' ? ergonomiaDaColloquio(s2, nEmp) : undefined;
       conditions = { pricingVersion, v2Params, ergonomia: ergonomiaV2, tier: s2.tier || undefined, groups, rates: sp.rates || undefined, vatExempt: sp.vat_exempt };
-      const sectorKey = fmd?.step1?.sector || (client.sector === 1 ? 'manufacturing' : 'services');
+      // Il moltiplicatore serve solo al listino v1 (congelato): nel v2 il Livello 2 viene
+      // dalle risposte.
       l2Mult = sp.l2_mult != null ? Number(sp.l2_mult) : CONFIG.l2_multiplier_default;
-      const fch = computeForchetta({ n: nEmp, sector: sectorKey, l2Mult, ...conditions });
-      min = fch.min.price_y1; avg = fch.avg.price_y1; max = fch.max.price_y1;
+      min = null; avg = null; max = null;
     }
 
-    // Reale OMOGENEO con la forbice: prevalenza L1 OSSERVATA × forza lavoro
-    // (snapshottata se presente), L2 derivato, coi parametri della stessa fonte.
-    const real = realL1L2FromAssessment({ l1Responders: nmq.level1.count, responders, employees: nEmp, l2Mult, pricingVersion, v2Params: conditions.v2Params });
+    // Prezzo reale (Enrico, 27/9: «SEMPRE»): Livello 1 e Livello 2 OSSERVATI nel check-up,
+    // riportati sulla forza lavoro (snapshottata se presente).
+    const real = realL1L2FromAssessment({ l1Responders: nmq.level1.count, l2Responders: nmq.level2.count, responders, employees: nEmp, l2Mult, pricingVersion, v2Params: conditions.v2Params });
     const calc = calculatePricing({ n: nEmp, l1: real.l1, l2: real.l2, ...conditions });
     if (!calc) return { block: '', compliance: null };
 
@@ -470,8 +483,8 @@ export async function buildQuoteBlock(client_id, client, answers) {
     const inRange = (min != null && max != null) ? (realPrice >= min && realPrice <= max) : null;
     const posizione = posizioneNellaForbice({ prezzo: realPrice, min, max, conSconto: statoSconto.stato === 'attivo' });
     const revisione = avvisoRevisioneForbice(tetto, costoAnno1, soglia);
-    // source: 'snapshot' = confronto contro la forbice promessa; 'live' = ricalcolata
-    // (nessuna Stima emessa). pricing_version: mai confronti incrociati tra versioni.
+    // source: 'snapshot' = confronto contro la forbice della Stima registrata; 'live' =
+    // nessuna Stima registrata, nessuna forbice. pricing_version: mai confronti incrociati.
     // `tetto`: traccia INTERNA dello scostamento — quanto vale il dimensionamento
     // reale rispetto al prezzo applicato. Serve al rinnovo, non al cliente.
     const compliance = {
@@ -498,9 +511,22 @@ export async function buildQuoteBlock(client_id, client, answers) {
     // lavoro (stessa regola della forbice, vedi realL1L2FromAssessment). Senza
     // questa riga il documento dice "5 in Livello 1" e fattura per 8: numeri
     // entrambi giusti, ma il passaggio non era spiegato da nessuna parte.
-    const obsPct = responders > 0 ? Math.round((nmq.level1.count / responders) * 100) : null;
-    const rigaDimensionamento = (pricingVersion === 'v2' && obsPct != null && nEmp > responders)
-      ? `\n- Dimensionamento: la quota in Livello 1 osservata sui ${responders} questionari (${obsPct}%) è riportata sull'intera popolazione di ${nEmp} dipendenti (${real.l1} persone attese), così il programma copre anche chi non ha compilato il questionario${real.l2 != null ? `; per la prevenzione il programma è dimensionato su ${real.l2} persone in Livello 2` : ''}.${ISTRUZIONE_DIMENSIONAMENTO}`
+    // Riservatezza (27/9): le quote e le persone attese si scrivono solo per i livelli
+    // mostrabili. Da quelle di un livello nascosto si risalirebbe al gruppo sotto soglia.
+    const partLiv = tooSmall(responders) ? null : Object.fromEntries(kAnonPartition([
+      { key: 'l1', count: nmq.level1.count }, { key: 'l2', count: nmq.level2.count }, { key: 'l3', count: nmq.level3.count },
+    ], responders).map(c => [c.key, c]));
+    const vis = k => !!(partLiv && !partLiv[k].suppressed);
+    const copreTutti = 'così il programma copre anche chi non ha compilato il questionario';
+    const quote = vis('l1') && vis('l2')
+      ? `le quote di Livello 1 (${partLiv.l1.pct}%) e di Livello 2 (${partLiv.l2.pct}%) osservate sui ${responders} questionari sono riportate sull'intera popolazione di ${nEmp} dipendenti (${real.l1} e ${real.l2} persone attese), ${copreTutti}`
+      : vis('l2')
+        ? `la quota di Livello 2 (${partLiv.l2.pct}%) osservata sui ${responders} questionari è riportata sull'intera popolazione di ${nEmp} dipendenti (${real.l2} persone attese), e così quella di Livello 1, che non si mostra a tutela della riservatezza: ${copreTutti}`
+        : vis('l1')
+          ? `la quota di Livello 1 (${partLiv.l1.pct}%) osservata sui ${responders} questionari è riportata sull'intera popolazione di ${nEmp} dipendenti (${real.l1} persone attese), e così quella di Livello 2, che non si mostra a tutela della riservatezza: ${copreTutti}`
+          : `le quote di Livello 1 e di Livello 2 osservate nel check-up sono riportate sull'intera popolazione di ${nEmp} dipendenti, ${copreTutti}; le quote non si mostrano a tutela della riservatezza`;
+    const rigaDimensionamento = (pricingVersion === 'v2' && responders > 0 && nEmp > responders)
+      ? `\n- Dimensionamento: ${quote}.${ISTRUZIONE_DIMENSIONAMENTO}`
       : '';
 
     // ERGONOMIA: e' una voce PAGATA (fino a qui invisibile nel documento). Senza
@@ -527,8 +553,9 @@ export async function buildQuoteBlock(client_id, client, answers) {
     // l'investimento e deve dire il prezzo proposto, non il calcolato.
     return { block, compliance, calc: calcFinale };
   } catch (e) {
-    // Il motore si ferma senza tariffe: il report non deve uscire senza prezzo in silenzio.
-    if (e && e.name === 'TariffeMancanti') return { block: '', compliance: null, errore: e.message };
+    // Il motore si ferma senza tariffe o senza i numeri del check-up: il report non deve
+    // uscire senza prezzo in silenzio.
+    if (e && (e.name === 'TariffeMancanti' || e.name === 'NumeriCheckupMancanti')) return { block: '', compliance: null, errore: e.message };
     return { block: '', compliance: null };
   }
 }

@@ -12,6 +12,8 @@ test('i valori del protocollo sono quelli contrattuali', () => {
     sedute_per_ciclo: 4, durata_seduta_min: 30, sessioni_prevenzione_l2: 4,
     cicli_trattamento_per_anno: 2, cicli_prevenzione_per_anno: 1,
     giorni_tra_cicli: 60, autosegnalazioni_per_anno: 2, buffer_pct: 0.20,
+    // Enrico, 27/9: ciclo completo entro 60 giorni, avviso all'osteopata dal 45°.
+    durata_max_ciclo_giorni: 60, avviso_ciclo_giorni: 45,
     durata_prevalidazione_min: 15,
     formazione_moduli_primo_anno: 2, formazione_moduli_anni_successivi: 1, formazione_ore_modulo: 1,
     recupero_finestra_mesi: 6,

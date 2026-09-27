@@ -9,10 +9,11 @@ import { fmt } from '../../lib/calculator';
 import { CONFIG } from '../../lib/config';
 import { nomeLivello } from '../../lib/livelli';
 import { oggiRoma, aggiungiGiorni } from '../../lib/checkup';
-import { finoAl, fraseValidita, scartoLivello2, testoScartoLivello2 } from '../../lib/offerta';
+import { finoAl, fraseValidita } from '../../lib/offerta';
+import { fraseRiduzioneAnno2 } from '../../lib/anno2.mjs';
 import { normalizza } from '../../lib/pipeline';
 import { VOCI_PROGRAMMA, RIGA_CHIUSURA, quantitaPrimoAnno } from '../../lib/programma';
-import { vistaRiservata, K_ANON, SUPPRESSED } from '../../lib/kanon';
+import { vistaRiservata, K_ANON, SUPPRESSED, livelliLeggibili, nomeCella, NOTA_LIVELLI_UNITI, NOTA_NESSUNA_DISTRIBUZIONE } from '../../lib/kanon';
 import { pianoDeterministico } from '../../lib/piano';
 import { legendaLivelli } from '../../lib/livelli';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
@@ -145,8 +146,6 @@ function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine,
         ...corpo,
         assessment_id: query?.assessmentId || null,
         ...(query?.n ? { n: query.n } : {}),
-        ...(query?.l1 ? { l1: query.l1 } : {}),
-        ...(query?.l2 ? { l2: query.l2 } : {}),
       }),
     }).catch(() => null);
     const j = r ? await r.json().catch(() => ({})) : {};
@@ -234,7 +233,7 @@ function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine,
 
 // ─── Offer Document ───────────────────────────────────────────────────────────
 
-export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, tetto = null, query = null, date, offertaGiorni = 10, scartoL2 = null, pianoBase = [], prezzo = null, errore = null }) {
+export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, tetto = null, query = null, date, offertaGiorni = 10, pianoBase = [], prezzo = null, errore = null }) {
   const [emailModal, setEmailModal] = useState(null);
   const [scadenza, setScadenza] = useState(() => scadenzaIniziale(client, offertaGiorni));
   const [esitoInvio, setEsitoInvio] = useState(null); // { ok, testo }
@@ -304,6 +303,15 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
     if (!riservata) return { count: l.count, pct: l.pct, suppressed: false };
     return riservata.livelli ? riservata.livelli.find(c => c.key === key) : { count: null, pct: null, suppressed: true };
   };
+  // Persone dell'Anno 2 (Livello 1 + Livello 2 attesi): si scrivono solo se entrambi i
+  // livelli sono mostrabili, altrimenti si risalirebbe a un gruppo sotto soglia (27/9).
+  const personeAnno2 = calc && !cella('l1').suppressed && !cella('l2').suppressed ? calc.pop_y2 : null;
+  // Livelli per il documento (Enrico, 27/9): quelli sotto soglia UNITI in un solo dato,
+  // mai «n.d.» livello per livello.
+  const L = riservata && riservata.pubblicabile && riservata.livelli ? livelliLeggibili(riservata.livelli, riservata.n) : null;
+  const celleLivelli = !riservata
+    ? ['l1', 'l2', 'l3'].map(k => ({ ...cella(k), key: k, keys: [k], unite: false }))
+    : (L && !L.nessunaDistribuzione ? L.celle : []);
   const zoneMostrate = riservata ? riservata.zone : nmq.zones;
   const prevalenzaMostrata = riservata ? riservata.prevalenza : nmq.prevalence.pct;
   const summaryText = (() => {
@@ -312,7 +320,7 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
     const soppressi = riservata.livelli.some(c => c.suppressed);
     const top = riservata.zone.find(z => !z.soppressa && z.pct12 > 0);
     if (!soppressi) return generateSummaryText({ ...nmq, zones: top ? [top] : [] });
-    return `Su ${riservata.n} risposte, la distribuzione di dettaglio per livello non è mostrata: uno o più gruppi contano meno di ${K_ANON} persone e vengono soppressi a tutela della riservatezza.${top ? ` La zona più colpita è ${top.zone} (${top.pct12}%).` : ''}`;
+    return `Su ${riservata.n} risposte, ${L && L.nessunaDistribuzione ? NOTA_NESSUNA_DISTRIBUZIONE.charAt(0).toLowerCase() + NOTA_NESSUNA_DISTRIBUZIONE.slice(1) : `${NOTA_LIVELLI_UNITI.charAt(0).toLowerCase()}${NOTA_LIVELLI_UNITI.slice(1)}`}${top ? ` La zona più colpita è ${top.zone} (${top.pct12}%).` : ''}`;
   })();
   const dettaglioVoce = n => (!calc ? '' : n === 3 && calc.days_osteo_y1 ? ` (${calc.days_osteo_y1} giornate nel primo anno)` : n === 6 && calc.training_sessions_y1 ? ` (${calc.training_sessions_y1} sessioni nel primo anno)` : '');
 
@@ -325,11 +333,7 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
       body: JSON.stringify({
         azione: 'inviata', scade_il: scadenza || null,
         assessment_id: query?.assessmentId || null,
-        // Solo gli override VALORIZZATI: passare null significherebbe «nessun valore»
-        // e il server lo tratta come assente — ma qui non lo mandiamo proprio.
         ...(query?.n ? { n: query.n } : {}),
-        ...(query?.l1 ? { l1: query.l1 } : {}),
-        ...(query?.l2 ? { l2: query.l2 } : {}),
       }),
     }).catch(() => null);
     const j = r ? await r.json().catch(() => ({})) : {};
@@ -399,12 +403,16 @@ ${FIRMA}`;
     });
   }
 
-  const semaforo = (key, base) => { const c = cella(key); return c.suppressed ? { ...base, value: SUPPRESSED, color: 'gray', sub: `gruppo < ${K_ANON}` } : { ...base, score: c.pct, value: `${c.pct}%` }; };
-  const semaphoreData = [
-    semaforo('l1', { type: 'nmq', label: 'Livello 1', sub: nomeLivello('level1') }),
-    semaforo('l2', { type: 'plain', label: 'Livello 2', sub: nomeLivello('level2'), color: 'yellow' }),
-    semaforo('l3', { type: 'plain', label: 'Livello 3', sub: nomeLivello('level3'), color: 'green' }),
-  ];
+  const STILE_SEM = {
+    l1: { type: 'nmq', sub: nomeLivello('level1') },
+    l2: { type: 'plain', sub: nomeLivello('level2'), color: 'yellow' },
+    l3: { type: 'plain', sub: nomeLivello('level3'), color: 'green' },
+  };
+  const semaphoreData = celleLivelli.map(c => (c.unite
+    ? { type: 'plain', label: nomeCella(c), sub: c.keys.map(k => STILE_SEM[k].sub).join(' · '), value: `${c.pct}%`, color: 'gray' }
+    : c.suppressed
+      ? { ...STILE_SEM[c.key], label: nomeCella(c), value: SUPPRESSED, color: 'gray', sub: `gruppo < ${K_ANON}` }
+      : { ...STILE_SEM[c.key], label: nomeCella(c), score: c.pct, value: `${c.pct}%` }));
 
   return (
     <>
@@ -494,9 +502,6 @@ ${FIRMA}`;
           {esitoInvio && <span className={`font-semibold ${esitoInvio.ok ? 'text-green-700' : 'text-red-600'}`}>{esitoInvio.testo}</span>}
         </div>
 
-        {scartoL2 && scartoL2.sopra && (
-          <div className="mt-2 rounded-xl px-4 py-2.5 text-xs border bg-amber-50 border-amber-300 text-amber-900">⚠ <strong>Solo per te:</strong> {testoScartoLivello2(scartoL2)}</div>
-        )}
         <div className="mt-2"><ArgomentarioVoci /></div>
 
         {/* Forbice della Stima — SOLO vista admin, mai nel PDF. Tre situazioni da
@@ -609,7 +614,7 @@ ${FIRMA}`;
             🔒 <strong>Risultati aggregati non pubblicabili.</strong> Le risposte raccolte sono meno di {K_ANON}: a tutela della riservatezza dei dipendenti i risultati del check-up vengono mostrati solo con almeno {K_ANON} risposte.
           </div>
         )}
-        {!nonPubblicabile && <div style={{ display: 'grid', gridTemplateColumns: `repeat(${semaphoreData.length}, 1fr)`, gap: 10, marginBottom: 14 }}>
+        {!nonPubblicabile && semaphoreData.length > 0 && <div style={{ display: 'grid', gridTemplateColumns: `repeat(${semaphoreData.length}, 1fr)`, gap: 10, marginBottom: 14 }}>
           {semaphoreData.map((s, i) => {
             const color = s.color || trafficLight(s.type, s.score);
             return (
@@ -677,20 +682,30 @@ ${FIRMA}`;
           {/* 3 livelli (sotto le zone corporee) */}
           <div style={{ marginTop: 18 }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Stratificazione — 3 livelli</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-              {[
-                { ...cella('l1'), label: 'Trattamento — Anno 1', sub: 'Impatto funzionale', bg: '#FFEBEE', border: '#E74C3C', color: '#E74C3C' },
-                // Listino v2: la prevenzione del Livello 2 parte dal primo anno (voce 5 di Enrico).
-                { ...cella('l2'), label: nuovoProgramma ? `${nomeLivello('level2')} — dal primo anno` : `${nomeLivello('level2')} — Anno 2`, sub: 'Segnali senza impatto funzionale', bg: '#FFF8E1', border: '#F39C12', color: '#F39C12' },
-                { ...cella('l3'), label: 'Solo formazione', sub: 'Postura ed ergonomia', bg: '#E8F5E9', border: '#16a34a', color: '#16a34a' },
-              ].map((l, i) => (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(celleLivelli.length, 1)}, 1fr)`, gap: 10 }}>
+              {celleLivelli.map((c, i) => {
+                const STILE = {
+                  l1: { label: 'Trattamento — Anno 1', sub: 'Impatto funzionale', bg: '#FFEBEE', border: '#E74C3C', color: '#E74C3C' },
+                  // Listino v2: la prevenzione del Livello 2 parte dal primo anno (voce 5 di Enrico).
+                  l2: { label: nuovoProgramma ? `${nomeLivello('level2')} — dal primo anno` : `${nomeLivello('level2')} — Anno 2`, sub: 'Segnali senza impatto funzionale', bg: '#FFF8E1', border: '#F39C12', color: '#F39C12' },
+                  l3: { label: 'Solo formazione', sub: 'Postura ed ergonomia', bg: '#E8F5E9', border: '#16a34a', color: '#16a34a' },
+                };
+                // Livelli uniti (27/9): un solo dato, a tutela della riservatezza.
+                const l = c.unite
+                  ? { label: nomeCella(c), sub: `${c.keys.map(k => STILE[k].sub).join(' · ')} — insieme, a tutela della riservatezza`, bg: '#F8FAFC', border: '#94A3B8', color: '#475569' }
+                  : STILE[c.key];
+                return (
                 <div key={i} style={{ background: l.bg, border: `1px solid ${l.border}`, borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: l.color, lineHeight: 1 }}>{l.suppressed ? SUPPRESSED : l.count}</div>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: l.color, lineHeight: 1 }}>{c.suppressed ? SUPPRESSED : c.count}</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: l.color }}>{l.label}</div>
-                  <div style={{ fontSize: 10, color: '#4b5563', lineHeight: 1.4 }}>{l.suppressed ? `gruppo < ${K_ANON}` : `${l.pct}% dipendenti`} — {l.sub}</div>
+                  <div style={{ fontSize: 10, color: '#4b5563', lineHeight: 1.4 }}>{c.suppressed ? `gruppo < ${K_ANON}` : `${c.pct}% dipendenti`} — {l.sub}</div>
                 </div>
-              ))}
+                );
+              })}
             </div>
+            {L && (L.unite || L.nessunaDistribuzione) && (
+              <div style={{ fontSize: 10, color: '#4b5563', marginTop: 6 }}>{L.nessunaDistribuzione ? NOTA_NESSUNA_DISTRIBUZIONE : NOTA_LIVELLI_UNITI}</div>
+            )}
             {/* Legenda: nel documento si legge «Livello 1» senza che sia detto cosa sia.
                 Fonte unica in lib/livelli.js, la stessa della Stima. */}
             {nuovoProgramma && (
@@ -883,10 +898,12 @@ ${FIRMA}`;
               <div style={{ fontSize: 20, fontWeight: 800, color: '#1d4ed8' }}>{fmt(calc.price_y2)}/anno</div>
             </div>
             <div style={{ fontSize: 9.5, color: '#1e3a8a', lineHeight: 1.5, marginTop: 4 }}>
-              Dal secondo anno il programma entra nella fase di <strong>mantenimento e prevenzione</strong>, estesa ai dipendenti di Livello 1 e Livello 2 ({calc.pop_y2} persone): sportello osteopatico per consolidare i risultati, prevenzione attiva, un modulo formativo avanzato, Piattaforma digitale ES Work, monitoraggio continuo e Report Annuale.
-              {/* Vero solo se l'Anno 2 costa davvero meno dell'Anno 1 proposto: con un
-                  prezzo applicato più basso (sconto) può non esserlo, e la frase sparisce. */}
-              {calc.price_y2 < calc.price_y1 && <> L&apos;investimento si riduce rispetto all&apos;Anno 1 perché la fase intensiva iniziale di trattamento è già stata completata: si protegge il risultato raggiunto e si previene la ricaduta.</>}
+              Dal secondo anno il programma entra nella fase di <strong>mantenimento e prevenzione</strong>, estesa ai dipendenti di Livello 1 e Livello 2{personeAnno2 != null ? ` (${personeAnno2} persone)` : ''}: sportello osteopatico per consolidare i risultati, prevenzione attiva, un modulo formativo avanzato, Piattaforma digitale ES Work, monitoraggio continuo e Report Annuale.
+              {/* Vero solo se l'Anno 2 costa davvero meno dell'Anno 1 proposto (con un prezzo
+                  applicato più basso può non esserlo, e la frase sparisce). Il motivo è quello
+                  vero del calcolo (Enrico, 27/9): l'Anno 2 ha gli stessi cicli; cala perché la
+                  formazione passa a un modulo e l'analisi ergonomica è già fatta. */}
+              {calc.price_y2 < calc.price_y1 && <> {fraseRiduzioneAnno2(calc)}</>}
             </div>
           </div>
 
@@ -1041,10 +1058,9 @@ ${FIRMA}`;
 
 export const getServerSideProps = requireAuthSsr(async (ctx) => {
   const q = ctx.query;
-  const { assessmentId, n, l1, l2 } = q;
+  const { assessmentId, n } = q;
   let offertaGiorni = 10;
-  let scartoL2Soglia = 15;
-  try { ({ offertaGiorni, scartoL2Soglia } = await (await import('../../lib/org')).getOrgParams()); } catch (_) {}
+  try { ({ offertaGiorni } = await (await import('../../lib/org')).getOrgParams()); } catch (_) {}
 
   // Solo dopo un check-up (21/9): tolti la «modalità preventivo» senza check-up e le
   // tariffe lette dall'indirizzo, un vecchio percorso del calcolatore che nessun link
@@ -1055,7 +1071,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
 
   try {
     // Numeri dalla fonte unica (lib/offerta-server.js), condivisa con Presentazione e Sintesi.
-    const d = await datiOffertaDaCheckup({ assessmentId, n, l1, l2 });
+    const d = await datiOffertaDaCheckup({ assessmentId, n });
     if (!d) return { notFound: true };
     // Tariffe mancanti (21/9): nessun documento, il messaggio dice dove mancano.
     if (d.errore) return { props: { client: d.client ? { id: d.client.id, name: d.client.name } : null, assessment: null, nmq: null, calc: null, roi: null, date: today(), errore: d.errore } };
@@ -1071,7 +1087,6 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       // Dopo il Report di Attivazione il prezzo è fissato: il riquadro resta, il modulo no.
       prezzoFissato: await (await import('../../lib/pricing/snapshot')).isChainClosed(client.id),
     };
-    const scartoL2 = scartoLivello2({ nmq, calc, dipendenti: client && client.employees, l2Mult: d.l2Mult, soglia: scartoL2Soglia });
     const roi = null; // il ROI si calcola nel colloquio (serve il numero di giorni di assenza)
     // Piano della piattaforma, calcolato qui: la tabella c'è già all'apertura e nessun
     // dato esce. Stesse soglie di riservatezza del resto della pagina (lib/kanon.js).
@@ -1087,12 +1102,11 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         roi,
         forchetta,
         tetto: tetto || null,
-        // Gli override usati QUI vanno passati al server quando si emette l'offerta:
+        // La popolazione usata QUI va passata al server quando si emette l'offerta:
         // il gate deve valutare esattamente il prezzo che sta per essere inviato.
-        query: { assessmentId, n: n ?? null, l1: l1 ?? null, l2: l2 ?? null },
+        query: { assessmentId, n: n ?? null },
         date: today(),
         offertaGiorni,
-        scartoL2,
         pianoBase,
         prezzo: JSON.parse(JSON.stringify(prezzo)),
       },

@@ -31,7 +31,7 @@ export default requireAuth(async function handler(req, res) {
       if (b.assessment_id) {
         const d = await datiOffertaDaCheckup({
           assessmentId: b.assessment_id,
-          n: b.n, l1: b.l1, l2: b.l2,
+          n: b.n,
         }).catch(() => null);
         const t = d && d.tetto;
         // Il tetto porta il margine sotto la soglia: avviso di revisione della forbice.
@@ -71,7 +71,7 @@ export default requireAuth(async function handler(req, res) {
     // obbligatoria; sotto la soglia del Listino serve la conferma; sotto il costo è
     // rifiutato comunque. Il cliente vede solo il totale finale.
     if (b.azione === 'registra_sconto') {
-      const r = await registraSconto({ clientId: id, assessmentId: b.assessment_id, n: b.n, l1: b.l1, l2: b.l2, prezzo: b.prezzo, motivo: b.motivo, conferma: b.conferma_margine, admin: req.session.email });
+      const r = await registraSconto({ clientId: id, assessmentId: b.assessment_id, n: b.n, prezzo: b.prezzo, motivo: b.motivo, conferma: b.conferma_margine, admin: req.session.email });
       return r.ok ? res.json({ ok: true, valutazione: r.valutazione }) : res.status(r.status || 422).json({ error: r.errore, valutazione: r.valutazione || null });
     }
     if (b.azione === 'revoca_sconto') {

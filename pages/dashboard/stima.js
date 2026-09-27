@@ -36,8 +36,12 @@ export default function StimaPage() {
   // Mail di riepilogo (punto 4+5) per il programma completo di un'azienda esistente; per
   // il Pacchetto (o una Stima senza azienda) resta la mail breve di prima.
   const conRiepilogo = !!q.clientId && variante === 'programma' && q.prodotto !== 'pacchetto_prevenzione';
+  // Si registra solo la Stima di un'azienda, e solo il suo prodotto: la variante Pacchetto
+  // mostrata a un'azienda del programma completo non diventa una promessa.
+  // snapMeta arriva solo per le aziende del listino v2 (le Stime v1 non si registrano).
+  const puoRegistrare = !!q.clientId && !!snapMeta && (variante === 'programma' || q.prodotto === 'pacchetto_prevenzione');
 
-  function buildBody(store, v = variante) {
+  function buildBody(store, v = variante, registra = false) {
     return {
       clientId: q.clientId || null,
       name: q.name || '—',
@@ -56,6 +60,7 @@ export default function StimaPage() {
       ergonomiaPostazioni: q.ergp != null ? Number(q.ergp) : undefined,
       tipoProdotto: q.prodotto === 'pacchetto_prevenzione' || v === 'pacchetto' ? 'pacchetto_prevenzione' : undefined,
       store,
+      registra,
     };
   }
 
@@ -78,9 +83,24 @@ export default function StimaPage() {
     if (w) { w.focus(); w.print(); }
   }
 
-  // "Invia al referente" (Pacchetto o Stima senza azienda): genera il PDF (così la forbice
-  // diventa la promessa fatta al cliente) e apre la posta con la mail breve. Per il
-  // programma completo c'è la mail di riepilogo (apriRiepilogo, qui sotto).
+  // «Registra Stima» (Enrico, 27/9): l'UNICO modo in cui la forbice diventa la promessa
+  // fatta al cliente (tetto dell'Anno 1 dopo il check-up) e la pipeline passa a «Stima
+  // inviata». Scaricare, inviare o aprire il riepilogo non registrano niente.
+  async function registraStima() {
+    if (snapMeta && snapMeta.exists && !window.confirm(`Sostituisce la Stima registrata${snapMeta.at ? ` il ${dataIt(snapMeta.at, { day: '2-digit', month: 'short', year: 'numeric' })}` : ''} con i numeri di adesso. Procedo?`)) return;
+    setBusy(true); setErr('');
+    try {
+      const r = await fetch('/api/stima', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildBody(false, variante, true)) });
+      const j = await r.json();
+      if (!r.ok || !j.ok) { setErr(j.error || 'Stima non registrata: riprova.'); setBusy(false); return; }
+      setSnapMeta(j.snapshot ?? snapMeta);
+      if (j.html) setHtml(j.html);
+    } catch { setErr('Errore di rete: Stima non registrata.'); }
+    setBusy(false);
+  }
+
+  // "Invia al referente" (Pacchetto o Stima senza azienda): genera il PDF e apre la posta
+  // con la mail breve. Per il programma completo c'è la mail di riepilogo (qui sotto).
   async function mostraVariante(v) {
     setBusy(true); setErr('');
     try {
@@ -108,8 +128,8 @@ export default function StimaPage() {
     setBusy(false);
   }
 
-  // "Mail di riepilogo": come sopra genera il PDF (forbice impegnata, pipeline "Stima
-  // inviata"), poi apre la finestra con la mail completa di Enrico.
+  // "Mail di riepilogo": come sopra genera il PDF, poi apre la finestra con la mail
+  // completa di Enrico. Non registra la Stima.
   async function apriRiepilogo() {
     setBusy(true); setErr('');
     try {
@@ -145,6 +165,13 @@ export default function StimaPage() {
           <div className="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between gap-3">
             <Link href={q.clientId ? `/dashboard/${q.clientId}` : '/dashboard'} className="text-sm text-gray-500 hover:text-gray-800">← Indietro</Link>
             <div className="flex items-center gap-2">
+              {puoRegistrare && (
+                <button onClick={registraStima} disabled={busy || !html || (snapMeta && snapMeta.frozen)}
+                  title="La forbice diventa la promessa fatta al cliente: dopo il check-up il prezzo dell'Anno 1 non la supera."
+                  className="text-sm font-semibold text-emerald-800 bg-emerald-50 border-2 border-emerald-500 px-4 py-2 rounded-xl hover:bg-emerald-100 disabled:opacity-50">
+                  📌 {snapMeta && snapMeta.exists ? 'Registra di nuovo' : 'Registra Stima'}
+                </button>
+              )}
               <button onClick={stampa} disabled={!html} className="text-sm font-semibold text-gray-700 bg-gray-100 border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-200 disabled:opacity-50">🖨 Stampa</button>
               <button onClick={scaricaPdf} disabled={busy || !html} className="text-sm font-semibold text-white bg-green-600 px-4 py-2 rounded-xl hover:bg-green-700 disabled:opacity-50">{busy ? '…' : '⬇ Scarica PDF'}</button>
               {conRiepilogo
@@ -163,15 +190,13 @@ export default function StimaPage() {
               Variante Pacchetto d&apos;ingresso: il prodotto dell&apos;azienda resta il programma completo. Lo cambi nel colloquio solo se il cliente sceglie il Pacchetto; la forbice del programma resta impegnata.
             </div></div>
           )}
-          {variante === 'programma' && snapMeta && (() => {
+          {puoRegistrare && (() => {
             const s = snapMeta;
             const fmt = s.at ? dataIt(s.at, { day: '2-digit', month: 'short', year: 'numeric' }) : null;
             let text, cls, icon;
-            if (s.frozen) { icon = '🔒'; text = 'Forbice congelata — la catena Stima→Report è chiusa: non più modificabile.'; cls = 'bg-gray-100 text-gray-600 border-gray-200'; }
-            else if (s.preview && !s.exists) { icon = '⚠'; text = 'ANTEPRIMA — forbice non impegnata: genera il PDF per fissarla.'; cls = 'bg-amber-50 text-amber-900 border-amber-300 font-semibold'; }
-            else if (s.preview && s.exists) { icon = '⚠'; text = `ANTEPRIMA — genera il PDF per aggiornare la forbice impegnata${fmt ? ` (attuale: del ${fmt})` : ''}.`; cls = 'bg-amber-50 text-amber-800 border-amber-200'; }
-            else if (s.exists) { icon = '✓'; text = `Forbice impegnata${fmt ? ` — Stima del ${fmt}` : ''}: è la promessa fatta al prospect.`; cls = 'bg-green-50 text-green-700 border-green-200'; }
-            else return null;
+            if (s.frozen) { icon = '🔒'; text = `Stima registrata${fmt ? ` il ${fmt}` : ''} e congelata: il Report di Attivazione è già stato generato, non si modifica più.`; cls = 'bg-gray-100 text-gray-600 border-gray-200'; }
+            else if (!s.exists) { icon = '⚠'; text = 'Stima NON registrata: dopo il check-up vale il prezzo pieno, senza forbice. Se la consegni al cliente, premi «Registra Stima».'; cls = 'bg-amber-50 text-amber-900 border-amber-300 font-semibold'; }
+            else { icon = '✓'; text = `Stima registrata${fmt ? ` il ${fmt}` : ''}: la sua forbice è il tetto dell'Anno 1 dopo il check-up.${s.preview ? ' Se i numeri qui sopra sono cambiati, «Registra di nuovo» la sostituisce.' : ''}`; cls = 'bg-green-50 text-green-700 border-green-200'; }
             return <div className="max-w-6xl mx-auto px-5 pb-2"><div className={`text-xs px-3 py-1.5 rounded-lg border ${cls}`}>{icon} {text}</div></div>;
           })()}
           {err && <div className="max-w-6xl mx-auto px-5 pb-2 text-xs text-amber-700">{err}</div>}

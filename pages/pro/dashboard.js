@@ -117,7 +117,26 @@ function LeadsList({ leads }) {
   );
 }
 
-export default function ProDashboard({ proName, clients, leads, accordo = null }) {
+// Cicli di trattamento da completare entro 60 giorni dalla presa in carico (Enrico, 27/9).
+function CicliDaCompletare({ cicli }) {
+  if (!cicli || !cicli.length) return null;
+  return (
+    <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 mb-5">
+      <div className="font-semibold text-amber-900 text-sm mb-2">⏱ Cicli da completare ({cicli.length})</div>
+      <ul className="space-y-1.5">
+        {cicli.map(c => (
+          <li key={c.patientId} className="text-sm">
+            <Link href={`/pro/patients/${c.patientId}`} className={`font-semibold underline ${c.superato ? 'text-red-700' : 'text-amber-900'}`}>{c.nome || 'Paziente'}</Link>
+            {c.azienda && <span className="text-gray-500"> · {c.azienda}</span>}
+            <span className="text-gray-700"> — {c.testo}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export default function ProDashboard({ proName, clients, leads, accordo = null, cicliDaCompletare = [] }) {
   async function logout() {
     await fetch('/api/pro/auth/logout', { method: 'POST' });
     window.location.href = '/pro/login';
@@ -129,6 +148,7 @@ export default function ProDashboard({ proName, clients, leads, accordo = null }
 
       <main className="max-w-5xl mx-auto px-6 py-6">
         <AvvisoAccordo stato={accordo} />
+        <CicliDaCompletare cicli={cicliDaCompletare} />
         {/* Link area osteopata */}
         <Link href="/osteopath/dashboard"
           className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-2xl p-3 mb-5 hover:bg-green-100 transition-colors">
@@ -205,13 +225,25 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   }
 
   const assignments = await getAssignmentsByProfessional(proId);
+  // Cicli di trattamento da completare entro 60 giorni (Enrico, 27/9): avviso dal 45°.
+  const { avvisoDurataCiclo } = await import('../../lib/scadenza-ciclo.mjs');
+  const { getAllCyclesByClient } = await import('../../lib/store');
+  const cicliDaCompletare = [];
   const clients = await Promise.all(
     assignments.map(async (a) => {
       const patients = await getPatientsByClient(a.client_id);
       const mine = (patients || []).filter(p => p.assigned_professional_id === proId);
+      const miei = new Map(mine.map(p => [p.id, p]));
+      const cicli = mine.length ? await getAllCyclesByClient(a.client_id).catch(() => []) : [];
+      for (const c of cicli || []) {
+        const p = miei.get(c.patient_id);
+        const av = p ? avvisoDurataCiclo(c) : null;
+        if (av) cicliDaCompletare.push({ patientId: p.id, nome: `${p.first_name || ''} ${p.last_name || ''}`.trim(), azienda: (a.clients && a.clients.name) || '', testo: av.testo, superato: av.superato, restano: av.restano });
+      }
       return { client: a.clients, patientCount: mine.length };
     })
   );
+  cicliDaCompletare.sort((x, y) => x.restano - y.restano);
 
   // Solo ciò che la lista disegna (21/9): prima usciva anche l'IP di chi ha chiesto il buono.
   const leads = (await getReferralLeadsByProfessional(proId).catch(() => [])).map(vistaLeadBuono);
@@ -224,5 +256,5 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
     accordo = statoPerIlBrowser(await statoAccordoPro(proId));
   } catch (_) {}
 
-  return { props: { proName, clients, leads, accordo } };
+  return { props: { proName, clients, leads, accordo, cicliDaCompletare } };
 });

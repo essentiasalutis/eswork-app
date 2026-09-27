@@ -26,6 +26,7 @@ import { documentiMancanti, prevedeSedute } from '../../../lib/documenti-seduta.
 import { dirittoCicli } from '../../../lib/anno-programma.mjs';
 import { PROTOCOLLO } from '../../../lib/protocollo.mjs';
 import { dataIt } from '../../../lib/date-it.mjs';
+import { avvisoDurataCiclo } from '../../../lib/scadenza-ciclo.mjs';
 
 // ─── NRS Slider ───────────────────────────────────────────────────────────────
 
@@ -617,6 +618,10 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
                     <div className="h-full bg-green-500 rounded-full transition-all"
                       style={{ width: `${(activeCycle.sessions_completed / activeCycle.sessions_planned) * 100}%` }} />
                   </div>
+                  {/* Ciclo entro 60 giorni dalla presa in carico (Enrico, 27/9): avviso dal 45°. */}
+                  {(() => { const av = avvisoDurataCiclo(activeCycle); return av ? (
+                    <div className={`mt-2 text-xs rounded-lg px-3 py-2 border ${av.superato ? 'text-red-800 bg-red-50 border-red-200' : 'text-amber-900 bg-amber-50 border-amber-300'}`}>⏱ {av.testo}</div>
+                  ) : null; })()}
                   {activeCycle.status === 'pending_pgic' ? (
                     <div className="mt-3 space-y-2">
                       <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">

@@ -2,9 +2,13 @@
 // I numeri arrivano SEMPRE da computeForchetta(); buildQuoteHtml è l'unico layout
 // (usato sia per l'anteprima/stampa nella pagina, sia per il PDF server).
 //   body: { clientId?, name, contact_name, sector, employees, tier, groups,
-//           vatExempt, rates, l2Mult, store }
-//   store=true → genera e salva il PDF (Vercel Blob) e ritorna { url, html }
-//   altrimenti → ritorna { html } per anteprima/stampa
+//           vatExempt, rates, l2Mult, store, registra }
+//   store=true    → genera e salva il PDF (Vercel Blob) e ritorna { url, html }
+//   registra=true → REGISTRA la Stima: la sua forbice diventa la promessa (tetto
+//                   dell'Anno 1 dopo il check-up) e la pipeline passa a «Stima inviata».
+//                   Solo dal pulsante «Registra Stima» (Enrico, 27/9): scaricare,
+//                   inviare o aprire il riepilogo NON registrano più niente.
+//   altrimenti    → ritorna { html } per anteprima/stampa
 import { requireAuth } from '../../lib/auth';
 import { generateAndStorePdf, buildQuoteHtml, buildPacchettoHtml } from '../../lib/pdf';
 import { computeForchetta } from '../../lib/calculator';
@@ -25,15 +29,15 @@ const SECTOR_LABELS = {
 };
 
 // Snapshot Stima→Report: se v2 con clientId, decide fra CONGELATO (catena chiusa),
-// SCRITTURA (store=true, catena aperta) o ANTEPRIMA (store=false). Ritorna i flag
-// per la UI e l'eventuale snapshot congelato (per mostrare la forbice promessa).
-async function applySnapshot({ clientId, pricingVersion, store, draftBuilder }) {
+// REGISTRAZIONE (registra=true, catena aperta) o ANTEPRIMA. Ritorna i flag per la UI
+// e l'eventuale snapshot congelato (per mostrare la forbice promessa).
+async function applySnapshot({ clientId, pricingVersion, registra, draftBuilder }) {
   if (pricingVersion !== 'v2' || !clientId) return { info: null, frozenSnap: null };
   const existing = getStimaSnapshot(await getFirstMeeting(clientId));
   if (await isChainClosed(clientId)) {
     return { info: { exists: !!existing, frozen: true, source: 'snapshot', at: existing?.at || null }, frozenSnap: existing };
   }
-  if (store) {
+  if (registra) {
     const snap = draftBuilder();
     const w = await writeStimaSnapshotIfOpen(clientId, snap);
     return { info: { exists: true, frozen: w.frozen, source: 'snapshot', at: (w.snapshot && w.snapshot.at) || snap.at }, frozenSnap: w.frozen ? w.snapshot : null };
@@ -83,15 +87,15 @@ export default requireAuth(async function handler(req, res) {
     const pacchetto = calculatePacchetto({ n: employees, groups: b.groups, rates: b.rates, vatExempt: b.vatExempt, v2Params, ergonomia });
     if (!(pacchetto && Number.isFinite(pacchetto.price) && pacchetto.price > 0)) return res.status(422).json({ ok: false, error: MESSAGGIO_IMPORTI_ZERO });
     const { info: snapshot } = await applySnapshot({
-      clientId: b.clientId, pricingVersion, store: b.store,
+      clientId: b.clientId, pricingVersion, registra: !!b.registra,
       draftBuilder: () => buildStimaSnapshot({
         pricingVersion, tipoProdotto: 'pacchetto_prevenzione',
         inputs: { n: employees, sector, groups: b.groups, rates: b.rates, vatExempt: b.vatExempt, ergonomia },
         v2Params, pacchettoPrice: pacchetto?.price, at: new Date().toISOString(),
       }),
     });
-    // Stima impegnata → pipeline "Stima inviata" (solo in avanti, mai da Accettato/No/Declinato).
-    if (b.store && b.clientId) await avanzaPipeline(b.clientId, 'stima_sent');
+    // Stima registrata → pipeline "Stima inviata" (solo in avanti, mai da Accettato/No/Declinato).
+    if (b.registra && b.clientId) await avanzaPipeline(b.clientId, 'stima_sent');
     // Template DEDICATO: naming parametrico, nessun trattamento come incluso.
     const pHtml = buildPacchettoHtml({
       client: { name: b.name || '—', employees: employees || '—', contact_name: b.contact_name || null },
@@ -121,16 +125,16 @@ export default requireAuth(async function handler(req, res) {
   });
   if (!scenariValidi(forchetta)) return res.status(422).json({ ok: false, error: MESSAGGIO_IMPORTI_ZERO });
 
-  // Snapshot: congelato (catena chiusa) / scritto (store=true) / anteprima.
+  // Snapshot: congelato (catena chiusa) / registrato (registra=true) / anteprima.
   const { info: snapshot, frozenSnap } = await applySnapshot({
-    clientId: b.clientId, pricingVersion, store: b.store,
+    clientId: b.clientId, pricingVersion, registra: !!b.registra,
     draftBuilder: () => buildStimaSnapshot({
       pricingVersion, tipoProdotto: 'programma_completo',
       inputs: { n: employees, sector, tier: b.tier, groups: b.groups, rates: b.rates, vatExempt: b.vatExempt, l2Mult: b.l2Mult, ergonomia },
       v2Params, forchetta, at: new Date().toISOString(),
     }),
   });
-  if (b.store && b.clientId) await avanzaPipeline(b.clientId, 'stima_sent');
+  if (b.registra && b.clientId) await avanzaPipeline(b.clientId, 'stima_sent');
   // Se la catena è chiusa mostriamo la forbice CONGELATA (decisione: nessun ricalcolo).
   const forchettaOut = (frozenSnap && frozenSnap.forchetta) ? frozenSnap.forchetta : forchetta;
 

@@ -20,7 +20,7 @@ import { getNoteReport, getAndamentoT12Texts } from '../../../../lib/pricing/set
 import { CONFIG_V1 } from '../../../../lib/pricing/v1';
 import { stratificazioneOsservata } from '../../../../lib/scoring';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
-import { kAnonPartition, maskCount, tooSmall, K_ANON } from '../../../../lib/kanon';
+import { kAnonPartition, maskCount, tooSmall, K_ANON, livelliLeggibili, nomeCella } from '../../../../lib/kanon';
 import { PROTOCOLLO } from '../../../../lib/protocollo.mjs';
 import { DEFINIZIONE_LIVELLI, VERSO_DEI_LIVELLI, IDENTITA_PROFESSIONALE, NIENTE_RIFERIMENTI_INVENTATI, programmaPrevisto, divisioneSedute, rigaFormazione } from '../../../../lib/regole-report.mjs';
 import { generaConControllo } from '../../../../lib/controllo-report.mjs';
@@ -65,8 +65,14 @@ export default requireAuth(async function handler(req, res) {
   const stratP = tooSmall(stratTotal) ? null
     : Object.fromEntries(kAnonPartition([{ key: 'l1', count: l1 }, { key: 'l2', count: l2 }, { key: 'l3', count: l3 }], stratTotal).map(c => [c.key, c]));
   // Conteggio e percentuale già calcolati: l'AI le calcolava da sé (15 su 228 = «6,6%»).
-  const ld = k => (!stratP || stratP[k].suppressed) ? `n.d.` : `${stratP[k].count} (${stratP[k].pct}%)`;
-  const l1d = ld('l1'), l2d = ld('l2'), l3d = ld('l3');
+  // Livelli sotto soglia UNITI in un solo dato (Enrico, 27/9): mai «n.d.» livello per livello.
+  const nomeL = k => nomeLivello({ l1: 'level1', l2: 'level2', l3: 'level3' }[k]).toLowerCase();
+  const LLp = stratP ? livelliLeggibili(Object.values(stratP), stratTotal) : null;
+  const righeLivelli = !LLp || LLp.nessunaDistribuzione
+    ? `- Distribuzione per livello NON pubblicabile: ogni livello conta meno di ${K_ANON} persone (tutela della riservatezza)`
+    : LLp.celle.map(c => (c.unite
+      ? `- ${nomeCella(c)} INSIEME (${c.keys.map(nomeL).join(' e ')}): ${c.count} (${c.pct}%) — non distinti a tutela della riservatezza: VIETATO attribuire il numero a uno solo dei due livelli o stimarne la divisione`
+      : `- ${nomeCella(c)} (${nomeL(c.key)}): ${c.count} (${c.pct}%)`)).join('\n');
 
   // sessione "completata" = chiusa (la tabella sessions usa closed_at, non status)
   const completed = sessions.filter(s => s.closed_at).length;
@@ -122,7 +128,7 @@ export default requireAuth(async function handler(req, res) {
       const trattamento = (cicli || []).filter(c => (c.cycle_type || 'treatment') === 'treatment');
       const prevenzione = (cicli || []).filter(c => c.cycle_type === 'prevention');
       movimentoSection = sezioneMovimento({
-        inizio: { n: t0.n, l1pct: t0.l1pct, l2pct: t0.l2pct, l3pct: t0.l3pct },
+        inizio: { n: t0.n, l1: t0.l1, l2: t0.l2, l3: t0.l3 },
         attuale: { l1, l2, l3 },
         movimenti: {
           trattamentiAvviati: trattamento.length,
@@ -239,8 +245,8 @@ export default requireAuth(async function handler(req, res) {
 
 DATI ANNO 1 (i valori "n.d." sono soppressi per riservatezza/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
 - Prevalenza osservata all'intake (${t12.t0N} risposte T0): ${t12.t0Strat}
-- Sessioni completate/pianificate: ${completed}/${planned}
-- Ore di seduta osteopatica erogate: ${oreSedute} in tutto (${completed} sedute da ${PROTOCOLLO.durata_seduta_min} minuti)${div.divisibile ? `, di cui ${ore(div.trattamento)} di trattamento (${div.trattamento} sedute) e ${ore(div.prevenzione)} di prevenzione (${div.prevenzione} sessioni)` : ''}
+- Trattamenti completati/pianificati: ${completed}/${planned}
+- Ore di trattamento osteopatico erogate: ${oreSedute} in tutto (${completed} trattamenti da ${PROTOCOLLO.durata_seduta_min} minuti)${div.divisibile ? `, di cui ${ore(div.trattamento)} per i cicli del Livello 1 (${div.trattamento} trattamenti) e ${ore(div.prevenzione)} di prevenzione (${div.prevenzione} trattamenti di prevenzione)` : ''}
 - Persone con un percorso di trattamento avviato: ${inTrattamentoD}; con un percorso di prevenzione avviato: ${inPrevenzioneD}; persone seguite in tutto (chi ha avuto entrambi i percorsi conta una volta): ${seguitiD}
 ${formazioneTxt}
 - Check-up a 12 mesi completati: ${t12.count}
@@ -257,7 +263,7 @@ STRUTTURA (markdown, ## per titoli):
 
 ## I tre KPI di risultato
 Presenta in tabella i tre indicatori v4:
-1. **Riduzione del dolore** — riduzione media NRS per sessione: ${avgDelta} punti.
+1. **Riduzione del dolore** — riduzione media NRS per trattamento: ${avgDelta} punti.
 2. **Miglioramento percepito (PGIC)** — PGIC medio ${t12.avgPgic}/5${t12.improvedPct != null ? `, ${t12.improvedPct}% dei dipendenti rivalutati riporta un miglioramento (PGIC 4-5)` : ''}.
 3. **Variazione della prevalenza L1** — prevalenza L1 OSSERVATA (stessa strumentazione ai due capi): dal ${t12.t0L1} all'intake al ${t12.t12L1} a 12 mesi${t12.kpiDeltaLabel}. NON confrontare conteggi grezzi (coorti T0/T12 di numerosità diversa: ${t12.t0N} vs ${t12.t12N}). Le due coorti sono IN PARTE DIVERSE anche quando hanno la stessa numerosità: VIETATO scrivere che è «la stessa coorte» o che una quota di persone è «transitata» da un livello all'altro.
 
@@ -273,22 +279,20 @@ ${t12.count === 0 ? 'NOTA: nessun check-up a 12 mesi ancora registrato — segna
 ${programmaPrevisto()}
 ${IDENTITA_PROFESSIONALE}
 ${NIENTE_RIFERIMENTI_INVENTATI}
-LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
+LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento». TRATTAMENTI (tassativo, Enrico 27/9): l'attività dell'osteopata si chiama «trattamento» — ciclo di trattamenti per il Livello 1, «trattamenti di prevenzione» per il Livello 2 — MAI «seduta/sedute» né «sessione/sessioni» (le «sessioni» sono solo quelle di formazione).
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
 Tono: clinico, orientato ai risultati e alla direzione. Italiano. Max 650 parole.` : `Sei un consulente clinico ES Work. Genera un Report Intermedio professionale a ${checkLabel} per un'azienda cliente.
 
 DATI CLINICI (i valori "n.d." sono soppressi per riservatezza/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
 Distribuzione ATTUALE dei dipendenti per livello, su ${stratTotal} dipendenti (è una classificazione, NON il numero di persone seguite in un percorso):
-- Livello 1 (${nomeLivello('level1').toLowerCase()}): ${l1d}
-- Livello 2 (${nomeLivello('level2').toLowerCase()}): ${l2d}
-- Livello 3 (${nomeLivello('level3').toLowerCase()}): ${l3d}
+${righeLivelli}
 Persone seguite dall'osteopata (queste sono le persone in percorso):
 - Con un percorso di trattamento avviato: ${inTrattamentoD}
 - Con un percorso di prevenzione avviato: ${inPrevenzioneD}
 - Persone seguite in tutto (chi ha avuto entrambi i percorsi conta una volta): ${seguitiD}
-- Sessioni completate/pianificate: ${completed}/${planned}${divisioneTxt}
+- Trattamenti completati/pianificati: ${completed}/${planned}${divisioneTxt}
 ${formazioneTxt}
-- Riduzione media NRS per sessione: ${avgDelta} punti
+- Riduzione media NRS per trattamento: ${avgDelta} punti
 - Settore: ${client.sector === 1 ? 'Manifattura' : 'Servizi'}
 
 MINI-CHECK ${checkpoint.toUpperCase()} — breve questionario inviato SOLO a chi ha avviato un percorso con l'osteopata, a ${checkpoint === 't6' ? '180' : '90'} giorni dall'inizio del suo primo percorso. NON va a tutta la popolazione e NON è il check-up: il numero di compilati dipende da quanti percorsi sono partiti da almeno ${checkpoint === 't6' ? 'sei' : 'tre'} mesi, NON misura l'adesione dei dipendenti.
@@ -308,7 +312,7 @@ STRUTTURA REPORT (markdown, ## per titoli):
 (3-4 punti chiave di rilievo clinico e operativo)
 
 ## KPI Clinici
-(tabella o lista strutturata: sessioni, NRS sedute, persone in percorso, mini-check ${checkpoint.toUpperCase()} con NRS dichiarato e limitazioni, distribuzione per livello)
+(tabella o lista strutturata: trattamenti, NRS dei trattamenti, persone in percorso, mini-check ${checkpoint.toUpperCase()} con NRS dichiarato e limitazioni, distribuzione per livello)
 
 ## Trend e Analisi
 (andamento NRS, compliance pazienti, situazioni da monitorare)
@@ -320,11 +324,11 @@ STRUTTURA REPORT (markdown, ## per titoli):
 (3-4 azioni per i prossimi ${checkpoint === 't3' ? '3' : '6'} mesi, scelte fra ciò che il programma prevede già)
 
 ${checkpoint === 't6' ? `FOTOGRAFIA (tassativo): il confronto fra il check-up iniziale e quello dei sei mesi è già scritto dal sistema nella sezione «La fotografia a sei mesi», con le sue cautele sulla rappresentatività. NON duplicarlo, NON ricalcolare le percentuali e NON presentarlo come un risultato clinico dimostrato.
-` : ''}${checkpoint === 't3' ? `MOVIMENTO (tassativo): il racconto di cosa si è mosso in questi tre mesi — percorsi avviati e conclusi, sedute, prevenzione, segnalazioni, nuovi ingressi, distribuzione attuale — è già scritto dal sistema nella sezione «Il movimento dei primi 3 mesi». NON duplicarlo e NON riscriverne i numeri. In particolare NON affermare che la distribuzione attuale derivi da un nuovo questionario: a tre mesi nessuno ricompila nulla.
+` : ''}${checkpoint === 't3' ? `MOVIMENTO (tassativo): il racconto di cosa si è mosso in questi tre mesi — percorsi avviati e conclusi, trattamenti, prevenzione, segnalazioni, nuovi ingressi, distribuzione attuale — è già scritto dal sistema nella sezione «Il movimento dei primi 3 mesi». NON duplicarlo e NON riscriverne i numeri. In particolare NON affermare che la distribuzione attuale derivi da un nuovo questionario: a tre mesi nessuno ricompila nulla.
 ` : ''}${programmaPrevisto()}
 ${IDENTITA_PROFESSIONALE}
 ${NIENTE_RIFERIMENTI_INVENTATI}
-LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento».
+LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento». TRATTAMENTI (tassativo, Enrico 27/9): l'attività dell'osteopata si chiama «trattamento» — ciclo di trattamenti per il Livello 1, «trattamenti di prevenzione» per il Livello 2 — MAI «seduta/sedute» né «sessione/sessioni» (le «sessioni» sono solo quelle di formazione).
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
 Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
 
@@ -451,8 +455,19 @@ function generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, 
   const stratTotal = l1 + l2 + l3;
   const SP = tooSmall(stratTotal) ? null
     : Object.fromEntries(kAnonPartition([{ key: 'l1', count: l1 }, { key: 'l2', count: l2 }, { key: 'l3', count: l3 }], stratTotal).map(c => [c.key, c]));
-  const ld = k => (!SP || SP[k].suppressed) ? 'n.d.' : String(SP[k].count);
-  const l1d = ld('l1'), l2d = ld('l2'), l3d = ld('l3');
+  // Livelli sotto soglia UNITI in un solo dato (Enrico, 27/9).
+  const LLf = SP ? livelliLeggibili(Object.values(SP), stratTotal) : null;
+  const visibile = k => !!(SP && !SP[k].suppressed);
+  const rigaPazienti = visibile('l1') && visibile('l2')
+    ? `${SP.l1.count} pazienti in protocollo L1 attivo, ${SP.l2.count} in prevenzione L2`
+    : !LLf || LLf.nessunaDistribuzione
+      ? `pazienti per livello non pubblicabili: ogni livello conta meno di ${K_ANON} persone`
+      : `pazienti per livello: ${LLf.celle.map(c => `${nomeCella(c)}${c.unite ? ' insieme' : ''} ${c.count}`).join(', ')} (i livelli uniti non si mostrano separati, a tutela della riservatezza)`;
+  const righeTabella = !LLf || LLf.nessunaDistribuzione
+    ? `| Pazienti per livello | non pubblicabili (ogni livello < ${K_ANON}) |`
+    : LLf.celle.filter(c => c.unite || c.key !== 'l3').map(c => (c.unite
+      ? `| ${nomeCella(c)}, insieme | ${c.count} |`
+      : `| ${c.key === 'l1' ? 'Pazienti L1 attivi' : 'Pazienti L2 monitorati'} | ${c.count} |`)).join('\n');
 
   if (checkpoint === 't12' && t12) {
     return `## Report Annuale — ${client.name}
@@ -463,7 +478,7 @@ Sintesi dei risultati del programma ES Work al termine dell'Anno 1${t12.count ==
 
 | KPI | Valore |
 |-----|--------|
-| Riduzione del dolore (NRS media/seduta) | ${avgDelta} punti |
+| Riduzione del dolore (NRS medio per trattamento) | ${avgDelta} punti |
 | Miglioramento percepito (PGIC medio) | ${t12.avgPgic}/5${t12.improvedPct != null ? ` · ${t12.improvedPct}% migliorati` : ''} |
 | Prevalenza L1 osservata (intake → 12 mesi) | ${t12.t0L1} → ${t12.t12L1}${t12.kpiDeltaLabel} |
 
@@ -482,22 +497,21 @@ ${completed} interventi erogati su ${planned} pianificati. ${TESTO_OT23_IN_VERIF
 
 Il programma ES Work per **${client.name}** ha raggiunto il checkpoint a ${checkLabel} con risultati in linea con le aspettative cliniche.
 
-- ${completed} sessioni completate su ${planned} pianificate (${planned > 0 ? Math.round(completed/planned*100) : 0}% completamento)
-- Riduzione media NRS: **${avgDelta} punti** per sessione
-- ${l1d} pazienti in protocollo L1 attivo, ${l2d} in prevenzione L2
+- ${completed} trattamenti completati su ${planned} pianificati (${planned > 0 ? Math.round(completed/planned*100) : 0}% completamento)
+- Riduzione media NRS: **${avgDelta} punti** per trattamento
+- ${rigaPazienti}
 
 ## KPI Clinici
 
 | Indicatore | Valore |
 |-----------|--------|
-| Sessioni completate | ${completed} / ${planned} |
-| Riduzione NRS media (sedute) | ${avgDelta} punti |
+| Trattamenti completati | ${completed} / ${planned} |
+| Riduzione NRS media (trattamenti) | ${avgDelta} punti |
 | Mini-check ${checkpoint.toUpperCase()} compilati | ${mc ? (mc.smallGroup ? 'n.d.' : mc.count) : 0} |
 | NRS medio dichiarato (mini-check) | ${mc ? mc.avgNrs : 'n.d.'} |
 | Con limitazioni funzionali | ${mc && mc.limitationsPct != null ? mc.limitationsPct + '%' : 'n.d.'} |
 | Richiedono contatto | ${mc ? mc.needsContact : 0} |
-| Pazienti L1 attivi | ${l1d} |
-| Pazienti L2 monitorati | ${l2d} |
+${righeTabella}
 
 ## Trend e Analisi
 

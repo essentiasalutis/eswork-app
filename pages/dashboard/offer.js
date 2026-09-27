@@ -543,9 +543,9 @@ ${FIRMA}`;
           <div style={{ fontSize: 13, color: '#6b7280', marginTop: 5, letterSpacing: 1 }}>by Essentia Salutis</div>
           <div style={{ width: 50, height: 3, background: '#16a34a', margin: '28px auto' }} />
           <div style={{ lineHeight: 1.3, textAlign: 'center' }}>
-            <div style={{ fontSize: 18, fontWeight: 400, color: '#6b7280' }}>Report di Attivazione</div>
-            <div style={{ fontSize: 14, fontWeight: 300, color: '#9ca3af', marginTop: 2 }}>e</div>
-            <div style={{ fontSize: 18, fontWeight: 400, color: '#6b7280', marginTop: 2 }}>proposta di intervento</div>
+            {/* «Proposta di intervento» (Enrico, 27/9): il Report di Attivazione è un altro
+                documento, quello che diventa l'Allegato A del contratto. */}
+            <div style={{ fontSize: 18, fontWeight: 400, color: '#6b7280' }}>Proposta di intervento</div>
           </div>
           <div style={{ marginTop: 28 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 }}>Azienda cliente</div>
@@ -939,7 +939,7 @@ ${FIRMA}`;
         <div style={{ marginTop: 24, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: '16px 20px' }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Accettazione offerta</div>
           {/* Strada B (Enrico, 27/9): l'accettazione fissa le condizioni, il programma parte
-              con il contratto entro 7 giorni. Nome e ruolo di chi firma; l'importo nella
+              con il contratto entro 15 giorni. Nome e ruolo di chi firma; l'importo nella
               frase, così la pagina firmata porta il prezzo anche da sola. */}
           <div style={{ fontSize: 11, color: '#374151', lineHeight: 2, marginBottom: 20 }}>
             Il/La sottoscritto/a <span style={{ display: 'inline-block', minWidth: 190, borderBottom: '1px solid #9ca3af' }}>&nbsp;</span>, in qualità di <span style={{ display: 'inline-block', minWidth: 150, borderBottom: '1px solid #9ca3af' }}>&nbsp;</span> di <strong>{client.name}</strong>, {accettazione.dichiarazione}
@@ -985,7 +985,8 @@ ${FIRMA}`;
 
         <div style={{ marginTop: 16, background: '#f9fafb', borderRadius: 12, padding: '12px 16px', border: '1px solid #e5e7eb' }}>
           <p style={{ fontSize: 12, color: '#374151', fontStyle: 'italic', textAlign: 'center', margin: 0, lineHeight: 1.7 }}>
-            &ldquo;I disturbi muscolo-scheletrici rappresentano il 77% delle malattie professionali in Italia. Noi lavoriamo su questo.&rdquo;
+            {/* Il «77%» non aveva una fonte: la frase verificata delle leve (Enrico, 27/9). */}
+            &ldquo;I disturbi muscolo-scheletrici sono la prima voce di malattia professionale denunciata. Noi lavoriamo su questo.&rdquo;
           </p>
         </div>
 

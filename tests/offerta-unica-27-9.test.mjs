@@ -70,7 +70,8 @@ test('Anno 2: si nomina solo ciò che è nel prezzo', () => {
   assert.match(contenutoAnno2({ y2: { sportello: { sell: 100 }, prevention: { sell: 50 } } }), /i cicli per chi ne avrà bisogno, la prevenzione individuale, un modulo di formazione e la regia del programma\./);
 });
 
-test('accettazione (strada B): chi firma, importo con IVA forfettaria, 7 giorni per il contratto', () => {
+test('accettazione (strada B): chi firma, importo con IVA forfettaria, 15 giorni per il contratto, sempre', () => {
+  assert.equal(GIORNI_FIRMA_CONTRATTO, 15);
   const a = testoAccettazione({ importo: '€5.576', iva: 'IVA non applicata — regime forfettario', scadenza: '2026-10-08' });
   assert.match(a.dichiarazione, /per un investimento nel primo anno di €5\.576 \(IVA non applicata — regime forfettario\)\.$/);
   assert.equal(a.condizioni, `L'accettazione fissa le condizioni di questa offerta per ${GIORNI_FIRMA_CONTRATTO} giorni: il programma si attiva con la firma del contratto entro questo termine.`);
@@ -80,7 +81,7 @@ test('accettazione (strada B): chi firma, importo con IVA forfettaria, 7 giorni 
   const offer = src('pages/dashboard/offer.js');
   assert.match(offer, /Il\/La sottoscritto\/a <span/);
   assert.match(offer, /in qualità di <span/);
-  assert.match(prossimoPassoInBreve({ scadenzaOfferta: '2026-10-07' }), /^Accettazione dell'offerta entro il 7 ottobre 2026, poi firma del contratto entro 7 giorni/);
+  assert.match(prossimoPassoInBreve({ scadenzaOfferta: '2026-10-07' }), /^Accettazione dell'offerta entro il 7 ottobre 2026, poi firma del contratto entro 15 giorni/);
 });
 
 test('scadenza dell\'offerta: la stessa per Offerta e presentazione', () => {
@@ -93,7 +94,7 @@ test('scadenza dell\'offerta: la stessa per Offerta e presentazione', () => {
 
 test('Offerta: niente promesse di risultato, niente voci inesistenti, niente testi vecchi (27/9)', () => {
   const offer = senzaCommenti(src('pages/dashboard/offer.js'));
-  for (const vietato of [/Riduzione sintomi/, /Timeline Anno 1/, /\/dipendente/, /giornate nel primo anno/, /intervention-plan/, /analisi ROI/i,
+  for (const vietato of [/Riduzione sintomi/, /Timeline Anno 1/, /\/dipendente/, /giornate nel primo anno/, /intervention-plan/, /analisi ROI/i, /77%/, /Report di Attivazione<\/div>/,
     /Sessioni intensive/, /fase di <strong>mantenimento/, /sessione per sessione/, /Sessioni di prevenzione/, /pianoDeterministico/]) {
     assert.ok(!vietato.test(offer), `ancora presente: ${vietato}`);
   }
@@ -117,4 +118,9 @@ test('Report di Attivazione: il prezzo non parla più di «condizioni concordate
   assert.match(gen, /const TESTA_STAMPATA = 'Investimento calcolato sui numeri del vostro check-up:';/);
   assert.ok(!/concordate al colloquio e/.test(gen.replace(/^\s*\/\/.*$/gm, '')));
   assert.match(gen, /entro la Stima di investimento presentata al colloquio/);
+});
+
+test('piano AI per zona cancellato: nessuna pagina, nessuna API, nessun modulo (27/9)', () => {
+  assert.ok(!fs.existsSync(new URL('../pages/api/ai/intervention-plan.js', import.meta.url)));
+  assert.ok(!fs.existsSync(new URL('../lib/piano.js', import.meta.url)));
 });

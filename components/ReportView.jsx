@@ -6,7 +6,7 @@ import {
 } from '../lib/scoring';
 import { CONFIG } from '../lib/config';
 import { kAnonPartition, maskCount, tooSmall, K_ANON, K_ANON_INCROCIO, SUPPRESSED, livelliLeggibili, nomeCella, NOTA_LIVELLI_UNITI, NOTA_NESSUNA_DISTRIBUZIONE } from '../lib/kanon';
-import { convieneAggregare, NOTA_DISTRETTI } from '../lib/distretti';
+import { zoneDaMostrare, NOTA_DISTRETTI } from '../lib/distretti';
 import { nomeLivello } from '../lib/livelli';
 import { dataIt } from '../lib/date-it.mjs';
 
@@ -118,6 +118,8 @@ function HBar({ label, value, max = 100 }) {
           {value > 0 && `${value}%`}
         </div>
       </div>
+      {/* Anche lo zero è un dato (Enrico, 27/9: «laddove ci sono % metterle»). */}
+      {value === 0 && <div className="text-xs font-semibold text-gray-500 flex-shrink-0">0%</div>}
     </div>
   );
 }
@@ -485,11 +487,8 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
           diventa una colonna di «n.d.»: si chiede meno dettaglio (tre distretti)
           invece di abbassare la tutela. Decisione di Enrico, 13/9. */}
       {(() => {
-        const zoneViste = nmq.zones.map(z => ({ ...z, soppressa: maskCount(z.count12) == null }));
-        const aggrega = convieneAggregare(zoneViste);
-        const righe = aggrega
-          ? (nmq.districts || []).map(d => ({ ...d, soppressa: maskCount(d.count12) == null }))
-          : zoneViste;
+        // Stessa regola di Presentazione, Sintesi e Offerta (lib/distretti.js, 27/9).
+        const { aggrega, righe } = zoneDaMostrare(nmq);
         return (
       <>
       <SectionTitle>{aggrega ? 'Disturbi muscolo-scheletrici per distretto — 12 mesi' : 'Disturbi muscolo-scheletrici per zona — 12 mesi'}</SectionTitle>
@@ -610,7 +609,8 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         <>
           <SectionTitle>Confronto MSDs — Baseline vs Attuale</SectionTitle>
           <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3 print-page">
-            {nmq.zones.slice(0, 6).map((z, i) => {
+            {/* Tutte le zone confrontabili, non solo le prime sei (Enrico, 27/9). */}
+            {nmq.zones.map((z, i) => {
               const bz = baseNmq.zones.find(b => b.zone === z.zone);
               if (!bz || maskCount(z.count12) == null || maskCount(bz.count12) == null) return null;
               return <CompareBar key={i} label={z.zone} before={bz.pct12} after={z.pct12} />;

@@ -65,5 +65,6 @@ test('riservatezza: nel prezzo niente quote né persone di un livello nascosto',
   const report = src('pages/api/clients/[id]/generate-activation-report.js');
   assert.ok(!/const obsPct = /.test(report), 'la quota del Livello 1 non si scrive senza controllo');
   assert.match(report, /const vis = k => !!\(partLiv && !partLiv\[k\]\.suppressed\);/);
-  assert.match(src('pages/dashboard/offer.js'), /const personeAnno2 = calc && !cella\('l1'\)\.suppressed && !cella\('l2'\)\.suppressed \? calc\.pop_y2 : null;/);
+  // L'Offerta non scrive più le persone dell'Anno 2: la frase è quella della presentazione.
+  assert.ok(!/pop_y2/.test(src('pages/dashboard/offer.js')));
 });

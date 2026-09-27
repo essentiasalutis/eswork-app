@@ -86,7 +86,7 @@ test('evento nuovo: ergonomia d\'ufficio ricalcolata e Stima congelata della dem
 test('report della demo: niente «colloquio»; la riga per l\'AI non finisce mai stampata (21/9)', () => {
   const gen = src('pages/api/clients/[id]/generate-activation-report.js');
   assert.match(gen, /const TESTA_STAMPATA_DEMO = 'Investimento calcolato sulla popolazione indicata e sulla stratificazione della sala:';/);
-  assert.match(gen, /const inLinea = inRange && !demo \?/);
+  assert.match(gen, /const inLinea = inRange && !demo\s*\?/);
   assert.match(gen, /\$\{demo \? TESTA_BLOCCO_DEMO : TESTA_BLOCCO\}/);
   // l'istruzione resta nel blocco che legge l'AI e si toglie dal testo stampato
   assert.match(gen, /\.\$\{ISTRUZIONE_DIMENSIONAMENTO\}`/);

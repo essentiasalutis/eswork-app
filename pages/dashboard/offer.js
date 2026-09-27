@@ -3,19 +3,17 @@ import Head from 'next/head';
 import { requireAuthSsr } from '../../lib/auth';
 import { datiOffertaDaCheckup } from '../../lib/offerta-server';
 import {
-  trafficLight, TL_COLOR, TL_BG, TL_BORDER, TYPE_LABELS, generateSummaryText, BODY_ZONES,
+  trafficLight, TL_COLOR, TL_BG, TL_BORDER, TYPE_LABELS, generateSummaryText,
 } from '../../lib/scoring';
 import { fmt } from '../../lib/calculator';
 import { CONFIG } from '../../lib/config';
-import { nomeLivello } from '../../lib/livelli';
-import { oggiRoma, aggiungiGiorni } from '../../lib/checkup';
-import { finoAl, fraseValidita } from '../../lib/offerta';
-import { fraseRiduzioneAnno2 } from '../../lib/anno2.mjs';
-import { normalizza } from '../../lib/pipeline';
-import { VOCI_PROGRAMMA, RIGA_CHIUSURA, quantitaPrimoAnno } from '../../lib/programma';
+import { nomeLivello, legendaLivelli, CARTE_LIVELLO, azioneLivello } from '../../lib/livelli';
+import { oggiRoma } from '../../lib/checkup';
+import { fraseValidita, scadenzaOffertaProposta } from '../../lib/offerta';
+import { isFirmato } from '../../lib/pipeline';
+import { VOCI_PROGRAMMA, RIGA_CHIUSURA } from '../../lib/programma';
 import { vistaRiservata, K_ANON, SUPPRESSED, livelliLeggibili, nomeCella, NOTA_LIVELLI_UNITI, NOTA_NESSUNA_DISTRIBUZIONE } from '../../lib/kanon';
-import { pianoDeterministico } from '../../lib/piano';
-import { legendaLivelli } from '../../lib/livelli';
+import { prossimiPassi, testoAccettazione, GIORNI_FIRMA_CONTRATTO } from '../../lib/presentazione-testi.mjs';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
 import { dataIt } from '../../lib/date-it.mjs';
 import { DICITURA_IVA, DICITURA_IVA_BREVE } from '../../lib/iva.mjs';
@@ -30,14 +28,6 @@ Tel: ${CONFIG.contact_phone}
 ${CONFIG.contact_email}`;
 
 // ─── Modale email ─────────────────────────────────────────────────────────────
-
-// Scadenza proposta sulla pagina: quella già salvata se l'offerta è aperta, altrimenti
-// la scadenza si PROPONE sempre (oggi + giorni del Listino) e si può cancellare.
-function scadenzaIniziale(client, giorniA) {
-  if (!client) return '';
-  if (normalizza(client.pipeline_stage) === 'offer_open') return client.offerta_scade_il || '';
-  return aggiungiGiorni(oggiRoma(), giorniA);
-}
 
 function EmailModal({ modal, onClose, onInvia }) {
   const [to, setTo] = useState(modal.to);
@@ -103,8 +93,6 @@ function EmailModal({ modal, onClose, onInvia }) {
 function today() {
   return dataIt(new Date(), { day: '2-digit', month: 'long', year: 'numeric' });
 }
-
-// generateInterventionPlan rimossa — ora usa AI via /api/ai/intervention-plan
 
 // ─── Print page wrapper ───────────────────────────────────────────────────────
 
@@ -233,48 +221,18 @@ function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine,
 
 // ─── Offer Document ───────────────────────────────────────────────────────────
 
-export default function OfferPage({ client, assessment, nmq, calc, roi, forchetta, tetto = null, query = null, date, offertaGiorni = 10, pianoBase = [], prezzo = null, errore = null }) {
+// Testi in comune con la presentazione e la Sintesi (lib/presentazione-server.js →
+// testiCondivisi): «deve essere tutto unico tra presentazione e preventivo» (Enrico, 27/9).
+//   condivisi: { zone, piano, anno2, leve, nuovoProgramma, pacchetto }
+export default function OfferPage({ client, assessment, nmq, calc, forchetta, tetto = null, query = null, date, offertaGiorni = 10, prezzo = null, errore = null, condivisi = null }) {
   const [emailModal, setEmailModal] = useState(null);
-  const [scadenza, setScadenza] = useState(() => scadenzaIniziale(client, offertaGiorni));
+  // Scadenza: la stessa data che la presentazione scrive nei prossimi passi.
+  const [scadenza, setScadenza] = useState(() => scadenzaOffertaProposta(client, offertaGiorni));
   const [esitoInvio, setEsitoInvio] = useState(null); // { ok, testo }
   // Sforamento del massimo promesso: il server risponde 409 e qui si chiede la
   // conferma consapevole + la motivazione (interna, mai nel documento).
   const [sforamento, setSforamento] = useState(null); // { calcolato, massimo, scostamento }
   const [motivoSforamento, setMotivoSforamento] = useState('');
-  // Il piano c'è già all'apertura: è quello della piattaforma, calcolato lato server.
-  // L'AI entra SOLO con il pulsante qui sotto (nessuna chiamata al montaggio, 12/9).
-  const [piano, setPiano] = useState(pianoBase);
-  const [pianoAi, setPianoAi] = useState(false);
-  const [aiStato, setAiStato] = useState(null); // null | 'attesa' | 'non_riuscito'
-
-  async function generaPianoAi() {
-    if (!nmq || aiStato === 'attesa') return;
-    // Riservatezza: le zone sotto soglia non escono (sarebbero stampate con la loro
-    // percentuale).
-    const r = assessment ? vistaRiservata(nmq) : null;
-    if (r && !r.pubblicabile) return;
-    setAiStato('attesa');
-    try {
-      const res = await fetch('/api/ai/intervention-plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          zones: (r ? r.zone.filter(z => !z.soppressa) : nmq.zones).map(z => ({ zone: z.zone, pct12: z.pct12 })),
-          sector: client?.sector ?? 2,
-          // Il numero di persone in Livello 1 esce solo se è sopra la soglia di
-          // riservatezza: se non si mostra sul documento, non esce nemmeno (12/9).
-          level1Count: (!r || r.l1Visibile) ? nmq.level1.count : null,
-        }),
-      });
-      const d = await res.json();
-      // Solo un piano davvero dell'AI sostituisce la tabella: il testo di riserva
-      // dell'API è lo stesso che è già a video.
-      if (d.source === 'ai' && Array.isArray(d.plan) && d.plan.length) {
-        setPiano(d.plan); setPianoAi(true); setAiStato(null);
-      } else setAiStato('non_riuscito');
-    } catch { setAiStato('non_riuscito'); }
-  }
-
   if (errore) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
@@ -303,16 +261,14 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
     if (!riservata) return { count: l.count, pct: l.pct, suppressed: false };
     return riservata.livelli ? riservata.livelli.find(c => c.key === key) : { count: null, pct: null, suppressed: true };
   };
-  // Persone dell'Anno 2 (Livello 1 + Livello 2 attesi): si scrivono solo se entrambi i
-  // livelli sono mostrabili, altrimenti si risalirebbe a un gruppo sotto soglia (27/9).
-  const personeAnno2 = calc && !cella('l1').suppressed && !cella('l2').suppressed ? calc.pop_y2 : null;
   // Livelli per il documento (Enrico, 27/9): quelli sotto soglia UNITI in un solo dato,
   // mai «n.d.» livello per livello.
   const L = riservata && riservata.pubblicabile && riservata.livelli ? livelliLeggibili(riservata.livelli, riservata.n) : null;
   const celleLivelli = !riservata
     ? ['l1', 'l2', 'l3'].map(k => ({ ...cella(k), key: k, keys: [k], unite: false }))
     : (L && !L.nessunaDistribuzione ? L.celle : []);
-  const zoneMostrate = riservata ? riservata.zone : nmq.zones;
+  // Tutte le zone (o i tre distretti), come nel report e nella presentazione (27/9).
+  const Z = (condivisi && condivisi.zone) || { aggrega: false, nota: null, righe: [] };
   const prevalenzaMostrata = riservata ? riservata.prevalenza : nmq.prevalence.pct;
   const summaryText = (() => {
     if (!riservata) return generateSummaryText(nmq);
@@ -322,7 +278,11 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
     if (!soppressi) return generateSummaryText({ ...nmq, zones: top ? [top] : [] });
     return `Su ${riservata.n} risposte, ${L && L.nessunaDistribuzione ? NOTA_NESSUNA_DISTRIBUZIONE.charAt(0).toLowerCase() + NOTA_NESSUNA_DISTRIBUZIONE.slice(1) : `${NOTA_LIVELLI_UNITI.charAt(0).toLowerCase()}${NOTA_LIVELLI_UNITI.slice(1)}`}${top ? ` La zona più colpita è ${top.zone} (${top.pct12}%).` : ''}`;
   })();
-  const dettaglioVoce = n => (!calc ? '' : n === 3 && calc.days_osteo_y1 ? ` (${calc.days_osteo_y1} giornate nel primo anno)` : n === 6 && calc.training_sessions_y1 ? ` (${calc.training_sessions_y1} sessioni nel primo anno)` : '');
+  // Niente «giornate di sportello» nei documenti del cliente: è una misura interna
+  // (Enrico, 27/9). Resta il numero delle sessioni di formazione.
+  const dettaglioVoce = n => (calc && n === 6 && calc.training_sessions_y1 ? ` (${calc.training_sessions_y1} sessioni nel primo anno)` : '');
+  const passi = condivisi && !condivisi.pacchetto ? prossimiPassi({ firmato: isFirmato(client.pipeline_stage), scadenzaOfferta: scadenza }) : null;
+  const accettazione = testoAccettazione({ importo: calc ? fmt(calc.price_y1) : null, iva: DICITURA_IVA_BREVE, scadenza });
 
   // Emissione dell'offerta. Il prezzo è già capato al massimo promesso: emettere
   // non chiede nulla. Il server registra la traccia dello scostamento, e per
@@ -377,20 +337,23 @@ export default function OfferPage({ client, assessment, nmq, calc, roi, forchett
   function openOfferEmail() {
     const referente = client.contact_name ? `Gentile ${client.contact_name},` : `Gentile referente,`;
     const prezzoY1 = calc ? fmt(calc.price_y1) : '–';
+    // Stesso programma della presentazione e del documento (27/9); il listino v1 tiene
+    // l'elenco delle sue voci.
+    const programma = condivisi && condivisi.piano
+      ? condivisi.piano.map(r => `• ${r.titolo ? `${r.titolo}: ` : ''}${r.testo}`).join('\n')
+      : ['• Sportello osteopatico in sede (trattamento individuale)', '• Formazione collettiva su postura ed ergonomia', '• 2 review intermedie (3 e 6 mesi) + report annuale finale', '• Coordinamento completo', '• Documentazione degli interventi erogati: pianificazione, presenze, risultati'].join('\n');
     const body = `${referente}
 
-Le invio in allegato la proposta di intervento per ${client.name}, elaborata a seguito del check-up ES Work.
+Le invio in allegato la proposta di intervento per ${client.name}, elaborata sui risultati del check-up ES Work.
 
-In sintesi, il programma anno 1 prevede:
-• Sportello osteopatico in sede (trattamento individuale)
-• Formazione collettiva su postura ed ergonomia
-• 2 review intermedie (3 e 6 mesi) + report annuale finale
-• Coordinamento completo
-• Documentazione degli interventi erogati: pianificazione, presenze, risultati
+Il programma del primo anno, in sintesi:
+${programma}
 
 Investimento Anno 1: ${prezzoY1} (${DICITURA_IVA_BREVE})
 ${scadenza ? `\n${fraseValidita(scadenza)}\n` : ''}
-Il documento allegato contiene tutti i dettagli: dati emersi dal check-up, piano di intervento, analisi ROI e metodologia.
+Per procedere basta firmare l'accettazione in fondo al documento; il contratto si firma entro ${GIORNI_FIRMA_CONTRATTO} giorni dall'accettazione.
+
+Il documento allegato contiene i dati emersi dal check-up, il programma, l'investimento e i prossimi passi.
 
 Sono disponibile per qualsiasi domanda o per fissare una call di approfondimento.
 
@@ -592,7 +555,14 @@ ${FIRMA}`;
 
           <div style={{ marginTop: 48, width: '100%', maxWidth: 480, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 16, padding: '16px 24px', textAlign: 'left' }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Contenuto del documento</div>
-            {['Cruscotto sintetico e dati emersi dal check-up', 'Disturbi muscolo-scheletrici — mappa corporea e stratificazione', 'Piano di intervento proposto', 'Investimento e analisi costi', 'Metodologia e timeline anno 1'].map((v, i, arr) => (
+            {[
+              'Cruscotto sintetico e dati emersi dal check-up',
+              'Disturbi muscolo-scheletrici — zone e stratificazione',
+              ...(condivisi && condivisi.piano ? ['Il vostro programma nel primo anno e cosa comprende'] : []),
+              'Investimento',
+              'Perché riguarda l\'azienda e leve economiche',
+              passi ? 'Come funziona, prossimi passi e accettazione' : 'Come funziona e accettazione',
+            ].map((v, i, arr) => (
               <div key={i} style={{ fontSize: 12, color: '#374151', paddingTop: 5, paddingBottom: 5, borderBottom: i < arr.length - 1 ? '1px solid #f3f4f6' : 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ color: '#16a34a', fontWeight: 700 }}>{i + 1}.</span> {v}
               </div>
@@ -654,8 +624,9 @@ ${FIRMA}`;
         ) : <div>
           {/* zone corporee — barre (sopra) */}
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Zone corporee — ultimi 12 mesi</div>
-            {zoneMostrate.map((z, i) => z.soppressa ? (
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>{Z.aggrega ? 'Distretti corporei' : 'Zone corporee'} — ultimi 12 mesi</div>
+            {Z.nota && <div style={{ fontSize: 10, color: '#4b5563', marginBottom: 8 }}>{Z.nota}</div>}
+            {Z.righe.map((z, i) => z.soppressa ? (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
                 <div style={{ width: 120, fontSize: 10, color: '#374151', textAlign: 'right', flexShrink: 0 }}>{z.zone}</div>
                 <div style={{ flex: 1, fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>{SUPPRESSED} (gruppo &lt; {K_ANON})</div>
@@ -671,6 +642,8 @@ ${FIRMA}`;
                       {z.pct12 > 0 && <span style={{ color: 'white', fontSize: 9, fontWeight: 600 }}>{z.pct12}%</span>}
                     </div>
                   </div>
+                  {/* Anche lo zero è un dato (Enrico, 27/9: «laddove ci sono % metterle»). */}
+                  {z.pct12 === 0 && <span style={{ fontSize: 9, fontWeight: 600, color: '#4b5563' }}>0%</span>}
                 </div>
               );
             })())}
@@ -684,21 +657,19 @@ ${FIRMA}`;
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Stratificazione — 3 livelli</div>
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(celleLivelli.length, 1)}, 1fr)`, gap: 10 }}>
               {celleLivelli.map((c, i) => {
-                const STILE = {
-                  l1: { label: 'Trattamento — Anno 1', sub: 'Impatto funzionale', bg: '#FFEBEE', border: '#E74C3C', color: '#E74C3C' },
-                  // Listino v2: la prevenzione del Livello 2 parte dal primo anno (voce 5 di Enrico).
-                  l2: { label: nuovoProgramma ? `${nomeLivello('level2')} — dal primo anno` : `${nomeLivello('level2')} — Anno 2`, sub: 'Segnali senza impatto funzionale', bg: '#FFF8E1', border: '#F39C12', color: '#F39C12' },
-                  l3: { label: 'Solo formazione', sub: 'Postura ed ergonomia', bg: '#E8F5E9', border: '#16a34a', color: '#16a34a' },
-                };
-                // Livelli uniti (27/9): un solo dato, a tutela della riservatezza.
-                const l = c.unite
-                  ? { label: nomeCella(c), sub: `${c.keys.map(k => STILE[k].sub).join(' · ')} — insieme, a tutela della riservatezza`, bg: '#F8FAFC', border: '#94A3B8', color: '#475569' }
-                  : STILE[c.key];
+                // Stesse carte della presentazione e della Sintesi (lib/livelli.js, 27/9):
+                // percentuale, persone, nome, descrizione e cosa ricevono.
+                const keys = c.keys || [c.key];
+                const colore = c.unite ? '#475569' : CARTE_LIVELLO[keys[0]].color;
+                const sfondo = c.unite ? '#F8FAFC' : CARTE_LIVELLO[keys[0]].bg;
                 return (
-                <div key={i} style={{ background: l.bg, border: `1px solid ${l.border}`, borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: l.color, lineHeight: 1 }}>{c.suppressed ? SUPPRESSED : c.count}</div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: l.color }}>{l.label}</div>
-                  <div style={{ fontSize: 10, color: '#4b5563', lineHeight: 1.4 }}>{c.suppressed ? `gruppo < ${K_ANON}` : `${c.pct}% dipendenti`} — {l.sub}</div>
+                <div key={i} style={{ background: sfondo, border: `1px solid ${colore}`, borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 3, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: colore, lineHeight: 1 }}>{c.suppressed ? SUPPRESSED : `${c.pct}%`}</div>
+                  <div style={{ fontSize: 10, color: '#4b5563' }}>{c.suppressed ? `gruppo < ${K_ANON}` : `${c.count} ${c.count === 1 ? 'dipendente' : 'dipendenti'}`}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: colore, marginTop: 2 }}>{nomeCella(c)}</div>
+                  <div style={{ fontSize: 10, color: '#4b5563', lineHeight: 1.4 }}>{keys.map(k => CARTE_LIVELLO[k].desc).join(' · ')}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#1e293b', lineHeight: 1.4 }}>→ {keys.map(k => azioneLivello(k, { nuovoProgramma })).join(' · ')}</div>
+                  {c.unite && <div style={{ fontSize: 9.5, color: '#64748b' }}>Insieme, a tutela della riservatezza.</div>}
                 </div>
                 );
               })}
@@ -724,78 +695,32 @@ ${FIRMA}`;
       </Page>
 
       {/* ══════════════════════════════════════════════════════════════
-          Piano di intervento (subito sotto i disturbi, niente interruzione)
+          Il vostro programma nel primo anno — lo stesso testo della presentazione
+          (Enrico, 27/9). Prima qui c'era una tabella per zona con «Riduzione sintomi
+          20-30% in 12 mesi» per ogni riga e servizi che il programma non ha («analisi
+          del passo», «calzature professionali»): una promessa di risultato clinico e
+          voci inesistenti in un documento che si firma. Tolta, con il suo pulsante AI.
           ══════════════════════════════════════════════════════════════ */}
-      <Page>
-        {/* — Piano di intervento — */}
-        <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 4 }}>Piano di intervento proposto</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3b82f6', flexShrink: 0, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }} />
-          {/* La frase sull'AI compare SOLO se il piano è davvero dell'AI: dichiararla
-              su un piano generato dalla piattaforma sarebbe falso (Enrico, 12/9).
-              Niente "validato da un professionista osteopata": è vero nei fatti ma non
-              registrato da nulla, e in un documento che legge il cliente si dichiara
-              solo ciò che è dimostrabile (Enrico, 12/9). Se un giorno servirà, servirà
-              una spunta registrata: "validato da [nome], [data]". */}
-          <span style={{ fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>
-            {pianoAi
-              ? 'Piano elaborato sui dati della vostra azienda secondo il protocollo ES Work, con il supporto di strumenti di intelligenza artificiale'
-              : 'Piano elaborato sui dati della vostra azienda secondo il protocollo ES Work'}
-            {pianoAi && <span className="no-print" style={{ marginLeft: 6, color: '#3b82f6', fontWeight: 600 }}>✦ AI</span>}
-          </span>
-        </div>
-        <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 12 }}>
-          Zone con prevalenza ≥ 30% — interventi e risultati attesi
-        </div>
-
-        {/* Solo per Enrico, mai in stampa: l'invio dei dati all'AI è un gesto esplicito. */}
-        {piano.length > 0 && !pianoAi && (
-          <div className="no-print" style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, padding: 10, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <button onClick={generaPianoAi} disabled={aiStato === 'attesa'}
-              style={{ background: aiStato === 'attesa' ? '#cbd5e1' : '#1e293b', color: '#fff', border: 0, borderRadius: 10, padding: '7px 12px', fontSize: 12, fontWeight: 700, cursor: aiStato === 'attesa' ? 'default' : 'pointer' }}>
-              {aiStato === 'attesa' ? '⏳ Elaborazione…' : '✦ Genera il piano con l\'AI'}
-            </button>
-            <span style={{ fontSize: 11, color: '#6b7280' }}>
-              {aiStato === 'non_riuscito'
-                ? 'L\'AI non ha risposto: resta il piano della piattaforma qui sotto.'
-                : 'Premendo il pulsante, le percentuali per zona vengono inviate ad Anthropic (Stati Uniti). Senza premere, non esce nulla.'}
-            </span>
+      {condivisi && condivisi.piano && (
+        <Page className="page-keep">
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 4 }}>Il vostro programma nel primo anno</div>
+          <div style={{ fontSize: 10, color: '#6b7280', fontStyle: 'italic', marginBottom: 12 }}>
+            Piano elaborato sui dati della vostra azienda secondo il protocollo ES Work
           </div>
-        )}
-
-        {(
-          <>
-            <table className="offer-table">
-              <thead>
-                <tr style={{ background: '#f9fafb', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                  <td style={{ fontWeight: 700, color: '#1e293b', width: '28%', fontSize: 11 }}>Criticità emersa</td>
-                  <td style={{ fontWeight: 700, color: '#1e293b', width: '46%', fontSize: 11 }}>Intervento proposto</td>
-                  <td style={{ fontWeight: 700, color: '#1e293b', width: '26%', fontSize: 11, textAlign: 'right' }}>Risultato atteso</td>
-                </tr>
-              </thead>
-              <tbody>
-                {piano.map((row, i) => (
-                  <tr key={i}>
-                    <td style={{ color: '#dc2626', fontWeight: 600 }}>{row.criticita}</td>
-                    <td style={{ color: '#374151' }}>{row.intervento}</td>
-                    <td style={{ color: '#16a34a', textAlign: 'right' }}>{row.risultato}</td>
-                  </tr>
-                ))}
-                <tr>
-                  <td style={{ color: '#374151', fontWeight: 600 }}>100% dipendenti</td>
-                  <td style={{ color: '#374151' }}>Formazione collettiva postura ed ergonomia</td>
-                  <td style={{ color: '#16a34a', textAlign: 'right' }}>Prevenzione primaria</td>
-                </tr>
-              </tbody>
-            </table>
-          </>
-        )}
-
-        <div style={{ marginTop: 12, background: '#f9fafb', borderRadius: 12, padding: 12, fontSize: 11, color: '#374151', lineHeight: 1.7 }}>
-          <strong>Nota metodologica:</strong> I dati derivano dal check-up (questionario NMQ) compilato dai dipendenti.
-          Il programma ES Work prevede un approccio integrato: sportello osteopatico individuale + formazione collettiva + monitoraggio continuo.
-        </div>
-      </Page>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {condivisi.piano.map((r, i) => (
+              <div key={i} style={{ display: 'flex', gap: 10, fontSize: 12, color: '#374151', lineHeight: 1.6 }}>
+                <span style={{ color: '#16a34a', fontWeight: 800 }}>●</span>
+                <span>{r.titolo && <strong style={{ color: '#1e293b' }}>{r.titolo}: </strong>}{r.testo}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 12, background: '#f9fafb', borderRadius: 12, padding: 12, fontSize: 11, color: '#374151', lineHeight: 1.7 }}>
+            <strong>Nota metodologica:</strong> I dati derivano dal check-up (questionario NMQ) compilato dai dipendenti.
+            Il programma ES Work prevede un approccio integrato: sportello osteopatico individuale + formazione collettiva + monitoraggio continuo.
+          </div>
+        </Page>
+      )}
 
       {/* ══════════════════════════════════════════════════════════════
           Cosa comprende il programma — 12 voci (solo programma completo v2)
@@ -833,21 +758,17 @@ ${FIRMA}`;
             <div style={{ fontSize: 9, opacity: 0.9, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 1 }}>Anno 1 — Programma completo</div>
             <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1.1 }}>{fmt(calc.price_y1)}</div>
             <div style={{ fontSize: 12, opacity: 0.95, marginTop: 1 }}>
-              {fmt(calc.price_monthly_y1)}/mese · {fmt(calc.price_per_employee_y1)}/dipendente
+              {/* Totale e mese, mai «per dipendente» (Enrico, 27/9). */}
+              {fmt(calc.price_monthly_y1)} al mese
             </div>
           </div>
           <div style={{ fontSize: 10, color: '#64748b', margin: '-4px 0 10px' }}>{DICITURA_IVA}</div>
 
           {nuovoProgramma ? (
-            // Quantità del primo anno, niente euro accanto alle voci (decisione Enrico).
-            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '10px 12px', marginBottom: 10, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: '#16a34a', textTransform: 'uppercase', marginBottom: 6 }}>Il vostro programma nel primo anno</div>
-              <div style={{ fontSize: 10, color: '#1e293b', lineHeight: 1.7 }}>
-                {quantitaPrimoAnno(calc, { mostraCicli: !riservata || riservata.l1Visibile }).join(' · ')}
-              </div>
-              <div style={{ marginTop: 6, fontSize: 9.5, color: '#15803d', lineHeight: 1.5 }}>
-                Tutte le componenti sono comprese nell&apos;investimento annuale indicato sopra; sono descritte nella pagina «Cosa comprende il programma».
-              </div>
+            // Il programma è descritto nella sua pagina, con lo stesso testo della
+            // presentazione (27/9): qui niente quantità né «giornate di sportello».
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '10px 12px', marginBottom: 10, fontSize: 10, color: '#15803d', lineHeight: 1.5, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+              Tutte le componenti sono comprese nell&apos;investimento annuale indicato sopra; sono descritte nelle pagine «Il vostro programma nel primo anno» e «Cosa comprende il programma».
             </div>
           ) : (
             <>
@@ -858,9 +779,9 @@ ${FIRMA}`;
             <tbody>
               {[
                 ['Check-up iniziale + Report di Attivazione', 'Fotografia clinica della salute muscolo-scheletrica dell\'intera popolazione aziendale. Ogni dipendente compila un questionario validato in meno di 5 minuti. Produce la stratificazione dei bisogni e il piano di intervento personalizzato per la vostra azienda.'],
-                [`Sportello osteopatico in sede (${calc.days_osteo_y1} gg/anno)`, 'Trattamento osteopatico individuale erogato direttamente nella vostra sede, riservato ai dipendenti con reale indicazione clinica. Ogni percorso è preceduto da una pre-validazione con l\'osteopata e monitorato sessione per sessione con misure di esito oggettive.'],
+                [`Sportello osteopatico in sede (${calc.days_osteo_y1} gg/anno)`, 'Trattamento osteopatico individuale erogato direttamente nella vostra sede, riservato ai dipendenti con reale indicazione clinica. Ogni percorso è preceduto da una pre-validazione con l\'osteopata e monitorato trattamento per trattamento con misure di esito oggettive.'],
                 ['Pre-validazioni cliniche', 'Valutazione clinica iniziale con l\'osteopata prima di ogni percorso di trattamento: conferma l\'indicazione, definisce gli obiettivi e garantisce che le risorse vadano a chi ne ha realmente bisogno.'],
-                ...(withPrevention ? [['Prevenzione attiva L2', 'Sessioni di prevenzione attiva dedicate ai dipendenti con segnali precoci, per intervenire prima che il disturbo evolva in patologia conclamata.']] : []),
+                ...(withPrevention ? [['Prevenzione attiva L2', 'Trattamenti di prevenzione dedicati ai dipendenti con segnali precoci, per intervenire prima che il disturbo evolva in patologia conclamata.']] : []),
                 [`Formazione postura ed ergonomia (${calc.training_sessions_y1} sessioni)`, 'Sessioni collettive in piccoli gruppi su postura, ergonomia e prevenzione dei disturbi muscolo-scheletrici, calibrate sul vostro settore. Anno 1: due moduli dedicati (prevenzione attiva). Anni successivi: un modulo avanzato (correlazione con alimentazione, attività motoria e benessere psicofisico).'],
               ].map(([servizio, dettaglio], i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
@@ -897,22 +818,19 @@ ${FIRMA}`;
               <div style={{ fontSize: 9, color: '#2563eb', letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700 }}>Anno 2 e successivi (indicativo)</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: '#1d4ed8' }}>{fmt(calc.price_y2)}/anno</div>
             </div>
-            <div style={{ fontSize: 9.5, color: '#1e3a8a', lineHeight: 1.5, marginTop: 4 }}>
-              Dal secondo anno il programma entra nella fase di <strong>mantenimento e prevenzione</strong>, estesa ai dipendenti di Livello 1 e Livello 2{personeAnno2 != null ? ` (${personeAnno2} persone)` : ''}: sportello osteopatico per consolidare i risultati, prevenzione attiva, un modulo formativo avanzato, Piattaforma digitale ES Work, monitoraggio continuo e Report Annuale.
-              {/* Vero solo se l'Anno 2 costa davvero meno dell'Anno 1 proposto (con un prezzo
-                  applicato più basso può non esserlo, e la frase sparisce). Il motivo è quello
-                  vero del calcolo (Enrico, 27/9): l'Anno 2 ha gli stessi cicli; cala perché la
-                  formazione passa a un modulo e l'analisi ergonomica è già fatta. */}
-              {calc.price_y2 < calc.price_y1 && <> {fraseRiduzioneAnno2(calc)}</>}
-            </div>
+            {/* La stessa spiegazione della presentazione (lib/anno2.mjs, Enrico 27/9): cosa
+                comprende e, solo se vero, perché costa meno o più dell'Anno 1. */}
+            {condivisi && condivisi.anno2 && (
+              <div style={{ fontSize: 9.5, color: '#1e3a8a', lineHeight: 1.5, marginTop: 4 }}>{condivisi.anno2}</div>
+            )}
           </div>
 
           {/* Tempo dipendenti — v2: tre voci dal protocollo (come i testi); v1: congelato */}
           {calc.hours_prevention != null ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: roi ? 10 : 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
             {[
               { titolo: 'In trattamento', ore: calc.hours_treated, circa: true, nota: 'Pre-validazione, ciclo e formazione', bg: '#fef2f2', bd: '#fecaca', col: '#dc2626' },
-              { titolo: 'In prevenzione', ore: calc.hours_prevention, circa: true, nota: 'Sessioni di prevenzione e formazione', bg: '#fffbeb', bd: '#fde68a', col: '#b45309' },
+              { titolo: 'In prevenzione', ore: calc.hours_prevention, circa: true, nota: 'Trattamenti di prevenzione e formazione', bg: '#fffbeb', bd: '#fde68a', col: '#b45309' },
               { titolo: 'Tutti gli altri', ore: calc.hours_untreated, circa: false, nota: 'Solo formazione collettiva', bg: '#f0fdf4', bd: '#bbf7d0', col: '#16a34a' },
             ].map(v => (
               <div key={v.titolo} style={{ background: v.bg, borderRadius: 12, padding: '8px 10px', border: `1px solid ${v.bd}`, textAlign: 'center', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
@@ -923,7 +841,7 @@ ${FIRMA}`;
             ))}
           </div>
           ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: roi ? 10 : 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div style={{ background: '#fef2f2', borderRadius: 12, padding: '8px 10px', border: '1px solid #fecaca', textAlign: 'center', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
               <div style={{ fontSize: 9, fontWeight: 700, color: '#dc2626', marginBottom: 2 }}>Dipendente TRATTATO</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: '#dc2626' }}>{calc.hours_treated}h/anno</div>
@@ -938,19 +856,38 @@ ${FIRMA}`;
 
           )}
 
-          {/* ROI (solo se disponibili i giorni di assenza) */}
-          {roi && (
-            <div style={{ background: '#fffbeb', borderRadius: 12, padding: '10px 14px', border: '1px solid #fde68a', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-              <div style={{ fontSize: 9, color: '#ca8a04', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Analisi ROI</div>
-              <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', fontSize: 10, color: '#374151' }}>
-                <span>Stima costo assenze: <strong>{fmt(roi.estimated_cost)}</strong></span>
-                <span>Break-even con riduzione: <strong style={{ color: '#ca8a04' }}>{roi.breakeven_pct}%</strong></span>
-                {roi.saving_15pct > 0 && (
-                  <span>Risparmio netto (−15% assenze): <strong style={{ color: '#16a34a' }}>{fmt(roi.saving_15pct)}</strong></span>
-                )}
+        </Page>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════
+          Perché riguarda l'azienda e leve economiche — gli stessi testi delle schermate
+          5 e 6 della presentazione (lib/leve.js, Enrico 27/9). Qui c'era un riquadro
+          «Analisi ROI» che non compariva mai (il dato non arrivava): tolto.
+          ══════════════════════════════════════════════════════════════ */}
+      {condivisi && condivisi.leve && (
+        <Page className="page-keep">
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginBottom: 2 }}>Perché riguarda l&apos;azienda</div>
+          <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 10 }}>Non è solo un problema del dipendente</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
+            {condivisi.leve.impatto.map(l => (
+              <div key={l.titolo} style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: '10px 12px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#1e293b' }}>{l.titolo}</div>
+                <div style={{ fontSize: 10, color: '#4b5563', lineHeight: 1.5, marginTop: 3 }}>{l.testo}</div>
+                {l.dato && <div style={{ fontSize: 10, fontWeight: 600, color: '#15803d', marginTop: 3 }}>{l.dato}</div>}
               </div>
-            </div>
-          )}
+            ))}
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginBottom: 10 }}>Le leve economiche</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {condivisi.leve.economiche.map(l => (
+              <div key={l.titolo} style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: '10px 12px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#1e293b' }}>{l.titolo}</div>
+                <div style={{ fontSize: 10, color: '#4b5563', lineHeight: 1.5, marginTop: 3 }}>{l.testo}</div>
+                {l.dato && <div style={{ fontSize: 10, fontWeight: 600, color: '#15803d', marginTop: 3 }}>{l.dato}</div>}
+                {l.nota && <div style={{ fontSize: 9.5, color: '#6b7280', marginTop: 3 }}>{l.nota}</div>}
+              </div>
+            ))}
+          </div>
         </Page>
       )}
 
@@ -965,9 +902,11 @@ ${FIRMA}`;
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
           {[
             { num: '1', title: 'Misurare', desc: 'Check-up già completato: i risultati di questo documento derivano dai questionari compilati dai vostri dipendenti.' },
-            { num: '2', title: 'Trattare', desc: 'Sportello osteopatico in sede secondo calendario concordato. Accesso prioritario per dipendenti Livello 1.' },
+            // Trattare e Monitorare con le parole della presentazione (Enrico, 27/9); il
+            // listino v1 tiene le condizioni che aveva.
+            { num: '2', title: 'Trattare', desc: withPrevention ? 'Sportello osteopatico in sede secondo il calendario concordato: cicli di trattamento per il Livello 1, trattamenti di prevenzione per il Livello 2.' : 'Sportello osteopatico in sede secondo calendario concordato. Accesso prioritario per dipendenti Livello 1.' },
             { num: '3', title: 'Formare', desc: 'Sessioni formative collettive su postura, ergonomia e gestione del rischio muscolo-scheletrico.' },
-            { num: '4', title: 'Monitorare', desc: 'Checkpoint a 3 e 6 mesi, report annuale, revisione del piano. Adattamento continuo ai risultati.' },
+            { num: '4', title: 'Monitorare', desc: nuovoProgramma ? 'Review al mese 3 per chi è stato in Livello 1 al check-up; al mese 6 nuovo check-up di tutta la popolazione; a fine anno check-up e Report annuale.' : 'Checkpoint a 3 e 6 mesi, report annuale, revisione del piano. Adattamento continuo ai risultati.' },
           ].map(s => (
             <div key={s.num} style={{ background: '#f9fafb', borderRadius: 14, padding: 14, border: '1px solid #e5e7eb', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
               <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#16a34a', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>{s.num}</div>
@@ -979,30 +918,33 @@ ${FIRMA}`;
           ))}
         </div>
 
-        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 14, padding: 16, marginBottom: 24, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', marginBottom: 10 }}>Timeline Anno 1</div>
-          <div style={{ display: 'flex' }}>
-            {[
-              ['Mese 1-2', 'Check-up + attivazione sportello', '#16a34a'],
-              ['Mese 3-4', 'Sessioni intensive + formazione', '#2563eb'],
-              ['Mese 5-6', 'Mantenimento + review 6 mesi', '#ca8a04'],
-              ['Mese 7-10', 'Mantenimento continuo', '#7c3aed'],
-              ['Mese 11-12', 'Check-up finale + Report annuale', '#16a34a'],
-            ].map(([period, desc, color], i) => (
-              <div key={i} style={{ flex: 1, borderLeft: `3px solid ${color}`, paddingLeft: 8, paddingRight: 4 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color, marginBottom: 3 }}>{period}</div>
-                <div style={{ fontSize: 9, color: '#374151', lineHeight: 1.4 }}>{desc}</div>
-              </div>
-            ))}
+        {/* I prossimi passi: lo stesso elenco dell'ultima schermata della presentazione
+            (Enrico, 27/9). Prima c'era una «Timeline Anno 1» che diceva cose non vere
+            (check-up al mese 1-2, «sessioni intensive» al mese 3-4, niente review a 3 mesi). */}
+        {passi && (
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 14, padding: 16, marginBottom: 24, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', marginBottom: 10 }}>I prossimi passi</div>
+            <ol style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {passi.map((t, n) => (
+                <li key={n} style={{ display: 'flex', gap: 8, fontSize: 10.5, color: '#1e293b', lineHeight: 1.5 }}>
+                  <span style={{ flexShrink: 0, width: 18, height: 18, borderRadius: '50%', background: '#16a34a', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>{n + 1}</span>
+                  <span>{t}</span>
+                </li>
+              ))}
+            </ol>
           </div>
-        </div>
+        )}
 
         {/* — Accettazione e firma — */}
         <div style={{ marginTop: 24, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: '16px 20px' }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Accettazione offerta</div>
-          <div style={{ fontSize: 11, color: '#374151', lineHeight: 1.7, marginBottom: 20 }}>
-            Il/La sottoscritto/a dichiara di accettare integralmente la presente proposta di intervento ES Work per <strong>{client.name}</strong>, nei termini e alle condizioni indicate.
-            {scadenza && <> La presente offerta è valida <strong>{finoAl(scadenza)}</strong>.</>}
+          {/* Strada B (Enrico, 27/9): l'accettazione fissa le condizioni, il programma parte
+              con il contratto entro 7 giorni. Nome e ruolo di chi firma; l'importo nella
+              frase, così la pagina firmata porta il prezzo anche da sola. */}
+          <div style={{ fontSize: 11, color: '#374151', lineHeight: 2, marginBottom: 20 }}>
+            Il/La sottoscritto/a <span style={{ display: 'inline-block', minWidth: 190, borderBottom: '1px solid #9ca3af' }}>&nbsp;</span>, in qualità di <span style={{ display: 'inline-block', minWidth: 150, borderBottom: '1px solid #9ca3af' }}>&nbsp;</span> di <strong>{client.name}</strong>, {accettazione.dichiarazione}
+            {' '}{accettazione.condizioni}
+            {accettazione.validita && <> <strong>{accettazione.validita}</strong></>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 }}>
             <div>
@@ -1066,7 +1008,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
   // tariffe lette dall'indirizzo, un vecchio percorso del calcolatore che nessun link
   // usava più e che accettava numeri dall'indirizzo e tariffe di riserva silenziose.
   if (!assessmentId) {
-    return { props: { client: null, assessment: null, nmq: null, calc: null, roi: null, date: today() } };
+    return { props: { client: null, assessment: null, nmq: null, calc: null, date: today() } };
   }
 
   try {
@@ -1074,7 +1016,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     const d = await datiOffertaDaCheckup({ assessmentId, n });
     if (!d) return { notFound: true };
     // Tariffe mancanti (21/9): nessun documento, il messaggio dice dove mancano.
-    if (d.errore) return { props: { client: d.client ? { id: d.client.id, name: d.client.name } : null, assessment: null, nmq: null, calc: null, roi: null, date: today(), errore: d.errore } };
+    if (d.errore) return { props: { client: d.client ? { id: d.client.id, name: d.client.name } : null, assessment: null, nmq: null, calc: null, date: today(), errore: d.errore } };
     const { client, assessment, nmq, calc, forchetta, tetto } = d;
     // Solo per il riquadro a video (mai nel documento): prezzo di partenza, costo,
     // margine, stato del prezzo applicato, rinnovo, avviso di revisione della forbice.
@@ -1087,11 +1029,15 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       // Dopo il Report di Attivazione il prezzo è fissato: il riquadro resta, il modulo no.
       prezzoFissato: await (await import('../../lib/pricing/snapshot')).isChainClosed(client.id),
     };
-    const roi = null; // il ROI si calcola nel colloquio (serve il numero di giorni di assenza)
-    // Piano della piattaforma, calcolato qui: la tabella c'è già all'apertura e nessun
-    // dato esce. Stesse soglie di riservatezza del resto della pagina (lib/kanon.js).
-    const vista = vistaRiservata(nmq);
-    const pianoBase = vista.pubblicabile ? pianoDeterministico(vista.zone.filter(z => !z.soppressa)) : [];
+    // Testi in comune con la presentazione e la Sintesi: zone, programma, Anno 2, leve
+    // (Enrico, 27/9: «deve essere tutto unico tra presentazione e preventivo»).
+    const [{ getFirstMeeting }, { getOrgParams }, { testiCondivisi }] = await Promise.all([
+      import('../../lib/store'), import('../../lib/org'), import('../../lib/presentazione-server'),
+    ]);
+    const fm = await getFirstMeeting(client.id).catch(() => null);
+    const params = await getOrgParams().catch(() => ({ offertaGiorni }));
+    const t = testiCondivisi({ client, d, fm, params });
+    const condivisi = { zone: t.zone, piano: t.piano, anno2: t.anno2, leve: { impatto: t.leve.impatto, economiche: t.leve.economiche }, nuovoProgramma: t.nuovoProgramma, pacchetto: t.pacchetto };
 
     return {
       props: {
@@ -1099,7 +1045,6 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         assessment,
         nmq,
         calc,
-        roi,
         forchetta,
         tetto: tetto || null,
         // La popolazione usata QUI va passata al server quando si emette l'offerta:
@@ -1107,7 +1052,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         query: { assessmentId, n: n ?? null },
         date: today(),
         offertaGiorni,
-        pianoBase,
+        condivisi: JSON.parse(JSON.stringify(condivisi)),
         prezzo: JSON.parse(JSON.stringify(prezzo)),
       },
     };

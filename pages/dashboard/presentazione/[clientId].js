@@ -5,18 +5,14 @@ import Link from 'next/link';
 import { requireAuthSsr } from '../../../lib/auth';
 import { etichettaData } from '../../../lib/checkup';
 import { DICITURA_IVA } from '../../../lib/iva.mjs';
+import { CARTE_LIVELLO as LIVELLI, azioneLivello } from '../../../lib/livelli';
+import { ilPct } from '../../../lib/articoli.mjs';
 
 // Presentazione del Report di Attivazione (punto 7) — a schermo, nell'ordine di Enrico:
 // fotografia → stratificazione → piano → preventivo dentro la forbice → leve (prima
 // l'impatto, poi l'economia; sostenibilità con la spunta). Prima di iniziare, un
 // controllo che vede solo Enrico. Numeri: stessa fonte dell'Offerta (lib/presentazione-server).
 const eur = (x) => `€${Math.round(Number(x) || 0).toLocaleString('it-IT', { useGrouping: 'always' })}`;
-
-const LIVELLI = {
-  l1: { nome: 'Livello 1', desc: 'Dolore con impatto funzionale', azione: 'Cicli clinici', color: '#dc2626', bg: '#fef2f2' },
-  l2: { nome: 'Livello 2', desc: 'Segnali senza impatto', azione: 'Prevenzione', color: '#ca8a04', bg: '#fffbeb' },
-  l3: { nome: 'Livello 3', desc: 'Nessun disturbo in atto', azione: 'Formazione', color: '#16a34a', bg: '#f0fdf4' },
-};
 
 function Titolo({ k, children }) {
   return (
@@ -35,26 +31,35 @@ function Fotografia({ d }) {
       {!v.pubblicabile ? (
         <p className="text-2xl text-gray-600">Risultati aggregati non pubblicabili: meno di {K_ANON} risposte. A tutela della riservatezza i risultati si mostrano solo con almeno {K_ANON} risposte.</p>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-5">
           <div className="text-3xl text-gray-800">
-            <span className="text-6xl font-extrabold text-green-600">{d.checkup.risposte}</span>
+            <span className="text-5xl font-extrabold text-green-600">{d.checkup.risposte}</span>
             {d.dipendenti ? <> su {d.dipendenti} dipendenti <span className="text-gray-500">({Math.round((d.checkup.risposte / d.dipendenti) * 100)}%)</span></> : ' dipendenti'} hanno compilato il check-up
           </div>
-          {v.zoneTop.length > 0 && (
+          {/* TUTTE le zone, come nel report (Enrico, 27/9): dalla più colpita, con la
+              percentuale dove è pubblicabile; con una popolazione piccola i distretti. */}
+          {v.zone && v.zone.righe.length > 0 && (
             <div>
-              <div className="text-lg font-semibold text-gray-500 mb-3">Zone più colpite negli ultimi 12 mesi</div>
-              <div className="space-y-3 max-w-3xl">
-                {v.zoneTop.map(z => (
+              <div className="text-lg font-semibold text-gray-500 mb-3">Disturbi negli ultimi 12 mesi, per {v.zone.aggrega ? 'distretto' : 'zona'}</div>
+              <div className="space-y-1.5 max-w-4xl">
+                {v.zone.righe.map(z => (
                   <div key={z.zone} className="flex items-center gap-4">
-                    <div className="w-44 text-xl text-gray-800">{z.zone}</div>
-                    <div className="flex-1 h-8 bg-gray-100 rounded-lg overflow-hidden"><div className="h-full bg-green-600 rounded-lg" style={{ width: `${Math.max(z.pct12, 4)}%` }} /></div>
-                    <div className="w-16 text-xl font-bold text-gray-800 text-right">{z.pct12}%</div>
+                    <div className="w-60 text-lg text-gray-800">{z.zone}</div>
+                    {z.soppressa ? (
+                      <div className="flex-1 text-base italic text-gray-400">n.d. (gruppo &lt; {K_ANON})</div>
+                    ) : (
+                      <>
+                        <div className="flex-1 h-5 bg-gray-100 rounded-lg overflow-hidden"><div className="h-full bg-green-600 rounded-lg" style={{ width: `${z.pct12 > 0 ? Math.max(z.pct12, 3) : 0}%` }} /></div>
+                        <div className="w-16 text-lg font-bold text-gray-800 text-right">{z.pct12}%</div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
+              {v.zone.nota && <div className="text-base text-gray-500 mt-3 max-w-4xl">{v.zone.nota}</div>}
             </div>
           )}
-          {v.prevalenza != null && <div className="text-xl text-gray-600">Il {v.prevalenza}% riporta almeno un disturbo negli ultimi 12 mesi.</div>}
+          {v.prevalenza != null && <div className="text-xl text-gray-600">{ilPct(v.prevalenza, { maiuscola: true })} riporta almeno un disturbo negli ultimi 12 mesi.</div>}
           <div className="text-xl italic text-gray-500">È la fotografia da cui parte tutto il programma.</div>
         </div>
       )}
@@ -78,7 +83,7 @@ function Stratificazione({ d }) {
           <div className={`grid gap-6 ${L.celle.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
             {L.celle.map(c => {
               const livelli = c.keys.map(k => LIVELLI[k]);
-              const azioneDi = k => (k === 'l2' && d.nuovoProgramma ? 'Prevenzione dal primo anno' : k === 'l3' ? 'Formazione per tutti' : LIVELLI[k].azione);
+              const azioneDi = k => azioneLivello(k, { nuovoProgramma: d.nuovoProgramma });
               const colore = c.unite ? '#475569' : livelli[0].color;
               const sfondo = c.unite ? '#f8fafc' : livelli[0].bg;
               return (

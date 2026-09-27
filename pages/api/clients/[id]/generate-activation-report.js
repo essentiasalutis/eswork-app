@@ -396,9 +396,12 @@ ${isPacchetto ? `## Raccomandazioni
 // Esportata (solo lettura) anche per la baseline di regressione pricing v1/v2.
 // Intestazioni del blocco economico: quella che legge l'AI e quella stampata nella versione
 // di sistema. Demo permanente (Enrico, 21/9): al convegno non c'è stato nessun colloquio.
-const TESTA_BLOCCO = 'PROPOSTA ECONOMICA COLLEGATA (condizioni del colloquio + stratificazione reale):';
+// «Condizioni concordate al colloquio» era inesatto (Enrico, 21/9: al colloquio si
+// presenta una Stima, non si concorda) e falso per chi una Stima non l'ha mai avuta:
+// dopo il check-up il prezzo si calcola sui numeri osservati (Enrico, 27/9).
+const TESTA_BLOCCO = 'PROPOSTA ECONOMICA COLLEGATA (numeri osservati nel check-up):';
 const TESTA_BLOCCO_DEMO = 'PROPOSTA ECONOMICA COLLEGATA (popolazione indicata + stratificazione della sala):';
-const TESTA_STAMPATA = 'Investimento calcolato con le condizioni concordate al colloquio e la stratificazione reale:';
+const TESTA_STAMPATA = 'Investimento calcolato sui numeri del vostro check-up:';
 const TESTA_STAMPATA_DEMO = 'Investimento calcolato sulla popolazione indicata e sulla stratificazione della sala:';
 // Istruzione per l'AI dentro la riga del dimensionamento: resta nel testo che va all'AI,
 // non nel documento (Enrico, 21/9: nella versione di sistema finiva stampata).
@@ -504,7 +507,10 @@ export async function buildQuoteBlock(client_id, client, answers) {
     // Testo CLIENTE: prezzo + framing positivo "in linea con la stima" se rientra.
     // MAI il flag grezzo dentro/fuori (resta dato interno persistito).
     const demo = !!(client && client.demo_permanente);
-    const inLinea = inRange && !demo ? ', in linea con la Stima di investimento presentata al colloquio' : '';
+    // Con il tetto il prezzo è il massimo della Stima, non il calcolato: si dice «entro».
+    const inLinea = inRange && !demo
+      ? (tetto && tetto.capApplicato ? ', entro la Stima di investimento presentata al colloquio' : ', in linea con la Stima di investimento presentata al colloquio')
+      : '';
 
     // PONTE rispondenti -> popolazione. Il prezzo NON si dimensiona sui soli
     // rispondenti: la prevalenza osservata viene riportata sull'intera forza

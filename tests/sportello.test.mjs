@@ -95,3 +95,14 @@ test('due viste, una funzione: la sezione «Sportello» e la scheda azienda chia
   assert.match(src('pages/api/sportello/index.js'), /datiSportello\(\{ da, a, clientId: clientId \|\| null \}\)/);
   assert.match(src('components/NavMenu.js'), /href: '\/dashboard\/sportello', label: 'Sportello'/);
 });
+
+test('prevenzione: si contano solo le sedute dell\'anno di programma in corso (prova su Officine, 28/9)', () => {
+  const cicli = [{ id: 'p1', cycle_type: 'prevention', status: 'closed', sessions_planned: 4, sessions_completed: 4, started_at: '2025-10-01T09:00:00Z' }];
+  const seduteDate = { p1: ['2025-10-05', '2026-01-10', '2026-04-10', '2026-07-10'] };
+  const righe = statoPercorso({ cicli, seduteDate, livello: 'level2', dataAvvio: '2025-09-22', adesso: alle('2026-10-15') });
+  assert.equal(righe[0], 'Prevenzione di quest\'anno non ancora avviata');
+  assert.match(righe[1], /^Prevenzione: 0 sedute su 4 nell'anno; trimestre 1: seduta da fare entro il 21\/12\/2026$/);
+  const ok = statoPercorso({ cicli, seduteDate: { p1: [...seduteDate.p1, '2026-10-02'] }, livello: 'level2', dataAvvio: '2025-09-22', adesso: alle('2026-10-15') });
+  assert.equal(ok[0], 'Prevenzione: 1 seduta su 4 nell\'anno; trimestre 1: seduta fatta');
+  assert.deepEqual(controllaGiornata({ client_id: 'c', data: '2026-10-06', ora_inizio: '09:00', ora_fine: '11:00', posti: 6 }), ['Una giornata dura almeno 3 ore.']);
+});

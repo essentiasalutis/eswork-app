@@ -2,24 +2,34 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
-const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Clienti', icon: '🏢', color: 'gray' },
-  { href: '/dashboard/comunicazioni', label: 'Comunicazioni', icon: '✉️', color: 'blue', badgeComunicazioni: true },
-  { href: '/dashboard/pipeline', label: 'Pipeline', icon: '📊', color: 'purple' },
-  { href: '/dashboard/sportello', label: 'Sportello', icon: '🗓', color: 'green' },
-  { href: '/dashboard/demo-permanente', label: 'Demo convegni', icon: '🎤', color: 'amber' },
-  { href: '/dashboard/professionals', label: 'Professionisti', icon: '👨‍⚕️', color: 'indigo' },
-  { href: '/dashboard/professional-compliance', label: 'Conformità prof.', icon: '🛡️', color: 'rose' },
-  { href: '/dashboard/medici-competenti', label: 'Medici competenti', icon: '🩺', color: 'teal' },
-  { href: '/dashboard/pro-document-log', label: 'Log documenti prof.', icon: '📁', color: 'slate' },
-  { href: '/dashboard/referrals', label: 'Referral B2C', icon: '🔗', color: 'orange' },
-  { href: '/dashboard/compliance', label: 'Compliance', icon: '✅', color: 'teal' },
-  { href: '/dashboard/access-logs', label: 'Registro accessi', icon: '🔒', color: 'slate' },
-  { href: '/dashboard/data-requests', label: 'Richieste GDPR', icon: '🔐', color: 'violet' },
-  { href: '/dashboard/retention', label: 'Conservazione dati', icon: '🗄️', color: 'amber' },
-  { href: '/dashboard/restratifications', label: 'Ri-stratificazioni', icon: '🔄', color: 'rose' },
-  { href: '/dashboard/finance', label: 'Finance', icon: '💶', color: 'emerald' },
-  { href: '/dashboard/pricing-v2', label: 'Listino v2', icon: '🏷️', color: 'green' },
+// Menu raggruppato e compatto (Enrico, 28/9: «troppo lungo, deve vedersi tutto»).
+// Tolta «Referral B2C»: 1 codice, 0 utilizzi in piattaforma; la pagina resta, e ci si
+// arriva dalla scheda azienda («Tutti →»).
+const NAV_GROUPS = [
+  { titolo: 'Lavoro', voci: [
+    { href: '/dashboard', label: 'Clienti', icon: '🏢' },
+    { href: '/dashboard/pipeline', label: 'Pipeline', icon: '📊' },
+    { href: '/dashboard/comunicazioni', label: 'Comunicazioni', icon: '✉️', badgeComunicazioni: true },
+    { href: '/dashboard/sportello', label: 'Sportello', icon: '🗓' },
+    { href: '/dashboard/restratifications', label: 'Ri-stratificazioni', icon: '🔄' },
+    { href: '/dashboard/demo-permanente', label: 'Demo convegni', icon: '🎤' },
+  ] },
+  { titolo: 'Professionisti', voci: [
+    { href: '/dashboard/professionals', label: 'Professionisti', icon: '👨‍⚕️' },
+    { href: '/dashboard/professional-compliance', label: 'Conformità prof.', icon: '🛡️' },
+    { href: '/dashboard/medici-competenti', label: 'Medici competenti', icon: '🩺' },
+  ] },
+  { titolo: 'Economia', voci: [
+    { href: '/dashboard/finance', label: 'Finance', icon: '💶' },
+    { href: '/dashboard/pricing-v2', label: 'Listino v2', icon: '🏷️' },
+  ] },
+  { titolo: 'Privacy e registri', voci: [
+    { href: '/dashboard/compliance', label: 'Compliance', icon: '✅' },
+    { href: '/dashboard/access-logs', label: 'Registro accessi', icon: '🔒' },
+    { href: '/dashboard/pro-document-log', label: 'Log documenti prof.', icon: '📁' },
+    { href: '/dashboard/data-requests', label: 'Richieste GDPR', icon: '🔐' },
+    { href: '/dashboard/retention', label: 'Conservazione dati', icon: '🗄️' },
+  ] },
 ];
 
 export default function NavMenu({ onLogout }) {
@@ -79,43 +89,42 @@ export default function NavMenu({ onLogout }) {
         )}
       </button>
 
-      {/* Dropdown */}
+      {/* Dropdown: gruppi compatti, due colonne sugli schermi larghi, scorre se serve */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50">
-          <div className="px-3 pb-2 mb-1 border-b border-gray-100">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Navigazione</span>
+        <div className="absolute right-0 top-full mt-2 w-64 md:w-[30rem] max-h-[calc(100vh-5rem)] overflow-y-auto bg-white rounded-2xl shadow-xl border border-gray-100 p-2 z-50">
+          <div className="md:grid md:grid-cols-2 md:gap-x-2">
+            {NAV_GROUPS.map(gruppo => (
+              <div key={gruppo.titolo} className="mb-1.5">
+                <div className="px-2 pt-1 pb-0.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{gruppo.titolo}</div>
+                {gruppo.voci.map(item => {
+                  const isActive = currentPath === item.href || (item.href !== '/dashboard' && currentPath.startsWith(item.href));
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center gap-2 px-2 py-1 rounded-lg text-[13px] leading-5 transition-colors
+                        ${isActive ? 'bg-gray-100 text-gray-900 font-medium' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'}`}
+                    >
+                      <span className="text-sm w-5 text-center flex-shrink-0">{item.icon}</span>
+                      <span className="flex-1 truncate">{item.label}</span>
+                      {item.badgeComunicazioni && nonLette > 0 && (
+                        <span className="min-w-[1.1rem] h-[1.1rem] px-1 bg-blue-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                          {nonLette > 9 ? '9+' : nonLette}
+                        </span>
+                      )}
+                      {isActive && <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
           </div>
-          {NAV_ITEMS.map(item => {
-            const isActive = currentPath === item.href || (item.href !== '/dashboard' && currentPath.startsWith(item.href));
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors relative
-                  ${isActive
-                    ? 'bg-gray-50 text-gray-900 font-medium'
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-              >
-                <span className="text-base w-5 text-center flex-shrink-0">{item.icon}</span>
-                <span className="flex-1">{item.label}</span>
-                {item.badgeComunicazioni && nonLette > 0 && (
-                  <span className="w-5 h-5 bg-blue-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                    {nonLette > 9 ? '9+' : nonLette}
-                  </span>
-                )}
-                {isActive && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
-                )}
-              </Link>
-            );
-          })}
-          <div className="px-3 pt-2 mt-1 border-t border-gray-100">
+          <div className="border-t border-gray-100 mt-1 pt-1">
             <button
               onClick={() => { setOpen(false); onLogout?.(); }}
-              className="w-full text-left flex items-center gap-3 px-1 py-2 text-sm text-red-600 hover:text-red-700 transition-colors"
+              className="w-full text-left flex items-center gap-2 px-2 py-1 rounded-lg text-[13px] text-red-600 hover:bg-red-50 transition-colors"
             >
-              <span className="text-base w-5 text-center">🚪</span>
+              <span className="text-sm w-5 text-center">🚪</span>
               <span>Esci</span>
             </button>
           </div>

@@ -569,14 +569,14 @@ ${FIRMA}`,
       body: JSON.stringify({ contracted_l1: v }),
     });
     if (res.ok && capacity) {
-      const fallback = (patientsNrs || []).filter(p => p.level === 'level1').length;
-      const contracted = v != null && v > 0 ? v : fallback;
+      // Campo vuoto: le persone L1 del Report di Attivazione (lib/store.js, 28/9).
+      const contracted = v != null && v > 0 ? v : capacity.auto;
       const budget = Math.ceil(contracted * (1 + PROTOCOLLO.buffer_pct));
       const committed = capacity.used + capacity.pending;
       setCapacity({
         ...capacity,
         contracted,
-        source: v != null && v > 0 ? 'contratto' : 'assessment',
+        source: v != null && v > 0 ? 'contratto' : capacity.sourceAuto,
         budget,
         committed,
         remaining: Math.max(0, budget - committed),
@@ -1412,7 +1412,7 @@ ${FIRMA}`,
                 ) : pct >= 80 ? (
                   <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{pct}% impegnata</span>
                 ) : (
-                  <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{capacity.remaining} percorsi disponibili</span>
+                  <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{capacity.remaining} {capacity.remaining === 1 ? 'percorso disponibile' : 'percorsi disponibili'}</span>
                 )}
               </div>
               <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-2">
@@ -1420,19 +1420,19 @@ ${FIRMA}`,
               </div>
               <div className="text-xs text-gray-500">
                 <strong className="text-gray-700">{capacity.used}</strong> cicli avviati · <strong className="text-gray-700">{capacity.pending}</strong> in coda · budget <strong className="text-gray-700">{capacity.budget}</strong> percorsi
-                <span className="text-gray-400"> = {capacity.contracted} L1 {capacity.source === 'contratto' ? 'a contratto' : 'da check-up'} + buffer {Math.round(capacity.buffer_pct * 100)}%</span>
+                <span className="text-gray-400"> = {capacity.contracted} L1 {capacity.source === 'contratto' ? 'a contratto (scritti a mano)' : capacity.source === 'report' ? 'del Report di Attivazione' : 'da check-up'} + buffer {Math.round(capacity.buffer_pct * 100)}% per chi entra in Livello 1 durante l&apos;anno</span>
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <label className="text-xs text-gray-400">L1 a contratto:</label>
                 <input type="number" min="0" value={contractedInput}
                   onChange={e => setContractedInput(e.target.value)}
-                  placeholder={`auto (${(patientsNrs || []).filter(p => p.level === 'level1').length})`}
+                  placeholder={`auto (${capacity.auto})`}
                   className="w-24 px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
                 <button onClick={saveContractedL1} disabled={savingContracted}
                   className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-50 disabled:opacity-50">
                   {savingContracted ? '…' : 'Salva'}
                 </button>
-                <span className="text-xs text-gray-300">vuoto = usa gli L1 reali del check-up</span>
+                <span className="text-xs text-gray-300">vuoto = {capacity.sourceAuto === 'report' ? 'le persone L1 del Report di Attivazione, quelle nel prezzo' : 'gli L1 del check-up (non c\'è ancora un Report di Attivazione)'}</span>
               </div>
             </div>
           );

@@ -85,3 +85,18 @@ test('scheda: «in valutazione» e «programma attivato» si spiegano al passagg
   assert.match(s, /\['avvio', 'programma attivato', 'Dopo la firma\./);
   assert.match(s, /<button key=\{v\} title=\{spiega\}/);
 });
+
+test('capacità trattamenti: la base sono le persone L1 del Report (quelle nel prezzo), + 20% per chi entra durante l\'anno (28/9)', () => {
+  const store = src('lib/store.js');
+  const cap = store.slice(store.indexOf('export async function getTreatmentCapacity'));
+  assert.match(cap, /reps\[0\]\.quote_compliance\.persone_l1 != null/);
+  assert.match(cap, /const contracted = manuale \|\| auto;/, 'il numero scritto a mano ha la precedenza');
+  assert.match(cap, /const budget = Math\.ceil\(contracted \* \(1 \+ PROTOCOLLO\.buffer_pct\)\);/);
+  const s = src('pages/dashboard/[clientId].js');
+  assert.match(s, /capacity\.remaining === 1 \? 'percorso disponibile' : 'percorsi disponibili'/);
+  assert.match(s, /placeholder=\{`auto \(\$\{capacity\.auto\}\)`\}/);
+  assert.match(s, /const contracted = v != null && v > 0 \? v : capacity\.auto;/);
+  // i conti di Enrico: Weisoft 3 L1 del Report → 4 percorsi; Officine 51 → 62
+  assert.equal(Math.ceil(3 * 1.2), 4);
+  assert.equal(Math.ceil(51 * 1.2), 62);
+});

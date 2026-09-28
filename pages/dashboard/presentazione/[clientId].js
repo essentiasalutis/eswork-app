@@ -46,7 +46,8 @@ function Cruscotto({ d }) {
   if (!v.pubblicabile) return null;
   const L = livelliLeggibili(v.livelli, v.n);
   if (L.nessunaDistribuzione) return <p className="text-lg text-gray-500">{NOTA_NESSUNA_DISTRIBUZIONE}</p>;
-  const colore = (c) => (c.unite ? 'gray' : c.key === 'l1' ? trafficLight('nmq', c.pct) : c.key === 'l2' ? 'yellow' : 'green');
+  // Colore fisso del livello (lib/livelli.js, Enrico 28/9); uniti = grigio.
+  const colore = (c) => (c.unite ? 'gray' : LIVELLI[c.keys[0]].semaforo);
   // La legenda sta fuori dal riquadro dei livelli, a tutta larghezza: su una riga sola.
   return (
     <>

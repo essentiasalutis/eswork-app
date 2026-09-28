@@ -359,9 +359,10 @@ export default function OfferPage({ client, assessment, nmq, calc, forchetta, te
       : '';
 
   const STILE_SEM = {
-    l1: { type: 'nmq', sub: nomeLivello('level1') },
-    l2: { type: 'plain', sub: nomeLivello('level2'), color: 'yellow' },
-    l3: { type: 'plain', sub: nomeLivello('level3'), color: 'green' },
+    // Colore fisso del livello, anche nel cruscotto (lib/livelli.js, Enrico 28/9).
+    l1: { type: 'plain', sub: nomeLivello('level1'), color: CARTE_LIVELLO.l1.semaforo },
+    l2: { type: 'plain', sub: nomeLivello('level2'), color: CARTE_LIVELLO.l2.semaforo },
+    l3: { type: 'plain', sub: nomeLivello('level3'), color: CARTE_LIVELLO.l3.semaforo },
   };
   const semaphoreData = celleLivelli.map(c => (c.unite
     ? { type: 'plain', label: nomeCella(c), sub: c.keys.map(k => STILE_SEM[k].sub).join(' · '), value: `${c.pct}%`, color: 'gray' }

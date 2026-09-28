@@ -129,3 +129,15 @@ test('legenda dei colori su una riga sola, nelle due slide (28/9)', () => {
   assert.match(src('pages/dashboard/presentazione/[clientId].js'), /<div className=\{`max-w-5xl grid gap-4 /);
   assert.ok(!/Welfare aziendale', testo/.test(src('lib/leve.js')), 'welfare tolto');
 });
+
+test('colore fisso del livello ovunque, anche nei cruscotti: Livello 1 sempre rosso (28/9, strada A)', async () => {
+  const { CARTE_LIVELLO } = await import('../lib/livelli.js');
+  assert.deepEqual(['l1', 'l2', 'l3'].map(k => CARTE_LIVELLO[k].semaforo), ['red', 'yellow', 'green']);
+  const { TL_COLOR } = await import('../lib/scoring.js');
+  assert.deepEqual(['l1', 'l2', 'l3'].map(k => CARTE_LIVELLO[k].color), [TL_COLOR.red, TL_COLOR.yellow, TL_COLOR.green], 'scheda e cruscotto, stesso colore');
+  // nessun cruscotto colora più il Livello 1 in base alla percentuale
+  for (const f of ['pages/dashboard/presentazione/[clientId].js', 'pages/dashboard/offer.js', 'components/ReportView.jsx']) {
+    assert.ok(!/trafficLight\('nmq'|type="nmq"|type: 'nmq'/.test(src(f)), f);
+  }
+  assert.match(src('components/ReportView.jsx'), /<Semaphore key=\{c\.key\} colore=\{CARTE_LIVELLO\[c\.key\]\.semaforo\}/);
+});

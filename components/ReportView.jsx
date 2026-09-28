@@ -7,7 +7,7 @@ import {
 import { CONFIG } from '../lib/config';
 import { kAnonPartition, maskCount, tooSmall, K_ANON, K_ANON_INCROCIO, SUPPRESSED, ND_POCHI, livelliLeggibili, nomeCella, NOTA_LIVELLI_UNITI, NOTA_NESSUNA_DISTRIBUZIONE } from '../lib/kanon';
 import { zoneDaMostrare, NOTA_DISTRETTI } from '../lib/distretti';
-import { nomeLivello } from '../lib/livelli';
+import { nomeLivello, CARTE_LIVELLO } from '../lib/livelli';
 import { dataIt } from '../lib/date-it.mjs';
 
 // ─── Commento clinico AI (parte discorsiva integrata nel report dati) ──────────
@@ -82,9 +82,9 @@ function AiCommentSection({ clientId, initialText }) {
 
 // ─── Semaphore ────────────────────────────────────────────────────────────────
 
-function Semaphore({ type, score, value, label, subtitle }) {
-  const numeric = score !== undefined ? score : parseFloat(value);
-  const color = trafficLight(type, numeric);
+// Il colore è quello fisso del livello (lib/livelli.js, Enrico 28/9): prima il Livello 1
+// prendeva il semaforo dalla percentuale e poteva uscire verde qui e rosso altrove.
+function Semaphore({ colore: color, value, label, subtitle }) {
   return (
     <div
       className="rounded-2xl p-3 text-center print-page"
@@ -469,15 +469,8 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
               <div className="text-xs text-gray-400 mt-0.5">insieme, a tutela della riservatezza</div>
             </div>
           );
-          if (c.key === 'l1') return <Semaphore key="l1" type="nmq" score={c.pct} value={`${c.pct}%`} label="Livello 1" subtitle={nomeLivello('level1')} />;
-          const stile = c.key === 'l2' ? ['bg-yellow-50 border-yellow-100', 'text-yellow-600'] : ['bg-green-50 border-green-100', 'text-green-600'];
-          return (
-            <div key={c.key} className={`rounded-2xl p-3 text-center border ${stile[0]}`}>
-              <div className="text-xs text-gray-600 mb-0.5">{nomeCella(c)}</div>
-              <div className={`text-xl font-bold ${stile[1]}`}>{c.pct}%</div>
-              <div className="text-xs text-gray-400 mt-0.5">{nomeLivello(c.key === 'l2' ? 'level2' : 'level3')}</div>
-            </div>
-          );
+          const livello = { l1: 'level1', l2: 'level2', l3: 'level3' }[c.key];
+          return <Semaphore key={c.key} colore={CARTE_LIVELLO[c.key].semaforo} value={`${c.pct}%`} label={nomeCella(c)} subtitle={nomeLivello(livello)} />;
         };
         return (
           <>

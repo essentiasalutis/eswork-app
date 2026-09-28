@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { aggiungiGiorni, oggiRoma, etichettaData, ilGiorno, giorniAllaChiusura, avvisiAvvioCheckup } from '../../lib/checkup';
+import { aggiungiGiorni, oggiRoma, etichettaData, ilGiorno, giorniAllaChiusura, avvisiAvvioCheckup, inizioAnalisi } from '../../lib/checkup';
 import { testoKit, testoKitCheckupDopoFirma, firmaKit, bloccoKit } from '../../lib/riepilogo';
 import { isFirmato } from '../../lib/pipeline';
 import MailAvvio from '../../components/MailAvvio';
@@ -429,14 +429,16 @@ export default function ClientPage({ dipInForza = 0, client: initialClient, asse
   }
 
   // Proroga (check-up aperto) o riapertura fino a una data (chiuso/scaduto).
-  // Dopo il Report di Attivazione il server rifiuta: l'analisi è congelata.
-  async function prorogaCheckup(a, riapri) {
+  // Dopo il Report di Attivazione si riapre solo in modo esplicito: il Report decade e va
+  // rigenerato (v82, Enrico 28/9).
+  async function prorogaCheckup(a, riapri, dopoReport = false) {
     const data = dataProroga[a.id];
     if (!data) { setCheckupErr('Scegli la nuova data di chiusura.'); return; }
+    if (dopoReport && !confirm(`Riaprire il check-up fino al ${etichettaData(data)}?\n\nIl Report di Attivazione attuale non varrà più: presentazione e proposta di intervento tornano in bozza finché non lo rigeneri. Le risposte già raccolte restano; quando hanno risposto tutti, rigenera il Report.`)) return;
     setCheckupErr('');
     const res = await fetch(`/api/assessments/${a.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(riapri ? { status: 'active', chiude_il: data } : { chiude_il: data }),
+      body: JSON.stringify(riapri ? { status: 'active', chiude_il: data, ...(dopoReport ? { dopoReport: true } : {}) } : { chiude_il: data }),
     });
     const j = await res.json().catch(() => ({}));
     if (res.ok) { setAssessments(prev => prev.map(x => x.id === a.id ? { ...x, ...j } : x)); if (j.avviso) setCheckupErr(j.avviso); }
@@ -671,7 +673,8 @@ ${FIRMA}`,
   }
 
   const sortedAssessments = [...assessments].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  const reportDopo = a => generatedReports.some(r => r.report_type === 'activation' && r.created_at >= a.created_at);
+  // Report valido per questo check-up: dopo l'avvio, o dopo la riapertura (v82).
+  const reportDopo = a => generatedReports.some(r => r.report_type === 'activation' && Date.parse(r.created_at) >= Date.parse(inizioAnalisi(a)));
   const idAperto = (sortedAssessments.find(a => a.status === 'active') || {}).id;
   // Momento del check-up: lo dice il contratto. Se l'ho forzato a mano resta SCRITTO
   // a schermo, perché fra un mese non si scopra che i testi partono sbagliati per una
@@ -1169,9 +1172,37 @@ ${FIRMA}`,
                         const scaduto = a.status === 'active' && a.chiude_il && giorniAllaChiusura(a.chiude_il) === null;
                         const riapri = a.status !== 'active' || scaduto;
                         if (riapri && (a.id !== sortedAssessments[0]?.id || (idAperto && idAperto !== a.id))) return null;
-                        if (reportDopo(a)) return <div className="mt-2 text-xs text-gray-500">🔒 Analisi congelata: il Report di Attivazione è già stato generato su questo check-up.</div>;
+                        if (reportDopo(a)) {
+                          // Riaprire dopo il Report (v82, Enrico 28/9): per far rispondere chi
+                          // manca; il Report decade e va rigenerato. Mai dopo la firma.
+                          const puoRiaprire = a.type === 'initial' && a.id === sortedAssessments[0]?.id
+                            && !isFirmato(client.pipeline_stage) && !(idAperto && idAperto !== a.id);
+                          return (
+                            <div className="mt-2 space-y-1.5">
+                              <div className="text-xs text-gray-500">🔒 Analisi congelata: il Report di Attivazione è già stato generato su questo check-up.{isFirmato(client.pipeline_stage) ? ' Il contratto è firmato: il check-up non si riapre.' : ''}</div>
+                              {puoRiaprire && (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs text-gray-500">Per far rispondere chi manca: riapri fino al</span>
+                                  <input type="date" min={oggiRoma()} value={dataProroga[a.id] || ''} onChange={e => setDataProroga(prev => ({ ...prev, [a.id]: e.target.value }))}
+                                    className="text-xs border border-gray-300 rounded-lg px-2 py-1" />
+                                  <button onClick={() => prorogaCheckup(a, true, true)} disabled={!dataProroga[a.id]}
+                                    title="Il Report di Attivazione decade: presentazione e proposta tornano in bozza finché non lo rigeneri."
+                                    className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-xl hover:bg-amber-100 disabled:opacity-50">
+                                    🔓 Riapri
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
                         return (
-                          <div className="mt-2 flex items-center gap-2 flex-wrap">
+                          <div className="mt-2 space-y-1.5">
+                          {a.riaperto_dopo_report_at && (
+                            <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                              🔓 Riaperto il {dataIt(a.riaperto_dopo_report_at)} dopo il Report di Attivazione: il Report precedente non vale più. Quando hanno risposto tutti, rigenera il Report: presentazione e proposta di intervento si aggiornano.
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs text-gray-500">{riapri ? 'Riapri fino al' : 'Proroga al'}</span>
                             <input type="date" min={oggiRoma()} value={dataProroga[a.id] || ''} onChange={e => setDataProroga(prev => ({ ...prev, [a.id]: e.target.value }))}
                               className="text-xs border border-gray-300 rounded-lg px-2 py-1" />
@@ -1179,6 +1210,7 @@ ${FIRMA}`,
                               className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-xl hover:bg-amber-100 disabled:opacity-50">
                               {riapri ? '🔓 Riapri' : 'Proroga'}
                             </button>
+                          </div>
                           </div>
                         );
                       })()}

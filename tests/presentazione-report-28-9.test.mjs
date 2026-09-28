@@ -169,6 +169,6 @@ test('scheda: Report, Presenta, Proposta da sinistra; il Report di Attivazione c
   // la scheda lo mostra subito, anche quando il Report si genera dalla sua pagina
   assert.match(scheda, /onReportGenerato=\{\(d\) => \{/);
   assert.match(src('components/ReportView.jsx'), /if \(onReportGenerato\) onReportGenerato\(d\);/);
-  // riaprire dopo il Report resta vietato: l'analisi è congelata
-  assert.match(src('pages/api/assessments/[id].js'), /l\\'analisi è congelata e il check-up non si riapre né si proroga/);
+  // dopo il Report si riapre solo in modo esplicito (v82): vedi la prova della riapertura
+  assert.match(src('pages/api/assessments/[id].js'), /l\\'analisi è congelata\. Per far rispondere altri dipendenti usa «Riapri»/);
 });

@@ -475,7 +475,8 @@ export default function OfferPage({ client, assessment, nmq, calc, forchetta, te
 
         {!reportAttivazione && (
           <div className="mb-2 rounded-xl px-4 py-2.5 text-xs border bg-amber-50 border-amber-300 text-amber-900">
-            📝 <strong>Bozza.</strong> La proposta di intervento nasce dal Report di Attivazione: qui prepari il prezzo e, se serve, il prezzo applicato, che il Report poi fissa. Stampa, invio e «Mostra al cliente» si accendono dopo il Report, che si genera dalla scheda dell&apos;azienda.
+            {/* Riaperto dopo il Report (v82): il Report precedente non vale più. */}
+            📝 <strong>Bozza.</strong>{assessment.riaperto_dopo_report_at && <> Il check-up è stato riaperto il {dataIt(assessment.riaperto_dopo_report_at)}: il Report di Attivazione precedente non vale più.</>} La proposta di intervento nasce dal Report di Attivazione: qui prepari il prezzo e, se serve, il prezzo applicato, che il Report poi fissa. Stampa, invio e «Mostra al cliente» si accendono dopo il Report, che si genera dalla scheda dell&apos;azienda.
           </div>
         )}
         {prezzoDiverso && (
@@ -1003,6 +1004,12 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     // Tariffe mancanti (21/9): nessun documento, il messaggio dice dove mancano.
     if (d.errore) return { props: { client: d.client ? { id: d.client.id, name: d.client.name } : null, assessment: null, nmq: null, calc: null, date: today(), errore: d.errore } };
     const { client, assessment, nmq, calc, forchetta, tetto } = d;
+    // Il Report di Attivazione VALIDO di questo check-up: dopo l'avvio, o dopo la
+    // riapertura (v82). La proposta ne porta il prezzo (28/9). Alla pagina solo data e
+    // prezzo, niente testo né dati interni del Report.
+    const [{ ultimoReportAttivazione }, { inizioAnalisi }] = await Promise.all([import('../../lib/checkup-server'), import('../../lib/checkup')]);
+    const rep = await ultimoReportAttivazione(client.id, inizioAnalisi(assessment)).catch(() => null);
+    const reportAttivazione = rep ? { il: rep.created_at, prezzo: rep.quote_compliance && rep.quote_compliance.real_price != null ? rep.quote_compliance.real_price : null } : null;
     // Solo per il riquadro a video (mai nel documento): prezzo di partenza, costo,
     // margine, stato del prezzo applicato, rinnovo, avviso di revisione della forbice.
     const prezzo = {
@@ -1012,7 +1019,8 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       posizione: d.posizione || null, minimoForbice: forchetta ? forchetta.min ?? null : null,
       conTetto: !!(tetto && tetto.capApplicato),
       // Dopo il Report di Attivazione il prezzo è fissato: il riquadro resta, il modulo no.
-      prezzoFissato: await (await import('../../lib/pricing/snapshot')).isChainClosed(client.id),
+      // Se il check-up è stato riaperto il Report decade e il prezzo torna in gioco (v82).
+      prezzoFissato: !!rep,
     };
     // Testi in comune con la presentazione: zone, programma, Anno 2, leve economiche
     // (Enrico, 27/9: «deve essere tutto unico tra presentazione e preventivo»).
@@ -1023,11 +1031,6 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     const params = await getOrgParams().catch(() => ({ offertaGiorni }));
     const t = testiCondivisi({ client, d, fm, params });
     // Alla pagina solo ciò che mostra: niente leve d'impatto (28/9, restano nella presentazione).
-    // Il Report di Attivazione di questo check-up: la proposta ne porta il prezzo (28/9).
-    // Alla pagina solo data e prezzo, niente testo né dati interni del Report.
-    const { ultimoReportAttivazione } = await import('../../lib/checkup-server');
-    const rep = await ultimoReportAttivazione(client.id, assessment.created_at).catch(() => null);
-    const reportAttivazione = rep ? { il: rep.created_at, prezzo: rep.quote_compliance && rep.quote_compliance.real_price != null ? rep.quote_compliance.real_price : null } : null;
     const condivisi = { zone: t.zone, piano: t.piano, anno2: t.anno2, leve: { economiche: leveEconomichePreventivo(t.leve.economiche, { conVoceOT23: t.nuovoProgramma }), slide: leveEconomicheSlide(t.leve.economiche) }, nuovoProgramma: t.nuovoProgramma, pacchetto: t.pacchetto };
 
     return {

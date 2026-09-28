@@ -339,7 +339,12 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
   // La presentazione nasce dal Report di Attivazione (Enrico, 28/9: chiudo il check-up →
   // creo il Report → da lì presentazione e proposta di intervento).
   if (d && !d.errore && !d.reportAttivazione) {
-    return { props: { d: { errore: 'La presentazione nasce dal Report di Attivazione: generalo dalla scheda dell\'azienda, poi torna qui.', azienda: d.azienda, clientId: d.clientId } } };
+    // Riaperto dopo il Report (v82): il Report di prima è decaduto, si rigenera alla chiusura.
+    const { dataIt } = await import('../../../lib/date-it.mjs');
+    const errore = d.riapertoIl
+      ? `Il check-up è stato riaperto il ${dataIt(d.riapertoIl, { day: 'numeric', month: 'long', year: 'numeric' })}: il Report di Attivazione precedente non vale più. Quando hanno risposto tutti, rigenera il Report dalla scheda dell'azienda: presentazione e proposta di intervento si aggiornano con il nuovo.`
+      : 'La presentazione nasce dal Report di Attivazione: generalo dalla scheda dell\'azienda, poi torna qui.';
+    return { props: { d: { errore, azienda: d.azienda, clientId: d.clientId } } };
   }
   return { props: { d: JSON.parse(JSON.stringify(d)) } };
 });

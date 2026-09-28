@@ -3,9 +3,11 @@ import {
   getAssessmentById,
   getResponsesByAssessment,
   deleteAssessmentById,
+  getClientById,
 } from '../../../lib/store';
-import { reportAttivazioneDopo, getCheckupCorrente, scriviAssessmentTollerante, contaRisposte } from '../../../lib/checkup-server';
-import { isYmd, oggiRoma, fineGiornataRoma } from '../../../lib/checkup';
+import { reportAttivazioneDopo, getCheckupCorrente, scriviAssessmentTollerante, contaRisposte, isFirmato } from '../../../lib/checkup-server';
+import { isYmd, oggiRoma, fineGiornataRoma, inizioAnalisi } from '../../../lib/checkup';
+import supabase from '../../../lib/db';
 
 const MIGRATION = 'Serve la migration v51 (scadenza e solleciti del check-up): applicala in Supabase e riprova.';
 
@@ -43,9 +45,21 @@ export default requireAuth(async function handler(req, res) {
 
       // Da qui: riapertura e proroga. Dopo il Report di Attivazione di QUESTO
       // check-up l'analisi è congelata: il Report è stato scritto su quei numeri.
+      // Si può riaprire solo in modo esplicito (dopoReport), e il Report DECADE (v82,
+      // Enrico 28/9: «se riapro devo poi rifare il report»): vale solo quello generato
+      // dopo la riapertura. Mai per chi ha firmato: il Report è l'Allegato A del contratto.
       if (status === 'active' || chiude_il !== undefined) {
-        if (await reportAttivazioneDopo(assessment.client_id, assessment.created_at)) {
-          return res.status(409).json({ error: 'Il Report di Attivazione è già stato generato su questo check-up: l\'analisi è congelata e il check-up non si riapre né si proroga.' });
+        let dopoReport = false;
+        if (await reportAttivazioneDopo(assessment.client_id, inizioAnalisi(assessment))) {
+          const cliente = await getClientById(assessment.client_id).catch(() => null);
+          const puoRiaprire = status === 'active' && req.body && req.body.dopoReport === true
+            && assessment.type === 'initial' && !isFirmato(cliente);
+          if (!puoRiaprire) {
+            return res.status(409).json({ error: isFirmato(cliente)
+              ? 'Il contratto è firmato: il Report di Attivazione è l\'Allegato A e il check-up non si riapre.'
+              : 'Il Report di Attivazione è già stato generato su questo check-up: l\'analisi è congelata. Per far rispondere altri dipendenti usa «Riapri»: il Report decade e va rigenerato.' });
+          }
+          dopoReport = true;
         }
         if (chiude_il !== undefined && (!isYmd(chiude_il) || chiude_il < oggiRoma())) {
           return res.status(422).json({ error: 'La data di chiusura deve essere oggi o un giorno futuro.' });
@@ -64,6 +78,17 @@ export default requireAuth(async function handler(req, res) {
           }
           fields.status = 'active';
           fields.chiuso_at = null;
+        }
+        if (dopoReport) {
+          // La riapertura dopo il Report si scrive per intero o non si fa: senza la v82 il
+          // Report resterebbe valido su numeri che stanno per cambiare.
+          fields.riaperto_dopo_report_at = now;
+          const { data, error } = await supabase.from('assessments').update(fields).eq('id', id).select().single();
+          if (error) {
+            const manca = error.code === 'PGRST204' || error.code === '42703';
+            return res.status(manca ? 409 : 500).json({ error: manca ? 'Serve la migration v82 (riapertura dopo il Report): applicala in Supabase e riprova.' : error.message });
+          }
+          return res.json(data);
         }
         const { data, v51Mancante } = await scriviAssessmentTollerante('update', fields, id);
         // Senza v51: una proroga pura non scrive nulla (409); una riapertura avviene

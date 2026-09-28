@@ -33,6 +33,14 @@ export default function HrIngressoPage() {
       .then(r => r.json()).then(j => { if (j.ok) setAgg(j.aggregati); }).catch(() => {});
   }, [token]);
 
+  // Sportello in sede (28/9): solo le giornate e i posti, mai chi né quanti prenotati.
+  const [giornate, setGiornate] = useState([]);
+  useEffect(() => {
+    if (!token) return;
+    fetch(`/api/hr/sportello?token=${encodeURIComponent(token)}`)
+      .then(r => r.json()).then(j => { if (j.ok) setGiornate(j.giornate || []); }).catch(() => {});
+  }, [token]);
+
   // Stato delle richieste: token nel BODY, non in URL.
   const caricaRichieste = useCallback(() => {
     if (!token) return;
@@ -105,6 +113,23 @@ export default function HrIngressoPage() {
                 <div className="text-xl font-bold text-amber-700">{agg.nNuoviInAttesaSoppresso ? `<${agg.sogliaK}` : num(agg.nNuoviInAttesa)}</div>
                 <div className="text-xs text-gray-400 mt-0.5">Nuovi ingressi in attesa</div>
               </div>
+            </div>
+          )}
+
+          {/* Sportello in sede — sola lettura: giornate e posti */}
+          {giornate.length > 0 && (
+            <div className={`${box} p-4 mb-4`}>
+              <div className="text-sm font-semibold text-gray-700 mb-2">Sportello in sede — prossime giornate</div>
+              <ul className="space-y-1 text-sm text-gray-700">
+                {giornate.map(g => (
+                  <li key={`${g.data}-${g.ora_inizio}`} className="flex flex-wrap gap-x-2">
+                    <span className="font-semibold">{g.data.split('-').reverse().join('/')}</span>
+                    <span>{g.ora_inizio}–{g.ora_fine}</span>
+                    {(g.sede || g.stanza) && <span className="text-gray-500">{[g.sede, g.stanza].filter(Boolean).join(' · ')}</span>}
+                    <span className="text-gray-500">{g.posti} posti</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

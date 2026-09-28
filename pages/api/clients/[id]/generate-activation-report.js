@@ -500,6 +500,9 @@ export async function buildQuoteBlock(client_id, client, answers) {
     const compliance = {
       in_range: inRange, min, avg, max, real_price: realPrice,
       pricing_version: pricingVersion, source,
+      // Persone di Livello 1 e 2 dimensionate nel prezzo, congelate al Report: sono il
+      // contratto delle sedute dello sportello (× 4, lib/sportello.mjs; Enrico, 28/9).
+      persone_l1: real.l1, persone_l2: real.l2,
       tetto: { stato: tetto.stato, calcolato: tetto.calcolato, massimo: tetto.max, scostamento: tetto.scostamento },
       // Interni (mai al cliente): posizione nella forbice, margine, sconto copiato e
       // fermato qui con la sua motivazione, avviso di revisione della forbice.

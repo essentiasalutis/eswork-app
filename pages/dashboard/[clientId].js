@@ -17,6 +17,8 @@ import { dataIt } from '../../lib/date-it.mjs';
 import { PROTOCOLLO } from '../../lib/protocollo.mjs';
 import { rigaRinnovo } from '../../lib/sconto.mjs';
 import QrCheckup from '../../components/QrCheckup';
+import SportelloAzienda from '../../components/sportello/SportelloAzienda';
+import { giornoIt } from '../../lib/date-it.mjs';
 
 
 
@@ -1467,6 +1469,9 @@ ${FIRMA}`,
             })}
           </div>
         </div>
+
+        {/* ── Sportello: la fetta di questa azienda (stessi dati della sezione «Sportello») ── */}
+        <SportelloAzienda clientId={client.id} oggi={giornoIt(new Date())} />
 
         {/* ── Sezione AI Reports ─────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5">

@@ -162,6 +162,19 @@ export default function ProDashboard({ proName, clients, leads, accordo = null, 
           </svg>
         </Link>
 
+        {/* Le giornate allo sportello (fase 1, 28/9) */}
+        <Link href="/pro/sportello"
+          className="flex items-center gap-3 bg-white border border-gray-200 rounded-2xl p-3 mb-5 hover:bg-gray-50 transition-colors">
+          <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white text-sm">🗓</div>
+          <div className="flex-1">
+            <div className="font-semibold text-gray-800 text-sm">Le mie giornate allo sportello</div>
+            <div className="text-xs text-gray-500">Giornate, posti prenotati, cose da guardare</div>
+          </div>
+          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+
         {/* Documenti e conformità */}
         <Link href="/pro/documents"
           className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-2xl p-3 mb-5 hover:bg-slate-100 transition-colors">

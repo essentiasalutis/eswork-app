@@ -14,7 +14,7 @@ test('prima del 45° giorno nessun avviso', () => {
 test('dal 45° giorno, se mancano trattamenti, avviso con i giorni che restano', () => {
   const a = avvisoDurataCiclo(ciclo(45, 2), { adesso });
   assert.equal(a.restano, 15);
-  assert.match(a.testo, /Ciclo aperto 45 giorni fa: 2 trattamenti su 4\. Va completato entro 60 giorni dalla presa in carico: restano 15 giorni\./);
+  assert.match(a.testo, /Ciclo aperto 45 giorni fa: 2 sedute su 4\. Va completato entro 60 giorni dalla presa in carico: restano 15 giorni\./);
 });
 
 test('oltre il 60° giorno l\'avviso dice di quanto è superato; non blocca niente', () => {

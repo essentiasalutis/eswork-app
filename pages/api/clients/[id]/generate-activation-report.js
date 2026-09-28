@@ -22,7 +22,7 @@ import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { calculatePricing, realL1L2FromAssessment } from '../../../../lib/calculator';
 import { getPricingSettingsV2, getNoteReport } from '../../../../lib/pricing/settings';
 import { ergonomiaDaColloquio } from '../../../../lib/pricing/v2';
-import { isFirmato } from '../../../../lib/checkup-server';
+import { isFirmato, chiudiCheckupDopoReport } from '../../../../lib/checkup-server';
 import { nomeLivello } from '../../../../lib/livelli';
 import { prezzoConTetto, applicaTettoAlCalcolo, STATI } from '../../../../lib/forbice.mjs';
 import { cosaComprendeMarkdown, inserisciCosaComprende, sostituisciProssimiPassi, VOCI_PROGRAMMA, quantitaPrimoAnno } from '../../../../lib/programma';
@@ -252,7 +252,8 @@ PRINCIPIO GUIDA: la stratificazione è la fotografia dello stato della popolazio
     const fallback = conNota(conPassi(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { sezioneComprende, isPacchetto, nomeProdotto, testoEvoluzione, firmato })));
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', ai_status: 'fallback_no_key', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
-    return res.json({ report: fallback, source: 'fallback', ai_status: 'fallback_no_key', pdf_url: pdfUrl, report_id: rec?.id });
+    const checkup_chiuso = rec ? await chiudiCheckupDopoReport(id).catch(() => null) : null;
+    return res.json({ report: fallback, source: 'fallback', ai_status: 'fallback_no_key', pdf_url: pdfUrl, report_id: rec?.id, checkup_chiuso });
   }
 
   try {
@@ -305,14 +306,17 @@ ${istruzioniPresentazione()}`;
     const report = conNota(conPassi(inserisciCosaComprende(testo, sezioneComprende)), true);
     const pdfUrl = await tryGeneratePdf(client, 'activation', report, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', ai_status: aiStatus, pdf_url: pdfUrl, quote_compliance: quoteCompliance, presentazione }).catch(() => null);
-    return res.json({ report, source: 'ai', ai_status: aiStatus, problemi, pdf_url: pdfUrl, report_id: rec?.id });
+    // Il Report chiude il check-up (Enrico, 28/9), solo se è stato davvero salvato.
+    const checkup_chiuso = rec ? await chiudiCheckupDopoReport(id).catch(() => null) : null;
+    return res.json({ report, source: 'ai', ai_status: aiStatus, problemi, pdf_url: pdfUrl, report_id: rec?.id, checkup_chiuso });
   } catch (e) {
     // Qui la chiamata è stata fatta: i dati SONO usciti, la risposta non è stata usata.
     // Si salva solo la classe, mai il messaggio d'errore (può contenere il payload).
     const fallback = conNota(conPassi(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { sezioneComprende, isPacchetto, nomeProdotto, testoEvoluzione, firmato })));
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', ai_status: 'fallback_errore', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
-    return res.json({ report: fallback, source: 'fallback', ai_status: 'fallback_errore', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
+    const checkup_chiuso = rec ? await chiudiCheckupDopoReport(id).catch(() => null) : null;
+    return res.json({ report: fallback, source: 'fallback', ai_status: 'fallback_errore', error: e.message, pdf_url: pdfUrl, report_id: rec?.id, checkup_chiuso });
   }
 });
 

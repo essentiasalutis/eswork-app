@@ -268,6 +268,13 @@ export default function ClientPage({ dipInForza = 0, client: initialClient, asse
   const [savingContracted, setSavingContracted] = useState(false);
 
 
+  // Il Report di Attivazione chiude il check-up (Enrico, 28/9): il server lo chiude, qui la
+  // scheda lo mostra subito, senza ricaricare.
+  function segnaCheckupChiuso(data) {
+    if (!data || !data.checkup_chiuso) return;
+    setAssessments(prev => prev.map(a => (a.id === data.checkup_chiuso.id ? { ...a, status: 'closed', chiuso_at: data.checkup_chiuso.chiuso_at } : a)));
+  }
+
   async function generateReport(type) {
     setGeneratingReport(type);
     try {
@@ -281,6 +288,7 @@ export default function ClientPage({ dipInForza = 0, client: initialClient, asse
         const title = type === 'activation' ? 'Report di Attivazione' : type === 't12' ? 'Report Annuale (12 mesi)' : `Report Intermedio ${type.toUpperCase()}`;
         setReportModal({ id: data.report_id, title, content: data.report, source: data.source, ai_status: data.ai_status, problemi: data.problemi || [], pdf_url: data.pdf_url, dateStr: dataIt(new Date()) });
         setGeneratedReports(prev => [{ id: data.report_id || Date.now(), report_type: type === 'activation' ? 'activation' : `checkpoint_${type}`, created_at: new Date().toISOString(), pdf_url: data.pdf_url, content_text: data.report, ai_status: data.ai_status }, ...prev]);
+        if (type === 'activation') segnaCheckupChiuso(data);
       }
     } catch {}
     setGeneratingReport(null);
@@ -653,6 +661,10 @@ ${FIRMA}`,
           baseline={getBaseline(reportAssessment)}
           onOpenCalculator={reportAssessment.type === 'initial' ? () => openRealQuote(reportAssessment) : null}
           aiInitialText={generatedReports.find(r => r.report_type === 'activation')?.content_text || null}
+          onReportGenerato={(d) => {
+            setGeneratedReports(prev => [{ id: d.report_id || Date.now(), report_type: 'activation', created_at: new Date().toISOString(), pdf_url: d.pdf_url, content_text: d.report, ai_status: d.ai_status }, ...prev]);
+            segnaCheckupChiuso(d);
+          }}
         />
       </div>
     );
@@ -1104,22 +1116,23 @@ ${FIRMA}`,
                               📊 Report
                             </button>
                           )}
-                          {/* Il flusso (Enrico, 28/9): chiudi il check-up → Report di Attivazione →
-                              da lì presentazione e proposta di intervento. Prima del Report la
-                              proposta si apre come bozza, solo per prezzo e prezzo applicato. */}
-                          {rCount > 0 && a.type === 'initial' && (
-                            <button onClick={() => openRealQuote(a)}
-                              className="text-xs font-semibold text-green-700 bg-green-50 border border-green-300 px-3 py-1.5 rounded-xl hover:bg-green-100"
-                              title={reportDopo(a) ? 'La proposta di intervento, con i numeri del Report di Attivazione' : 'Bozza: prezzo e prezzo applicato prima del Report di Attivazione'}>
-                              📄 Proposta di intervento{reportDopo(a) ? '' : ' (bozza)'}
-                            </button>
-                          )}
                           {rCount > 0 && a.type === 'initial' && sortedAssessments[0] && a.id === sortedAssessments[0].id && reportDopo(a) && (
                             <Link href={`/dashboard/presentazione/${client.id}`}
                               className="text-xs font-semibold text-white bg-gray-900 px-3 py-1.5 rounded-xl hover:bg-gray-700"
                               title="Presentazione a schermo del Report di Attivazione (secondo incontro)">
                               🖥 Presenta
                             </Link>
+                          )}
+                          {/* Il flusso (Enrico, 28/9): chiudi il check-up → Report di Attivazione →
+                              da lì presentazione e proposta di intervento, in quest'ordine da
+                              sinistra: Report, Presenta, Proposta. Prima del Report la proposta si
+                              apre come bozza, solo per prezzo e prezzo applicato. */}
+                          {rCount > 0 && a.type === 'initial' && (
+                            <button onClick={() => openRealQuote(a)}
+                              className="text-xs font-semibold text-green-700 bg-green-50 border border-green-300 px-3 py-1.5 rounded-xl hover:bg-green-100"
+                              title={reportDopo(a) ? 'La proposta di intervento, con i numeri del Report di Attivazione' : 'Bozza: prezzo e prezzo applicato prima del Report di Attivazione'}>
+                              📄 Proposta di intervento{reportDopo(a) ? '' : ' (bozza)'}
+                            </button>
                           )}
                           {a.status === 'active' && (
                             <button onClick={() => closeAssessment(a.id)}

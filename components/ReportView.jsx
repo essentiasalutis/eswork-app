@@ -32,7 +32,7 @@ function renderMd(text) {
 // Il pulsante genera il Report di Attivazione VERO (Enrico, 28/9: si chiamava «Genera
 // commento AI» e non si capiva): lo dice, chiede conferma e, se il controllo automatico
 // lo segna «da rivedere», mostra subito perché.
-function AiCommentSection({ clientId, initialText }) {
+function AiCommentSection({ clientId, initialText, onReportGenerato }) {
   const [text, setText] = useState(initialText || null);
   const [busy, setBusy] = useState(false);
   const [problemi, setProblemi] = useState(null);
@@ -48,6 +48,8 @@ function AiCommentSection({ clientId, initialText }) {
       const d = await res.json().catch(() => null);
       if (d?.report) {
         setText(d.report);
+        // La scheda aggiorna subito «Presenta» e il check-up chiuso (28/9).
+        if (onReportGenerato) onReportGenerato(d);
         if (d.ai_status === 'ai_da_rivedere') setProblemi(d.problemi && d.problemi.length ? d.problemi : []);
       } else alert(d?.error || 'Errore nella generazione del Report di Attivazione.');
     } catch { alert('Errore di rete.'); }
@@ -342,7 +344,7 @@ function ReportFooter() {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function ReportView({ assessment, client, baseline, onOpenCalculator, aiInitialText }) {
+export default function ReportView({ assessment, client, baseline, onOpenCalculator, aiInitialText, onReportGenerato }) {
   const responseList = assessment.responseList || [];
   const n = responseList.length;
 
@@ -700,7 +702,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
 
       {/* Commento discorsivo AI — integrato nel report dati (un solo report) */}
       {assessment.type === 'initial' && client?.id && (
-        <AiCommentSection clientId={client.id} initialText={aiInitialText} />
+        <AiCommentSection clientId={client.id} initialText={aiInitialText} onReportGenerato={onReportGenerato} />
       )}
 
       {/* Genera preventivo button */}

@@ -155,3 +155,20 @@ test('slide della proposta: l\'OT23 tra le leve, accanto alla deducibilità; nel
   assert.match(offer, /slide: leveEconomicheSlide\(t\.leve\.economiche\) \}/);
   assert.match(offer, /leve: \(condivisi && condivisi\.leve && condivisi\.leve\.slide\) \|\| leveEconomiche,/);
 });
+
+test('scheda: Report, Presenta, Proposta da sinistra; il Report di Attivazione chiude il check-up (28/9)', () => {
+  const scheda = src('pages/dashboard/[clientId].js');
+  const pos = ['📊 Report', '🖥 Presenta', '📄 Proposta di intervento{reportDopo(a)'].map(t => scheda.indexOf(t));
+  assert.ok(pos.every(p => p > 0), JSON.stringify(pos));
+  assert.deepEqual([...pos].sort((a, b) => a - b), pos);
+  const srv = src('lib/checkup-server.js');
+  assert.match(srv, /if \(!corrente \|\| corrente\.status !== 'active' \|\| corrente\.type !== 'initial'\) return null;/);
+  assert.match(srv, /scriviAssessmentTollerante\('update', \{ status: 'closed', chiuso_at \}, corrente\.id\)/);
+  const gen = src('pages/api/clients/[id]/generate-activation-report.js');
+  assert.equal((gen.match(/const checkup_chiuso = rec \? await chiudiCheckupDopoReport\(id\)\.catch\(\(\) => null\) : null;/g) || []).length, 3, 'AI, riserva senza chiave, riserva per errore');
+  // la scheda lo mostra subito, anche quando il Report si genera dalla sua pagina
+  assert.match(scheda, /onReportGenerato=\{\(d\) => \{/);
+  assert.match(src('components/ReportView.jsx'), /if \(onReportGenerato\) onReportGenerato\(d\);/);
+  // riaprire dopo il Report resta vietato: l'analisi è congelata
+  assert.match(src('pages/api/assessments/[id].js'), /l\\'analisi è congelata e il check-up non si riapre né si proroga/);
+});

@@ -63,12 +63,14 @@ export function Elenco({ k, titolo, voci }) {
   );
 }
 
-// Come si leggono i colori: la legenda del Report (lib/scoring.js).
+// Come si leggono i colori: la legenda del Report (lib/scoring.js), su una riga sola
+// (Enrico, 28/9). Il testo si adatta alla larghezza: 15 px su un portatile, più piccolo
+// solo sugli schermi stretti, così non va mai a capo.
 export function Legenda() {
   return (
-    <div className="flex flex-wrap gap-x-6 gap-y-1 text-base text-gray-500">
+    <div className="flex flex-nowrap gap-x-6 text-gray-500" style={{ fontSize: 'clamp(11px, 1.05vw, 15px)' }}>
       {LEGENDA_SEMAFORO.map(l => (
-        <span key={l.colore} className="flex items-center gap-2">
+        <span key={l.colore} className="flex items-center gap-2 whitespace-nowrap">
           <span className="inline-block w-3 h-3 rounded-full" style={{ background: TL_COLOR[l.colore] }} />{l.nome}: {l.testo}
         </span>
       ))}

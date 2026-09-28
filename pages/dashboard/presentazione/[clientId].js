@@ -47,9 +47,10 @@ function Cruscotto({ d }) {
   const L = livelliLeggibili(v.livelli, v.n);
   if (L.nessunaDistribuzione) return <p className="text-lg text-gray-500">{NOTA_NESSUNA_DISTRIBUZIONE}</p>;
   const colore = (c) => (c.unite ? 'gray' : c.key === 'l1' ? trafficLight('nmq', c.pct) : c.key === 'l2' ? 'yellow' : 'green');
+  // La legenda sta fuori dal riquadro dei livelli, a tutta larghezza: su una riga sola.
   return (
-    <div className="max-w-5xl">
-      <div className={`grid gap-4 ${L.celle.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+    <>
+      <div className={`max-w-5xl grid gap-4 ${L.celle.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
         {L.celle.map(c => {
           const t = colore(c);
           return (
@@ -63,7 +64,7 @@ function Cruscotto({ d }) {
         })}
       </div>
       <div className="mt-3"><Legenda /></div>
-    </div>
+    </>
   );
 }
 

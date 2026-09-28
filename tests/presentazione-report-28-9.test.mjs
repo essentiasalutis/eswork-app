@@ -120,3 +120,12 @@ test('i due tasti su entrambe: PDF / Stampa e Invia al referente (28/9)', () => 
 test('executive: non ripete adesione e prevalenza, che la slide mostra già come numeri (28/9)', () => {
   assert.match(istruzioniPresentazione(), /executive: la slide mostra già, come numeri, l'adesione al check-up e la prevalenza dei disturbi: non ripeterle\./);
 });
+
+test('legenda dei colori su una riga sola, nelle due slide (28/9)', () => {
+  const slide = src('components/presentazione/slide.jsx');
+  assert.match(slide, /<div className="flex flex-nowrap gap-x-6 text-gray-500" style=\{\{ fontSize: 'clamp\(11px, 1\.05vw, 15px\)' \}\}>/);
+  assert.match(slide, /className="flex items-center gap-2 whitespace-nowrap"/);
+  // nella pagina 2 fuori dal riquadro dei livelli (largo 1024 px), a tutta larghezza
+  assert.match(src('pages/dashboard/presentazione/[clientId].js'), /<div className=\{`max-w-5xl grid gap-4 /);
+  assert.ok(!/Welfare aziendale', testo/.test(src('lib/leve.js')), 'welfare tolto');
+});

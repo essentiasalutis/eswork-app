@@ -51,11 +51,11 @@ test('documento: cruscotto, programma, investimento con le leve, accettazione �
   assert.match(src('pages/dashboard/offer.js'), /leveEconomichePreventivo\(t\.leve\.economiche, \{ conVoceOT23: t\.nuovoProgramma \}\)/);
 });
 
-test('leve nel preventivo: senza il tempo (è nell\'investimento) e senza l\'OT23 quando c\'è la voce 12', () => {
+test('leve nel preventivo: senza il tempo (è nell\'investimento) e senza l\'OT23 quando c\'è la voce 12; niente welfare (28/9)', () => {
   const tutte = leveEconomiche({ giorniMsk: 40 });
-  assert.deepEqual(tutte.map(l => l.id), ['ot23', 'deducibilita', 'assenze', 'welfare', 'tempo']);
-  assert.deepEqual(leveEconomichePreventivo(tutte).map(l => l.id), ['deducibilita', 'assenze', 'welfare']);
-  assert.deepEqual(leveEconomichePreventivo(tutte, { conVoceOT23: false }).map(l => l.id), ['ot23', 'deducibilita', 'assenze', 'welfare']);
+  assert.deepEqual(tutte.map(l => l.id), ['ot23', 'deducibilita', 'assenze', 'tempo']);
+  assert.deepEqual(leveEconomichePreventivo(tutte).map(l => l.id), ['deducibilita', 'assenze']);
+  assert.deepEqual(leveEconomichePreventivo(tutte, { conVoceOT23: false }).map(l => l.id), ['ot23', 'deducibilita', 'assenze']);
 });
 
 test('mail della proposta: niente elenco del programma né «prossimi passi»; importo, validità, 15 giorni', async () => {

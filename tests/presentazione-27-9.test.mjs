@@ -64,8 +64,9 @@ test('slide: niente prezzo per dipendente, niente etichette ripetute, leve senza
   const pag = src('pages/dashboard/presentazione/[clientId].js');
   assert.ok(!/per dipendente/.test(pag));
   assert.ok(!/d\.voci\.map/.test(pag));
-  assert.match(pag, /function ProssimiPassi/);
-  assert.match(pag, /const unica = voci\.length === 1;/);
+  // prossimi passi e schede: i mattoni comuni delle slide (28/9)
+  assert.match(pag, /<Elenco k=\{`\$\{conSost \? 8 : 7\} · Dopo oggi`\} titolo="I prossimi passi"/);
+  assert.match(fs.readFileSync(new URL('../components/presentazione/slide.jsx', import.meta.url), 'utf8'), /const unica = voci\.length === 1;/);
   assert.ok(!/Da confermare con il vostro commercialista/.test(src('lib/leve.js').replace(/\/\/.*$/gm, '')));
 });
 

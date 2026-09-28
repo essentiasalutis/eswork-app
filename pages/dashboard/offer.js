@@ -9,95 +9,21 @@ import { fmt } from '../../lib/calculator';
 import { CONFIG } from '../../lib/config';
 import { nomeLivello, legendaLivelli, CARTE_LIVELLO, azioneLivello } from '../../lib/livelli';
 import { oggiRoma } from '../../lib/checkup';
-import { fraseValidita, scadenzaOffertaProposta } from '../../lib/offerta';
+import { scadenzaOffertaProposta } from '../../lib/offerta';
 import { avanzamento, normalizza } from '../../lib/pipeline';
-import { VOCI_PROGRAMMA, RIGA_CHIUSURA } from '../../lib/programma';
+import { VOCI_PROGRAMMA, RIGA_CHIUSURA, quantitaPrimoAnno } from '../../lib/programma';
 import { vistaRiservata, K_ANON, SUPPRESSED, ND_POCHI, livelliLeggibili, nomeCella, NOTA_LIVELLI_UNITI, NOTA_NESSUNA_DISTRIBUZIONE } from '../../lib/kanon';
-import { testoAccettazione, GIORNI_FIRMA_CONTRATTO } from '../../lib/presentazione-testi.mjs';
+import { testoAccettazione, prossimiPassi } from '../../lib/presentazione-testi.mjs';
+import { isFirmato } from '../../lib/pipeline';
+import EmailModal from '../../components/EmailModal';
+import { Lettore } from '../../components/presentazione/slide';
+import { slideProposta } from '../../components/presentazione/SlideProposta';
+import { mailProposta } from '../../lib/mail-referente.mjs';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
 import { dataIt } from '../../lib/date-it.mjs';
 import { DICITURA_IVA, DICITURA_IVA_BREVE } from '../../lib/iva.mjs';
 import { valutaSconto, rigaRinnovo, MOTIVO_MIN, pctIt, conArticolo } from '../../lib/sconto.mjs';
 import { ETICHETTA_POSIZIONE } from '../../lib/forbice.mjs';
-
-// ─── Firma standard ───────────────────────────────────────────────────────────
-
-const FIRMA = `Cordiali saluti,
-Dott. Enrico Maiolo — founder @ Essentia Salutis
-Tel: ${CONFIG.contact_phone}
-${CONFIG.contact_email}`;
-
-// ─── Modale email ─────────────────────────────────────────────────────────────
-
-function EmailModal({ modal, onClose, onInvia, scadenza, stage }) {
-  const [to, setTo] = useState(modal.to);
-  const [subject, setSubject] = useState(modal.subject);
-  const [body, setBody] = useState(modal.body);
-
-  const href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-lg p-5 space-y-3 shadow-2xl">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800">Invia al referente</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">A</label>
-          <input
-            value={to}
-            onChange={e => setTo(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Oggetto</label>
-          <input
-            value={subject}
-            onChange={e => setSubject(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Testo</label>
-          <textarea
-            value={body}
-            onChange={e => setBody(e.target.value)}
-            rows={10}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-          />
-        </div>
-        {/* mailto non allega file: il PDF lo allega Enrico. Qui, non più sopra il documento,
-            anche cosa succede in Pipeline quando apre la mail (28/9). */}
-        <p className="text-xs text-gray-500 leading-relaxed">
-          📎 La mail non allega il documento da sola: salvalo con «Stampa / Salva PDF» e allegalo.
-          {/* Stessa regola di registraOffertaInviata (lib/pipeline-server.js): solo in avanti. */}
-          {normalizza(stage) === 'offer_open'
-            ? ` Aprendo la mail la scadenza in Pipeline diventa ${scadenza ? dataIt(scadenza) : 'nessuna'}.`
-            : avanzamento(normalizza(stage), 'offer_open')
-              ? ` Aprendo la mail l'azienda passa in «Proposta aperta»${scadenza ? `, con scadenza ${dataIt(scadenza)}` : ''}.`
-              : ''}
-        </p>
-        <div className="flex gap-3">
-          <a
-            href={href}
-            onClick={() => { if (onInvia) onInvia(); }}
-            className="flex-1 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold text-center hover:bg-green-700"
-          >
-            Apri in Mail
-          </a>
-          <button
-            onClick={onClose}
-            className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-600 text-sm"
-          >
-            Chiudi
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -248,10 +174,11 @@ export default function OfferPage({ client, assessment, nmq, calc, forchetta, te
   // presentazione. I 15 giorni sono un'altra cosa: dall'accettazione al contratto.
   const [scadenza, setScadenza] = useState(() => scadenzaOffertaProposta(client, offertaGiorni));
   const [esitoInvio, setEsitoInvio] = useState(null); // { ok, testo }
-  // «Mostra al cliente» (Enrico, 28/9): a schermo intero resta solo il documento; forbice,
+  // «Mostra al cliente» (Enrico, 28/9): a schermo intero le slide della proposta; forbice,
   // costo, margine e argomentario spariscono. Si esce con Esc (o uscendo dallo schermo intero).
   const [cliente, setCliente] = useState(false);
   const [conArgomentario, setConArgomentario] = useState(false);
+  const [slide, setSlide] = useState(0);
   // Sul PC di Enrico il documento occupa tutta la larghezza (28/9): si ingrandisce in
   // proporzione, come un PDF «adatta alla larghezza»; in stampa resta A4.
   const docRef = useRef(null);
@@ -269,12 +196,15 @@ export default function OfferPage({ client, assessment, nmq, calc, forchetta, te
     const ro = new ResizeObserver(misura);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [errore]);
+  }, [errore, cliente]);
   const esciCliente = useCallback(() => {
     setCliente(false);
     try { if (document.fullscreenElement) document.exitFullscreen(); } catch (_) {}
   }, []);
+  // «Mostra al cliente» fa partire le slide della proposta (Enrico, 28/9): lo stesso
+  // contenuto del documento, in parure con la presentazione del Report.
   function mostraAlCliente() {
+    setSlide(0);
     setCliente(true);
     try { document.documentElement.requestFullscreen(); } catch (_) {}
   }
@@ -398,29 +328,35 @@ export default function OfferPage({ client, assessment, nmq, calc, forchetta, te
   const mgmtServices = (CONFIG.management_services && CONFIG.management_services[offerTier])
     || (CONFIG.management_services && CONFIG.management_services.core) || [];
 
-  // Mail dell'offerta (Enrico, 28/9): segue l'incontro in cui ha presentato i risultati.
-  // Niente elenco del programma (è nel documento allegato e l'ha appena presentato):
-  // importo, validità, come si accetta, i 15 giorni per il contratto.
+  // Mail al referente (lib/mail-referente.mjs, Enrico 28/9): importo, validità, come si
+  // accetta; niente elenco del programma, che è nel documento allegato.
   function openOfferEmail() {
-    const referente = client.contact_name ? `Gentile ${client.contact_name},` : `Gentile referente,`;
-    const prezzoY1 = calc ? fmt(calc.price_y1) : '–';
-    const body = `${referente}
-grazie per il tempo che ci ha dedicato alla presentazione dei risultati del check-up. Le invio in allegato la proposta di intervento per ${client.name}${/\.$/.test(client.name) ? '' : '.'}
-
-Investimento Anno 1: ${prezzoY1} (${DICITURA_IVA_BREVE})
-${scadenza ? `${fraseValidita(scadenza)}\n` : ''}
-Per procedere basta firmare l'accettazione in fondo al documento e rinviarcela; il contratto si firma poi entro ${GIORNI_FIRMA_CONTRATTO} giorni dall'accettazione.
-
-Resto a disposizione per qualsiasi domanda.
-
-${FIRMA}`;
-
-    setEmailModal({
-      to: client.contact_email || '',
-      subject: `Proposta di intervento ES Work — ${client.name}`,
-      body,
-    });
+    const m = mailProposta({ azienda: client.name, referente: client.contact_name, importo: calc ? fmt(calc.price_y1) : '–', iva: DICITURA_IVA_BREVE, scadenza });
+    setEmailModal({ to: client.contact_email || '', subject: m.oggetto, body: m.corpo });
   }
+
+  // Le slide della proposta: gli stessi dati del documento qui sotto.
+  const firmato = isFirmato(client.pipeline_stage);
+  const datiSlide = calc ? {
+    azienda: client.name, data: date, nuovoProgramma,
+    piano: (condivisi && condivisi.piano) || null,
+    quantita: condivisi && condivisi.piano ? null : quantitaPrimoAnno(calc),
+    prezzo: { y1: calc.price_y1, mese: calc.price_monthly_y1, y2: calc.price_y2 },
+    anno2: condivisi && condivisi.anno2,
+    forchetta: forchetta && forchetta.min != null && forchetta.max != null ? { min: forchetta.min, max: forchetta.max } : null,
+    inRange: forchetta && forchetta.min != null && forchetta.max != null ? (calc.price_y1 >= forchetta.min && calc.price_y1 <= forchetta.max) : null,
+    tempo: calc.hours_prevention != null ? { trattamento: calc.hours_treated, prevenzione: calc.hours_prevention, altri: calc.hours_untreated } : null,
+    leve: leveEconomiche,
+    passi: condivisi && !condivisi.pacchetto && !firmato ? prossimiPassi({ scadenzaOfferta: scadenza }).slice(0, 2) : null,
+  } : null;
+
+  // Riga sulla Pipeline nella finestra della mail: la stessa regola di
+  // registraOffertaInviata (lib/pipeline-server.js), solo in avanti.
+  const notaPipeline = normalizza(client.pipeline_stage) === 'offer_open'
+    ? ` Aprendo la mail la scadenza in Pipeline diventa ${scadenza ? dataIt(scadenza) : 'nessuna'}.`
+    : avanzamento(normalizza(client.pipeline_stage), 'offer_open')
+      ? ` Aprendo la mail l'azienda passa in «Proposta aperta»${scadenza ? `, con scadenza ${dataIt(scadenza)}` : ''}.`
+      : '';
 
   const STILE_SEM = {
     l1: { type: 'nmq', sub: nomeLivello('level1') },
@@ -432,6 +368,17 @@ ${FIRMA}`;
     : c.suppressed
       ? { ...STILE_SEM[c.key], label: nomeCella(c), value: 'N.d.', color: 'gray', sub: `poiché < ${K_ANON} persone` }
       : { ...STILE_SEM[c.key], label: nomeCella(c), score: c.pct, value: `${c.pct}%` }));
+
+  // «Mostra al cliente»: solo le slide della proposta, a schermo intero (Esc per uscire).
+  const schermateCliente = cliente && datiSlide ? slideProposta(datiSlide) : [];
+  if (schermateCliente.length) {
+    return (
+      <>
+        <Head><title>{`Proposta di intervento — ${client.name}`}</title></Head>
+        <Lettore schermate={schermateCliente} i={slide} setI={setSlide} onEsci={esciCliente} />
+      </>
+    );
+  }
 
   return (
     <>
@@ -496,7 +443,7 @@ ${FIRMA}`;
             onClick={() => window.print()} disabled={!pronta} title={motivoSpento}
             className="flex items-center gap-1 text-sm text-green-700 border border-green-300 bg-green-50 px-4 py-2 rounded-xl font-semibold disabled:opacity-40"
           >
-            🖨 Stampa / Salva PDF
+            🖨 PDF / Stampa
           </button>
           <button
             onClick={openOfferEmail} disabled={!pronta} title={motivoSpento}
@@ -507,7 +454,7 @@ ${FIRMA}`;
           <button
             onClick={mostraAlCliente} disabled={!pronta}
             className="flex items-center gap-1 text-sm text-white bg-gray-900 px-4 py-2 rounded-xl font-semibold disabled:opacity-40"
-            title={motivoSpento || 'Schermo intero con il solo documento: niente forbice, margine né argomentario. Esc per tornare.'}
+            title={motivoSpento || 'Le slide della proposta a schermo intero: niente forbice, margine né argomentario. Esc per tornare.'}
           >
             🖥 Mostra al cliente
           </button>
@@ -577,7 +524,7 @@ ${FIRMA}`;
       </div>
       )}
 
-      {emailModal && <EmailModal modal={emailModal} scadenza={scadenza} stage={client.pipeline_stage} onClose={() => setEmailModal(null)} onInvia={() => registraInvio()} />}
+      {emailModal && <EmailModal modal={emailModal} allegato="la proposta" nota={notaPipeline} onClose={() => setEmailModal(null)} onInvia={() => registraInvio()} />}
 
       {/* Conferma consapevole dello sforamento. Non è una spunta sola: senza una
           motivazione scritta l'offerta non parte — l'eccezione deve lasciare
@@ -607,10 +554,6 @@ ${FIRMA}`;
             {motivoSforamento.trim().length < 15 && <p className="text-xs text-gray-400">Scrivi la motivazione (almeno 15 caratteri) per poter procedere.</p>}
           </div>
         </div>
-      )}
-
-      {cliente && (
-        <button onClick={esciCliente} className="no-print fixed top-3 right-3 z-40 text-xs text-gray-400 hover:text-gray-700 bg-white/80 border border-gray-200 rounded-lg px-2 py-1" title="Torna alla vista di lavoro (Esc)">✕</button>
       )}
 
       {/* Documento a tutta larghezza (Enrico, 28/9); in stampa resta A4. */}

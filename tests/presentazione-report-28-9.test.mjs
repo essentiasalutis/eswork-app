@@ -71,3 +71,37 @@ test('presentazione: dal Report, 9 schermate, niente prezzo; «da rivedere» o s
   assert.equal(ambitoAzienda(1), 'Manifattura / Produzione');
   assert.equal(ambitoAzienda(2), 'Ufficio / IT / Servizi');
 });
+
+test('proposta di intervento a slide: dopo il «Grazie» con un clic, e da «Mostra al cliente» (28/9)', () => {
+  const sp = src('components/presentazione/SlideProposta.jsx');
+  const ordine = ["id: 'p-copertina'", "id: 'p-programma'", "id: 'p-comprende'", "id: 'p-investimento'", "id: 'p-leve'", "id: 'p-accettazione'"];
+  const pos = ordine.map(t => sp.indexOf(t));
+  assert.ok(pos.every(p => p > 0), JSON.stringify(pos));
+  assert.deepEqual([...pos].sort((a, b) => a - b), pos);
+  // la forbice si mostra solo con il prezzo dentro: fuori, il cliente vede il totale
+  assert.match(sp, /if \(f && p\.inRange === true\) \{/);
+  const pag = src('pages/dashboard/presentazione/[clientId].js');
+  assert.match(pag, /const schermate = \[\.\.\.slideReport, \.\.\.proposta\];/);
+  assert.match(pag, /<StampaSlide schermate=\{slideReport\} \/>/);
+  // la proposta segue solo se porta il prezzo del Report e il contratto non è firmato
+  const srv = src('lib/presentazione-server.js');
+  assert.match(srv, /: firmato \? 'firmato'\n\s+: prezzoReport != null && Math\.round\(prezzoReport\) !== Math\.round\(prezzo\.y1\) \? 'prezzo_diverso'/);
+  assert.match(srv, /leve: leveEconomichePreventivo\(t\.leve\.economiche, \{ conVoceOT23: nuovoProgramma \}\),/);
+  assert.ok(!/content_text/.test(srv));
+  const offer = src('pages/dashboard/offer.js');
+  assert.match(offer, /const schermateCliente = cliente && datiSlide \? slideProposta\(datiSlide\) : \[\];/);
+  assert.match(offer, /passi: condivisi && !condivisi\.pacchetto && !firmato \? prossimiPassi\(\{ scadenzaOfferta: scadenza \}\)\.slice\(0, 2\) : null,/);
+});
+
+test('i due tasti su entrambe: PDF / Stampa e Invia al referente (28/9)', () => {
+  const pag = src('pages/dashboard/presentazione/[clientId].js');
+  assert.match(pag, /🖨 PDF \/ Stampa/);
+  assert.match(pag, /✉ Invia al referente/);
+  assert.match(pag, /<EmailModal modal=\{mail\} allegato="la presentazione"/);
+  const offer = src('pages/dashboard/offer.js');
+  assert.match(offer, /🖨 PDF \/ Stampa/);
+  assert.match(offer, /✉ Invia al referente/);
+  const slide = src('components/presentazione/slide.jsx');
+  assert.match(slide, /@page \{ size: A4 landscape; margin: 0; \}/);
+  assert.match(slide, /\.stampa-slide \.foglio \{ width: 297mm; height: 210mm;/);
+});

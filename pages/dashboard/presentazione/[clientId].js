@@ -8,37 +8,19 @@ import { CARTE_LIVELLO as LIVELLI, azioneLivello } from '../../../lib/livelli';
 import { ilPct } from '../../../lib/articoli.mjs';
 import { dataIt } from '../../../lib/date-it.mjs';
 import { CONFIG } from '../../../lib/config';
+import { Titolo, Frasi, Schede, Elenco, Lettore, StampaSlide, STILE_STAMPA_SLIDE } from '../../../components/presentazione/slide';
+import { slideProposta } from '../../../components/presentazione/SlideProposta';
+import EmailModal from '../../../components/EmailModal';
+import { mailPresentazione } from '../../../lib/mail-referente.mjs';
 
 // Presentazione del Report di Attivazione (Enrico, 28/9). Nasce dal Report: ne riassume
 // le voci (Executive Summary, Mappa Clinica, Piano Operativo Proposto, Raccomandazioni)
 // con i riassunti scritti insieme al Report (v81), accanto ai numeri del check-up. Poi
 // «Perché riguarda l'azienda», i prossimi passi e il grazie; circa 5 minuti. Il prezzo
-// non c'è: si presenta dopo, con la proposta di intervento. Prima di iniziare, un
-// controllo che vede solo Enrico.
+// non c'è: dal «Grazie», con un clic, si passa alla proposta di intervento a slide
+// (components/presentazione/SlideProposta.jsx). Prima di iniziare, un controllo che vede
+// solo Enrico, con «PDF / Stampa» e «Invia al referente».
 const eur = (x) => `€${Math.round(Number(x) || 0).toLocaleString('it-IT', { useGrouping: 'always' })}`;
-
-function Titolo({ k, children }) {
-  return (
-    <div className="mb-8">
-      <div className="text-sm font-bold uppercase tracking-[0.2em] text-green-600">{k}</div>
-      <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 mt-2 leading-tight">{children}</h1>
-    </div>
-  );
-}
-
-// Le frasi del Report, una per riga.
-function Frasi({ frasi, grandi = true }) {
-  if (!frasi || !frasi.length) return null;
-  return (
-    <ul className="space-y-5 max-w-5xl">
-      {frasi.map(f => (
-        <li key={f} className={`${grandi ? 'text-2xl md:text-3xl' : 'text-xl md:text-2xl'} text-gray-800 flex gap-4 leading-snug`}>
-          <span className="text-green-600">●</span><span>{f}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 function Copertina({ d }) {
   return (
@@ -152,43 +134,7 @@ function Livelli({ d, frasi }) {
   );
 }
 
-function Leve({ k, titolo, voci }) {
-  // Una sola scheda (Standard e sostenibilità) occupa tutta la pagina (Enrico, 27/9).
-  const unica = voci.length === 1;
-  return (
-    <>
-      <Titolo k={k}>{titolo}</Titolo>
-      <div className={unica ? '' : 'grid md:grid-cols-2 gap-5'}>
-        {voci.map(l => (
-          <div key={l.titolo} className={`rounded-2xl border border-gray-200 bg-white ${unica ? 'p-10' : 'p-6'}`}>
-            <div className={`${unica ? 'text-4xl' : 'text-2xl'} font-bold text-gray-900`}>{l.titolo}</div>
-            <div className={`${unica ? 'text-3xl mt-5' : 'text-lg mt-2'} text-gray-700 leading-relaxed`}>{l.testo}</div>
-            {l.dato && <div className="text-lg font-semibold text-green-700 mt-2">{l.dato}</div>}
-            {l.nota && <div className={`${unica ? 'text-2xl mt-6' : 'text-base mt-2'} text-gray-500`}>{l.nota}</div>}
-          </div>
-        ))}
-      </div>
-    </>
-  );
-}
-
-function ProssimiPassi({ k, passi }) {
-  return (
-    <>
-      <Titolo k={k}>I prossimi passi</Titolo>
-      <ol className="space-y-5 max-w-5xl">
-        {passi.map((t, n) => (
-          <li key={t} className="flex gap-5 text-2xl md:text-3xl text-gray-800 leading-snug">
-            <span className="shrink-0 w-12 h-12 rounded-full bg-green-600 text-white font-extrabold flex items-center justify-center text-2xl">{n + 1}</span>
-            <span className="pt-1.5">{t}</span>
-          </li>
-        ))}
-      </ol>
-    </>
-  );
-}
-
-function Grazie() {
+function Grazie({ poi = false }) {
   return (
     <div className="h-full flex flex-col items-center justify-center text-center gap-6 py-10">
       <div className="text-7xl md:text-8xl font-extrabold text-gray-900">Grazie</div>
@@ -198,6 +144,7 @@ function Grazie() {
         {CONFIG.contact_email && <span>{CONFIG.contact_email}</span>}
         {CONFIG.contact_website && <span>{CONFIG.contact_website}</span>}
       </div>
+      {poi && <div className="no-print text-base text-gray-300 mt-6">→ Proposta di intervento</div>}
     </div>
   );
 }
@@ -211,9 +158,15 @@ export default function PresentazionePage({ d }) {
   const [validato, setValidato] = useState(!!(R && R.validato));
   const [validando, setValidando] = useState(false);
   const [erroreValida, setErroreValida] = useState('');
+  const [mail, setMail] = useState(null);
+  const esci = useCallback(() => {
+    setI(-1);
+    try { if (document.fullscreenElement) document.exitFullscreen(); } catch (_) {}
+  }, []);
   const r = (R && R.riassunti) || {};
   const conSost = conSostenibilita && d && d.leve && d.leve.sostenibilita;
-  const schermate = R ? [
+  const proposta = R ? slideProposta(d.proposta) : [];
+  const slideReport = R ? [
     { id: 'copertina', el: <Copertina d={d} /> },
     { id: 'sintesi', el: <InSintesi d={d} frasi={r.executive} /> },
     { id: 'zone', el: <Zone d={d} /> },
@@ -222,24 +175,21 @@ export default function PresentazionePage({ d }) {
     { id: 'raccomandazioni', el: <><Titolo k="5 · Raccomandazioni">Le raccomandazioni</Titolo><Frasi frasi={r.raccomandazioni} /></> },
     // «Assolutamente teniamo Perché riguarda l'azienda» (Enrico, 28/9): l'unica slide che
     // non viene dal Report.
-    { id: 'impatto', el: <Leve k="6 · Perché riguarda l'azienda" titolo="Non è solo un problema del dipendente" voci={d.leve.impatto} /> },
-    ...(conSost ? [{ id: 'sostenibilita', el: <Leve k="7 · Standard e sostenibilità" titolo="Dati utilizzabili per la rendicontazione" voci={[d.leve.sostenibilita]} /> }] : []),
-    ...(d.prossimiPassi ? [{ id: 'prossimi', el: <ProssimiPassi k={`${conSost ? 8 : 7} · Dopo oggi`} passi={d.prossimiPassi} /> }] : []),
-    { id: 'grazie', el: <Grazie /> },
+    { id: 'impatto', el: <Schede k="6 · Perché riguarda l'azienda" titolo="Non è solo un problema del dipendente" voci={d.leve.impatto} /> },
+    ...(conSost ? [{ id: 'sostenibilita', el: <Schede k="7 · Standard e sostenibilità" titolo="Dati utilizzabili per la rendicontazione" voci={[d.leve.sostenibilita]} /> }] : []),
+    ...(d.prossimiPassi ? [{ id: 'prossimi', el: <Elenco k={`${conSost ? 8 : 7} · Dopo oggi`} titolo="I prossimi passi" voci={d.prossimiPassi} /> }] : []),
+    { id: 'grazie', el: <Grazie poi={proposta.length > 0} /> },
   ] : [];
-  const tot = schermate.length;
-  const vai = useCallback((n) => setI(x => Math.max(-1, Math.min(tot - 1, n(x)))), [tot]);
-  useEffect(() => {
-    const onKey = (e) => {
-      if (i < 0) return;
-      if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); vai(x => x + 1); }
-      else if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); vai(x => x - 1); }
-      else if (e.key === 'Escape') setI(-1);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [i, vai]);
+  // Dal «Grazie», con un clic, la proposta di intervento (Enrico, 28/9).
+  const schermate = [...slideReport, ...proposta];
   const schermoIntero = () => { try { document.documentElement.requestFullscreen(); } catch (_) {} };
+  useEffect(() => {
+    if (i < 0) return undefined;
+    // Chrome usa Esc per uscire dallo schermo intero senza passarlo alla pagina.
+    const schermo = () => { if (!document.fullscreenElement) setI(-1); };
+    document.addEventListener('fullscreenchange', schermo);
+    return () => document.removeEventListener('fullscreenchange', schermo);
+  }, [i]);
 
   if (!d || d.errore) {
     return (
@@ -267,94 +217,99 @@ export default function PresentazionePage({ d }) {
     else setErroreValida(j.error || 'Validazione non registrata: riprova.');
   }
 
-  // ── Controllo prima di presentare (solo per Enrico) ──
-  if (i < 0) {
-    const righe = [];
-    const quando = dataIt(R.il, { day: 'numeric', month: 'long', year: 'numeric' });
-    if (validato) righe.push(['ok', `Report di Attivazione del ${quando}, validato.`]);
-    else if (R.stato === 'ai') righe.push(['ok', `Report di Attivazione del ${quando}: ha passato il controllo automatico.`]);
-    else if (R.stato === 'ai_da_rivedere') righe.push(['warn', `Report di Attivazione del ${quando}: «da rivedere», il controllo automatico ha trovato frasi da correggere.`]);
-    else righe.push(['warn', `Report di Attivazione del ${quando}: è il testo di riserva (l'AI non ha risposto).`]);
-    if (d.inRange === true) righe.push(['ok', `Prezzo dentro la forbice presentata al colloquio (${eur(d.forchetta.min)} – ${eur(d.forchetta.max)}).`]);
-    else if (d.posizione === 'sotto_per_sconto') righe.push(['info', `Sotto la forbice per il prezzo applicato che hai registrato: ${eur(d.prezzo.y1)} contro ${eur(d.forchetta.min)} – ${eur(d.forchetta.max)}. Il cliente vede solo il totale.`]);
-    else if (d.inRange === false) righe.push(['warn', `Fuori forbice: ${eur(d.prezzo.y1)} contro ${eur(d.forchetta.min)} – ${eur(d.forchetta.max)}. Prepara la motivazione: la proposta di intervento lo mostra.`]);
-    else righe.push(['info', 'Nessuna Stima registrata: prezzo pieno, senza forbice e senza tetto.']);
-    righe.push(d.vista.pubblicabile ? ['ok', `${d.checkup.risposte} risposte al check-up.`] : ['warn', `Meno di ${K_ANON} risposte: zone e livelli non mostrano dati.`]);
-    if (d.scontoStato === 'sospeso') righe.push(['warn', 'Il prezzo applicato registrato è sospeso: i dati sono cambiati. Riconfermalo dalla proposta di intervento, altrimenti vale il prezzo pieno.']);
-    if (d.checkup.stato === 'aperto') righe.push(['warn', `Il check-up è ancora aperto${d.checkup.chiude_il ? ` (chiude il ${etichettaData(d.checkup.chiude_il)})` : ''}: i numeri possono ancora cambiare.`]);
+  function apriMail() {
+    const m = mailPresentazione({ azienda: d.azienda, referente: d.referente && d.referente.nome });
+    setMail({ to: (d.referente && d.referente.email) || '', subject: m.oggetto, body: m.corpo });
+  }
 
-    const icona = { ok: '✓', warn: '⚠', info: 'ℹ' };
-    const colore = { ok: 'text-green-700', warn: 'text-amber-700', info: 'text-gray-600' };
+  // ── Le schermate ──
+  if (i >= 0) {
     return (
       <>
         <Head><title>{`Presentazione — ${d.azienda}`}</title></Head>
-        <div className="min-h-screen bg-gray-50 p-6 md:p-12">
-          <div className="max-w-3xl mx-auto bg-white rounded-3xl border border-gray-200 p-8 space-y-6">
-            <div>
-              <div className="text-xs font-bold uppercase tracking-widest text-gray-400">Prima di presentare — solo per te</div>
-              <h1 className="text-2xl font-bold text-gray-900 mt-1">Report di Attivazione — {d.azienda}</h1>
-            </div>
-            <ul className="space-y-2">
-              {righe.map(([t, testo]) => <li key={testo} className={`text-sm ${colore[t]}`}>{icona[t]} {testo}</li>)}
-            </ul>
-            {bloccata && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 space-y-3 text-sm text-red-800">
-                {senzaRiassunti && <p><strong>Questo Report non ha i riassunti per le slide</strong> ({String(R.stato || '').startsWith('fallback') ? 'è il testo di riserva: l\'AI non ha risposto' : 'è stato generato prima che il Report li scrivesse, oppure non erano leggibili'}). La presentazione nasce dal Report: rigeneralo dalla scheda dell&apos;azienda.</p>}
-                {!senzaRiassunti && daRivedere && (
-                  <>
-                    <p><strong>Il Report è «da rivedere»</strong> e la presentazione porta i suoi testi: leggilo nella scheda dell&apos;azienda. Se va bene, validalo qui; altrimenti rigeneralo.</p>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <button onClick={valida} disabled={validando}
-                        title="Registra che l'hai letto e validato: chi e quando. La riga compare nel documento e il PDF si rigenera."
-                        className="text-sm font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-xl disabled:opacity-50">
-                        {validando ? '…' : '✅ Valido questo report'}
-                      </button>
-                      <Link href={`/dashboard/${d.clientId}`} className="text-red-700 underline">Leggilo nella scheda</Link>
-                    </div>
-                    {erroreValida && <p>{erroreValida}</p>}
-                  </>
-                )}
-              </div>
-            )}
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-              <div className="text-xs font-bold uppercase tracking-widest text-amber-800 mb-2">Note per te sulle leve</div>
-              <ul className="space-y-1.5">{d.noteEnrico.map(n => <li key={n} className="text-sm text-amber-900">• {n}</li>)}</ul>
-            </div>
-            <label className="flex items-start gap-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-2xl p-3 cursor-pointer">
-              <input type="checkbox" checked={conSostenibilita} onChange={e => setConSostenibilita(e.target.checked)} className="mt-0.5" />
-              <span>
-                Aggiungi la schermata <strong>«Standard e sostenibilità»</strong> (GRI 403, ESRS S1, ISO 45001, B Corp).
-                <span className="block text-xs text-gray-500">Serve a chi redige la rendicontazione di sostenibilità. A un titolare di micro-impresa non dice nulla: lascia spento.</span>
-              </span>
-            </label>
-            <div className="text-sm text-gray-500">{tot} schermate, circa 5 minuti: copertina, executive summary, zone, livelli, piano operativo, raccomandazioni, perché riguarda l&apos;azienda{conSost ? ', standard e sostenibilità' : ''}{d.prossimiPassi ? ', prossimi passi' : ''}, grazie. Frecce ← → per muoverti, Esc per tornare qui.</div>
-            <div className="flex gap-3 flex-wrap">
-              <button onClick={() => { schermoIntero(); setI(0); }} disabled={bloccata}
-                className="text-base font-semibold text-white bg-green-600 px-5 py-3 rounded-2xl hover:bg-green-700 disabled:opacity-40 disabled:hover:bg-green-600">▶ Inizia la presentazione</button>
-              <Link href={`/dashboard/${d.clientId}`} className="text-base text-gray-500 px-3 py-3">← Scheda azienda</Link>
-            </div>
-          </div>
-        </div>
+        <Lettore schermate={schermate} i={i} setI={setI} onEsci={esci} />
       </>
     );
   }
 
+  // ── Controllo prima di presentare (solo per Enrico) ──
+  const righe = [];
+  const quando = dataIt(R.il, { day: 'numeric', month: 'long', year: 'numeric' });
+  if (validato) righe.push(['ok', `Report di Attivazione del ${quando}, validato.`]);
+  else if (R.stato === 'ai') righe.push(['ok', `Report di Attivazione del ${quando}: ha passato il controllo automatico.`]);
+  else if (R.stato === 'ai_da_rivedere') righe.push(['warn', `Report di Attivazione del ${quando}: «da rivedere», il controllo automatico ha trovato frasi da correggere.`]);
+  else righe.push(['warn', `Report di Attivazione del ${quando}: è il testo di riserva (l'AI non ha risposto).`]);
+  if (d.inRange === true) righe.push(['ok', `Prezzo dentro la forbice presentata al colloquio (${eur(d.forchetta.min)} – ${eur(d.forchetta.max)}).`]);
+  else if (d.posizione === 'sotto_per_sconto') righe.push(['info', `Sotto la forbice per il prezzo applicato che hai registrato: ${eur(d.prezzo.y1)} contro ${eur(d.forchetta.min)} – ${eur(d.forchetta.max)}. Il cliente vede solo il totale.`]);
+  else if (d.inRange === false) righe.push(['warn', `Fuori forbice: ${eur(d.prezzo.y1)} contro ${eur(d.forchetta.min)} – ${eur(d.forchetta.max)}. Il cliente vede solo il totale: prepara la motivazione.`]);
+  else righe.push(['info', 'Nessuna Stima registrata: prezzo pieno, senza forbice e senza tetto.']);
+  righe.push(d.vista.pubblicabile ? ['ok', `${d.checkup.risposte} risposte al check-up.`] : ['warn', `Meno di ${K_ANON} risposte: zone e livelli non mostrano dati.`]);
+  if (d.scontoStato === 'sospeso') righe.push(['warn', 'Il prezzo applicato registrato è sospeso: i dati sono cambiati. Riconfermalo dalla proposta di intervento, altrimenti vale il prezzo pieno.']);
+  if (d.checkup.stato === 'aperto') righe.push(['warn', `Il check-up è ancora aperto${d.checkup.chiude_il ? ` (chiude il ${etichettaData(d.checkup.chiude_il)})` : ''}: i numeri possono ancora cambiare.`]);
+  if (proposta.length) righe.push(['ok', `Dopo il «Grazie», con → si passa alla proposta di intervento (${proposta.length} schermate).`]);
+  else if (d.motivoSenzaProposta === 'prezzo_diverso') righe.push(['warn', 'La proposta di intervento non si presenta: il prezzo di oggi non è quello scritto nel Report. Rigenera il Report dalla scheda.']);
+  else if (d.motivoSenzaProposta === 'firmato') righe.push(['info', 'Contratto già firmato: dopo il «Grazie» non segue la proposta di intervento.']);
+
+  const icona = { ok: '✓', warn: '⚠', info: 'ℹ' };
+  const colore = { ok: 'text-green-700', warn: 'text-amber-700', info: 'text-gray-600' };
   return (
     <>
       <Head><title>{`Presentazione — ${d.azienda}`}</title></Head>
-      <div className="min-h-screen bg-white flex flex-col">
-        <div className="flex-1 px-8 md:px-20 py-12 max-w-7xl w-full mx-auto">{schermate[i].el}</div>
-        <div className="flex items-center justify-between px-8 md:px-20 py-5 border-t border-gray-100">
-          <div className="text-sm text-gray-400"><span className="font-bold text-gray-700">ES <span className="text-green-600">Work</span></span> · Essentia Salutis</div>
-          <div className="flex items-center gap-2">
-            {schermate.map((s, n) => <button key={s.id} onClick={() => setI(n)} className={`w-2.5 h-2.5 rounded-full ${n === i ? 'bg-green-600' : 'bg-gray-200'}`} aria-label={`schermata ${n + 1}`} />)}
+      <style>{STILE_STAMPA_SLIDE}</style>
+      <div className="no-print min-h-screen bg-gray-50 p-6 md:p-12">
+        <div className="max-w-3xl mx-auto bg-white rounded-3xl border border-gray-200 p-8 space-y-6">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-widest text-gray-400">Prima di presentare — solo per te</div>
+            <h1 className="text-2xl font-bold text-gray-900 mt-1">Report di Attivazione — {d.azienda}</h1>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => vai(x => x - 1)} disabled={i === 0} className="px-4 py-2 rounded-xl border border-gray-200 text-gray-600 disabled:opacity-30">←</button>
-            <button onClick={() => vai(x => x + 1)} disabled={i === tot - 1} className="px-4 py-2 rounded-xl bg-gray-900 text-white disabled:opacity-30">→</button>
+          <ul className="space-y-2">
+            {righe.map(([t, testo]) => <li key={testo} className={`text-sm ${colore[t]}`}>{icona[t]} {testo}</li>)}
+          </ul>
+          {bloccata && (
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 space-y-3 text-sm text-red-800">
+              {senzaRiassunti && <p><strong>Questo Report non ha i riassunti per le slide</strong> ({String(R.stato || '').startsWith('fallback') ? 'è il testo di riserva: l\'AI non ha risposto' : 'è stato generato prima che il Report li scrivesse, oppure non erano leggibili'}). La presentazione nasce dal Report: rigeneralo dalla scheda dell&apos;azienda.</p>}
+              {!senzaRiassunti && daRivedere && (
+                <>
+                  <p><strong>Il Report è «da rivedere»</strong> e la presentazione porta i suoi testi: leggilo nella scheda dell&apos;azienda. Se va bene, validalo qui; altrimenti rigeneralo.</p>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <button onClick={valida} disabled={validando}
+                      title="Registra che l'hai letto e validato: chi e quando. La riga compare nel documento e il PDF si rigenera."
+                      className="text-sm font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-xl disabled:opacity-50">
+                      {validando ? '…' : '✅ Valido questo report'}
+                    </button>
+                    <Link href={`/dashboard/${d.clientId}`} className="text-red-700 underline">Leggilo nella scheda</Link>
+                  </div>
+                  {erroreValida && <p>{erroreValida}</p>}
+                </>
+              )}
+            </div>
+          )}
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+            <div className="text-xs font-bold uppercase tracking-widest text-amber-800 mb-2">Note per te sulle leve</div>
+            <ul className="space-y-1.5">{d.noteEnrico.map(n => <li key={n} className="text-sm text-amber-900">• {n}</li>)}</ul>
+          </div>
+          <label className="flex items-start gap-2 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-2xl p-3 cursor-pointer">
+            <input type="checkbox" checked={conSostenibilita} onChange={e => setConSostenibilita(e.target.checked)} className="mt-0.5" />
+            <span>
+              Aggiungi la schermata <strong>«Standard e sostenibilità»</strong> (GRI 403, ESRS S1, ISO 45001, B Corp).
+              <span className="block text-xs text-gray-500">Serve a chi redige la rendicontazione di sostenibilità. A un titolare di micro-impresa non dice nulla: lascia spento.</span>
+            </span>
+          </label>
+          <div className="text-sm text-gray-500">{slideReport.length} schermate, circa 5 minuti: copertina, executive summary, zone, livelli, piano operativo, raccomandazioni, perché riguarda l&apos;azienda{conSost ? ', standard e sostenibilità' : ''}{d.prossimiPassi ? ', prossimi passi' : ''}, grazie{proposta.length ? '; poi la proposta di intervento' : ''}. Frecce ← → per muoverti, Esc per tornare qui.</div>
+          <div className="flex gap-3 flex-wrap items-center">
+            <button onClick={() => { schermoIntero(); setI(0); }} disabled={bloccata}
+              className="text-base font-semibold text-white bg-green-600 px-5 py-3 rounded-2xl hover:bg-green-700 disabled:opacity-40 disabled:hover:bg-green-600">▶ Inizia la presentazione</button>
+            {/* I due tasti (Enrico, 28/9): il PDF delle slide del Report e la mail al referente. */}
+            <button onClick={() => window.print()} disabled={bloccata}
+              className="text-sm font-semibold text-green-700 border border-green-300 bg-green-50 px-4 py-3 rounded-2xl disabled:opacity-40">🖨 PDF / Stampa</button>
+            <button onClick={apriMail} disabled={bloccata}
+              className="text-sm font-semibold text-blue-700 border border-blue-300 bg-blue-50 px-4 py-3 rounded-2xl disabled:opacity-40">✉ Invia al referente</button>
+            <Link href={`/dashboard/${d.clientId}`} className="text-base text-gray-500 px-3 py-3">← Scheda azienda</Link>
           </div>
         </div>
       </div>
+      {!bloccata && <StampaSlide schermate={slideReport} />}
+      {mail && <EmailModal modal={mail} allegato="la presentazione" onClose={() => setMail(null)} />}
     </>
   );
 }

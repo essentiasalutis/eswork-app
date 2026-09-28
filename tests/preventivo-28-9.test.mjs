@@ -58,18 +58,22 @@ test('leve nel preventivo: senza il tempo (è nell\'investimento) e senza l\'OT2
   assert.deepEqual(leveEconomichePreventivo(tutte, { conVoceOT23: false }).map(l => l.id), ['ot23', 'deducibilita', 'assenze', 'welfare']);
 });
 
-test('mail dell\'offerta: niente elenco del programma né «prossimi passi»; importo, validità, 15 giorni', () => {
+test('mail della proposta: niente elenco del programma né «prossimi passi»; importo, validità, 15 giorni', async () => {
+  const { mailProposta, mailPresentazione } = await import('../lib/mail-referente.mjs');
+  const m = mailProposta({ azienda: 'Officine Demo S.p.A.', referente: 'Laura Ferri', importo: '€54.308', iva: 'IVA non applicata — regime forfettario', scadenza: '2026-10-08' });
+  assert.equal(m.oggetto, 'Proposta di intervento ES Work — Officine Demo S.p.A.');
+  assert.ok(!/prossimi passi|in sintesi|offert/i.test(m.corpo), m.corpo);
+  assert.match(m.corpo, /^Gentile Laura Ferri,\ngrazie per il tempo che ci ha dedicato alla presentazione dei risultati del check-up\. Le invio in allegato la proposta di intervento per Officine Demo S\.p\.A\.\n/);
+  assert.match(m.corpo, /Investimento Anno 1: €54\.308 \(IVA non applicata — regime forfettario\)\nLa proposta è valida fino all'8 ottobre 2026\./);
+  assert.match(m.corpo, /il contratto si firma poi entro 15 giorni dall'accettazione\./);
+  const pres = mailPresentazione({ azienda: 'Weisoft', referente: null });
+  assert.match(pres.corpo, /^Gentile referente,\ngrazie per il tempo che ci ha dedicato\. Le invio in allegato la presentazione dei risultati del check-up di Weisoft\./);
+  assert.ok(!/€/.test(pres.corpo), 'nella mail della presentazione niente prezzo');
   const offer = src('pages/dashboard/offer.js');
-  const mail = offer.slice(offer.indexOf('function openOfferEmail()'), offer.indexOf('const STILE_SEM'));
-  assert.ok(!/prossimi passi|in sintesi|condivisi\.piano/.test(mail), mail);
-  assert.match(mail, /grazie per il tempo che ci ha dedicato alla presentazione dei risultati del check-up/);
-  assert.match(mail, /entro \$\{GIORNI_FIRMA_CONTRATTO\} giorni dall'accettazione/);
-  assert.match(mail, /subject: `Proposta di intervento ES Work — \$\{client\.name\}`/);
-  assert.match(offer, /La mail non allega il documento da sola/);
-  // «S.p.A.» non diventa «S.p.A..» (prova su Officine, 28/9)
-  assert.match(mail, /\$\{client\.name\}\$\{\/\\\.\$\/\.test\(client\.name\) \? '' : '\.'\}/);
+  assert.match(offer, /mailProposta\(\{ azienda: client\.name, referente: client\.contact_name,/);
+  assert.match(src('components/EmailModal.jsx'), /La mail non allega il documento da sola/);
   // la nota sulla Pipeline dice il vero: solo in avanti, come registraOffertaInviata
-  assert.match(offer, /avanzamento\(normalizza\(stage\), 'offer_open'\)/);
+  assert.match(offer, /avanzamento\(normalizza\(client\.pipeline_stage\), 'offer_open'\)/);
 });
 
 test('«Cosa comprende» allineato ai passi della presentazione; argomentario senza cose non vere', () => {

@@ -99,5 +99,7 @@ test('email con importi: dicitura breve accanto all\'importo, dallo stesso punto
   const giro = d => { for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); f.isDirectory() ? giro(p) : /\.(m?js|jsx)$/.test(f.name) && file.push(p); } };
   giro('lib'); giro('pages'); giro('components');
   assert.deepEqual(file.filter(f => fs.readFileSync(f, 'utf8').includes('IVA non applicata')), [path.join('lib', 'iva.mjs')]);
-  assert.match(fs.readFileSync('pages/dashboard/offer.js', 'utf8'), /Investimento Anno 1: \$\{prezzoY1\} \(\$\{DICITURA_IVA_BREVE\}\)/);
+  // la mail della proposta (lib/mail-referente.mjs, 28/9) riceve la dicitura breve dalla pagina
+  assert.match(fs.readFileSync('lib/mail-referente.mjs', 'utf8'), /Investimento Anno 1: \$\{importo\} \(\$\{iva\}\)/);
+  assert.match(fs.readFileSync('pages/dashboard/offer.js', 'utf8'), /iva: DICITURA_IVA_BREVE, scadenza \}\)/);
 });

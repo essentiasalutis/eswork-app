@@ -1049,9 +1049,14 @@ ${FIRMA}`,
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 {/* Momento e tono si scelgono QUI, al momento dell'invio. */}
                 <div className="flex items-center gap-1 text-[11px] text-gray-500">
-                  <span className="font-semibold uppercase tracking-wide">Testo:</span>
-                  {[['valutazione', 'in valutazione'], ['avvio', 'programma attivato']].map(([v, l]) => (
-                    <button key={v} onClick={() => setMomentoKit(v === momentoDedotto ? null : v)}
+                  {/* Spiegazioni al passaggio del mouse (Enrico, 28/9: «non ricordo cosa fanno»). */}
+                  <span className="font-semibold uppercase tracking-wide cursor-help"
+                    title="Quale messaggio per i dipendenti prepara «Invia link al referente HR». Si sceglie da solo in base al contratto (non firmato → in valutazione, firmato → programma attivato); puoi forzarlo qui.">Testo:</span>
+                  {[
+                    ['valutazione', 'in valutazione', 'Prima della firma. Il messaggio ai dipendenti dice che l\'azienda STA VALUTANDO un programma sui disturbi muscolo-scheletrici e che il check-up è conoscitivo; chi non compila non rientra nei percorsi individuali che l\'azienda deciderà eventualmente di attivare.'],
+                    ['avvio', 'programma attivato', 'Dopo la firma. Il messaggio ai dipendenti dice che l\'azienda HA ATTIVATO il programma, che il programma si costruisce sui risultati del check-up, e anticipa che prima delle domande verrà chiesto il consenso al trattamento dei dati sulla salute.'],
+                  ].map(([v, l, spiega]) => (
+                    <button key={v} title={spiega} onClick={() => setMomentoKit(v === momentoDedotto ? null : v)}
                       className={`px-2 py-1 rounded-lg font-semibold ${momentoEffettivo === v ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{l}</button>
                   ))}
                 </div>

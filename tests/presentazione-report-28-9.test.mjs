@@ -172,3 +172,9 @@ test('scheda: Report, Presenta, Proposta da sinistra; il Report di Attivazione c
   // dopo il Report si riapre solo in modo esplicito (v82): vedi la prova della riapertura
   assert.match(src('pages/api/assessments/[id].js'), /l\\'analisi è congelata\. Per far rispondere altri dipendenti usa «Riapri»/);
 });
+
+test('Report di Attivazione: chi non ha compilato è un dato, non un calcolo dell\'AI (Meccanica Demo, 28/9)', () => {
+  // Il controllo aveva segnato «72 dipendenti» (300 − 228), giusto ma calcolato: la cura
+  // è passarlo già calcolato nei dati, non allentare il controllo.
+  assert.match(src('pages/api/clients/[id]/generate-activation-report.js'), /; non hanno compilato: \$\{client\.employees - stratTotal\}/);
+});

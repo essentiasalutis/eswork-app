@@ -193,7 +193,7 @@ ${DEFINIZIONE_LIVELLI}
 
 NOTA PRIVACY: quando due livelli sono indicati INSIEME è per riservatezza (k-anonymity): da soli, uno dei due gruppi conterebbe meno di ${K_ANON} persone. Riporta il dato così com'è, INSIEME. VIETATO attribuire quel numero a uno solo dei due livelli, stimare come si divide, dedurre che uno dei due livelli esista o manchi, o trarne conclusioni cliniche su uno dei due. Di' solo che quei livelli non si mostrano separati a tutela della riservatezza. I dati dei dipendenti si dicono RISERVATI, mai «anonimi»: il dato individuale esiste ed è protetto.
 ${clinicoBlock}
-CHECK-UP: ${stratTotal > 0 ? `${stratTotal} questionari raccolti${client.employees ? ` su ${client.employees} dipendenti (adesione ${Math.round(stratTotal / client.employees * 100)}%)` : ''}` : 'nessun questionario ancora raccolto'}
+CHECK-UP: ${stratTotal > 0 ? `${stratTotal} questionari raccolti${client.employees ? ` su ${client.employees} dipendenti (adesione ${Math.round(stratTotal / client.employees * 100)}%${client.employees > stratTotal ? `; non hanno compilato: ${client.employees - stratTotal}` : ''})` : ''}` : 'nessun questionario ancora raccolto'}
 NUMERI (tassativo): usa SOLO i numeri presenti in questi dati. VIETATO calcolarne di nuovi (somme, differenze, percentuali, proiezioni sulla popolazione): se un numero non c'è, descrivi senza numero.
 ${isPacchetto ? '' : quoteBlock}${senzaPrezzo ? '\nPARTE ECONOMICA: in questo report NON c\'è (demo con la parte economica spenta). VIETATO citare investimento, prezzo, costi o una proposta economica, e VIETATO rimandare a sezioni economiche.' : ''}
 `.trim();

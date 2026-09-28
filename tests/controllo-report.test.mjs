@@ -108,3 +108,14 @@ test('lessico (Enrico, 27/9): nei report si dice «trattamento», mai «seduta»
   assert.ok(controllaTesto('Una seduta da 30 minuti.').some(p => /trattamento/.test(p)));
   assert.deepEqual(controllaTesto('Sono stati erogati 12 trattamenti di prevenzione.'), []);
 });
+
+test('«seduta» vietata solo come trattamento; scala di rischio anche all\'inverso; «coerente con» (28/9)', async () => {
+  const { controllaTesto } = await import('../lib/controllo-report.mjs');
+  const lessico = (t) => controllaTesto(t).filter(p => !p.startsWith('numero'));
+  assert.deepEqual(lessico('Il lavoro d\'ufficio comporta posture sedute prolungate.'), []);
+  assert.deepEqual(lessico('Postazioni sedute e lavoro seduto.'), []);
+  assert.equal(lessico('Ogni persona riceve 4 sedute di trattamento.').length, 1);
+  assert.equal(lessico('La prima seduta dura 30 minuti.').length, 1);
+  assert.match(lessico('Costituisce un contesto a medio rischio muscolo-scheletrico.').join(), /scala di rischio/);
+  assert.match(lessico('Il profilo è coerente con queste condizioni.').join(), /coerente con/);
+});

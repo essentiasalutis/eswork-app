@@ -293,9 +293,9 @@ export default function PatientExport({ patient, client, documents, sessions, as
 
         {/* ── SESSIONI ── */}
         <div className="page-break" />
-        <h2>5. Storico sedute e trend NRS</h2>
+        <h2>5. Storico dei trattamenti e trend NRS</h2>
         {closedSessions.length === 0 ? (
-          <p>Nessuna seduta registrata.</p>
+          <p>Nessun trattamento registrato.</p>
         ) : (
           <table>
             <thead><tr><th>#</th><th>Data</th><th>NRS pre</th><th>Note trattamento</th><th>Indicazioni prossima</th></tr></thead>
@@ -332,7 +332,7 @@ export default function PatientExport({ patient, client, documents, sessions, as
         {/* ── WATERMARK ── */}
         <div className="watermark">
           Documento generato da ES Work — Essentia Salutis · info@essentiasalutis.it · Via Salbertrand 9, Torino<br />
-          Conservazione {PROTOCOLLO.anni_conservazione} anni dall'ultima seduta ai sensi degli obblighi normativi sulle cartelle cliniche
+          Conservazione {PROTOCOLLO.anni_conservazione} anni dall'ultimo trattamento ai sensi degli obblighi normativi sulle cartelle cliniche
         </div>
       </div>
     </>

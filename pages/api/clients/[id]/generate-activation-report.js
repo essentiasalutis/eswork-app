@@ -173,9 +173,9 @@ export default requireAuth(async function handler(req, res) {
   // falsi prima della firma. Se l'azienda ha già firmato (binario A) si può dire "attivo".
   const firmato = isFirmato(client);
   const clinicoBlock = (isPacchetto || !firmato) ? '' : `
-SESSIONI EROGATE: ${sessions.length}
-NRS medio pre-sessione: ${avgNrsPre.toFixed(1)}/10
-NRS medio post-sessione: ${avgNrsPost.toFixed(1)}/10
+TRATTAMENTI EROGATI: ${sessions.length}
+NRS medio a inizio trattamento: ${avgNrsPre.toFixed(1)}/10
+NRS medio a fine trattamento: ${avgNrsPost.toFixed(1)}/10
 Riduzione media NRS: ${(avgNrsPre - avgNrsPost).toFixed(1)} punti
 `;
   // Verso il modello NON esce alcun identificativo dell'azienda (Enrico, 14/9):

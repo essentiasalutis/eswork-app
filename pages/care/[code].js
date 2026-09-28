@@ -147,7 +147,7 @@ export default function CarePage({ code, clientName, type, expiresAt, valid, dis
 
               <p style={{ color: '#475569', fontSize: 14, margin: '0 0 6px', lineHeight: 1.6 }}>
                 {type === 'F'
-                  ? <>Sei il familiare convivente di un dipendente{clientName ? <> di <strong>{clientName}</strong></> : ''} che partecipa al programma <strong>ES Work</strong>. Hai diritto alla <strong>tariffa agevolata (sconto {discountPct}%)</strong> per le tue sedute osteopatiche.</>
+                  ? <>Sei il familiare convivente di un dipendente{clientName ? <> di <strong>{clientName}</strong></> : ''} che partecipa al programma <strong>ES Work</strong>. Hai diritto alla <strong>tariffa agevolata (sconto {discountPct}%)</strong> per i tuoi trattamenti osteopatici.</>
                   : <>{clientName ? <>La tua azienda (<strong>{clientName}</strong>) ti ha </> : 'Hai '}fornito questo codice per accedere alle prestazioni osteopatiche a <strong>tariffa agevolata (sconto {discountPct}%)</strong> tramite il programma <strong>ES Work</strong>.</>
                 }
               </p>

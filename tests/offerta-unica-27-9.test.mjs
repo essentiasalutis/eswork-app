@@ -195,3 +195,17 @@ test('pagina Stima: la forbice registrata (la promessa) si vede e «Registra di 
   assert.match(pag, /il tetto promesso al cliente/);
   assert.match(pag, /\$\{forbiceReg\}/);
 });
+
+test('lessico: nei testi che leggono il cliente e il lavoratore «trattamenti», mai «sedute»; «sessioni» solo per la formazione (28/9)', () => {
+  const file = ['lib/avvio.js', 'pages/employee/[token].js', 'pages/q/c/[client_code].js', 'pages/care/[code].js',
+    'pages/dashboard/patients/[patientId]/export.js', 'pages/api/employee/[token]/export.js', 'lib/sintesi.js', 'lib/pdf.js',
+    'lib/leve.js', 'lib/anno2.mjs', 'components/ReportView.jsx', 'lib/email-templates.js', 'pages/hr/[token].js',
+    'pages/dashboard/offer.js', 'lib/programma.js', 'lib/livelli.js', 'lib/presentazione-testi.mjs'];
+  for (const f of file) {
+    const t = senzaCommenti(src(f)).replace(/'seduta'/g, '');
+    assert.ok(!/\bsedut[ae]\b/i.test(t), `${f}: «seduta/sedute» in un testo del cliente o del lavoratore`);
+    const sessioni = [...t.matchAll(/\bsession[ei]\b/gi)].map(m => t.slice(Math.max(0, m.index - 70), m.index + 40)).filter(x => !/formazion|formativ|collettiv|training/i.test(x));
+    assert.deepEqual(sessioni, [], `${f}: «sessioni» fuori dalla formazione`);
+  }
+  assert.match(src('lib/avvio.js'), /I trattamenti durano \$\{PROTOCOLLO\.durata_seduta_min\} minuti\./);
+});

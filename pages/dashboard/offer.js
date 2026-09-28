@@ -167,7 +167,7 @@ function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine,
 // 28/9: il preventivo è il documento che si firma, la presentazione quello che racconta —
 // niente «Perché riguarda l'azienda», «Come funziona» né «Prossimi passi», che sono già
 // nella presentazione; le leve economiche subito dopo l'investimento, a sostegno del prezzo.
-//   condivisi: { zone, piano, anno2, leve: { economiche }, nuovoProgramma, pacchetto }
+//   condivisi: { zone, piano, anno2, leve: { economiche, slide }, nuovoProgramma, pacchetto }
 export default function OfferPage({ client, assessment, nmq, calc, forchetta, tetto = null, query = null, date, offertaGiorni = 10, prezzo = null, errore = null, condivisi = null, reportAttivazione = null }) {
   const [emailModal, setEmailModal] = useState(null);
   // Validità dell'offerta (Listino, 10 giorni): la stessa data dei prossimi passi della
@@ -346,7 +346,8 @@ export default function OfferPage({ client, assessment, nmq, calc, forchetta, te
     forchetta: forchetta && forchetta.min != null && forchetta.max != null ? { min: forchetta.min, max: forchetta.max } : null,
     inRange: forchetta && forchetta.min != null && forchetta.max != null ? (calc.price_y1 >= forchetta.min && calc.price_y1 <= forchetta.max) : null,
     tempo: calc.hours_prevention != null ? { trattamento: calc.hours_treated, prevenzione: calc.hours_prevention, altri: calc.hours_untreated } : null,
-    leve: leveEconomiche,
+    // Nelle slide anche l'OT23, accanto alla deducibilità (Enrico, 28/9).
+    leve: (condivisi && condivisi.leve && condivisi.leve.slide) || leveEconomiche,
     passi: condivisi && !condivisi.pacchetto && !firmato ? prossimiPassi({ scadenzaOfferta: scadenza }).slice(0, 2) : null,
   } : null;
 
@@ -1015,7 +1016,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     };
     // Testi in comune con la presentazione: zone, programma, Anno 2, leve economiche
     // (Enrico, 27/9: «deve essere tutto unico tra presentazione e preventivo»).
-    const [{ getFirstMeeting }, { getOrgParams }, { testiCondivisi }, { leveEconomichePreventivo }] = await Promise.all([
+    const [{ getFirstMeeting }, { getOrgParams }, { testiCondivisi }, { leveEconomichePreventivo, leveEconomicheSlide }] = await Promise.all([
       import('../../lib/store'), import('../../lib/org'), import('../../lib/presentazione-server'), import('../../lib/leve'),
     ]);
     const fm = await getFirstMeeting(client.id).catch(() => null);
@@ -1027,7 +1028,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     const { ultimoReportAttivazione } = await import('../../lib/checkup-server');
     const rep = await ultimoReportAttivazione(client.id, assessment.created_at).catch(() => null);
     const reportAttivazione = rep ? { il: rep.created_at, prezzo: rep.quote_compliance && rep.quote_compliance.real_price != null ? rep.quote_compliance.real_price : null } : null;
-    const condivisi = { zone: t.zone, piano: t.piano, anno2: t.anno2, leve: { economiche: leveEconomichePreventivo(t.leve.economiche, { conVoceOT23: t.nuovoProgramma }) }, nuovoProgramma: t.nuovoProgramma, pacchetto: t.pacchetto };
+    const condivisi = { zone: t.zone, piano: t.piano, anno2: t.anno2, leve: { economiche: leveEconomichePreventivo(t.leve.economiche, { conVoceOT23: t.nuovoProgramma }), slide: leveEconomicheSlide(t.leve.economiche) }, nuovoProgramma: t.nuovoProgramma, pacchetto: t.pacchetto };
 
     return {
       props: {

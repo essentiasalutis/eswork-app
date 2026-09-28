@@ -97,7 +97,7 @@ test('proposta di intervento a slide: dopo i prossimi passi con un clic, e da «
   // la proposta segue solo se porta il prezzo del Report e il contratto non è firmato
   const srv = src('lib/presentazione-server.js');
   assert.match(srv, /: firmato \? 'firmato'\n\s+: prezzoReport != null && Math\.round\(prezzoReport\) !== Math\.round\(prezzo\.y1\) \? 'prezzo_diverso'/);
-  assert.match(srv, /leve: leveEconomichePreventivo\(t\.leve\.economiche, \{ conVoceOT23: nuovoProgramma \}\),/);
+  assert.match(srv, /leve: leveEconomicheSlide\(t\.leve\.economiche\),/);
   assert.ok(!/content_text/.test(srv));
   const offer = src('pages/dashboard/offer.js');
   assert.match(offer, /const schermateCliente = slideCliente\.length \? \[\.\.\.slideCliente, SLIDE_GRAZIE\] : \[\];/);
@@ -140,4 +140,18 @@ test('colore fisso del livello ovunque, anche nei cruscotti: Livello 1 sempre ro
     assert.ok(!/trafficLight\('nmq'|type="nmq"|type: 'nmq'/.test(src(f)), f);
   }
   assert.match(src('components/ReportView.jsx'), /<Semaphore key=\{c\.key\} colore=\{CARTE_LIVELLO\[c\.key\]\.semaforo\}/);
+});
+
+test('slide della proposta: l\'OT23 tra le leve, accanto alla deducibilità; nel documento resta la voce 12 (28/9)', async () => {
+  const { leveEconomiche, leveEconomicheSlide, leveEconomichePreventivo } = await import('../lib/leve.js');
+  const { TESTO_OT23_IN_VERIFICA } = await import('../lib/ot23-stato.mjs');
+  const tutte = leveEconomiche({});
+  assert.deepEqual(leveEconomicheSlide(tutte).map(l => l.id), ['ot23', 'deducibilita']);
+  assert.equal(leveEconomicheSlide(tutte)[0].testo, TESTO_OT23_IN_VERIFICA, 'il testo «in verifica», senza percentuali');
+  assert.ok(!/\d+\s?%/.test(leveEconomicheSlide(tutte)[0].testo));
+  // il documento A4 non la ripete: c'è già la voce 12 con lo stesso testo
+  assert.deepEqual(leveEconomichePreventivo(tutte, { conVoceOT23: true }).map(l => l.id), ['deducibilita']);
+  const offer = src('pages/dashboard/offer.js');
+  assert.match(offer, /slide: leveEconomicheSlide\(t\.leve\.economiche\) \}/);
+  assert.match(offer, /leve: \(condivisi && condivisi\.leve && condivisi\.leve\.slide\) \|\| leveEconomiche,/);
 });

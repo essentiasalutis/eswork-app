@@ -95,6 +95,9 @@ test('«in linea con la Stima di investimento» è un fatto, non un paragone inv
 
 test('«persone attese» del dimensionamento non è un paragone', () => {
   assert.deepEqual(controllaTesto('Il programma copre 51 persone attese.', { dati: '51 persone attese' }), []);
+  // Report di Officine, 28/9: la stessa proiezione detta con «numero atteso»
+  assert.deepEqual(controllaTesto('La presa in carico di 51 persone, numero atteso applicando la prevalenza del 17%.', { dati: '51 persone attese, 17%' }), []);
+  assert.ok(controllaTesto('in linea con il valore atteso di settore').length > 0);
   assert.ok(controllaTesto('risultato migliore dell\'atteso').length > 0);
 });
 

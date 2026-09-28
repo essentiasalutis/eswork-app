@@ -431,8 +431,8 @@ export default function ClientPage({ dipInForza = 0, client: initialClient, asse
   // Proroga (check-up aperto) o riapertura fino a una data (chiuso/scaduto).
   // Dopo il Report di Attivazione si riapre solo in modo esplicito: il Report decade e va
   // rigenerato (v82, Enrico 28/9).
-  async function prorogaCheckup(a, riapri, dopoReport = false) {
-    const data = dataProroga[a.id];
+  async function prorogaCheckup(a, riapri, dopoReport = false, dataScelta = null) {
+    const data = dataScelta || dataProroga[a.id];
     if (!data) { setCheckupErr('Scegli la nuova data di chiusura.'); return; }
     if (dopoReport && !confirm(`Riaprire il check-up fino al ${etichettaData(data)}?\n\nIl Report di Attivazione attuale non varrà più: presentazione e proposta di intervento tornano in bozza finché non lo rigeneri. Le risposte già raccolte restano; quando hanno risposto tutti, rigenera il Report.`)) return;
     setCheckupErr('');
@@ -1183,9 +1183,12 @@ ${FIRMA}`,
                               {puoRiaprire && (
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="text-xs text-gray-500">Per far rispondere chi manca: riapri fino al</span>
-                                  <input type="date" min={oggiRoma()} value={dataProroga[a.id] || ''} onChange={e => setDataProroga(prev => ({ ...prev, [a.id]: e.target.value }))}
+                                  {/* Data già proposta, oggi + 7 giorni, modificabile: prima il
+                                      pulsante restava spento finché non si sceglieva una data, e
+                                      non si capiva perché (Enrico, 28/9). */}
+                                  <input type="date" min={oggiRoma()} value={dataProroga[a.id] || aggiungiGiorni(oggiRoma(), 7)} onChange={e => setDataProroga(prev => ({ ...prev, [a.id]: e.target.value }))}
                                     className="text-xs border border-gray-300 rounded-lg px-2 py-1" />
-                                  <button onClick={() => prorogaCheckup(a, true, true)} disabled={!dataProroga[a.id]}
+                                  <button onClick={() => prorogaCheckup(a, true, true, dataProroga[a.id] || aggiungiGiorni(oggiRoma(), 7))}
                                     title="Il Report di Attivazione decade: presentazione e proposta tornano in bozza finché non lo rigeneri."
                                     className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-xl hover:bg-amber-100 disabled:opacity-50">
                                     🔓 Riapri

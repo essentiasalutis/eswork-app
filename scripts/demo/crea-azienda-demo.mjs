@@ -8,11 +8,18 @@
 // con il generatore vero IN PRODUZIONE (sessione admin nel browser: la chiave
 // Anthropic locale è vuota), poi se ne riporta la data al giorno giusto. Così ogni
 // report racconta solo ciò che era successo fino ad allora. Ordine obbligato:
-//   fase1  → Report di Attivazione → data activation 2025-09-16
+//   fase1  → Report di Attivazione → data activation 2025-09-16 → firma
 //   fase2  → Report T3             → data t3 2026-01-26
 //   fase3  → Report T6             → data t6 2026-04-13
 //   fase4  → Report Annuale        → data t12 2026-09-16
 //   esempi (link dell'area personale) · pulisci (cancella tutto; fase1 lo fa da sé)
+//
+// 28/9 (Enrico: «vedo bene tutto»): fase1 si ferma PRIMA della firma, così il Report di
+// Attivazione è quello di un programma PROPOSTO e, prima di `firma`, si vedono la
+// presentazione e la proposta di intervento a slide. Per un'azienda demo solo
+// commerciale (check-up raccolto e Report, mai firmata) basta fase1 con le date spostate
+// ad oggi: DEMO_SPOSTA_GIORNI=365 (e DEMO_CLIENT, DEMO_PREFISSO, DEMO_NOME, DEMO_CODICE,
+// DEMO_CODICE_T0, DEMO_DOMINIO, DEMO_REFERENTE, DEMO_STATO).
 //
 // I mini-check T3/T6 seguono la regola della piattaforma (lib/store.js,
 // getPatientsForMinicheckInvite): solo a chi ha un primo ciclo, a 90/180 giorni
@@ -44,6 +51,12 @@ const A = `${P}_checkup_t0`;
 const NOME = process.env.DEMO_NOME || 'Officine Demo S.p.A.';
 const CODICE = process.env.DEMO_CODICE || 'DMOOFF01';
 const AVVIO = '2025-09-22';
+// Solo fase1: sposta le date del commerciale (colloquio, Stima, check-up) di N giorni.
+const SPOSTA = Number(process.env.DEMO_SPOSTA_GIORNI || 0);
+const D = (giorno) => (SPOSTA ? new Date(Date.parse(`${giorno}T12:00:00Z`) + SPOSTA * 864e5).toISOString().slice(0, 10) : giorno);
+const DOMINIO = process.env.DEMO_DOMINIO || 'officinedemo.example';
+const REFERENTE = process.env.DEMO_REFERENTE || 'Laura Ferri';
+const REF_EMAIL = `${REFERENTE.split(' ')[0].charAt(0).toLowerCase()}.${REFERENTE.split(' ').slice(-1)[0].toLowerCase()}@${DOMINIO}`;
 
 // Sessione admin per le API locali (firmata come il server: chiave del ruolo admin,
 // lib/firma-sessione.js, con il segreto LOCALE: vale solo qui).
@@ -189,30 +202,31 @@ function nmqRivalutazione(livello, area) {
 
 // ═══ FASE 1 — colloquio, Stima, check-up, offerta, firma, Report di Attivazione ═══
 async function fase1() {
-  log('FASE 1 — fino alla firma (luglio–settembre 2025)');
+  log(`FASE 1 — fino al check-up raccolto (${D('2025-07-10')} – ${D('2025-09-07')}), prima della firma`);
   const { data: tc } = await db.from('testi_legali').select('id,versione,impronta').eq('codice', 'consenso_trattamento').eq('stato', 'in_vigore').single();
   const { data: ti } = await db.from('testi_legali').select('id,versione,impronta').eq('codice', 'informativa_estesa').eq('stato', 'in_vigore').single();
   S.testi = { consenso: tc, informativa: ti };
 
-  await ins('clients', { id: C, name: NOME, sector: 1, employees: 300, contact_name: 'Laura Ferri', contact_email: 'l.ferri@officinedemo.example', contact_phone: '011 000 0000', source: 'passaparola', pipeline_stage: 'meeting_scheduled', created_at: g('2025-07-10'), pricing_version: 'v2', tipo_prodotto: 'programma_completo', is_demo: true, capienza_gruppo: 25, assessment_share_code: CODICE, hr_ingressi_token: hex(24) });
-  await ins('first_meetings', { id: id('fm'), client_id: C, employees: 300, sector: 1, max_people_training: 25, num_locations: 2, absence_days: 2100, turnover: 12, remote_work: 'no', work_shifts: 'due turni', internal_contact: 'Laura Ferri (HR)', motivation: 'Ridurre le assenze legate al mal di schiena in produzione', created_at: g('2025-07-10', 10), updated_at: g('2025-07-10', 11),
-    data: { step1: { nome: NOME, ref_nome: 'Laura Ferri', ref_ruolo: 'Responsabile HR', ref_email: 'l.ferri@officinedemo.example', ref_tel: '011 000 0000', work_desc: 'Lavorazioni meccaniche, montaggio e magazzino su due turni; uffici tecnici e amministrativi.', sector: 'manufacturing', disturbi: ['Mal di schiena', 'Cervicale', 'Spalle', 'Dolori da movimentazione'], disturbi_altro: '', prev_fatta: 'no', prev_note: '', assenteismo: 'alto', absence_days: 2100, absence_days_msk: 700, premio_inail: 48000, note: 'Molte richieste dal reparto montaggio.' },
+  await ins('clients', { id: C, name: NOME, sector: 1, employees: 300, contact_name: REFERENTE, contact_email: REF_EMAIL, contact_phone: '011 000 0000', source: 'passaparola', pipeline_stage: 'meeting_scheduled', created_at: g(D('2025-07-10')), pricing_version: 'v2', tipo_prodotto: 'programma_completo', is_demo: true, capienza_gruppo: 25, assessment_share_code: CODICE, hr_ingressi_token: hex(24) });
+  await ins('first_meetings', { id: id('fm'), client_id: C, employees: 300, sector: 1, max_people_training: 25, num_locations: 2, absence_days: 2100, turnover: 12, remote_work: 'no', work_shifts: 'due turni', internal_contact: `${REFERENTE} (HR)`, motivation: 'Ridurre le assenze legate al mal di schiena in produzione', created_at: g(D('2025-07-10'), 10), updated_at: g(D('2025-07-10'), 11),
+    data: { step1: { nome: NOME, ref_nome: REFERENTE, ref_ruolo: 'Responsabile HR', ref_email: REF_EMAIL, ref_tel: '011 000 0000', work_desc: 'Lavorazioni meccaniche, montaggio e magazzino su due turni; uffici tecnici e amministrativi.', sector: 'manufacturing', disturbi: ['Mal di schiena', 'Cervicale', 'Spalle', 'Dolori da movimentazione'], disturbi_altro: '', prev_fatta: 'no', prev_note: '', assenteismo: 'alto', absence_days: 2100, absence_days_msk: 700, premio_inail: 48000, note: 'Molte richieste dal reparto montaggio.' },
       step2: { sedi: [{ nome: 'Stabilimento', employees: 200 }, { nome: 'Uffici', employees: 100 }], capienza: 25, training_mode: 'per_sede', fatturato: 'high', hr_maturity: 'medium', tier_override: null, tier: null, ergonomia_ufficio: 100, ergonomia_ufficio_auto: true, ergonomia_addetti: 40, ergonomia_postazioni: 6 },
       step3: { spazio: 'sala riunioni piano terra', spazio_note: '', fasce: ['Mattina', 'Prima/dopo turno'], mc: 'si', mc_nome: 'Dott. Medico Competente', mc_contatti: '', esg: 'si', refop_nome: 'Marco Villa', refop_ruolo: 'Capo reparto', refop_contatti: '' },
       params: { l2_mult: 2, vat_exempt: true, rates: { ...CONFIG.rates_new } } } });
   // Stima consegnata: il generatore vero scrive la forbice (snapshot) e porta la pipeline a «Stima inviata».
   // Tariffe esplicite (21/9): la Stima non ripiega più in silenzio su quelle standard.
-  await api('POST', '/api/stima', { clientId: C, name: NOME, contact_name: 'Laura Ferri', sector: 'manufacturing', employees: 300, groups: 12, vatExempt: true, l2Mult: 2, rates: { ...CONFIG.rates_new }, store: true, ergonomiaUfficio: 100, ergonomiaAddetti: 40, ergonomiaPostazioni: 6 });
+  // «Registra Stima» (28/9: solo registra=true scrive la promessa; store salva solo il PDF).
+  await api('POST', '/api/stima', { clientId: C, name: NOME, contact_name: REFERENTE, sector: 'manufacturing', employees: 300, groups: 12, vatExempt: true, l2Mult: 2, rates: { ...CONFIG.rates_new }, registra: true, ergonomiaUfficio: 100, ergonomiaAddetti: 40, ergonomiaPostazioni: 6 });
   const { data: fm } = await db.from('first_meetings').select('id, stima_snapshot').eq('client_id', C).single();
-  await upd('first_meetings', { stima_snapshot: { ...fm.stima_snapshot, at: g('2025-07-17', 10) } }, 'id', fm.id);
+  await upd('first_meetings', { stima_snapshot: { ...fm.stima_snapshot, at: g(D('2025-07-17'), 10), stima_presentata_il: D('2025-07-17') } }, 'id', fm.id);
   log(`   Stima: forbice ${fm.stima_snapshot.forchetta.min.price_y1} – ${fm.stima_snapshot.forchetta.max.price_y1} €`);
 
   // Anagrafica: 300 in forza prima dell'avvio.
   S.dip = generaDipendenti(300, r).map(d => ({ ...d, did: id('dip'), ingresso: `${tra(2006, 2024)}-${String(tra(1, 12)).padStart(2, '0')}-${String(tra(1, 28)).padStart(2, '0')}` }));
-  await ins('org_dipendente', S.dip.map(d => ({ id: d.did, client_id: C, nome: d.nome, matricola: d.matricola, data_ingresso: d.ingresso, attivo: true, straordinario: false, inserito_da: 'admin', area: d.area, created_at: g('2025-09-15') })));
+  await ins('org_dipendente', S.dip.map(d => ({ id: d.did, client_id: C, nome: d.nome, matricola: d.matricola, data_ingresso: d.ingresso, attivo: true, straordinario: false, inserito_da: 'admin', area: d.area, created_at: g(D('2025-09-15')) })));
 
   // Check-up: 25/8 – 7/9, 228 risposte (76%).
-  await ins('assessments', { id: A, client_id: C, type: 'initial', status: 'closed', share_code: process.env.DEMO_CODICE_T0 || 'DMOT0Q01', created_at: g('2025-08-25', 6), chiude_il: '2025-09-07', chiuso_at: g('2025-09-07', 21, 59) });
+  await ins('assessments', { id: A, client_id: C, type: 'initial', status: 'closed', share_code: process.env.DEMO_CODICE_T0 || 'DMOT0Q01', created_at: g(D('2025-08-25'), 6), chiude_il: D('2025-09-07'), chiuso_at: g(D('2025-09-07'), 21, 59) });
   const rispondenti = [...S.dip].sort(() => r() - 0.5).slice(0, 228);
   const livelli = [...Array(39).fill('level1'), ...Array(78).fill('level2'), ...Array(111).fill('level3')].sort(() => r() - 0.5);
   const resp = [], paz = [], cons = [], attesa = [];
@@ -220,7 +234,7 @@ async function fase1() {
     const livello = livelli[k];
     const a = risposte(livello, r, d.area);
     if (computeLevel(a) !== livello) throw new Error('livello incoerente');
-    const giorno = piuGiorni('2025-08-25', tra(0, 13));
+    const giorno = piuGiorni(D('2025-08-25'), tra(0, 13));
     const quando = g(giorno, tra(6, 17), tra(0, 59));
     const contatto = r() < (livello === 'level1' ? 0.85 : livello === 'level2' ? 0.7 : 0.55);
     const pid = id('pat');
@@ -228,13 +242,20 @@ async function fase1() {
     const p = { ...d, pid, livello, contatto, quando, zona: zi >= 0 ? BODY_ZONES[zi] : null, nrs0: tra(5, 8), token: hex(24) };
     S.persone.push(p);
     resp.push({ id: id('resp'), assessment_id: A, answers: a, submitted_at: quando });
-    paz.push({ id: pid, client_id: C, first_name: contatto ? d.first : 'Nome non indicato', last_name: contatto ? d.last : '', email: contatto ? `${d.first}.${d.last}`.toLowerCase().replace(/[^a-z.]/g, '') + '@officinedemo.example' : null, phone: contatto ? `333 ${tra(100, 999)} ${tra(1000, 9999)}` : null, location: d.area === 'reparto' ? 'Stabilimento' : 'Uffici', age: d.eta, gender: d.sesso, level: livello, computed_level: livello, level_status: livello === 'level1' ? 'pending' : 'active', prevention_eligible: livello === 'level2', care_token: p.token, self_declared: true, wants_to_be_contacted: contatto, assessment_completed_at: quando, current_cycle: 0, created_at: quando, updated_at: quando });
+    paz.push({ id: pid, client_id: C, first_name: contatto ? d.first : 'Nome non indicato', last_name: contatto ? d.last : '', email: contatto ? `${d.first}.${d.last}`.toLowerCase().replace(/[^a-z.]/g, '') + `@${DOMINIO}` : null, phone: contatto ? `333 ${tra(100, 999)} ${tra(1000, 9999)}` : null, location: d.area === 'reparto' ? 'Stabilimento' : 'Uffici', age: d.eta, gender: d.sesso, level: livello, computed_level: livello, level_status: livello === 'level1' ? 'pending' : 'active', prevention_eligible: livello === 'level2', care_token: p.token, self_declared: true, wants_to_be_contacted: contatto, assessment_completed_at: quando, current_cycle: 0, created_at: quando, updated_at: quando });
     cons.push({ id: id('ac'), assessment_id: A, patient_id: pid, consent_privacy_at: quando, consent_health_at: quando, informativa_version: '2025-08-01', created_at: quando });
     if (contatto && livello === 'level1') attesa.push({ id: id('wl'), patient_id: pid, client_id: C, score: 100, source: 'self_declaration', status: 'pending', created_at: quando, updated_at: quando });
   });
   await ins('responses', resp); await ins('patients', paz); await ins('assessment_consents', cons); await ins('waitlist', attesa);
   log(`   check-up: ${resp.length} risposte, ${attesa.length} Livello 1 in coda di pre-validazione`);
+  // Check-up raccolto, nessun Report ancora: il Report di Attivazione si genera in
+  // produzione, poi si presentano Report e proposta di intervento.
+  await upd('clients', { pipeline_stage: 'assessment_sent' }, 'id', C);
+}
 
+// ═══ FIRMA — dopo il Report di Attivazione (e la sua presentazione) ═══
+async function faseFirma() {
+  log('FIRMA — proposta accettata, contratto, avvio del programma');
   // Offerta, firma, avvio. Capacità: L1 del check-up.
   await upd('clients', { pipeline_stage: 'signed', contracted_l1: 39, offerta_aperta_il: '2025-09-09', offerta_scade_il: '2025-09-19', secondo_incontro_il: '2025-09-09', contract_start_date: AVVIO, data_avvio_programma: AVVIO, last_contact_date: '2025-09-12' }, 'id', C);
   await ins('professional_assignments', { id: id('pa'), professional_id: PRO, client_id: C, active: true, created_at: g('2025-09-15') });
@@ -472,7 +493,7 @@ async function pulisci() {
 }
 
 const [cmd, arg1, arg2] = process.argv.slice(2);
-const FASI = { fase1, fase2, fase3, fase4 };
+const FASI = { firma: faseFirma, fase2, fase3, fase4 };
 try {
   if (cmd === 'pulisci') await pulisci();
   else if (cmd === 'fase1') { await pulisci(); await fase1(); salva(); }

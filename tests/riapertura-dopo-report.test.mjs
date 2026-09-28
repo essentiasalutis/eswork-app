@@ -57,10 +57,22 @@ test('prezzo: fissato solo finché il Report vale; la Stima resta congelata', ()
 
 test('scheda: «Riapri» dopo il Report con la conferma, e la nota finché il Report non si rigenera', () => {
   const s = src('pages/dashboard/[clientId].js');
-  assert.match(s, /onClick=\{\(\) => prorogaCheckup\(a, true, true\)\}/);
+  assert.match(s, /onClick=\{\(\) => prorogaCheckup\(a, true, true, /);
   assert.match(s, /Il Report di Attivazione attuale non varrà più: presentazione e proposta di intervento tornano in bozza finché non lo rigeneri\./);
   assert.match(s, /&& !isFirmato\(client\.pipeline_stage\) && !\(idAperto && idAperto !== a\.id\);/);
   assert.match(s, /🔓 Riaperto il \{dataIt\(a\.riaperto_dopo_report_at\)\} dopo il Report di Attivazione/);
   assert.match(src('pages/dashboard/presentazione/[clientId].js'), /Il check-up è stato riaperto il \$\{dataIt\(d\.riapertoIl/);
   assert.match(src('pages/dashboard/offer.js'), /Il check-up è stato riaperto il \{dataIt\(assessment\.riaperto_dopo_report_at\)\}/);
+});
+
+test('«Riapri» con la data già proposta (oggi + 7 giorni) e il pulsante subito attivo (28/9)', () => {
+  const s = src('pages/dashboard/[clientId].js');
+  assert.match(s, /value=\{dataProroga\[a\.id\] \|\| aggiungiGiorni\(oggiRoma\(\), 7\)\}/);
+  assert.match(s, /onClick=\{\(\) => prorogaCheckup\(a, true, true, dataProroga\[a\.id\] \|\| aggiungiGiorni\(oggiRoma\(\), 7\)\)\}\n/);
+});
+
+test('elenco aziende: niente «N assessment · N attivo» (28/9)', () => {
+  const d = src('pages/dashboard/index.js');
+  assert.ok(!/\} assessment<\/span>|\} attivo\n/.test(d));
+  assert.ok(!/getAssessmentCounts/.test(d + src('lib/store.js')));
 });

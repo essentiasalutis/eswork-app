@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { getSessionToken, verifyAdminToken } from '../../lib/auth';
-import { getClients, getAssessmentCounts } from '../../lib/store';
+import { getClients } from '../../lib/store';
 import { getDashboardFormazione } from '../../lib/org';
 import NavMenu from '../../components/NavMenu';
 import { TYPE_COLORS, TYPE_LABELS } from '../../lib/scoring';
@@ -18,7 +18,7 @@ const AGENDA = {
   checkup: { icona: '📋', testo: 'Check-up in chiusura', scaduto: '' },
 };
 
-export default function Dashboard({ clients: initialClients, assessmentCounts, formazioneAlerts = [], solleciti: sollecitiIniziali = [], sollecitiOfferta: sollecitiOffertaIniziali = [], agenda = [], oggi = '', avvisoEmail = null }) {
+export default function Dashboard({ clients: initialClients, formazioneAlerts = [], solleciti: sollecitiIniziali = [], sollecitiOfferta: sollecitiOffertaIniziali = [], agenda = [], oggi = '', avvisoEmail = null }) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
   const [solleciti, setSolleciti] = useState(sollecitiIniziali);
@@ -187,7 +187,6 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, f
             </div>
           )}
           {clients.map(c => {
-            const counts = assessmentCounts[c.id] || { total: 0, active: 0 };
             return (
               <Link key={c.id} href={`/dashboard/${c.id}`} className="block">
                 <div className="bg-white rounded-2xl border border-gray-200 p-4 active:bg-gray-50 transition-colors">
@@ -201,14 +200,8 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, f
                       <div className="text-sm text-gray-500 mt-0.5">
                         {c.employees} dipendenti · {c.sector === 1 ? 'Manifattura' : 'Ufficio/IT'}
                       </div>
-                      <div className="flex items-center gap-3 mt-2">
-                        <span className="text-xs text-gray-500">{counts.total} assessment</span>
-                        {counts.active > 0 && (
-                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-                            {counts.active} attivo
-                          </span>
-                        )}
-                      </div>
+                      {/* Niente «N assessment · N attivo» (Enrico, 28/9): si vede aprendo
+                          l'azienda, e le scadenze sono in dashboard. */}
                     </div>
                     <div className="flex items-center gap-2 ml-3">
                       <button
@@ -236,10 +229,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, f
 }
 
 export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async (ctx) => {
-  const [clients, assessmentCounts] = await Promise.all([
-    getClients(),
-    getAssessmentCounts(),
-  ]);
+  const clients = await getClients();
 
 
   let formazioneAlerts = [];
@@ -286,5 +276,5 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
     if (!r.ok) avvisoEmail = r.errore;
   } catch (_) {}
 
-  return { props: { clients, assessmentCounts, formazioneAlerts, solleciti, sollecitiOfferta, agenda, oggi, avvisoEmail } };
+  return { props: { clients, formazioneAlerts, solleciti, sollecitiOfferta, agenda, oggi, avvisoEmail } };
 });

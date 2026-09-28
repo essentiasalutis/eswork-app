@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   aggregateNMQ,
-  trafficLight, TL_COLOR, TL_BG, TL_BORDER,
+  trafficLight, TL_COLOR, TL_BG, TL_BORDER, LEGENDA_SEMAFORO,
   TYPE_LABELS, generateSummaryText,
 } from '../lib/scoring';
 import { CONFIG } from '../lib/config';
@@ -114,7 +114,7 @@ function Semaphore({ type, score, value, label, subtitle }) {
 // ─── Bar chart ────────────────────────────────────────────────────────────────
 
 function HBar({ label, value, max = 100 }) {
-  const color = value > 50 ? '#dc2626' : value > 30 ? '#ca8a04' : '#16a34a';
+  const color = TL_COLOR[trafficLight('zona', value)];
   const pct = Math.max((value / max) * 100, value > 0 ? 4 : 0);
   return (
     <div className="flex items-center gap-2 mb-1.5">
@@ -297,7 +297,7 @@ function RoleAnalysis({ byRole }) {
                   className="h-full rounded"
                   style={{
                     width: `${z.pct12}%`,
-                    background: z.pct12 > 50 ? '#dc2626' : z.pct12 > 30 ? '#ca8a04' : '#16a34a',
+                    background: TL_COLOR[trafficLight('zona', z.pct12)],
                     minWidth: z.pct12 > 0 ? 16 : 0,
                   }}
                 />
@@ -491,9 +491,9 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
       <LegendBox>
         <div className="font-semibold text-gray-600 mb-1">Come leggere i dati:</div>
         <div className="flex flex-col gap-0.5">
-          <span><span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1.5 align-middle" />Verde = situazione positiva, nessun intervento urgente</span>
-          <span><span className="inline-block w-2 h-2 rounded-full bg-yellow-400 mr-1.5 align-middle" />Giallo = area di attenzione, intervento consigliato</span>
-          <span><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1.5 align-middle" />Rosso = area critica, intervento prioritario</span>
+          {LEGENDA_SEMAFORO.map(l => (
+            <span key={l.colore}><span className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ background: TL_COLOR[l.colore] }} />{l.nome} = {l.testo}</span>
+          ))}
         </div>
         <div className="mt-1.5 text-gray-400">
           Livello 1: % dipendenti con disturbi che impattano le attività (candidati al trattamento) ·
@@ -585,7 +585,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
                           className="h-full rounded"
                           style={{
                             width: `${z.pct12}%`,
-                            background: z.pct12 > 50 ? '#dc2626' : z.pct12 > 30 ? '#ca8a04' : '#16a34a',
+                            background: TL_COLOR[trafficLight('zona', z.pct12)],
                             minWidth: 16,
                           }}
                         />

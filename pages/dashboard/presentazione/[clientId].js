@@ -7,19 +7,21 @@ import { etichettaData } from '../../../lib/checkup';
 import { CARTE_LIVELLO as LIVELLI, azioneLivello } from '../../../lib/livelli';
 import { ilPct } from '../../../lib/articoli.mjs';
 import { dataIt } from '../../../lib/date-it.mjs';
-import { CONFIG } from '../../../lib/config';
-import { Titolo, Frasi, Schede, Elenco, Lettore, StampaSlide, STILE_STAMPA_SLIDE } from '../../../components/presentazione/slide';
+import { trafficLight, TL_COLOR, TL_BG, TL_BORDER } from '../../../lib/scoring';
+import { Titolo, Frasi, Schede, Elenco, Lettore, StampaSlide, STILE_STAMPA_SLIDE, Legenda, SLIDE_GRAZIE } from '../../../components/presentazione/slide';
 import { slideProposta } from '../../../components/presentazione/SlideProposta';
 import EmailModal from '../../../components/EmailModal';
 import { mailPresentazione } from '../../../lib/mail-referente.mjs';
 
 // Presentazione del Report di Attivazione (Enrico, 28/9). Nasce dal Report: ne riassume
-// le voci (Executive Summary, Mappa Clinica, Piano Operativo Proposto, Raccomandazioni)
+// le voci (Executive Summary con il cruscotto, Mappa Clinica, Piano Operativo Proposto)
 // con i riassunti scritti insieme al Report (v81), accanto ai numeri del check-up. Poi
-// «Perché riguarda l'azienda», i prossimi passi e il grazie; circa 5 minuti. Il prezzo
-// non c'è: dal «Grazie», con un clic, si passa alla proposta di intervento a slide
-// (components/presentazione/SlideProposta.jsx). Prima di iniziare, un controllo che vede
-// solo Enrico, con «PDF / Stampa» e «Invia al referente».
+// «Perché riguarda l'azienda» e i prossimi passi; circa 5 minuti. Niente valori
+// economici: dopo i prossimi passi segue la proposta di intervento a slide
+// (components/presentazione/SlideProposta.jsx), e in fondo a tutto «Grazie per
+// l'attenzione». Le raccomandazioni restano nel Report («sono per me più che per loro»).
+// Prima di iniziare, un controllo che vede solo Enrico, con «PDF / Stampa» e «Invia al
+// referente».
 const eur = (x) => `€${Math.round(Number(x) || 0).toLocaleString('it-IT', { useGrouping: 'always' })}`;
 
 function Copertina({ d }) {
@@ -37,12 +39,40 @@ function Copertina({ d }) {
   );
 }
 
+// Il cruscotto del Report (Enrico, 28/9: «nella pagina 2 metti il cruscotto»): i livelli
+// con i colori del semaforo; quelli sotto soglia uniti, a tutela della riservatezza.
+function Cruscotto({ d }) {
+  const v = d.vista;
+  if (!v.pubblicabile) return null;
+  const L = livelliLeggibili(v.livelli, v.n);
+  if (L.nessunaDistribuzione) return <p className="text-lg text-gray-500">{NOTA_NESSUNA_DISTRIBUZIONE}</p>;
+  const colore = (c) => (c.unite ? 'gray' : c.key === 'l1' ? trafficLight('nmq', c.pct) : c.key === 'l2' ? 'yellow' : 'green');
+  return (
+    <div className="max-w-5xl">
+      <div className={`grid gap-4 ${L.celle.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        {L.celle.map(c => {
+          const t = colore(c);
+          return (
+            <div key={c.key} className="rounded-2xl p-4 text-center border-2" style={{ background: TL_BG[t], borderColor: TL_BORDER[t] }}>
+              <div className="w-4 h-4 rounded-full mx-auto mb-1" style={{ background: TL_COLOR[t] }} />
+              <div className="text-lg text-gray-600">{nomeCella(c)}</div>
+              <div className="text-4xl font-extrabold" style={{ color: TL_COLOR[t] }}>{c.pct}%</div>
+              <div className="text-base text-gray-500">{c.unite ? 'insieme, a tutela della riservatezza' : c.keys.map(k => LIVELLI[k].desc).join(' · ')}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3"><Legenda /></div>
+    </div>
+  );
+}
+
 function InSintesi({ d, frasi }) {
   const v = d.vista;
   return (
     <>
       <Titolo k="1 · Executive summary">Il check-up di {d.azienda}</Titolo>
-      <div className="flex flex-wrap gap-x-12 gap-y-3 mb-10 text-2xl text-gray-700">
+      <div className="flex flex-wrap gap-x-12 gap-y-3 mb-6 text-2xl text-gray-700">
         <div>
           <span className="text-5xl font-extrabold text-green-600">{d.checkup.risposte}</span>
           {d.dipendenti ? <> su {d.dipendenti} dipendenti <span className="text-gray-500">({Math.round((d.checkup.risposte / d.dipendenti) * 100)}%)</span></> : ' dipendenti'} hanno compilato il check-up
@@ -51,7 +81,8 @@ function InSintesi({ d, frasi }) {
           <div><span className="text-5xl font-extrabold text-green-600">{v.prevalenza}%</span> riporta almeno un disturbo negli ultimi 12 mesi</div>
         )}
       </div>
-      <Frasi frasi={frasi} />
+      <div className="mb-8"><Cruscotto d={d} /></div>
+      <Frasi frasi={frasi} grandi={false} />
     </>
   );
 }
@@ -78,8 +109,9 @@ function Zone({ d }) {
                       <div className="flex-1 text-base italic text-gray-400">{ND_POCHI}</div>
                     ) : (
                       <>
-                        <div className="flex-1 h-5 bg-gray-100 rounded-lg overflow-hidden"><div className="h-full bg-green-600 rounded-lg" style={{ width: `${z.pct12 > 0 ? Math.max(z.pct12, 3) : 0}%` }} /></div>
-                        <div className="w-16 text-lg font-bold text-gray-800 text-right">{z.pct12}%</div>
+                        {/* Verde, giallo, rosso secondo la percentuale, come nel Report (28/9). */}
+                        <div className="flex-1 h-5 bg-gray-100 rounded-lg overflow-hidden"><div className="h-full rounded-lg" style={{ width: `${z.pct12 > 0 ? Math.max(z.pct12, 3) : 0}%`, background: TL_COLOR[trafficLight('zona', z.pct12)] }} /></div>
+                        <div className="w-16 text-lg font-bold text-right" style={{ color: TL_COLOR[trafficLight('zona', z.pct12)] }}>{z.pct12}%</div>
                       </>
                     )}
                   </div>
@@ -89,6 +121,7 @@ function Zone({ d }) {
             </div>
           )}
           {v.prevalenza != null && <div className="text-xl text-gray-600">{ilPct(v.prevalenza, { maiuscola: true })} riporta almeno un disturbo negli ultimi 12 mesi.</div>}
+          <Legenda />
         </div>
       )}
     </>
@@ -134,21 +167,6 @@ function Livelli({ d, frasi }) {
   );
 }
 
-function Grazie({ poi = false }) {
-  return (
-    <div className="h-full flex flex-col items-center justify-center text-center gap-6 py-10">
-      <div className="text-7xl md:text-8xl font-extrabold text-gray-900">Grazie</div>
-      <div className="text-2xl text-gray-700">Dott. Enrico Maiolo · Essentia Salutis · ES <span className="text-green-600 font-bold">Work</span></div>
-      <div className="text-xl text-gray-500 space-x-6">
-        {CONFIG.contact_phone && <span>{CONFIG.contact_phone}</span>}
-        {CONFIG.contact_email && <span>{CONFIG.contact_email}</span>}
-        {CONFIG.contact_website && <span>{CONFIG.contact_website}</span>}
-      </div>
-      {poi && <div className="no-print text-base text-gray-300 mt-6">→ Proposta di intervento</div>}
-    </div>
-  );
-}
-
 export default function PresentazionePage({ d }) {
   const [i, setI] = useState(-1); // -1 = controllo per Enrico, poi le schermate
   // «Standard e sostenibilità»: si decide caso per caso, qui, prima di presentare
@@ -172,16 +190,15 @@ export default function PresentazionePage({ d }) {
     { id: 'zone', el: <Zone d={d} /> },
     { id: 'livelli', el: <Livelli d={d} frasi={r.mappa} /> },
     { id: 'piano', el: <><Titolo k="4 · Piano operativo proposto">Come si interviene</Titolo><Frasi frasi={r.piano} /></> },
-    { id: 'raccomandazioni', el: <><Titolo k="5 · Raccomandazioni">Le raccomandazioni</Titolo><Frasi frasi={r.raccomandazioni} /></> },
     // «Assolutamente teniamo Perché riguarda l'azienda» (Enrico, 28/9): l'unica slide che
     // non viene dal Report.
-    { id: 'impatto', el: <Schede k="6 · Perché riguarda l'azienda" titolo="Non è solo un problema del dipendente" voci={d.leve.impatto} /> },
-    ...(conSost ? [{ id: 'sostenibilita', el: <Schede k="7 · Standard e sostenibilità" titolo="Dati utilizzabili per la rendicontazione" voci={[d.leve.sostenibilita]} /> }] : []),
-    ...(d.prossimiPassi ? [{ id: 'prossimi', el: <Elenco k={`${conSost ? 8 : 7} · Dopo oggi`} titolo="I prossimi passi" voci={d.prossimiPassi} /> }] : []),
-    { id: 'grazie', el: <Grazie poi={proposta.length > 0} /> },
+    { id: 'impatto', el: <Schede k="5 · Perché riguarda l'azienda" titolo="Non è solo un problema del dipendente" voci={d.leve.impatto} /> },
+    ...(conSost ? [{ id: 'sostenibilita', el: <Schede k="6 · Standard e sostenibilità" titolo="Dati utilizzabili per la rendicontazione" voci={[d.leve.sostenibilita]} /> }] : []),
+    ...(d.prossimiPassi ? [{ id: 'prossimi', el: <Elenco k={`${conSost ? 7 : 6} · Dopo oggi`} titolo="I prossimi passi" voci={d.prossimiPassi} /> }] : []),
   ] : [];
-  // Dal «Grazie», con un clic, la proposta di intervento (Enrico, 28/9).
-  const schermate = [...slideReport, ...proposta];
+  // Dopo i prossimi passi, con un clic, la proposta di intervento; in fondo a tutto
+  // «Grazie per l'attenzione» (Enrico, 28/9).
+  const schermate = R ? [...slideReport, ...proposta, SLIDE_GRAZIE] : [];
   const schermoIntero = () => { try { document.documentElement.requestFullscreen(); } catch (_) {} };
   useEffect(() => {
     if (i < 0) return undefined;
@@ -246,9 +263,9 @@ export default function PresentazionePage({ d }) {
   righe.push(d.vista.pubblicabile ? ['ok', `${d.checkup.risposte} risposte al check-up.`] : ['warn', `Meno di ${K_ANON} risposte: zone e livelli non mostrano dati.`]);
   if (d.scontoStato === 'sospeso') righe.push(['warn', 'Il prezzo applicato registrato è sospeso: i dati sono cambiati. Riconfermalo dalla proposta di intervento, altrimenti vale il prezzo pieno.']);
   if (d.checkup.stato === 'aperto') righe.push(['warn', `Il check-up è ancora aperto${d.checkup.chiude_il ? ` (chiude il ${etichettaData(d.checkup.chiude_il)})` : ''}: i numeri possono ancora cambiare.`]);
-  if (proposta.length) righe.push(['ok', `Dopo il «Grazie», con → si passa alla proposta di intervento (${proposta.length} schermate).`]);
+  if (proposta.length) righe.push(['ok', `Dopo i prossimi passi, con → si passa alla proposta di intervento (${proposta.length} schermate); in fondo «Grazie per l'attenzione».`]);
   else if (d.motivoSenzaProposta === 'prezzo_diverso') righe.push(['warn', 'La proposta di intervento non si presenta: il prezzo di oggi non è quello scritto nel Report. Rigenera il Report dalla scheda.']);
-  else if (d.motivoSenzaProposta === 'firmato') righe.push(['info', 'Contratto già firmato: dopo il «Grazie» non segue la proposta di intervento.']);
+  else if (d.motivoSenzaProposta === 'firmato') righe.push(['info', 'Contratto già firmato: dopo i prossimi passi non segue la proposta di intervento.']);
 
   const icona = { ok: '✓', warn: '⚠', info: 'ℹ' };
   const colore = { ok: 'text-green-700', warn: 'text-amber-700', info: 'text-gray-600' };
@@ -295,7 +312,7 @@ export default function PresentazionePage({ d }) {
               <span className="block text-xs text-gray-500">Serve a chi redige la rendicontazione di sostenibilità. A un titolare di micro-impresa non dice nulla: lascia spento.</span>
             </span>
           </label>
-          <div className="text-sm text-gray-500">{slideReport.length} schermate, circa 5 minuti: copertina, executive summary, zone, livelli, piano operativo, raccomandazioni, perché riguarda l&apos;azienda{conSost ? ', standard e sostenibilità' : ''}{d.prossimiPassi ? ', prossimi passi' : ''}, grazie{proposta.length ? '; poi la proposta di intervento' : ''}. Frecce ← → per muoverti, Esc per tornare qui.</div>
+          <div className="text-sm text-gray-500">{slideReport.length} schermate, circa 5 minuti: copertina, executive summary con il cruscotto, zone, livelli, piano operativo, perché riguarda l&apos;azienda{conSost ? ', standard e sostenibilità' : ''}{d.prossimiPassi ? ', prossimi passi' : ''}{proposta.length ? `; poi la proposta di intervento (${proposta.length})` : ''}; in fondo «Grazie per l&apos;attenzione». Frecce ← → per muoverti, Esc per tornare qui.</div>
           <div className="flex gap-3 flex-wrap items-center">
             <button onClick={() => { schermoIntero(); setI(0); }} disabled={bloccata}
               className="text-base font-semibold text-white bg-green-600 px-5 py-3 rounded-2xl hover:bg-green-700 disabled:opacity-40 disabled:hover:bg-green-600">▶ Inizia la presentazione</button>
@@ -308,7 +325,7 @@ export default function PresentazionePage({ d }) {
           </div>
         </div>
       </div>
-      {!bloccata && <StampaSlide schermate={slideReport} />}
+      {!bloccata && <StampaSlide schermate={[...slideReport, SLIDE_GRAZIE]} />}
       {mail && <EmailModal modal={mail} allegato="la presentazione" onClose={() => setMail(null)} />}
     </>
   );

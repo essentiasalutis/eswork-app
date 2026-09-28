@@ -16,7 +16,7 @@ import { vistaRiservata, K_ANON, SUPPRESSED, ND_POCHI, livelliLeggibili, nomeCel
 import { testoAccettazione, prossimiPassi } from '../../lib/presentazione-testi.mjs';
 import { isFirmato } from '../../lib/pipeline';
 import EmailModal from '../../components/EmailModal';
-import { Lettore } from '../../components/presentazione/slide';
+import { Lettore, SLIDE_GRAZIE } from '../../components/presentazione/slide';
 import { slideProposta } from '../../components/presentazione/SlideProposta';
 import { mailProposta } from '../../lib/mail-referente.mjs';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
@@ -369,8 +369,10 @@ export default function OfferPage({ client, assessment, nmq, calc, forchetta, te
       ? { ...STILE_SEM[c.key], label: nomeCella(c), value: 'N.d.', color: 'gray', sub: `poiché < ${K_ANON} persone` }
       : { ...STILE_SEM[c.key], label: nomeCella(c), score: c.pct, value: `${c.pct}%` }));
 
-  // «Mostra al cliente»: solo le slide della proposta, a schermo intero (Esc per uscire).
-  const schermateCliente = cliente && datiSlide ? slideProposta(datiSlide) : [];
+  // «Mostra al cliente»: solo le slide della proposta, a schermo intero (Esc per uscire),
+  // e in fondo «Grazie per l'attenzione» (Enrico, 28/9).
+  const slideCliente = cliente && datiSlide ? slideProposta(datiSlide) : [];
+  const schermateCliente = slideCliente.length ? [...slideCliente, SLIDE_GRAZIE] : [];
   if (schermateCliente.length) {
     return (
       <>
@@ -655,7 +657,7 @@ export default function OfferPage({ client, assessment, nmq, calc, forchetta, te
                 <div style={{ flex: 1, fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>{ND_POCHI}</div>
               </div>
             ) : (() => {
-              const c = z.pct12 > 50 ? '#dc2626' : z.pct12 > 30 ? '#ca8a04' : '#16a34a';
+              const c = TL_COLOR[trafficLight('zona', z.pct12)];
               const w = Math.max((z.pct12 / 100) * 100, z.pct12 > 0 ? 5 : 0);
               return (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>

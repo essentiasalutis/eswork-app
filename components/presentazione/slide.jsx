@@ -1,6 +1,8 @@
 // I mattoni delle slide, uguali per la presentazione del Report e per la proposta di
 // intervento: stesso aspetto, «in parure» (Enrico, 28/9).
 import { useEffect, useCallback } from 'react';
+import { CONFIG } from '../../lib/config';
+import { LEGENDA_SEMAFORO, TL_COLOR } from '../../lib/scoring';
 
 export function Titolo({ k, children }) {
   return (
@@ -60,6 +62,37 @@ export function Elenco({ k, titolo, voci }) {
     </>
   );
 }
+
+// Come si leggono i colori: la legenda del Report (lib/scoring.js).
+export function Legenda() {
+  return (
+    <div className="flex flex-wrap gap-x-6 gap-y-1 text-base text-gray-500">
+      {LEGENDA_SEMAFORO.map(l => (
+        <span key={l.colore} className="flex items-center gap-2">
+          <span className="inline-block w-3 h-3 rounded-full" style={{ background: TL_COLOR[l.colore] }} />{l.nome}: {l.testo}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// L'ultima schermata, sempre (Enrico, 28/9): dopo la proposta di intervento, o dopo i
+// prossimi passi quando la proposta non segue.
+export function Grazie() {
+  return (
+    <div className="h-full flex flex-col items-center justify-center text-center gap-6 py-10">
+      <img src="/logo-es.png" alt="Essentia Salutis" className="w-24 h-24 object-contain" />
+      <div className="text-6xl md:text-7xl font-extrabold text-gray-900">Grazie per l&apos;attenzione</div>
+      <div className="text-2xl text-gray-700">Dott. Enrico Maiolo · Essentia Salutis · ES <span className="text-green-600 font-bold">Work</span></div>
+      <div className="text-xl text-gray-500 flex flex-wrap justify-center gap-x-8 gap-y-1">
+        {CONFIG.contact_phone && <span>{CONFIG.contact_phone}</span>}
+        {CONFIG.contact_email && <span>{CONFIG.contact_email}</span>}
+        {CONFIG.contact_website && <span>{CONFIG.contact_website}</span>}
+      </div>
+    </div>
+  );
+}
+export const SLIDE_GRAZIE = { id: 'grazie', el: <Grazie /> };
 
 // Il lettore: una schermata alla volta, frecce ← → (o spazio), Esc per uscire.
 export function Lettore({ schermate, i, setI, onEsci }) {

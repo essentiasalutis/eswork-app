@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import { zoneDaMostrare } from '../lib/distretti.js';
 import { legendaLivelli, CARTE_LIVELLO, azioneLivello } from '../lib/livelli.js';
 import { contenutoAnno2 } from '../lib/anno2.mjs';
-import { testoAccettazione, prossimoPassoInBreve, GIORNI_FIRMA_CONTRATTO } from '../lib/presentazione-testi.mjs';
+import { testoAccettazione, GIORNI_FIRMA_CONTRATTO } from '../lib/presentazione-testi.mjs';
 import { scadenzaOffertaProposta } from '../lib/offerta.js';
 
 const src = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
@@ -54,11 +54,11 @@ test('legenda dei livelli: trattamenti, mai sedute; il ciclo entro 2 mesi (27/9)
   assert.match(t, /4 trattamenti di prevenzione nell'anno/);
 });
 
-test('carte dei livelli: una sola fonte per presentazione, Sintesi e Offerta', () => {
+test('carte dei livelli: una sola fonte per presentazione, Offerta e medico competente', () => {
   assert.equal(azioneLivello('l2', { nuovoProgramma: true }), 'Prevenzione dal primo anno');
   assert.equal(azioneLivello('l3'), 'Formazione per tutti');
   assert.equal(CARTE_LIVELLO.l1.desc, 'Dolore con impatto funzionale');
-  for (const f of ['pages/dashboard/presentazione/[clientId].js', 'lib/sintesi.js']) {
+  for (const f of ['pages/dashboard/presentazione/[clientId].js', 'lib/dati-sanitari.js']) {
     assert.ok(!/const LIVELLI = \{/.test(src(f)), `${f}: niente copia locale dei livelli`);
   }
   assert.ok(!/Trattamento — Anno 1|label: 'Solo formazione'/.test(src('pages/dashboard/offer.js')));
@@ -81,7 +81,6 @@ test('accettazione (strada B): chi firma, importo con IVA forfettaria, 15 giorni
   const offer = src('pages/dashboard/offer.js');
   assert.match(offer, /Il\/La sottoscritto\/a <span/);
   assert.match(offer, /in qualità di <span/);
-  assert.match(prossimoPassoInBreve({ scadenzaOfferta: '2026-10-07' }), /^Accettazione dell'offerta entro il 7 ottobre 2026, poi firma del contratto entro 15 giorni/);
 });
 
 test('scadenza dell\'offerta: la stessa per Offerta e presentazione', () => {
@@ -99,13 +98,13 @@ test('Offerta: niente promesse di risultato, niente voci inesistenti, niente tes
     assert.ok(!vietato.test(offer), `ancora presente: ${vietato}`);
   }
   assert.match(offer, /testiCondivisi\(\{ client, d, fm, params \}\)/);
-  assert.match(offer, /I prossimi passi/);
-  assert.match(offer, /Perché riguarda l&apos;azienda/);
+  // 28/9: «Come funziona», «I prossimi passi» e «Perché riguarda l'azienda» solo nella presentazione
+  assert.ok(!/I prossimi passi|Perché riguarda l&apos;azienda|Come funziona/.test(offer));
   assert.match(offer, /Le leve economiche/);
 });
 
-test('Sintesi e presentazione: tutte le zone, niente prezzo per dipendente', () => {
-  const sint = senzaCommenti(src('lib/sintesi.js'));
+test('dati del medico competente e presentazione: tutte le zone, niente prezzo per dipendente', () => {
+  const sint = senzaCommenti(src('lib/dati-sanitari.js'));
   assert.ok(!/per dipendente/.test(sint));
   assert.ok(!/zoneTop/.test(sint));
   assert.ok(!/zoneTop/.test(src('pages/dashboard/presentazione/[clientId].js')));
@@ -129,14 +128,14 @@ test('risposte del 28/9: niente giornate, voce 4 entro 2 mesi, «N.d. poiché < 
   const { VOCI_PROGRAMMA, quantitaPrimoAnno, cosaComprendeMarkdown } = await import('../lib/programma.js');
   const { ND_POCHI } = await import('../lib/kanon.js');
   const { prossimiPassi } = await import('../lib/presentazione-testi.mjs');
-  assert.match(VOCI_PROGRAMMA.find(v => v.n === 4).cliente, /ciclo di 4 trattamenti entro 2 mesi, con rilevazione del dolore/);
+  assert.match(VOCI_PROGRAMMA.find(v => v.n === 4).cliente, /ciclo di 4 trattamenti entro 2 mesi, con misura del dolore/);
   const q = quantitaPrimoAnno({ y1: { prevention: { sessions: 8 } }, days_osteo_y1: 4, l1: 2, l2: 2, training_sessions_y1: 2 });
   assert.ok(!q.some(t => /giornat/.test(t)), q.join(' | '));
   assert.ok(!/giornate sportello/.test(src('pages/api/clients/[id]/generate-activation-report.js').replace(/^\s*\/\/.*$/gm, '')));
   assert.ok(!/gg\/anno/.test(src('pages/dashboard/offer.js')));
   assert.match(cosaComprendeMarkdown({ piano: [{ titolo: 'Livello 2 (segnali senza impatto)', testo: '4 trattamenti di prevenzione nell\'anno.' }] }), /- \*\*Livello 2 \(segnali senza impatto\):\*\* 4 trattamenti di prevenzione/);
   assert.equal(ND_POCHI, 'N.d. poiché < 3 persone');
-  for (const f of ['pages/dashboard/offer.js', 'components/ReportView.jsx', 'pages/dashboard/presentazione/[clientId].js', 'lib/sintesi.js']) {
+  for (const f of ['pages/dashboard/offer.js', 'components/ReportView.jsx', 'pages/dashboard/presentazione/[clientId].js', 'lib/dati-sanitari.js']) {
     assert.ok(!/gruppo &lt;|\(gruppo </.test(src(f)), `${f}: ancora «gruppo < 3»`);
   }
   assert.match(prossimiPassi()[5], /per chi ha iniziato un percorso, di trattamento \(Livello 1\) o di prevenzione \(Livello 2\)/);
@@ -198,7 +197,7 @@ test('pagina Stima: la forbice registrata (la promessa) si vede e «Registra di 
 
 test('lessico: nei testi che leggono il cliente e il lavoratore «trattamenti», mai «sedute»; «sessioni» solo per la formazione (28/9)', () => {
   const file = ['lib/avvio.js', 'pages/employee/[token].js', 'pages/q/c/[client_code].js', 'pages/care/[code].js',
-    'pages/dashboard/patients/[patientId]/export.js', 'pages/api/employee/[token]/export.js', 'lib/sintesi.js', 'lib/pdf.js',
+    'pages/dashboard/patients/[patientId]/export.js', 'pages/api/employee/[token]/export.js', 'lib/dati-sanitari.js', 'lib/pdf.js',
     'lib/leve.js', 'lib/anno2.mjs', 'components/ReportView.jsx', 'lib/email-templates.js', 'pages/hr/[token].js',
     'pages/dashboard/offer.js', 'lib/programma.js', 'lib/livelli.js', 'lib/presentazione-testi.mjs'];
   for (const f of file) {

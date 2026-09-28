@@ -136,7 +136,7 @@ test('avviso di revisione della forbice: il tetto porta il margine sotto la sogl
 test('nei documenti del cliente non entra la parola «sconto» né la motivazione', () => {
   // I documenti leggono calc (price_y1 già applicato); la traccia interna sta in calc.sconto
   // e nelle colonne sconto_*, che nessun generatore di documenti per il cliente legge.
-  for (const f of ['lib/sintesi.js', 'lib/pdf.js', 'pages/dashboard/presentazione/[clientId].js']) {
+  for (const f of ['lib/dati-sanitari.js', 'lib/pdf.js', 'pages/dashboard/presentazione/[clientId].js']) {
     const src = fs.readFileSync(f, 'utf8');
     assert.doesNotMatch(src, /sconto_motivo|registrato\.motivo|calc\.sconto/, `${f} non deve leggere la traccia dello sconto`);
   }

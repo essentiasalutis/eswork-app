@@ -29,7 +29,7 @@ test('il dato unito è sempre ricavabile dal totale: non rivela niente di nuovo'
 });
 
 test('nessun «n.d.» livello per livello, e mai più «sotto le 5 persone»', () => {
-  for (const f of ['pages/dashboard/presentazione/[clientId].js', 'lib/sintesi.js', 'components/ReportView.jsx', 'pages/dashboard/offer.js', 'lib/movimento.js', 'pages/api/clients/[id]/generate-activation-report.js']) {
+  for (const f of ['pages/dashboard/presentazione/[clientId].js', 'lib/dati-sanitari.js', 'components/ReportView.jsx', 'pages/dashboard/offer.js', 'lib/movimento.js', 'pages/api/clients/[id]/generate-activation-report.js']) {
     assert.match(src(f), /livelliLeggibili\(/, f);
   }
   assert.ok(!/sotto le 5 persone/.test(src('pages/dashboard/presentazione/[clientId].js')));
@@ -41,7 +41,7 @@ test('piano per livello: il testo di Enrico, numeri dal protocollo', () => {
   assert.equal(p[0].testo, 'un ciclo di 4 trattamenti da 30 minuti entro 2 mesi, con misura del dolore prima e dopo ogni trattamento; fino a 2 cicli nell\'anno.');
   assert.equal(p[1].testo, '4 trattamenti di prevenzione nell\'anno.');
   assert.equal(p[2].testo, '2 sessioni di formazione collettiva su postura ed ergonomia, da un\'ora; analisi ergonomica delle postazioni di lavoro, con indicazioni pratiche e personalizzate.');
-  assert.equal(p[3].testo, '4 report nell\'anno (Attivazione, review a 3 e 6 mesi, annuale).');
+  assert.equal(p[3].testo, '4 report nell\'anno (di Attivazione, al mese 3, al mese 6 e annuale).');
   assert.ok(!/analisi ergonomica/.test(pianoPerLivello({ ergonomia: false })[2].testo), 'senza ergonomia nel prezzo non si promette');
   assert.ok(!p.some(r => /giornat|sedut/.test(r.testo)));
 });

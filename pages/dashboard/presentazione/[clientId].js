@@ -284,7 +284,6 @@ export default function PresentazionePage({ d }) {
             <div className="text-sm text-gray-500">{tot} schermate: fotografia, stratificazione, piano, preventivo, perché riguarda l&apos;azienda, quanto vale{conSostenibilita ? ', standard e sostenibilità' : ''}{d.prossimiPassi ? ', prossimi passi' : ''}. Frecce ← → per muoverti, Esc per tornare qui.</div>
             <div className="flex gap-3 flex-wrap">
               <button onClick={() => { schermoIntero(); setI(0); }} className="text-base font-semibold text-white bg-green-600 px-5 py-3 rounded-2xl hover:bg-green-700">▶ Inizia la presentazione</button>
-              <Link href={`/dashboard/sintesi/${d.clientId}`} className="text-base font-semibold text-gray-700 border border-gray-300 px-5 py-3 rounded-2xl hover:bg-gray-50">📄 Sintesi</Link>
               <Link href={`/dashboard/${d.clientId}`} className="text-base text-gray-500 px-3 py-3">← Scheda azienda</Link>
             </div>
           </div>

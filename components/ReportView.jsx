@@ -507,7 +507,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
           diventa una colonna di «n.d.»: si chiede meno dettaglio (tre distretti)
           invece di abbassare la tutela. Decisione di Enrico, 13/9. */}
       {(() => {
-        // Stessa regola di Presentazione, Sintesi e Offerta (lib/distretti.js, 27/9).
+        // Stessa regola di Presentazione e Offerta (lib/distretti.js, 27/9).
         const { aggrega, righe } = zoneDaMostrare(nmq);
         return (
       <>

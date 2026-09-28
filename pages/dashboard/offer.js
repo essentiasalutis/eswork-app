@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Head from 'next/head';
 import { requireAuthSsr } from '../../lib/auth';
 import { datiOffertaDaCheckup } from '../../lib/offerta-server';
@@ -10,10 +10,10 @@ import { CONFIG } from '../../lib/config';
 import { nomeLivello, legendaLivelli, CARTE_LIVELLO, azioneLivello } from '../../lib/livelli';
 import { oggiRoma } from '../../lib/checkup';
 import { fraseValidita, scadenzaOffertaProposta } from '../../lib/offerta';
-import { isFirmato } from '../../lib/pipeline';
+import { avanzamento, normalizza } from '../../lib/pipeline';
 import { VOCI_PROGRAMMA, RIGA_CHIUSURA } from '../../lib/programma';
 import { vistaRiservata, K_ANON, SUPPRESSED, ND_POCHI, livelliLeggibili, nomeCella, NOTA_LIVELLI_UNITI, NOTA_NESSUNA_DISTRIBUZIONE } from '../../lib/kanon';
-import { prossimiPassi, testoAccettazione, GIORNI_FIRMA_CONTRATTO } from '../../lib/presentazione-testi.mjs';
+import { testoAccettazione, GIORNI_FIRMA_CONTRATTO } from '../../lib/presentazione-testi.mjs';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
 import { dataIt } from '../../lib/date-it.mjs';
 import { DICITURA_IVA, DICITURA_IVA_BREVE } from '../../lib/iva.mjs';
@@ -29,7 +29,7 @@ ${CONFIG.contact_email}`;
 
 // ─── Modale email ─────────────────────────────────────────────────────────────
 
-function EmailModal({ modal, onClose, onInvia }) {
+function EmailModal({ modal, onClose, onInvia, scadenza, stage }) {
   const [to, setTo] = useState(modal.to);
   const [subject, setSubject] = useState(modal.subject);
   const [body, setBody] = useState(modal.body);
@@ -68,6 +68,17 @@ function EmailModal({ modal, onClose, onInvia }) {
             className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
           />
         </div>
+        {/* mailto non allega file: il PDF lo allega Enrico. Qui, non più sopra il documento,
+            anche cosa succede in Pipeline quando apre la mail (28/9). */}
+        <p className="text-xs text-gray-500 leading-relaxed">
+          📎 La mail non allega il documento da sola: salvalo con «Stampa / Salva PDF» e allegalo.
+          {/* Stessa regola di registraOffertaInviata (lib/pipeline-server.js): solo in avanti. */}
+          {normalizza(stage) === 'offer_open'
+            ? ` Aprendo la mail la scadenza in Pipeline diventa ${scadenza ? dataIt(scadenza) : 'nessuna'}.`
+            : avanzamento(normalizza(stage), 'offer_open')
+              ? ` Aprendo la mail l'azienda passa in «Offerta aperta»${scadenza ? `, con scadenza ${dataIt(scadenza)}` : ''}.`
+              : ''}
+        </p>
         <div className="flex gap-3">
           <a
             href={href}
@@ -95,6 +106,10 @@ function today() {
 }
 
 // ─── Print page wrapper ───────────────────────────────────────────────────────
+
+// Larghezza di una pagina del documento (A4 con i margini di stampa): a schermo il
+// documento si ingrandisce in proporzione da qui.
+const LARGHEZZA_PAGINA = 720;
 
 function Page({ children, className = '' }) {
   return (
@@ -221,14 +236,56 @@ function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine,
 
 // ─── Offer Document ───────────────────────────────────────────────────────────
 
-// Testi in comune con la presentazione e la Sintesi (lib/presentazione-server.js →
-// testiCondivisi): «deve essere tutto unico tra presentazione e preventivo» (Enrico, 27/9).
-//   condivisi: { zone, piano, anno2, leve, nuovoProgramma, pacchetto }
+// Testi in comune con la presentazione (lib/presentazione-server.js → testiCondivisi):
+// «deve essere tutto unico tra presentazione e preventivo» (Enrico, 27/9). Revisione del
+// 28/9: il preventivo è il documento che si firma, la presentazione quello che racconta —
+// niente «Perché riguarda l'azienda», «Come funziona» né «Prossimi passi», che sono già
+// nella presentazione; le leve economiche subito dopo l'investimento, a sostegno del prezzo.
+//   condivisi: { zone, piano, anno2, leve: { economiche }, nuovoProgramma, pacchetto }
 export default function OfferPage({ client, assessment, nmq, calc, forchetta, tetto = null, query = null, date, offertaGiorni = 10, prezzo = null, errore = null, condivisi = null }) {
   const [emailModal, setEmailModal] = useState(null);
-  // Scadenza: la stessa data che la presentazione scrive nei prossimi passi.
+  // Validità dell'offerta (Listino, 10 giorni): la stessa data dei prossimi passi della
+  // presentazione. I 15 giorni sono un'altra cosa: dall'accettazione al contratto.
   const [scadenza, setScadenza] = useState(() => scadenzaOffertaProposta(client, offertaGiorni));
   const [esitoInvio, setEsitoInvio] = useState(null); // { ok, testo }
+  // «Mostra al cliente» (Enrico, 28/9): a schermo intero resta solo il documento; forbice,
+  // costo, margine e argomentario spariscono. Si esce con Esc (o uscendo dallo schermo intero).
+  const [cliente, setCliente] = useState(false);
+  // Sul PC di Enrico il documento occupa tutta la larghezza (28/9): si ingrandisce in
+  // proporzione, come un PDF «adatta alla larghezza»; in stampa resta A4.
+  const docRef = useRef(null);
+  const [zoom, setZoom] = useState(1);
+  useEffect(() => {
+    const el = docRef.current;
+    if (!el) return undefined;
+    // Subito all'apertura, poi a ogni cambio di larghezza (finestra, «Mostra al cliente»).
+    const misura = () => setZoom(Math.max(0.5, Math.min(2.5, el.clientWidth / LARGHEZZA_PAGINA)));
+    misura();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', misura);
+      return () => window.removeEventListener('resize', misura);
+    }
+    const ro = new ResizeObserver(misura);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [errore]);
+  const esciCliente = useCallback(() => {
+    setCliente(false);
+    try { if (document.fullscreenElement) document.exitFullscreen(); } catch (_) {}
+  }, []);
+  function mostraAlCliente() {
+    setCliente(true);
+    try { document.documentElement.requestFullscreen(); } catch (_) {}
+  }
+  useEffect(() => {
+    if (!cliente) return undefined;
+    const tasto = (e) => { if (e.key === 'Escape') esciCliente(); };
+    // Chrome usa Esc per uscire dallo schermo intero senza passarlo alla pagina.
+    const schermo = () => { if (!document.fullscreenElement) setCliente(false); };
+    window.addEventListener('keydown', tasto);
+    document.addEventListener('fullscreenchange', schermo);
+    return () => { window.removeEventListener('keydown', tasto); document.removeEventListener('fullscreenchange', schermo); };
+  }, [cliente, esciCliente]);
   // Sforamento del massimo promesso: il server risponde 409 e qui si chiede la
   // conferma consapevole + la motivazione (interna, mai nel documento).
   const [sforamento, setSforamento] = useState(null); // { calcolato, massimo, scostamento }
@@ -281,8 +338,8 @@ export default function OfferPage({ client, assessment, nmq, calc, forchetta, te
   // Niente «giornate di sportello» nei documenti del cliente: è una misura interna
   // (Enrico, 27/9). Resta il numero delle sessioni di formazione.
   const dettaglioVoce = n => (calc && n === 6 && calc.training_sessions_y1 ? ` (${calc.training_sessions_y1} sessioni nel primo anno)` : '');
-  const passi = condivisi && !condivisi.pacchetto ? prossimiPassi({ firmato: isFirmato(client.pipeline_stage), scadenzaOfferta: scadenza }) : null;
   const accettazione = testoAccettazione({ importo: calc ? fmt(calc.price_y1) : null, iva: DICITURA_IVA_BREVE, scadenza });
+  const leveEconomiche = (condivisi && condivisi.leve && condivisi.leve.economiche) || [];
 
   // Emissione dell'offerta. Il prezzo è già capato al massimo promesso: emettere
   // non chiede nulla. Il server registra la traccia dello scostamento, e per
@@ -334,34 +391,26 @@ export default function OfferPage({ client, assessment, nmq, calc, forchetta, te
   const mgmtServices = (CONFIG.management_services && CONFIG.management_services[offerTier])
     || (CONFIG.management_services && CONFIG.management_services.core) || [];
 
+  // Mail dell'offerta (Enrico, 28/9): segue l'incontro in cui ha presentato i risultati.
+  // Niente elenco del programma (è nel documento allegato e l'ha appena presentato):
+  // importo, validità, come si accetta, i 15 giorni per il contratto.
   function openOfferEmail() {
     const referente = client.contact_name ? `Gentile ${client.contact_name},` : `Gentile referente,`;
     const prezzoY1 = calc ? fmt(calc.price_y1) : '–';
-    // Stesso programma della presentazione e del documento (27/9); il listino v1 tiene
-    // l'elenco delle sue voci.
-    const programma = condivisi && condivisi.piano
-      ? condivisi.piano.map(r => `• ${r.titolo ? `${r.titolo}: ` : ''}${r.testo}`).join('\n')
-      : ['• Sportello osteopatico in sede (trattamento individuale)', '• Formazione collettiva su postura ed ergonomia', '• 2 review intermedie (3 e 6 mesi) + report annuale finale', '• Coordinamento completo', '• Documentazione degli interventi erogati: pianificazione, presenze, risultati'].join('\n');
     const body = `${referente}
-
-Le invio in allegato la proposta di intervento per ${client.name}, elaborata sui risultati del check-up ES Work.
-
-Il programma del primo anno, in sintesi:
-${programma}
+grazie per il tempo che ci ha dedicato alla presentazione dei risultati del check-up. Le invio in allegato la proposta di intervento per ${client.name}${/\.$/.test(client.name) ? '' : '.'}
 
 Investimento Anno 1: ${prezzoY1} (${DICITURA_IVA_BREVE})
-${scadenza ? `\n${fraseValidita(scadenza)}\n` : ''}
-Per procedere basta firmare l'accettazione in fondo al documento; il contratto si firma entro ${GIORNI_FIRMA_CONTRATTO} giorni dall'accettazione.
+${scadenza ? `${fraseValidita(scadenza)}\n` : ''}
+Per procedere basta firmare l'accettazione in fondo al documento e rinviarcela; il contratto si firma poi entro ${GIORNI_FIRMA_CONTRATTO} giorni dall'accettazione.
 
-Il documento allegato contiene i dati emersi dal check-up, il programma, l'investimento e i prossimi passi.
-
-Sono disponibile per qualsiasi domanda o per fissare una call di approfondimento.
+Resto a disposizione per qualsiasi domanda.
 
 ${FIRMA}`;
 
     setEmailModal({
       to: client.contact_email || '',
-      subject: `Proposta ES Work — ${client.name}`,
+      subject: `Proposta di intervento ES Work — ${client.name}`,
       body,
     });
   }
@@ -380,7 +429,7 @@ ${FIRMA}`;
   return (
     <>
       <Head>
-        <title>{`Offerta ES Work — ${client.name}`}</title>
+        <title>{`Proposta di intervento — ${client.name}`}</title>
       </Head>
 
       <style>{`
@@ -393,7 +442,7 @@ ${FIRMA}`;
         }
         * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         .offer-page {
-          max-width: 720px;
+          max-width: ${LARGHEZZA_PAGINA}px;
           margin: 0 auto;
           padding: 28px 32px;
         }
@@ -408,7 +457,10 @@ ${FIRMA}`;
         @media print {
           .no-print { display: none !important; }
           body { background: white; }
+          .offer-layout { display: block !important; padding: 0 !important; }
+          .offer-doc { zoom: 1 !important; }
         }
+        @media screen { .offer-doc { zoom: var(--zoom-doc, 1); } }
         .section-label {
           font-size: 10px;
           font-weight: 700;
@@ -423,8 +475,9 @@ ${FIRMA}`;
         table.offer-table tr.total td { border-top: 2px solid #e5e7eb; font-weight: 700; font-size: 13px; }
       `}</style>
 
-      {/* ── Pulsanti UI (no print) ─────────────────────────────────────── */}
-      <div className="no-print max-w-5xl mx-auto px-6 pt-4 pb-2">
+      {/* ── Pulsanti UI (no print) — spariscono con «Mostra al cliente» ─────── */}
+      {!cliente && (
+      <div className="no-print px-6 pt-4 pb-2">
         <div className="flex gap-3 flex-wrap mb-2">
           <button
             onClick={() => window.history.back()}
@@ -444,11 +497,13 @@ ${FIRMA}`;
           >
             ✉ Invia offerta via email
           </button>
-          <a href={`/dashboard/presentazione/${client.id}`} className="flex items-center gap-1 text-sm text-white bg-gray-900 px-4 py-2 rounded-xl font-semibold">🖥 Presenta</a>
-          <a href={`/dashboard/sintesi/${client.id}`} className="flex items-center gap-1 text-sm text-gray-700 border border-gray-300 bg-white px-4 py-2 rounded-xl font-semibold">📄 Sintesi</a>
-        </div>
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-xs text-amber-800">
-          <strong>Per un PDF pulito:</strong> nel dialog di stampa Chrome → <em>Altre impostazioni</em> → deseleziona <strong>&quot;Intestazioni e piè di pagina&quot;</strong> → salva come PDF
+          <button
+            onClick={mostraAlCliente}
+            className="flex items-center gap-1 text-sm text-white bg-gray-900 px-4 py-2 rounded-xl font-semibold"
+            title="Schermo intero con il solo documento: niente forbice, margine né argomentario. Esc per tornare."
+          >
+            🖥 Mostra al cliente
+          </button>
         </div>
 
         {/* Validità dell'offerta — scelta qui, stampata nel documento se c'è una data */}
@@ -458,14 +513,12 @@ ${FIRMA}`;
           {scadenza
             ? <button onClick={() => setScadenza('')} className="text-gray-500 underline">togli la scadenza</button>
             : <span className="font-semibold text-gray-600">senza scadenza</span>}
-          <span className="text-gray-500">
-            {`Scadenza proposta dal Listino (${offertaGiorni} giorni): cancellala se questa offerta non deve scadere.`}
-            {' '}Con «Invia offerta via email» l&apos;azienda passa in «Offerta aperta» con questa data.
-          </span>
+          <span className="text-gray-500">{offertaGiorni} giorni dal Listino</span>
           {esitoInvio && <span className={`font-semibold ${esitoInvio.ok ? 'text-green-700' : 'text-red-600'}`}>{esitoInvio.testo}</span>}
         </div>
 
-        <div className="mt-2"><ArgomentarioVoci /></div>
+        {/* Sotto lo schermo largo l'argomentario non ha spazio a lato: resta qui, chiuso. */}
+        <div className="mt-2 lg:hidden"><ArgomentarioVoci /></div>
 
         {/* Forbice della Stima — SOLO vista admin, mai nel PDF. Tre situazioni da
             distinguere: dentro il tetto, tetto applicato, nessuna forbice promessa.
@@ -498,8 +551,9 @@ ${FIRMA}`;
         })()}
         {calc && tetto && prezzo && <PrezzoApplicato client={client} query={query} {...prezzo} />}
       </div>
+      )}
 
-      {emailModal && <EmailModal modal={emailModal} onClose={() => setEmailModal(null)} onInvia={() => registraInvio()} />}
+      {emailModal && <EmailModal modal={emailModal} scadenza={scadenza} stage={client.pipeline_stage} onClose={() => setEmailModal(null)} onInvia={() => registraInvio()} />}
 
       {/* Conferma consapevole dello sforamento. Non è una spunta sola: senza una
           motivazione scritta l'offerta non parte — l'eccezione deve lasciare
@@ -531,6 +585,16 @@ ${FIRMA}`;
         </div>
       )}
 
+      {cliente && (
+        <button onClick={esciCliente} className="no-print fixed top-3 right-3 z-40 text-xs text-gray-400 hover:text-gray-700 bg-white/80 border border-gray-200 rounded-lg px-2 py-1" title="Torna alla vista di lavoro (Esc)">✕</button>
+      )}
+
+      {/* Documento a tutta larghezza + argomentario a lato, che segue lo scorrimento
+          (Enrico, 28/9: «mettilo affianco a sintesi, con un box»). Mai stampato. */}
+      <div className="offer-layout px-6 pb-10 lg:flex lg:items-start lg:gap-6">
+        <div ref={docRef} className="flex-1 min-w-0">
+          <div className="offer-doc" style={{ '--zoom-doc': zoom }}>
+
       {/* ══════════════════════════════════════════════════════════════
           PAG 1 — Copertina
           ══════════════════════════════════════════════════════════════ */}
@@ -559,9 +623,8 @@ ${FIRMA}`;
               'Cruscotto sintetico e dati emersi dal check-up',
               'Disturbi muscolo-scheletrici — zone e stratificazione',
               ...(condivisi && condivisi.piano ? ['Il vostro programma nel primo anno e cosa comprende'] : []),
-              'Investimento',
-              'Perché riguarda l\'azienda e leve economiche',
-              passi ? 'Come funziona, prossimi passi e accettazione' : 'Come funziona e accettazione',
+              leveEconomiche.length ? 'Investimento e leve economiche' : 'Investimento',
+              'Accettazione dell\'offerta',
             ].map((v, i, arr) => (
               <div key={i} style={{ fontSize: 12, color: '#374151', paddingTop: 5, paddingBottom: 5, borderBottom: i < arr.length - 1 ? '1px solid #f3f4f6' : 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ color: '#16a34a', fontWeight: 700 }}>{i + 1}.</span> {v}
@@ -603,16 +666,8 @@ ${FIRMA}`;
           <p style={{ fontSize: 12, color: '#374151', lineHeight: 1.7, margin: 0 }}>{summaryText}</p>
         </div>}
 
-        {/* Riquadro piattaforma — si chiama solo "Piattaforma digitale ES Work" (mai "AI" come nome); testo: voce 11 di Enrico */}
-        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: '8px 12px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-          <span style={{ fontSize: 18 }}>📊</span>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#1d4ed8', marginBottom: 1 }}>Piattaforma digitale ES Work</div>
-            <div style={{ fontSize: 10, color: '#3b82f6', lineHeight: 1.5 }}>
-              Piattaforma digitale dedicata: check-up, cartella clinica del professionista, monitoraggio degli indicatori, report periodici alla direzione. L&apos;azienda accede esclusivamente a dati aggregati.
-            </div>
-          </div>
-        </div>
+        {/* Il riquadro «Piattaforma digitale ES Work» è tolto (Enrico, 28/9): è la voce 11 di
+            «Cosa comprende il programma». */}
 
         <hr className="section-sep" />
 
@@ -657,7 +712,7 @@ ${FIRMA}`;
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Stratificazione — 3 livelli</div>
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(celleLivelli.length, 1)}, 1fr)`, gap: 10 }}>
               {celleLivelli.map((c, i) => {
-                // Stesse carte della presentazione e della Sintesi (lib/livelli.js, 27/9):
+                // Stesse carte della presentazione (lib/livelli.js, 27/9):
                 // percentuale, persone, nome, descrizione e cosa ricevono.
                 const keys = c.keys || [c.key];
                 const colore = c.unite ? '#475569' : CARTE_LIVELLO[keys[0]].color;
@@ -861,26 +916,16 @@ ${FIRMA}`;
       )}
 
       {/* ══════════════════════════════════════════════════════════════
-          Perché riguarda l'azienda e leve economiche — gli stessi testi delle schermate
-          5 e 6 della presentazione (lib/leve.js, Enrico 27/9). Qui c'era un riquadro
-          «Analisi ROI» che non compariva mai (il dato non arrivava): tolto.
+          Le leve economiche, subito dopo l'investimento: «a sostegno del prezzo» (Enrico,
+          28/9). Stessi testi della presentazione (lib/leve.js) senza le due che il
+          preventivo dice già: il tempo (pagina dell'investimento) e l'OT23 (voce 12).
+          «Perché riguarda l'azienda» resta solo nella presentazione.
           ══════════════════════════════════════════════════════════════ */}
-      {condivisi && condivisi.leve && (
+      {calc && leveEconomiche.length > 0 && (
         <Page className="page-keep">
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginBottom: 2 }}>Perché riguarda l&apos;azienda</div>
-          <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 10 }}>Non è solo un problema del dipendente</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
-            {condivisi.leve.impatto.map(l => (
-              <div key={l.titolo} style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: '10px 12px' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#1e293b' }}>{l.titolo}</div>
-                <div style={{ fontSize: 10, color: '#4b5563', lineHeight: 1.5, marginTop: 3 }}>{l.testo}</div>
-                {l.dato && <div style={{ fontSize: 10, fontWeight: 600, color: '#15803d', marginTop: 3 }}>{l.dato}</div>}
-              </div>
-            ))}
-          </div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginBottom: 10 }}>Le leve economiche</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {condivisi.leve.economiche.map(l => (
+            {leveEconomiche.map(l => (
               <div key={l.titolo} style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: '10px 12px' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#1e293b' }}>{l.titolo}</div>
                 <div style={{ fontSize: 10, color: '#4b5563', lineHeight: 1.5, marginTop: 3 }}>{l.testo}</div>
@@ -893,51 +938,14 @@ ${FIRMA}`;
       )}
 
       {/* ══════════════════════════════════════════════════════════════
-          PAG 5 — Come funziona + Footer (flusso continuo, tenuta insieme)
+          Accettazione + contatti. «Come funziona» e «I prossimi passi» sono tolti (Enrico,
+          28/9): li racconta la presentazione. I 15 giorni per il contratto restano scritti
+          qui, nell'accettazione.
           ══════════════════════════════════════════════════════════════ */}
       <Page className="page-keep">
         <div>
-        {/* — Come funziona — */}
-        <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginBottom: 14 }}>Come funziona</div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-          {[
-            { num: '1', title: 'Misurare', desc: 'Check-up già completato: i risultati di questo documento derivano dai questionari compilati dai vostri dipendenti.' },
-            // Trattare e Monitorare con le parole della presentazione (Enrico, 27/9); il
-            // listino v1 tiene le condizioni che aveva.
-            { num: '2', title: 'Trattare', desc: withPrevention ? 'Sportello osteopatico in sede secondo il calendario concordato: cicli di trattamento per il Livello 1, trattamenti di prevenzione per il Livello 2.' : 'Sportello osteopatico in sede secondo calendario concordato. Accesso prioritario per dipendenti Livello 1.' },
-            { num: '3', title: 'Formare', desc: 'Sessioni formative collettive su postura, ergonomia e gestione del rischio muscolo-scheletrico.' },
-            { num: '4', title: 'Monitorare', desc: nuovoProgramma ? 'Review al mese 3 per chi ha iniziato un percorso, di trattamento (Livello 1) o di prevenzione (Livello 2); al mese 6 nuovo check-up di tutta la popolazione; a fine anno check-up e Report annuale.' : 'Checkpoint a 3 e 6 mesi, report annuale, revisione del piano. Adattamento continuo ai risultati.' },
-          ].map(s => (
-            <div key={s.num} style={{ background: '#f9fafb', borderRadius: 14, padding: 14, border: '1px solid #e5e7eb', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#16a34a', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>{s.num}</div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 4 }}>{s.title}</div>
-                <div style={{ fontSize: 11, color: '#4b5563', lineHeight: 1.6 }}>{s.desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* I prossimi passi: lo stesso elenco dell'ultima schermata della presentazione
-            (Enrico, 27/9). Prima c'era una «Timeline Anno 1» che diceva cose non vere
-            (check-up al mese 1-2, «sessioni intensive» al mese 3-4, niente review a 3 mesi). */}
-        {passi && (
-          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 14, padding: 16, marginBottom: 24, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', marginBottom: 10 }}>I prossimi passi</div>
-            <ol style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {passi.map((t, n) => (
-                <li key={n} style={{ display: 'flex', gap: 8, fontSize: 10.5, color: '#1e293b', lineHeight: 1.5 }}>
-                  <span style={{ flexShrink: 0, width: 18, height: 18, borderRadius: '50%', background: '#16a34a', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>{n + 1}</span>
-                  <span>{t}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-
         {/* — Accettazione e firma — */}
-        <div style={{ marginTop: 24, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: '16px 20px' }}>
+        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: '16px 20px' }}>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Accettazione offerta</div>
           {/* Strada B (Enrico, 27/9): l'accettazione fissa le condizioni, il programma parte
               con il contratto entro 15 giorni. Nome e ruolo di chi firma; l'importo nella
@@ -996,6 +1004,14 @@ ${FIRMA}`;
         </div>
         </div>{/* end flex column */}
       </Page>
+          </div>
+        </div>
+        {!cliente && (
+          <aside className="no-print hidden lg:block w-[22rem] shrink-0 sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
+            <ArgomentarioVoci aperto />
+          </aside>
+        )}
+      </div>
     </>
   );
 }
@@ -1014,7 +1030,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
   }
 
   try {
-    // Numeri dalla fonte unica (lib/offerta-server.js), condivisa con Presentazione e Sintesi.
+    // Numeri dalla fonte unica (lib/offerta-server.js), condivisa con la Presentazione.
     const d = await datiOffertaDaCheckup({ assessmentId, n });
     if (!d) return { notFound: true };
     // Tariffe mancanti (21/9): nessun documento, il messaggio dice dove mancano.
@@ -1031,15 +1047,16 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
       // Dopo il Report di Attivazione il prezzo è fissato: il riquadro resta, il modulo no.
       prezzoFissato: await (await import('../../lib/pricing/snapshot')).isChainClosed(client.id),
     };
-    // Testi in comune con la presentazione e la Sintesi: zone, programma, Anno 2, leve
+    // Testi in comune con la presentazione: zone, programma, Anno 2, leve economiche
     // (Enrico, 27/9: «deve essere tutto unico tra presentazione e preventivo»).
-    const [{ getFirstMeeting }, { getOrgParams }, { testiCondivisi }] = await Promise.all([
-      import('../../lib/store'), import('../../lib/org'), import('../../lib/presentazione-server'),
+    const [{ getFirstMeeting }, { getOrgParams }, { testiCondivisi }, { leveEconomichePreventivo }] = await Promise.all([
+      import('../../lib/store'), import('../../lib/org'), import('../../lib/presentazione-server'), import('../../lib/leve'),
     ]);
     const fm = await getFirstMeeting(client.id).catch(() => null);
     const params = await getOrgParams().catch(() => ({ offertaGiorni }));
     const t = testiCondivisi({ client, d, fm, params });
-    const condivisi = { zone: t.zone, piano: t.piano, anno2: t.anno2, leve: { impatto: t.leve.impatto, economiche: t.leve.economiche }, nuovoProgramma: t.nuovoProgramma, pacchetto: t.pacchetto };
+    // Alla pagina solo ciò che mostra: niente leve d'impatto (28/9, restano nella presentazione).
+    const condivisi = { zone: t.zone, piano: t.piano, anno2: t.anno2, leve: { economiche: leveEconomichePreventivo(t.leve.economiche, { conVoceOT23: t.nuovoProgramma }) }, nuovoProgramma: t.nuovoProgramma, pacchetto: t.pacchetto };
 
     return {
       props: {

@@ -29,17 +29,27 @@ function renderMd(text) {
   });
 }
 
+// Il pulsante genera il Report di Attivazione VERO (Enrico, 28/9: si chiamava «Genera
+// commento AI» e non si capiva): lo dice, chiede conferma e, se il controllo automatico
+// lo segna «da rivedere», mostra subito perché.
 function AiCommentSection({ clientId, initialText }) {
   const [text, setText] = useState(initialText || null);
   const [busy, setBusy] = useState(false);
+  const [problemi, setProblemi] = useState(null);
 
   async function generate() {
-    setBusy(true);
+    const conferma = `${text ? 'Generare un NUOVO Report di Attivazione?' : 'Generare il Report di Attivazione?'}\n\n`
+      + 'Chiude il check-up (chi non ha risposto resta fuori dall\'analisi), fissa il prezzo dell\'Anno 1 e salva il PDF.'
+      + (text ? ' Il report attuale resta in archivio; il nuovo diventa quello valido.' : '');
+    if (!window.confirm(conferma)) return;
+    setBusy(true); setProblemi(null);
     try {
       const res = await fetch(`/api/clients/${clientId}/generate-activation-report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       const d = await res.json().catch(() => null);
-      if (d?.report) setText(d.report);
-      else alert(d?.error || 'Errore nella generazione del commento.');
+      if (d?.report) {
+        setText(d.report);
+        if (d.ai_status === 'ai_da_rivedere') setProblemi(d.problemi && d.problemi.length ? d.problemi : []);
+      } else alert(d?.error || 'Errore nella generazione del Report di Attivazione.');
     } catch { alert('Errore di rete.'); }
     setBusy(false);
   }
@@ -50,13 +60,21 @@ function AiCommentSection({ clientId, initialText }) {
         <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Commento clinico e raccomandazioni ✨ AI</div>
         <button onClick={generate} disabled={busy}
           className="no-print text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-100 disabled:opacity-50">
-          {busy ? '⏳ Generazione (15-30s)…' : text ? '↻ Aggiorna commento' : '✨ Genera commento AI'}
+          {busy ? '⏳ Generazione (15-30s)…' : text ? '↻ Rigenera il Report di Attivazione' : '✨ Genera il Report di Attivazione'}
         </button>
       </div>
+      {problemi && (
+        <div className="no-print mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+          <strong>⚠ Da rivedere prima di consegnarlo.</strong> Il controllo automatico ha trovato nel testo dell&apos;AI, anche dopo la riscrittura:
+          {problemi.length
+            ? <ul className="list-disc ml-5 mt-1">{problemi.map(p => <li key={p}>{p}</li>)}</ul>
+            : <span> nessun dettaglio disponibile.</span>}
+        </div>
+      )}
       {text ? (
         <div>{renderMd(text)}</div>
       ) : (
-        <p className="text-sm text-gray-400 no-print">Nessun commento ancora generato. Clicca &quot;Genera commento AI&quot; per aggiungere la parte discorsiva (executive summary, analisi e raccomandazioni) a questo report.</p>
+        <p className="text-sm text-gray-400 no-print">Il Report di Attivazione non è ancora stato generato. «Genera il Report di Attivazione» scrive la parte discorsiva (sintesi, analisi, raccomandazioni), chiude il check-up e fissa il prezzo dell&apos;Anno 1.</p>
       )}
     </div>
   );

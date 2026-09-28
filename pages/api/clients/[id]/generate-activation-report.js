@@ -24,8 +24,10 @@ import { ergonomiaDaColloquio } from '../../../../lib/pricing/v2';
 import { isFirmato } from '../../../../lib/checkup-server';
 import { nomeLivello } from '../../../../lib/livelli';
 import { prezzoConTetto, applicaTettoAlCalcolo, STATI } from '../../../../lib/forbice.mjs';
-import { cosaComprendeMarkdown, inserisciCosaComprende, VOCI_PROGRAMMA, quantitaPrimoAnno } from '../../../../lib/programma';
-import { pianoPerLivello } from '../../../../lib/presentazione-testi.mjs';
+import { cosaComprendeMarkdown, inserisciCosaComprende, sostituisciProssimiPassi, VOCI_PROGRAMMA, quantitaPrimoAnno } from '../../../../lib/programma';
+import { pianoPerLivello, prossimiPassi } from '../../../../lib/presentazione-testi.mjs';
+import { scadenzaOffertaProposta } from '../../../../lib/offerta';
+import { getOrgParams } from '../../../../lib/org';
 import { getForchettaSnapshot, freezeStimaSnapshot } from '../../../../lib/pricing/snapshot';
 import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
@@ -205,12 +207,13 @@ PARAMETRI OPERATIVI REALI (usa ESATTAMENTE questi, non altri):
 - Trattamento osteopatico individuale: ${pOp.session_duration_min} minuti
 - Ciclo per persona in Livello 1: ${pOp.sessions_per_l1} trattamenti
 - Prevenzione attiva per persona in Livello 2: ${pOp.prevention_sessions_per_l2} trattamenti di prevenzione
-- Una giornata di sportello in sede vale ${CONFIG.hours_per_day} ore di erogazione
+VIETATO parlare di «giornate di sportello» o delle ore di una giornata: è una misura interna, non compare nei documenti del cliente (Enrico, 27/9).
+VIETATO scrivere scadenze o tempi di avvio («entro N giorni», «entro il mese X», «settimana 1-2»): i prossimi passi li inserisce il sistema.
 VIETATO inventare dettagli di erogazione che non trovi qui sopra: quanti trattamenti stanno in una giornata, la cadenza degli accessi (settimanale, quindicinale, mensile), durate, calendari, orari. Se un dato non ti è stato fornito, NON scriverlo: il report fissa il prezzo, ogni numero che scrivi diventa un impegno.
 VIETATO attribuire alla Piattaforma digitale ES Work funzioni che non ti sono state elencate (alert automatici, contenuti educativi personalizzati, questionari periodici, notifiche, tracciamento in tempo reale): è lo strumento con cui il programma viene gestito e i report prodotti, nient'altro.
 ERGONOMIA: descrivila SOLO con le voci e i numeri della riga «consulenza ergonomico-posturale» della PROPOSTA ECONOMICA COLLEGATA, senza aggiungerne. Se lì non compaiono addetti di reparto, NON citare alcuna formazione degli addetti; se non compaiono postazioni tipo di produzione, NON parlare di «studio delle postazioni». In ufficio l'intervento è per persona. Se la PROPOSTA ECONOMICA COLLEGATA manca o non ha quella riga, descrivila solo in termini generali (osservazione delle postazioni e del gesto, raccomandazioni di adeguamento), senza addetti e senza elenchi di interventi tecnici.
 COMPONENTI DEL PROGRAMMA (le SOLE che esistono; la sezione con i loro testi la inserisce il sistema): ${VOCI_PROGRAMMA.map(v => v.nome).join('; ')}.
-TEMPI (tassativi): le review intermedie al mese 3 e al mese 6 sono REPORT di andamento, NON nuovi check-up; il check-up si ripete UNA sola volta, a 12 mesi, con il Report annuale. VIETATO proporre check-up semestrali, periodici o intermedi, «ricalibrazioni» o aggiornamenti della stratificazione durante l'anno, e qualsiasi attività che non sia tra le componenti qui sopra.
+TEMPI (tassativi, Enrico 27/9): review al mese 3 per chi ha iniziato un percorso, di trattamento (Livello 1) o di prevenzione (Livello 2); al mese 6 nuovo check-up di tutta la popolazione, per vedere l'efficacia generale del programma; a fine anno check-up e Report annuale. VIETATO proporre altri check-up o rilevazioni, «ricalibrazioni» della stratificazione e qualsiasi attività che non sia tra le componenti qui sopra.
 DESTINATARI: la formazione su postura ed ergonomia è aperta a TUTTI i dipendenti, non solo al Livello 3; la prevenzione individuale è per il Livello 2; i cicli clinici per il Livello 1.
 VIETATO raccomandare al cliente attività che sono GIÀ comprese nell'investimento (in particolare la consulenza ergonomico-posturale — studio delle postazioni e formazione degli addetti sulla propria postazione — se compare nella PROPOSTA ECONOMICA COLLEGATA): sono incluse, non sono cose "da valutare".`;
 
@@ -235,10 +238,17 @@ DIVIETI ASSOLUTI — valgono su TUTTO il testo, incluse le PARAFRASI che aggiran
 5. MAPPA CLINICA = fotografia NEUTRA del questionario: descrivi i livelli con i soli dati osservati (dolore riportato, impatto funzionale). MAI come bisogni clinici da soddisfare, MAI tono di allarme, MAI "non trattati", "non presi in carico", "sintomatologia non gestita", "richiedono trattamento/protocollo".
 PRINCIPIO GUIDA: la stratificazione è la fotografia dello stato della popolazione, NON un elenco di bisogni da colmare. Il pacchetto si esaurisce nelle sue tre attività.` : '';
 
+  // Prossimi Passi del programma: quelli della presentazione e dell'Offerta, con la stessa
+  // data di validità dell'offerta (27/9). Il pacchetto tiene i suoi.
+  let offertaGiorni = 10;
+  try { ({ offertaGiorni } = await getOrgParams()); } catch (_) {}
+  const passiProgramma = isPacchetto ? null : prossimiPassi({ firmato, scadenzaOfferta: scadenzaOffertaProposta(client, offertaGiorni) });
+  const conPassi = (md) => (passiProgramma ? sostituisciProssimiPassi(md, passiProgramma) : md);
+
   // Fallback se manca la chiave: NESSUNA chiamata, nessun dato uscito. La distinzione si
   // conosce qui, prima di chiamare, e resta scritta sul record (ai_status, v57).
   if (!process.env.ANTHROPIC_API_KEY) {
-    const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { sezioneComprende, isPacchetto, nomeProdotto, testoEvoluzione, firmato }));
+    const fallback = conNota(conPassi(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { sezioneComprende, isPacchetto, nomeProdotto, testoEvoluzione, firmato })));
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', ai_status: 'fallback_no_key', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', ai_status: 'fallback_no_key', pdf_url: pdfUrl, report_id: rec?.id });
@@ -269,10 +279,9 @@ ${isPacchetto
   ? '(3-5 raccomandazioni SOLO su formazione, ergonomia e comportamenti organizzativi — vedi DIVIETI: niente monitoraggio/follow-up/trattamenti)'
   : '(3-5 raccomandazioni specifiche basate sui dati)'}
 
-## Prossimi Passi
 ${isPacchetto
-  ? '(SOLO gli step del pacchetto: restituzione dei risultati alla direzione, formazione collettiva, sopralluogo ergonomico e conferma delle postazioni, consulenza ergonomico-posturale; NIENTE monitoraggio, follow-up clinici o trattamenti)'
-  : '(5 step operativi con timeframe indicativo)'}
+  ? '## Prossimi Passi\n(SOLO gli step del pacchetto: restituzione dei risultati alla direzione, formazione collettiva, sopralluogo ergonomico e conferma delle postazioni, consulenza ergonomico-posturale; NIENTE monitoraggio, follow-up clinici o trattamenti)'
+  : 'NON scrivere la sezione «Prossimi Passi»: la inserisce il sistema, uguale alla presentazione e all\'Offerta.'}
 ${parametriOperativi}${vincoliV2}${istruzioniPacchetto}
 ${firmato ? '' : 'STATO (tassativo): il contratto NON è ancora firmato, questo report PROPONE il programma. VIETATO scrivere che il programma è stato attivato, avviato, erogato o che è operativo, e VIETATO citare trattamenti già svolti: scrivi «programma proposto», «si propone di attivare».\n'}${IDENTITA_PROFESSIONALE}
 RISULTATI CLINICI (tassativo): MAI promettere risultati clinici — niente «risolvere», «eliminare», «guarire» il dolore o la sintomatologia. Il programma promette presa in carico e misura: scrivi «trattare», «prendere in carico», «monitorare».
@@ -287,14 +296,14 @@ Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole tota
 
     // Testo troncato (visto l'11/9: "Prossimi Passi" finiva a metà frase) → meglio il testo di riserva.
     if (troncato) throw new Error('testo dell\'AI troncato: troppo lungo');
-    const report = conNota(inserisciCosaComprende(testo, sezioneComprende), true);
+    const report = conNota(conPassi(inserisciCosaComprende(testo, sezioneComprende)), true);
     const pdfUrl = await tryGeneratePdf(client, 'activation', report, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', ai_status: aiStatus, pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report, source: 'ai', ai_status: aiStatus, problemi, pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
     // Qui la chiamata è stata fatta: i dati SONO usciti, la risposta non è stata usata.
     // Si salva solo la classe, mai il messaggio d'errore (può contenere il payload).
-    const fallback = conNota(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { sezioneComprende, isPacchetto, nomeProdotto, testoEvoluzione, firmato }));
+    const fallback = conNota(conPassi(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { sezioneComprende, isPacchetto, nomeProdotto, testoEvoluzione, firmato })));
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', ai_status: 'fallback_errore', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', ai_status: 'fallback_errore', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
@@ -386,12 +395,7 @@ ${isPacchetto ? `## Raccomandazioni
 4. Review clinica a 3 mesi per valutare adeguamento del protocollo
 
 ## Prossimi Passi
-
-1. **Settimana 1-2**: Completamento assegnazione turni e prima pre-validazione L1
-2. **Mese 1**: Avvio sportello osteopatico — Turno 1
-3. **Mese 2-3**: Avvio turni 2 e 3, prima sessione formativa collettiva
-4. **Mese 3**: Mini-check T3 per pazienti L2
-5. **Mese 6**: Review intermedia con report dati aggregati`}`;
+`}`;
 }
 
 // Blocco "proposta economica" per il report: condizioni della scheda colloquio

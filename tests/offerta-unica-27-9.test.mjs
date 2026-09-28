@@ -141,3 +141,48 @@ test('risposte del 28/9: niente giornate, voce 4 entro 2 mesi, «N.d. poiché < 
   }
   assert.match(prossimiPassi()[5], /per chi ha iniziato un percorso, di trattamento \(Livello 1\) o di prevenzione \(Livello 2\)/);
 });
+
+test('Report di Attivazione: i Prossimi Passi li scrive il sistema, niente scadenze inventate (28/9)', async () => {
+  const { sostituisciProssimiPassi } = await import('../lib/programma.js');
+  const ai = '# Report\n\n## Raccomandazioni Cliniche\n\n1. Qualcosa\n\n## Prossimi Passi\n\n1. **Firma del contratto** — entro 10 giorni\n2. Avvio entro 30 giorni\n\n---\n';
+  const out = sostituisciProssimiPassi(ai, ['Accettazione dell\'offerta.', 'Firma del contratto, entro 15 giorni dall\'accettazione.']);
+  assert.ok(!/entro 10 giorni|entro 30 giorni/.test(out), out);
+  assert.match(out, /## Raccomandazioni Cliniche[\s\S]*## Prossimi Passi\n\n1\. Accettazione dell'offerta\.\n2\. Firma del contratto, entro 15 giorni dall'accettazione\.\n$/);
+  assert.equal((out.match(/## Prossimi Passi/g) || []).length, 1);
+  // senza sezione dell'AI la aggiunge in fondo
+  assert.match(sostituisciProssimiPassi('# R\n\ntesto', ['Uno.']), /testo\n\n## Prossimi Passi\n\n1\. Uno\.\n$/);
+  const gen = src('pages/api/clients/[id]/generate-activation-report.js');
+  assert.match(gen, /NON scrivere la sezione «Prossimi Passi»/);
+  assert.match(gen, /VIETATO parlare di «giornate di sportello»/);
+  assert.ok(!/Una giornata di sportello in sede vale/.test(gen));
+  assert.ok(!/Settimana 1-2\*\*: Completamento assegnazione turni/.test(gen));
+  assert.match(gen, /al mese 6 nuovo check-up di tutta la popolazione/);
+  assert.equal((gen.match(/conNota\(conPassi\(/g) || []).length, 3, 'AI, riserva senza chiave, riserva per errore');
+});
+
+test('pulsante: «Genera il Report di Attivazione», con conferma e motivi del «da rivedere» (28/9)', () => {
+  const rv = src('components/ReportView.jsx');
+  assert.match(rv, /'✨ Genera il Report di Attivazione'/);
+  assert.match(rv, /'↻ Rigenera il Report di Attivazione'/);
+  assert.match(rv, /window\.confirm\(conferma\)/);
+  assert.match(rv, /Chiude il check-up/);
+  assert.match(rv, /d\.ai_status === 'ai_da_rivedere'/);
+  assert.ok(!/Genera commento AI|Aggiorna commento/.test(rv));
+});
+
+test('6 e 12 mesi: livelli uniti, confronto del Livello 1 solo con almeno 3 persone ai due capi (28/9)', async () => {
+  const { sezioneRifotografia, distribuzioneLeggibile, L1_NON_CONFRONTABILE } = await import('../lib/rifotografia.js');
+  const s = (l1, l2, l3) => { const n = l1 + l2 + l3; return { n, l1, l2, l3, l1pct: Math.round(l1 / n * 100), l2pct: Math.round(l2 / n * 100), l3pct: Math.round(l3 / n * 100) }; };
+  assert.equal(distribuzioneLeggibile(s(2, 6, 1)).testo, 'Livello 1 e Livello 3 33%, Livello 2 67%');
+  const t = sezioneRifotografia({ t0: s(4, 6, 5), t6: s(2, 7, 6) });
+  assert.ok(!/Livello 1 13%|Livello 1 2\b/.test(t), t);
+  assert.match(t, /Livello 1 e Livello 3|Livello 1 e Livello 2/);
+  assert.ok(t.includes(L1_NON_CONFRONTABILE), t);
+  assert.ok(!/scende|sale di|passa dal/.test(t), 'nessun confronto del Livello 1');
+  const ok = sezioneRifotografia({ t0: s(5, 6, 5), t6: s(4, 7, 6) });
+  assert.match(ok, /La quota in Livello 1/);
+  assert.equal(L1_NON_CONFRONTABILE, 'Il confronto della quota in Livello 1 non si mostra: in uno dei due momenti il Livello 1 conta meno di 3 persone.');
+  const cp = src('pages/api/clients/[id]/generate-checkpoint-report.js');
+  assert.match(cp, /if \(!t12\.l1Confrontabile\) \{\n\s+out\.push\(L1_NON_CONFRONTABILE\);/);
+  assert.ok(!/`L1 \$\{t0\.l1pct\}%, L2/.test(cp), 'niente più percentuali per livello senza soglia');
+});

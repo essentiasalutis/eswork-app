@@ -15,7 +15,7 @@ import {
   getSelfTriggersByClient,
 } from '../../../../lib/store';
 import { sezioneMovimento, inserisciMovimento } from '../../../../lib/movimento';
-import { sezioneRifotografia, inserisciRifotografia } from '../../../../lib/rifotografia';
+import { sezioneRifotografia, inserisciRifotografia, distribuzioneLeggibile, l1Confrontabile, L1_NON_CONFRONTABILE } from '../../../../lib/rifotografia';
 import { getNoteReport, getAndamentoT12Texts } from '../../../../lib/pricing/settings';
 import { CONFIG_V1 } from '../../../../lib/pricing/v1';
 import { stratificazioneOsservata } from '../../../../lib/scoring';
@@ -214,23 +214,26 @@ export default requireAuth(async function handler(req, res) {
 
     // k-anon: prevalenza e distribuzioni mostrate SOLO se ENTRAMBE le coorti ≥ K.
     const prevalenceShown = t0.n >= K_ANON && t12s.n >= K_ANON;
-    const prevalenceDeltaPts = prevalenceShown ? (t0.l1pct - t12s.l1pct) : null; // punti % di riduzione L1
+    // Livello 1 confrontabile solo con almeno k persone in Livello 1 ai due capi (28/9).
+    const l1Conf = prevalenceShown && l1Confrontabile(t0, t12s);
+    const prevalenceDeltaPts = l1Conf ? (t0.l1pct - t12s.l1pct) : null; // punti % di riduzione L1
     // Rappresentatività della coorte T12 (soglia 70% hard, come nella sezione andamento):
     // sotto soglia il delta anno-su-anno NON è un risultato → la riga KPI non lo spaccia
     // come tale (marca "coorte parziale"), coerente con "L'andamento del programma".
     const cohortRepresentative = t0.n > 0 && (t12s.n / t0.n) >= COHORT_REP_MIN;
-    const kpiDeltaLabel = !prevalenceShown ? ''
+    const kpiDeltaLabel = !l1Conf ? ''
       : (cohortRepresentative && prevalenceDeltaPts != null
           ? ` (${prevalenceDeltaPts >= 0 ? '−' : '+'}${Math.abs(prevalenceDeltaPts)} punti)`
           : ' (coorte parziale)');
-    const nd = (s) => prevalenceShown ? s : 'n.d.';
+    // Livelli sotto soglia uniti anche qui (Enrico, 28/9): «n.d.» per l'AI = dato nascosto.
+    const strat = (s) => { const dl = prevalenceShown ? distribuzioneLeggibile(s) : null; return dl ? dl.testo : 'n.d.'; };
     t12 = {
       count: reass.length, avgPgic, improvedPct,
-      t0N: t0.n, t12N: t12s.n, prevalenceShown, prevalenceDeltaPts,
+      t0N: t0.n, t12N: t12s.n, prevalenceShown, prevalenceDeltaPts, l1Confrontabile: l1Conf,
       cohortRepresentative, kpiDeltaLabel,
-      t0L1: nd(`${t0.l1pct}%`), t12L1: nd(`${t12s.l1pct}%`),
-      t0Strat: nd(`L1 ${t0.l1pct}%, L2 ${t0.l2pct}%, L3 ${t0.l3pct}%`),
-      t12Strat: nd(`L1 ${t12s.l1pct}%, L2 ${t12s.l2pct}%, L3 ${t12s.l3pct}%`),
+      t0L1: l1Conf ? `${t0.l1pct}%` : 'n.d.', t12L1: l1Conf ? `${t12s.l1pct}%` : 'n.d.',
+      t0Strat: strat(t0),
+      t12Strat: strat(t12s),
       _t0: t0, _t12: t12s, // grezzi per il Blocco 2 (confronti A/B)
     };
 
@@ -407,6 +410,14 @@ function buildAndamentoSection(t12, client, T) {
   // RAMO 0 — degrado k-anon: nessun numero A/B disponibile.
   if (!shown) {
     out.push(fillT(T.report_t12_andamento_degrado_kanon, { t0N, t12N, kMin }));
+    out.push(T.report_t12_andamento_chiusura_neutra);
+    return out.join('\n\n');
+  }
+  // RAMO 0-bis (28/9) — le risposte bastano, ma il Livello 1 ha meno di k persone in uno
+  // dei due momenti: il testo del Listino per il ramo 0 direbbe il falso («tutto sotto
+  // soglia»), quindi qui la frase approvata da Enrico.
+  if (!t12.l1Confrontabile) {
+    out.push(L1_NON_CONFRONTABILE);
     out.push(T.report_t12_andamento_chiusura_neutra);
     return out.join('\n\n');
   }

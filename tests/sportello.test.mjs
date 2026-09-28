@@ -106,3 +106,11 @@ test('prevenzione: si contano solo le sedute dell\'anno di programma in corso (p
   assert.equal(ok[0], 'Prevenzione: 1 seduta su 4 nell\'anno; trimestre 1: seduta fatta');
   assert.deepEqual(controllaGiornata({ client_id: 'c', data: '2026-10-06', ora_inizio: '09:00', ora_fine: '11:00', posti: 6 }), ['Una giornata dura almeno 3 ore.']);
 });
+
+test('promemoria data di avvio nella stessa voce «Avvio del programma»; niente paragoni col settore nei report (28/9)', () => {
+  const scheda = src('pages/dashboard/[clientId].js');
+  assert.match(scheda, /⚠ Manca la data di avvio: senza, non partono l&apos;anno di programma/);
+  assert.equal((scheda.match(/Avvio del programma<\/h2>/g) || []).length, 1, 'una voce sola, nessun riquadro in più');
+  assert.match(src('pages/api/clients/[id]/generate-activation-report.js'), /\$\{NIENTE_PARAGONI\}\nRISULTATI CLINICI/);
+  assert.equal((src('pages/api/clients/[id]/generate-checkpoint-report.js').match(/\$\{NIENTE_PARAGONI\}/g) || []).length, 2);
+});

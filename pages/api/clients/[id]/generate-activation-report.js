@@ -1,4 +1,4 @@
-import { DEFINIZIONE_LIVELLI, IDENTITA_PROFESSIONALE } from '../../../../lib/regole-report.mjs';
+import { DEFINIZIONE_LIVELLI, IDENTITA_PROFESSIONALE, NIENTE_PARAGONI } from '../../../../lib/regole-report.mjs';
 import { generaConControllo } from '../../../../lib/controllo-report.mjs';
 import { parametriDaStimaCongelata } from '../../../../lib/pricing/v2-defaults.mjs';
 import { statoScontoCliente, applicaScontoAlCalcolo, avvisoRevisioneForbice, margine } from '../../../../lib/sconto.mjs';
@@ -284,6 +284,7 @@ ${isPacchetto
   : 'NON scrivere la sezione «Prossimi Passi»: la inserisce il sistema, uguale alla presentazione e all\'Offerta.'}
 ${parametriOperativi}${vincoliV2}${istruzioniPacchetto}
 ${firmato ? '' : 'STATO (tassativo): il contratto NON è ancora firmato, questo report PROPONE il programma. VIETATO scrivere che il programma è stato attivato, avviato, erogato o che è operativo, e VIETATO citare trattamenti già svolti: scrivi «programma proposto», «si propone di attivare».\n'}${IDENTITA_PROFESSIONALE}
+${NIENTE_PARAGONI}
 RISULTATI CLINICI (tassativo): MAI promettere risultati clinici — niente «risolvere», «eliminare», «guarire» il dolore o la sintomatologia. Il programma promette presa in carico e misura: scrivi «trattare», «prendere in carico», «monitorare».
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento». TRATTAMENTI (tassativo, Enrico 27/9): l'attività dell'osteopata si chiama «trattamento» — ciclo di trattamenti per il Livello 1, «trattamenti di prevenzione» per il Livello 2 — MAI «seduta/sedute» né «sessione/sessioni» (le «sessioni» sono solo quelle di formazione).
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.${sezioneComprende ? '\nCOMPONENTI: NON scrivere una sezione con l\'elenco delle componenti del programma né le loro quantità (niente «Cosa include» / «Cosa comprende»): la inserisce il sistema con i testi approvati.' : ''}

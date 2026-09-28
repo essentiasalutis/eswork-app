@@ -22,7 +22,7 @@ import { stratificazioneOsservata } from '../../../../lib/scoring';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { kAnonPartition, maskCount, tooSmall, K_ANON, livelliLeggibili, nomeCella } from '../../../../lib/kanon';
 import { PROTOCOLLO } from '../../../../lib/protocollo.mjs';
-import { DEFINIZIONE_LIVELLI, VERSO_DEI_LIVELLI, IDENTITA_PROFESSIONALE, NIENTE_RIFERIMENTI_INVENTATI, programmaPrevisto, divisioneSedute, rigaFormazione } from '../../../../lib/regole-report.mjs';
+import { DEFINIZIONE_LIVELLI, VERSO_DEI_LIVELLI, IDENTITA_PROFESSIONALE, NIENTE_RIFERIMENTI_INVENTATI, NIENTE_PARAGONI, programmaPrevisto, divisioneSedute, rigaFormazione } from '../../../../lib/regole-report.mjs';
 import { generaConControllo } from '../../../../lib/controllo-report.mjs';
 import { getOrgSessioni } from '../../../../lib/org';
 import { TESTO_OT23_IN_VERIFICA } from '../../../../lib/ot23-stato.mjs';
@@ -282,6 +282,7 @@ ${t12.count === 0 ? 'NOTA: nessun check-up a 12 mesi ancora registrato — segna
 ${programmaPrevisto()}
 ${IDENTITA_PROFESSIONALE}
 ${NIENTE_RIFERIMENTI_INVENTATI}
+${NIENTE_PARAGONI}
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento». TRATTAMENTI (tassativo, Enrico 27/9): l'attività dell'osteopata si chiama «trattamento» — ciclo di trattamenti per il Livello 1, «trattamenti di prevenzione» per il Livello 2 — MAI «seduta/sedute» né «sessione/sessioni» (le «sessioni» sono solo quelle di formazione).
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
 Tono: clinico, orientato ai risultati e alla direzione. Italiano. Max 650 parole.` : `Sei un consulente clinico ES Work. Genera un Report Intermedio professionale a ${checkLabel} per un'azienda cliente.
@@ -331,6 +332,7 @@ ${checkpoint === 't6' ? `FOTOGRAFIA (tassativo): il confronto fra il check-up in
 ` : ''}${programmaPrevisto()}
 ${IDENTITA_PROFESSIONALE}
 ${NIENTE_RIFERIMENTI_INVENTATI}
+${NIENTE_PARAGONI}
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento». TRATTAMENTI (tassativo, Enrico 27/9): l'attività dell'osteopata si chiama «trattamento» — ciclo di trattamenti per il Livello 1, «trattamenti di prevenzione» per il Livello 2 — MAI «seduta/sedute» né «sessione/sessioni» (le «sessioni» sono solo quelle di formazione).
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
 Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;

@@ -893,12 +893,19 @@ ${FIRMA}`,
 
         {/* ── Avvio del programma (solo dopo la firma): kit di avvio per i dipendenti ── */}
         {isFirmato(client.pipeline_stage) && (
-          <div className="bg-white rounded-2xl border border-green-200 p-5 flex items-center justify-between gap-3 flex-wrap">
+          <div className={`rounded-2xl border p-5 flex items-center justify-between gap-3 flex-wrap ${client.data_avvio_programma ? 'bg-white border-green-200' : 'bg-amber-50 border-amber-300'}`}>
             <div>
               <h2 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">🚀 Avvio del programma</h2>
               <p className="text-xs text-gray-500 mt-1">
                 {client.data_avvio_programma ? `Avvio in sede: ${etichettaData(client.data_avvio_programma)} ${client.data_avvio_programma.slice(0, 4)}.` : 'Data di avvio non ancora fissata.'} Il kit annuncia ai dipendenti la partenza del programma (con il calendario in allegato).
               </p>
+              {/* Promemoria (Enrico, 28/9): «Attiva il programma» chiede la data, ma si può arrivare
+                  ad «Accettato» anche dalla Pipeline senza. Qui, nella stessa voce, niente doppioni. */}
+              {!client.data_avvio_programma && (
+                <p className="text-xs font-semibold text-amber-900 mt-1.5 max-w-2xl">
+                  ⚠ Manca la data di avvio: senza, non partono l&apos;anno di programma, i trimestri della prevenzione e i loro allarmi, e le sedute erogate non si contano. Si fissa da «🚀 Kit di avvio».
+                </p>
+              )}
             </div>
             <button onClick={() => setKitAvvio(true)} className="text-sm font-semibold text-white bg-green-600 px-4 py-2 rounded-xl hover:bg-green-700">🚀 Kit di avvio</button>
           </div>

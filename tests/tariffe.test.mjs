@@ -66,7 +66,10 @@ test('report di Attivazione, Offerta e Finanza non chiamano il motore senza tari
   assert.ok(report.indexOf('tariffeMancanti(tariffeQui)') < report.indexOf('const calc = calculatePricing({ n: nEmp'), 'controllo prima del motore');
   const offerta = fs.readFileSync('lib/offerta-server.js', 'utf8');
   assert.ok(offerta.indexOf('tariffeMancanti(condBasis && condBasis.rates)') < offerta.indexOf('const calcPieno = calculatePricing'));
-  assert.match(fs.readFileSync('pages/dashboard/finance.js', 'utf8'), /rates: tariffe\[c\.id\]/);
+  // Finanza (28/9): gli stessi numeri dell'Offerta, niente motore proprio, niente L1 × 2,2.
+  const fin = fs.readFileSync('pages/dashboard/finance.js', 'utf8');
+  assert.match(fin, /datiOffertaDaCheckup\(\{ assessmentId: a\.id, n: c\.employees \}\)/);
+  assert.ok(!/calculatePricing|2\.2\b|estimateL1/.test(fin.replace(/^\s*\/\/.*$/gm, '')));
   for (const f of ['lib/pricing/v1.js', 'lib/pricing/v2.js']) assert.ok(!/rates \|\| (cfg|CONFIG_V1)\.rates_new|rates = cfg\.rates_new/.test(fs.readFileSync(f, 'utf8')), `${f}: nessun ripiego`);
 });
 

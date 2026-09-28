@@ -12,7 +12,7 @@ import { oggiRoma } from '../../lib/checkup';
 import { fraseValidita, scadenzaOffertaProposta } from '../../lib/offerta';
 import { isFirmato } from '../../lib/pipeline';
 import { VOCI_PROGRAMMA, RIGA_CHIUSURA } from '../../lib/programma';
-import { vistaRiservata, K_ANON, SUPPRESSED, livelliLeggibili, nomeCella, NOTA_LIVELLI_UNITI, NOTA_NESSUNA_DISTRIBUZIONE } from '../../lib/kanon';
+import { vistaRiservata, K_ANON, SUPPRESSED, ND_POCHI, livelliLeggibili, nomeCella, NOTA_LIVELLI_UNITI, NOTA_NESSUNA_DISTRIBUZIONE } from '../../lib/kanon';
 import { prossimiPassi, testoAccettazione, GIORNI_FIRMA_CONTRATTO } from '../../lib/presentazione-testi.mjs';
 import ArgomentarioVoci from '../../components/ArgomentarioVoci';
 import { dataIt } from '../../lib/date-it.mjs';
@@ -374,7 +374,7 @@ ${FIRMA}`;
   const semaphoreData = celleLivelli.map(c => (c.unite
     ? { type: 'plain', label: nomeCella(c), sub: c.keys.map(k => STILE_SEM[k].sub).join(' · '), value: `${c.pct}%`, color: 'gray' }
     : c.suppressed
-      ? { ...STILE_SEM[c.key], label: nomeCella(c), value: SUPPRESSED, color: 'gray', sub: `gruppo < ${K_ANON}` }
+      ? { ...STILE_SEM[c.key], label: nomeCella(c), value: 'N.d.', color: 'gray', sub: `poiché < ${K_ANON} persone` }
       : { ...STILE_SEM[c.key], label: nomeCella(c), score: c.pct, value: `${c.pct}%` }));
 
   return (
@@ -629,7 +629,7 @@ ${FIRMA}`;
             {Z.righe.map((z, i) => z.soppressa ? (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
                 <div style={{ width: 120, fontSize: 10, color: '#374151', textAlign: 'right', flexShrink: 0 }}>{z.zone}</div>
-                <div style={{ flex: 1, fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>{SUPPRESSED} (gruppo &lt; {K_ANON})</div>
+                <div style={{ flex: 1, fontSize: 10, color: '#9ca3af', fontStyle: 'italic' }}>{ND_POCHI}</div>
               </div>
             ) : (() => {
               const c = z.pct12 > 50 ? '#dc2626' : z.pct12 > 30 ? '#ca8a04' : '#16a34a';
@@ -648,7 +648,7 @@ ${FIRMA}`;
               );
             })())}
             <div style={{ fontSize: 10, color: '#4b5563', marginTop: 8 }}>
-              Prevalenza: {prevalenzaMostrata == null ? `${SUPPRESSED} (gruppo < ${K_ANON})` : `${prevalenzaMostrata}% ha almeno un disturbo negli ultimi 12 mesi`}
+              Prevalenza: {prevalenzaMostrata == null ? ND_POCHI : `${prevalenzaMostrata}% ha almeno un disturbo negli ultimi 12 mesi`}
             </div>
           </div>
 
@@ -664,8 +664,8 @@ ${FIRMA}`;
                 const sfondo = c.unite ? '#F8FAFC' : CARTE_LIVELLO[keys[0]].bg;
                 return (
                 <div key={i} style={{ background: sfondo, border: `1px solid ${colore}`, borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 3, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: colore, lineHeight: 1 }}>{c.suppressed ? SUPPRESSED : `${c.pct}%`}</div>
-                  <div style={{ fontSize: 10, color: '#4b5563' }}>{c.suppressed ? `gruppo < ${K_ANON}` : `${c.count} ${c.count === 1 ? 'dipendente' : 'dipendenti'}`}</div>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: colore, lineHeight: 1 }}>{c.suppressed ? 'N.d.' : `${c.pct}%`}</div>
+                  <div style={{ fontSize: 10, color: '#4b5563' }}>{c.suppressed ? `poiché < ${K_ANON} persone` : `${c.count} ${c.count === 1 ? 'dipendente' : 'dipendenti'}`}</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: colore, marginTop: 2 }}>{nomeCella(c)}</div>
                   <div style={{ fontSize: 10, color: '#4b5563', lineHeight: 1.4 }}>{keys.map(k => CARTE_LIVELLO[k].desc).join(' · ')}</div>
                   <div style={{ fontSize: 10, fontWeight: 700, color: '#1e293b', lineHeight: 1.4 }}>→ {keys.map(k => azioneLivello(k, { nuovoProgramma })).join(' · ')}</div>
@@ -779,7 +779,8 @@ ${FIRMA}`;
             <tbody>
               {[
                 ['Check-up iniziale + Report di Attivazione', 'Fotografia clinica della salute muscolo-scheletrica dell\'intera popolazione aziendale. Ogni dipendente compila un questionario validato in meno di 5 minuti. Produce la stratificazione dei bisogni e il piano di intervento personalizzato per la vostra azienda.'],
-                [`Sportello osteopatico in sede (${calc.days_osteo_y1} gg/anno)`, 'Trattamento osteopatico individuale erogato direttamente nella vostra sede, riservato ai dipendenti con reale indicazione clinica. Ogni percorso è preceduto da una pre-validazione con l\'osteopata e monitorato trattamento per trattamento con misure di esito oggettive.'],
+                // Niente giornate: misura interna (Enrico, 27/9).
+                ['Sportello osteopatico in sede', 'Trattamento osteopatico individuale erogato direttamente nella vostra sede, riservato ai dipendenti con reale indicazione clinica. Ogni percorso è preceduto da una pre-validazione con l\'osteopata e monitorato trattamento per trattamento con misure di esito oggettive.'],
                 ['Pre-validazioni cliniche', 'Valutazione clinica iniziale con l\'osteopata prima di ogni percorso di trattamento: conferma l\'indicazione, definisce gli obiettivi e garantisce che le risorse vadano a chi ne ha realmente bisogno.'],
                 ...(withPrevention ? [['Prevenzione attiva L2', 'Trattamenti di prevenzione dedicati ai dipendenti con segnali precoci, per intervenire prima che il disturbo evolva in patologia conclamata.']] : []),
                 [`Formazione postura ed ergonomia (${calc.training_sessions_y1} sessioni)`, 'Sessioni collettive in piccoli gruppi su postura, ergonomia e prevenzione dei disturbi muscolo-scheletrici, calibrate sul vostro settore. Anno 1: due moduli dedicati (prevenzione attiva). Anni successivi: un modulo avanzato (correlazione con alimentazione, attività motoria e benessere psicofisico).'],
@@ -906,7 +907,7 @@ ${FIRMA}`;
             // listino v1 tiene le condizioni che aveva.
             { num: '2', title: 'Trattare', desc: withPrevention ? 'Sportello osteopatico in sede secondo il calendario concordato: cicli di trattamento per il Livello 1, trattamenti di prevenzione per il Livello 2.' : 'Sportello osteopatico in sede secondo calendario concordato. Accesso prioritario per dipendenti Livello 1.' },
             { num: '3', title: 'Formare', desc: 'Sessioni formative collettive su postura, ergonomia e gestione del rischio muscolo-scheletrico.' },
-            { num: '4', title: 'Monitorare', desc: nuovoProgramma ? 'Review al mese 3 per chi è stato in Livello 1 al check-up; al mese 6 nuovo check-up di tutta la popolazione; a fine anno check-up e Report annuale.' : 'Checkpoint a 3 e 6 mesi, report annuale, revisione del piano. Adattamento continuo ai risultati.' },
+            { num: '4', title: 'Monitorare', desc: nuovoProgramma ? 'Review al mese 3 per chi ha iniziato un percorso, di trattamento (Livello 1) o di prevenzione (Livello 2); al mese 6 nuovo check-up di tutta la popolazione; a fine anno check-up e Report annuale.' : 'Checkpoint a 3 e 6 mesi, report annuale, revisione del piano. Adattamento continuo ai risultati.' },
           ].map(s => (
             <div key={s.num} style={{ background: '#f9fafb', borderRadius: 14, padding: 14, border: '1px solid #e5e7eb', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
               <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#16a34a', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' }}>{s.num}</div>

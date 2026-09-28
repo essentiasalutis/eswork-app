@@ -124,3 +124,20 @@ test('piano AI per zona cancellato: nessuna pagina, nessuna API, nessun modulo (
   assert.ok(!fs.existsSync(new URL('../pages/api/ai/intervention-plan.js', import.meta.url)));
   assert.ok(!fs.existsSync(new URL('../lib/piano.js', import.meta.url)));
 });
+
+test('risposte del 28/9: niente giornate, voce 4 entro 2 mesi, «N.d. poiché < 3 persone», review a L1 e L2', async () => {
+  const { VOCI_PROGRAMMA, quantitaPrimoAnno, cosaComprendeMarkdown } = await import('../lib/programma.js');
+  const { ND_POCHI } = await import('../lib/kanon.js');
+  const { prossimiPassi } = await import('../lib/presentazione-testi.mjs');
+  assert.match(VOCI_PROGRAMMA.find(v => v.n === 4).cliente, /ciclo di 4 trattamenti entro 2 mesi, con rilevazione del dolore/);
+  const q = quantitaPrimoAnno({ y1: { prevention: { sessions: 8 } }, days_osteo_y1: 4, l1: 2, l2: 2, training_sessions_y1: 2 });
+  assert.ok(!q.some(t => /giornat/.test(t)), q.join(' | '));
+  assert.ok(!/giornate sportello/.test(src('pages/api/clients/[id]/generate-activation-report.js').replace(/^\s*\/\/.*$/gm, '')));
+  assert.ok(!/gg\/anno/.test(src('pages/dashboard/offer.js')));
+  assert.match(cosaComprendeMarkdown({ piano: [{ titolo: 'Livello 2 (segnali senza impatto)', testo: '4 trattamenti di prevenzione nell\'anno.' }] }), /- \*\*Livello 2 \(segnali senza impatto\):\*\* 4 trattamenti di prevenzione/);
+  assert.equal(ND_POCHI, 'N.d. poiché < 3 persone');
+  for (const f of ['pages/dashboard/offer.js', 'components/ReportView.jsx', 'pages/dashboard/presentazione/[clientId].js', 'lib/sintesi.js']) {
+    assert.ok(!/gruppo &lt;|\(gruppo </.test(src(f)), `${f}: ancora «gruppo < 3»`);
+  }
+  assert.match(prossimiPassi()[5], /per chi ha iniziato un percorso, di trattamento \(Livello 1\) o di prevenzione \(Livello 2\)/);
+});

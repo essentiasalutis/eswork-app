@@ -1,9 +1,8 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
-import { getClients, getPatientsByClient, getFirstMeeting } from '../../lib/store';
-import { tariffeMancanti } from '../../lib/tariffe.mjs';
-import { calculatePricing, fmt } from '../../lib/calculator';
+import { getClients, getFirstMeeting } from '../../lib/store';
+import { fmt } from '../../lib/calculator';
 import { tierFromEmployees } from '../../lib/pricing/tier';
 import NavMenu from '../../components/NavMenu';
 import { trovaStage, normalizza, isFirmato, isAperto } from '../../lib/pipeline';
@@ -15,13 +14,20 @@ function getTier(employees) {
   return tierFromEmployees(employees); // fonte unica: lib/pricing/tier.js
 }
 
-// Stima L1 da dipendenti (avg sector)
-function estimateL1(employees, sector) {
-  const n = parseInt(employees) || 0;
-  return Math.round(n * (sector === 1 ? 0.17 : 0.12));
-}
+// Numeri economici di ogni azienda dalla STESSA fonte dell'Offerta (Enrico, 28/9: «allineala»).
+// Dopo il check-up: il prezzo dell'Offerta (Livello 1 e 2 osservati, tetto e prezzo applicato
+// compresi) e il suo costo. Prima: la Stima registrata, media della forbice, senza costo.
+// Senza l'uno né l'altra: nessun valore, e la riga lo dice. Fino a oggi qui si stimava il
+// Livello 1 per settore (17% / 12%) e il Livello 2 come Livello 1 × 2,2, contando i soli
+// rispondenti: numeri di riserva che scattavano senza dirlo.
+const FONTE = {
+  checkup: (e) => `dal check-up (${e.risposte} risposte)`,
+  stima: (e) => `Stima registrata: media di ${fmt(e.min)} – ${fmt(e.max)}`,
+  errore: (e) => e.nota || 'prezzo non calcolabile',
+  nessuna: () => 'nessun check-up né Stima registrata',
+};
 
-export default function FinancePage({ clients, patientCounts, tariffe = {} }) {
+export default function FinancePage({ clients, economia = {} }) {
   // Le aziende DEMO (clients.is_demo, v49) restano VISIBILI in tabella con badge,
   // ma non entrano in NESSUN aggregato economico: ARR, pipeline, forecast, margini
   // e revenue per tier devono riflettere solo clienti reali. Senza questo filtro il
@@ -38,25 +44,21 @@ export default function FinancePage({ clients, patientCounts, tariffe = {} }) {
   // KPI
   let totalARR = 0;
   let totalCost = 0;
+  let ricavoConCosto = 0;   // il margine si calcola solo dove il costo è noto
   const clientsWithFinance = clients.map(c => {
-    const l1 = patientCounts[c.id]?.l1 || estimateL1(c.employees, c.sector);
-    const l2 = patientCounts[c.id]?.l2 || Math.round(l1 * 2.2);
-    // Instradato per versione listino del cliente (fail-safe v1). Tariffe dell'azienda
-    // (Stima congelata o scheda del colloquio), mai quelle standard di riserva (21/9):
-    // se mancano, la riga lo dice e l'azienda non entra nei totali.
-    const senzaTariffe = tariffeMancanti(tariffe[c.id]).length > 0;
-    const calc = senzaTariffe ? null : calculatePricing({ n: parseInt(c.employees) || 0, l1, l2, pricingVersion: c.pricing_version || 'v1', rates: tariffe[c.id] });
+    const e = economia[c.id] || { fonte: 'nessuna' };
     const isActive = isFirmato(c.pipeline_stage);
-    const revenue = calc?.price_y1 || 0;
-    // Costo dal motore (y1.total_cost: professionisti + quota al 30%). Fino al 21/9 si
-    // leggeva un campo che il motore non produce: costo sempre vuoto e margine 0%.
-    const cost = calc?.y1 ? Math.round(calc.y1.total_cost) : 0;
-    const margin = revenue > 0 && cost > 0 ? Math.round(((revenue - cost) / revenue) * 100) : 0;
-    if (isActive && !c.is_demo) { totalARR += revenue; totalCost += cost; }
-    return { ...c, calc, revenue, cost, margin, l1, l2, senzaTariffe };
+    const revenue = e.revenue || 0;
+    const cost = e.cost || 0;
+    const margin = revenue > 0 && cost > 0 ? Math.round(((revenue - cost) / revenue) * 100) : null;
+    if (isActive && !c.is_demo) {
+      totalARR += revenue;
+      if (cost > 0) { totalCost += cost; ricavoConCosto += revenue; }
+    }
+    return { ...c, revenue, cost, margin, l1: e.l1 ?? null, l2: e.l2 ?? null, fonte: (FONTE[e.fonte] || FONTE.nessuna)(e), errore: e.fonte === 'errore' };
   });
 
-  const totalMargin = totalARR > 0 ? Math.round((1 - totalCost / totalARR) * 100) : 0;
+  const totalMargin = ricavoConCosto > 0 ? Math.round((1 - totalCost / ricavoConCosto) * 100) : 0;
 
   const pipelineValue = prospectClients.reduce((sum, c) => {
     const cf = clientsWithFinance.find(x => x.id === c.id);
@@ -171,12 +173,15 @@ export default function FinancePage({ clients, patientCounts, tariffe = {} }) {
                             </span>
                           ); })()}
                         </td>
-                        <td className="px-4 py-3 text-gray-600">{c.l1} / {c.l2}</td>
-                        <td className="px-4 py-3 font-semibold text-green-700">{c.senzaTariffe ? <span className="text-xs font-semibold text-red-600">tariffe mancanti</span> : c.revenue > 0 ? fmt(c.revenue) : '—'}</td>
+                        <td className="px-4 py-3 text-gray-600" title="Persone attese sull'intera popolazione, dalle risposte del check-up">{c.l1 != null ? `${c.l1} / ${c.l2}` : '—'}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-green-700">{c.revenue > 0 ? fmt(c.revenue) : '—'}</div>
+                          <div className={`text-[11px] ${c.errore ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>{c.fonte}</div>
+                        </td>
                         <td className="px-4 py-3 text-gray-500">{c.cost > 0 ? fmt(c.cost) : '—'}</td>
                         <td className="px-4 py-3">
                           <span className={`font-bold ${c.margin > 40 ? 'text-green-600' : c.margin > 30 ? 'text-amber-600' : 'text-red-600'}`}>
-                            {c.revenue > 0 ? `${c.margin}%` : '—'}
+                            {c.margin != null ? `${c.margin}%` : '—'}
                           </span>
                         </td>
                       </tr>
@@ -189,7 +194,7 @@ export default function FinancePage({ clients, patientCounts, tariffe = {} }) {
 
           {/* Note */}
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-700">
-            <strong>Note:</strong> {demoCount > 0 && <>Le {demoCount} aziende marcate <strong>DEMO</strong> sono elencate ma <strong>escluse</strong> da ARR, pipeline, forecast, margini e revenue per tier. </>}I valori revenue e L1/L2 sono stime basate sul calcolatore quando i dati reali non sono disponibili. Gli stati sono quelli della Pipeline: gli <strong>accettati</strong> (contratto firmato) formano l&apos;ARR, il forecast aggiunge metà del valore delle <strong>offerte aperte</strong>, i &laquo;Non ora&raquo; restano fuori dal valore della pipeline. Margini calcolati senza costi fissi aziendali.
+            <strong>Note:</strong> {demoCount > 0 && <>Le {demoCount} aziende marcate <strong>DEMO</strong> sono elencate ma <strong>escluse</strong> da ARR, pipeline, forecast, margini e revenue per tier. </>}Revenue e L1/L2 vengono dalla stessa fonte dell&apos;Offerta: dopo il check-up il prezzo proposto (Livello 1 e 2 osservati, riportati su tutta la popolazione); prima, la media della forbice della Stima registrata, senza costo né margine; senza l&apos;uno né l&apos;altra nessun valore. Il margine totale conta solo le aziende con il costo noto. Gli stati sono quelli della Pipeline: gli <strong>accettati</strong> (contratto firmato) formano l&apos;ARR, il forecast aggiunge metà del valore delle <strong>offerte aperte</strong>, i &laquo;Non ora&raquo; restano fuori dal valore della pipeline. Margini calcolati senza costi fissi aziendali.
           </div>
         </main>
       </div>
@@ -197,34 +202,42 @@ export default function FinancePage({ clients, patientCounts, tariffe = {} }) {
   );
 }
 
+// Una riga di Finanza = quello che l'Offerta proporrebbe oggi (lib/offerta-server.js).
+async function economiaCliente(c) {
+  const [{ statoCheckupCliente }, { datiOffertaDaCheckup }] = await Promise.all([
+    import('../../lib/checkup-server'), import('../../lib/offerta-server'),
+  ]);
+  const stato = await statoCheckupCliente(c).catch(() => null);
+  const a = stato && stato.assessment;
+  if (a) {
+    try {
+      const d = await datiOffertaDaCheckup({ assessmentId: a.id, n: c.employees });
+      if (d && d.errore) return { fonte: 'errore', nota: d.errore };
+      if (d && d.calc && d.responders > 0) {
+        const cost = d.costoAnno1 != null ? d.costoAnno1 : (d.calc.y1 ? d.calc.y1.total_cost : null);
+        return { fonte: 'checkup', risposte: d.responders, l1: d.calc.l1, l2: d.calc.l2, revenue: d.calc.price_y1, cost: cost != null ? Math.round(cost) : null };
+      }
+    } catch (e) {
+      return { fonte: 'errore', nota: (e && e.message) || 'prezzo non calcolabile' };
+    }
+  }
+  const fm = await getFirstMeeting(c.id).catch(() => null);
+  const f = fm && fm.stima_snapshot && fm.stima_snapshot.forchetta;
+  if (f && f.min && f.max && f.min.price_y1 != null && f.max.price_y1 != null) {
+    const media = f.avg && f.avg.price_y1 != null ? f.avg.price_y1 : Math.round((f.min.price_y1 + f.max.price_y1) / 2);
+    return { fonte: 'stima', revenue: media, min: f.min.price_y1, max: f.max.price_y1 };
+  }
+  return { fonte: 'nessuna' };
+}
+
 export const getServerSideProps = requireAuthSsr(async () => {
   try {
     const clients = await getClients();
 
-    // Per ogni cliente, conta L1/L2 reali
-    const patientCounts = {};
-    await Promise.all(
-      clients.map(async c => {
-        const patients = await getPatientsByClient(c.id).catch(() => []);
-        patientCounts[c.id] = {
-          l1: patients.filter(p => p.level === 'level1').length,
-          l2: patients.filter(p => p.level === 'level2').length,
-          total: patients.length,
-        };
-      })
-    );
-
-    // Tariffe di ogni azienda, dalla stessa fonte dell'Offerta: la Stima congelata se
-    // c'è (solo lei), altrimenti la scheda del colloquio. Nessuna di riserva (21/9).
-    const tariffe = {};
-    await Promise.all(clients.map(async c => {
-      const fm = await getFirstMeeting(c.id).catch(() => null);
-      const snap = fm && fm.stima_snapshot && fm.stima_snapshot.forchetta ? fm.stima_snapshot : null;
-      tariffe[c.id] = snap ? ((snap.inputs && snap.inputs.rates) || null) : ((fm && fm.data && fm.data.params && fm.data.params.rates) || null);
-    }));
-
-    return { props: { clients, patientCounts, tariffe } };
+    const economia = {};
+    await Promise.all(clients.map(async c => { economia[c.id] = await economiaCliente(c); }));
+    return { props: { clients, economia: JSON.parse(JSON.stringify(economia)) } };
   } catch {
-    return { props: { clients: [], patientCounts: {}, tariffe: {} } };
+    return { props: { clients: [], economia: {} } };
   }
 });

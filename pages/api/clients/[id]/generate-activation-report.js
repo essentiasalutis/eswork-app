@@ -25,6 +25,7 @@ import { isFirmato } from '../../../../lib/checkup-server';
 import { nomeLivello } from '../../../../lib/livelli';
 import { prezzoConTetto, applicaTettoAlCalcolo, STATI } from '../../../../lib/forbice.mjs';
 import { cosaComprendeMarkdown, inserisciCosaComprende, VOCI_PROGRAMMA, quantitaPrimoAnno } from '../../../../lib/programma';
+import { pianoPerLivello } from '../../../../lib/presentazione-testi.mjs';
 import { getForchettaSnapshot, freezeStimaSnapshot } from '../../../../lib/pricing/snapshot';
 import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
@@ -142,7 +143,9 @@ export default requireAuth(async function handler(req, res) {
       const l1Visibile = stratTotal >= K_ANON && !kAnonPartition([
         { key: 'l1', count: l1Count }, { key: 'l2', count: l2Count }, { key: 'l3', count: l3Count },
       ], stratTotal).find(c => c.key === 'l1').suppressed;
-      sezioneComprende = cosaComprendeMarkdown({ quantita: quantitaPrimoAnno(quoteCalc, { mostraCicli: l1Visibile }), investimento: quoteCalc ? quoteCalc.price_y1 : null });
+      // Lo stesso programma per livello della presentazione e dell'Offerta (27/9).
+      const ergonomiaNelPrezzo = !!(quoteCalc && quoteCalc.y1 && quoteCalc.y1.ergonomia && quoteCalc.y1.ergonomia.sell > 0);
+      sezioneComprende = cosaComprendeMarkdown({ quantita: quantitaPrimoAnno(quoteCalc, { mostraCicli: l1Visibile }), piano: pianoPerLivello({ ergonomia: ergonomiaNelPrezzo }), investimento: quoteCalc ? quoteCalc.price_y1 : null });
     }
   }
   const nomeProdotto = isPacchetto
@@ -554,7 +557,7 @@ export async function buildQuoteBlock(client_id, client, answers) {
       ? `\n- Include la consulenza ergonomico-posturale — osservazione delle postazioni di lavoro e del gesto, con raccomandazioni di adeguamento e indicazioni personalizzate — ${pezzi.join('; ')}. È già compresa nell'investimento, non è un'attività da acquistare a parte. Non sostituisce la valutazione dei rischi ai sensi del D.Lgs. 81/2008, che resta di competenza del datore di lavoro e dell'RSPP.`
       : '';
 
-    const block = `\n${demo ? TESTA_BLOCCO_DEMO : TESTA_BLOCCO}\n- Programma Anno 1: €${eur(realPrice)}${inLinea} (${calc.days_osteo_y1} giornate sportello, ${calc.training_sessions_y1} sessioni formative)\n- Anno 2 e successivi (indicativo): €${eur(calc.price_y2)}${rigaDimensionamento}${rigaErgonomia}`;
+    const block = `\n${demo ? TESTA_BLOCCO_DEMO : TESTA_BLOCCO}\n- Programma Anno 1: €${eur(realPrice)}${inLinea}\n- Anno 2 e successivi (indicativo): €${eur(calc.price_y2)}${rigaDimensionamento}${rigaErgonomia}`;
     // `calc` con il tetto già applicato: la sezione «Cosa comprende» stampa
     // l'investimento e deve dire il prezzo proposto, non il calcolato.
     return { block, compliance, calc: calcFinale };

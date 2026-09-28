@@ -5,7 +5,7 @@ import {
   TYPE_LABELS, generateSummaryText,
 } from '../lib/scoring';
 import { CONFIG } from '../lib/config';
-import { kAnonPartition, maskCount, tooSmall, K_ANON, K_ANON_INCROCIO, SUPPRESSED, livelliLeggibili, nomeCella, NOTA_LIVELLI_UNITI, NOTA_NESSUNA_DISTRIBUZIONE } from '../lib/kanon';
+import { kAnonPartition, maskCount, tooSmall, K_ANON, K_ANON_INCROCIO, SUPPRESSED, ND_POCHI, livelliLeggibili, nomeCella, NOTA_LIVELLI_UNITI, NOTA_NESSUNA_DISTRIBUZIONE } from '../lib/kanon';
 import { zoneDaMostrare, NOTA_DISTRETTI } from '../lib/distretti';
 import { nomeLivello } from '../lib/livelli';
 import { dataIt } from '../lib/date-it.mjs';
@@ -235,7 +235,9 @@ function LevelBoxes({ nmq }) {
       </div>}
       {LL.unite && <div className="text-xs text-gray-400 text-center mb-2">{NOTA_LIVELLI_UNITI}</div>}
       <div className="text-xs text-gray-400 text-center mb-2">
-        Prevalenza generica: <strong>{prevShown ? `${nmq.prevalence.pct}%` : SUPPRESSED}</strong> ha riportato almeno un fastidio negli ultimi 12 mesi (dato informativo)
+        {prevShown
+          ? <>Prevalenza generica: <strong>{nmq.prevalence.pct}%</strong> ha riportato almeno un fastidio negli ultimi 12 mesi (dato informativo)</>
+          : <>Prevalenza generica: <strong>{ND_POCHI}</strong></>}
       </div>
     </div>
   );
@@ -500,7 +502,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
           z.soppressa ? (
             <div key={i} className="flex items-center gap-2 mb-1.5">
               <div className="w-36 text-xs text-gray-600 text-right flex-shrink-0 truncate">{z.zone}</div>
-              <div className="flex-1 text-xs text-gray-400 italic">{SUPPRESSED} (gruppo &lt; {K_ANON})</div>
+              <div className="flex-1 text-xs text-gray-400 italic">{ND_POCHI}</div>
             </div>
           ) : (
             <HBar key={i} label={z.zone} value={z.pct12} />
@@ -508,7 +510,7 @@ export default function ReportView({ assessment, client, baseline, onOpenCalcula
         ))}
         <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-100">
           {maskCount(nmq.prevalence.count) == null
-            ? <>Prevalenza: <strong>{SUPPRESSED}</strong> (gruppo &lt; {K_ANON})</>
+            ? <>Prevalenza: <strong>{ND_POCHI}</strong></>
             : <>Prevalenza: <strong>{nmq.prevalence.count}</strong> dip. ({nmq.prevalence.pct}%) con almeno 1 disturbo negli ultimi 12 mesi</>}
         </div>
       </div>

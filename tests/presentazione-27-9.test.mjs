@@ -51,7 +51,7 @@ test('prossimi passi: prima l\'accettazione dell\'offerta, poi il contratto entr
   assert.equal(p.length, 6);
   assert.equal(p[0], 'Accettazione dell\'offerta: la firma in fondo all\'Offerta.');
   assert.equal(p[1], 'Firma del contratto, entro 15 giorni dall\'accettazione.');
-  assert.match(p[5], /^Review al mese 3 per chi è stato in Livello 1 al check-up; al mese 6 nuovo check-up di tutta la popolazione/);
+  assert.match(p[5], /^Review al mese 3 per chi ha iniziato un percorso, di trattamento \(Livello 1\) o di prevenzione \(Livello 2\); al mese 6 nuovo check-up di tutta la popolazione/);
   // la data è quella stampata in fondo all'Offerta, con l'articolo giusto
   assert.equal(prossimiPassi({ scadenzaOfferta: '2026-10-07' })[0], 'Accettazione dell\'offerta: la firma in fondo all\'Offerta, entro il 7 ottobre 2026.');
   assert.equal(prossimiPassi({ scadenzaOfferta: '2026-10-08' })[0], 'Accettazione dell\'offerta: la firma in fondo all\'Offerta, entro l\'8 ottobre 2026.');

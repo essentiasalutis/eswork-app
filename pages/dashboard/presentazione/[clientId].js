@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { K_ANON, livelliLeggibili, nomeCella, NOTA_LIVELLI_UNITI, NOTA_NESSUNA_DISTRIBUZIONE } from '../../../lib/kanon';
+import { K_ANON, ND_POCHI, livelliLeggibili, nomeCella, NOTA_LIVELLI_UNITI, NOTA_NESSUNA_DISTRIBUZIONE } from '../../../lib/kanon';
 import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../../lib/auth';
@@ -46,7 +46,7 @@ function Fotografia({ d }) {
                   <div key={z.zone} className="flex items-center gap-4">
                     <div className="w-60 text-lg text-gray-800">{z.zone}</div>
                     {z.soppressa ? (
-                      <div className="flex-1 text-base italic text-gray-400">n.d. (gruppo &lt; {K_ANON})</div>
+                      <div className="flex-1 text-base italic text-gray-400">{ND_POCHI}</div>
                     ) : (
                       <>
                         <div className="flex-1 h-5 bg-gray-100 rounded-lg overflow-hidden"><div className="h-full bg-green-600 rounded-lg" style={{ width: `${z.pct12 > 0 ? Math.max(z.pct12, 3) : 0}%` }} /></div>

@@ -186,3 +186,12 @@ test('6 e 12 mesi: livelli uniti, confronto del Livello 1 solo con almeno 3 pers
   assert.match(cp, /if \(!t12\.l1Confrontabile\) \{\n\s+out\.push\(L1_NON_CONFRONTABILE\);/);
   assert.ok(!/`L1 \$\{t0\.l1pct\}%, L2/.test(cp), 'niente più percentuali per livello senza soglia');
 });
+
+test('pagina Stima: la forbice registrata (la promessa) si vede e «Registra di nuovo» la nomina (28/9)', () => {
+  const api = src('pages/api/stima.js');
+  assert.match(api, /function promessa\(snap\)/);
+  assert.equal((api.match(/\.\.\.promessa\(/g) || []).length, 3);
+  const pag = src('pages/dashboard/stima.js');
+  assert.match(pag, /il tetto promesso al cliente/);
+  assert.match(pag, /\$\{forbiceReg\}/);
+});

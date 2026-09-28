@@ -87,7 +87,9 @@ export default function StimaPage() {
   // fatta al cliente (tetto dell'Anno 1 dopo il check-up) e la pipeline passa a «Stima
   // inviata». Scaricare, inviare o aprire il riepilogo non registrano niente.
   async function registraStima() {
-    if (snapMeta && snapMeta.exists && !window.confirm(`Sostituisce la Stima registrata${snapMeta.at ? ` il ${dataIt(snapMeta.at, { day: '2-digit', month: 'short', year: 'numeric' })}` : ''} con i numeri di adesso. Procedo?`)) return;
+    const eurR = (x) => `€${Math.round(Number(x) || 0).toLocaleString('it-IT', { useGrouping: 'always' })}`;
+    const promessaR = snapMeta && snapMeta.forbice ? ` (forbice ${eurR(snapMeta.forbice.min)} – ${eurR(snapMeta.forbice.max)}, il tetto promesso al cliente)` : '';
+    if (snapMeta && snapMeta.exists && !window.confirm(`Sostituisce la Stima registrata${snapMeta.at ? ` il ${dataIt(snapMeta.at, { day: '2-digit', month: 'short', year: 'numeric' })}` : ''}${promessaR} con i numeri di adesso. Procedo?`)) return;
     setBusy(true); setErr('');
     try {
       const r = await fetch('/api/stima', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildBody(false, variante, true)) });
@@ -193,10 +195,12 @@ export default function StimaPage() {
           {puoRegistrare && (() => {
             const s = snapMeta;
             const fmt = s.at ? dataIt(s.at, { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+            const eurB = (x) => `€${Math.round(Number(x) || 0).toLocaleString('it-IT', { useGrouping: 'always' })}`;
+            const forbiceReg = s.forbice ? ` (forbice ${eurB(s.forbice.min)} – ${eurB(s.forbice.max)})` : '';
             let text, cls, icon;
-            if (s.frozen) { icon = '🔒'; text = `Stima registrata${fmt ? ` il ${fmt}` : ''} e congelata: il Report di Attivazione è già stato generato, non si modifica più.`; cls = 'bg-gray-100 text-gray-600 border-gray-200'; }
+            if (s.frozen) { icon = '🔒'; text = `Stima registrata${fmt ? ` il ${fmt}` : ''}${forbiceReg} e congelata: il Report di Attivazione è già stato generato, non si modifica più.`; cls = 'bg-gray-100 text-gray-600 border-gray-200'; }
             else if (!s.exists) { icon = '⚠'; text = 'Stima NON registrata: dopo il check-up vale il prezzo pieno, senza forbice. Se la consegni al cliente, premi «Registra Stima».'; cls = 'bg-amber-50 text-amber-900 border-amber-300 font-semibold'; }
-            else { icon = '✓'; text = `Stima registrata${fmt ? ` il ${fmt}` : ''}: la sua forbice è il tetto dell'Anno 1 dopo il check-up.${s.preview ? ' Se i numeri qui sopra sono cambiati, «Registra di nuovo» la sostituisce.' : ''}`; cls = 'bg-green-50 text-green-700 border-green-200'; }
+            else { icon = '✓'; text = `Stima registrata${fmt ? ` il ${fmt}` : ''}${forbiceReg}: la sua forbice è il tetto dell'Anno 1 dopo il check-up.${s.nota ? ` ${s.nota} Non premere «Registra di nuovo»: sostituirebbe la forbice promessa con quella qui sopra.` : s.preview ? ' Se i numeri qui sopra sono cambiati, «Registra di nuovo» la sostituisce.' : ''}`; cls = 'bg-green-50 text-green-700 border-green-200'; }
             return <div className="max-w-6xl mx-auto px-5 pb-2"><div className={`text-xs px-3 py-1.5 rounded-lg border ${cls}`}>{icon} {text}</div></div>;
           })()}
           {err && <div className="max-w-6xl mx-auto px-5 pb-2 text-xs text-amber-700">{err}</div>}

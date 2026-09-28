@@ -31,18 +31,27 @@ const SECTOR_LABELS = {
 // Snapshot Stima→Report: se v2 con clientId, decide fra CONGELATO (catena chiusa),
 // REGISTRAZIONE (registra=true, catena aperta) o ANTEPRIMA. Ritorna i flag per la UI
 // e l'eventuale snapshot congelato (per mostrare la forbice promessa).
+// La forbice REGISTRATA (la promessa), da mostrare accanto all'anteprima: con Sella (28/9)
+// la promessa è quella presentata il 17/6 e l'anteprima del listino nuovo dice altro.
+function promessa(snap) {
+  const s = snap && (snap.forchetta ? snap : snap.programma_completo);
+  const f = s && s.forchetta;
+  if (!f || !f.min || !f.max) return {};
+  return { forbice: { min: f.min.price_y1, max: f.max.price_y1 }, nota: s.nota || null };
+}
+
 async function applySnapshot({ clientId, pricingVersion, registra, draftBuilder }) {
   if (pricingVersion !== 'v2' || !clientId) return { info: null, frozenSnap: null };
   const existing = getStimaSnapshot(await getFirstMeeting(clientId));
   if (await isChainClosed(clientId)) {
-    return { info: { exists: !!existing, frozen: true, source: 'snapshot', at: existing?.at || null }, frozenSnap: existing };
+    return { info: { exists: !!existing, frozen: true, source: 'snapshot', at: existing?.at || null, ...promessa(existing) }, frozenSnap: existing };
   }
   if (registra) {
     const snap = draftBuilder();
     const w = await writeStimaSnapshotIfOpen(clientId, snap);
-    return { info: { exists: true, frozen: w.frozen, source: 'snapshot', at: (w.snapshot && w.snapshot.at) || snap.at }, frozenSnap: w.frozen ? w.snapshot : null };
+    return { info: { exists: true, frozen: w.frozen, source: 'snapshot', at: (w.snapshot && w.snapshot.at) || snap.at, ...promessa(w.snapshot || snap) }, frozenSnap: w.frozen ? w.snapshot : null };
   }
-  return { info: { exists: !!existing, frozen: false, source: 'live', preview: true, at: existing?.at || null }, frozenSnap: null };
+  return { info: { exists: !!existing, frozen: false, source: 'live', preview: true, at: existing?.at || null, ...promessa(existing) }, frozenSnap: null };
 }
 
 export default requireAuth(async function handler(req, res) {

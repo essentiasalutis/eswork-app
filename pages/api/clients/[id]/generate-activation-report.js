@@ -1,5 +1,6 @@
 import { DEFINIZIONE_LIVELLI, IDENTITA_PROFESSIONALE, NIENTE_PARAGONI } from '../../../../lib/regole-report.mjs';
 import { generaConControllo } from '../../../../lib/controllo-report.mjs';
+import { istruzioniPresentazione, separaPresentazione, CORREZIONE_PRESENTAZIONE } from '../../../../lib/presentazione-report.mjs';
 import { parametriDaStimaCongelata } from '../../../../lib/pricing/v2-defaults.mjs';
 import { statoScontoCliente, applicaScontoAlCalcolo, avvisoRevisioneForbice, margine } from '../../../../lib/sconto.mjs';
 import { posizioneNellaForbice } from '../../../../lib/forbice.mjs';
@@ -289,17 +290,21 @@ RISULTATI CLINICI (tassativo): MAI promettere risultati clinici — niente «ris
 LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-up» — MAI «assessment» né «re-assessment»; dei dati dei dipendenti si dice che sono «riservati» — MAI «anonimi»; il documento presentato al colloquio è la «Stima di investimento». TRATTAMENTI (tassativo, Enrico 27/9): l'attività dell'osteopata si chiama «trattamento» — ciclo di trattamenti per il Livello 1, «trattamenti di prevenzione» per il Livello 2 — MAI «seduta/sedute» né «sessione/sessioni» (le «sessioni» sono solo quelle di formazione).
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.${sezioneComprende ? '\nCOMPONENTI: NON scrivere una sezione con l\'elenco delle componenti del programma né le loro quantità (niente «Cosa include» / «Cosa comprende»): la inserisce il sistema con i testi approvati.' : ''}
 DATA: se includi un'intestazione con il riepilogo del cliente, riporta "Data: ${dataOggi}". Usa ESATTAMENTE questa data; non inventarne altre né citare altre date nel testo.
-Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole totali.`;
+Tono: professionale, orientato ai dati. In italiano. Non più di 800 parole totali.
+${istruzioniPresentazione()}`;
     const chiedi = messages => anthropic.messages.create({ model: 'claude-sonnet-4-5', max_tokens: 4000, messages })
       .then(m => ({ testo: m.content[0]?.text || '', troncato: m.stop_reason === 'max_tokens' }));
     // Controllo automatico, come per i report di monitoraggio (lib/controllo-report.mjs).
-    const { testo, troncato, problemi, aiStatus } = await generaConControllo(chiedi, prompt, { scadenza: avvio + 45000 });
+    const { testo: testoAi, troncato, problemi, aiStatus } = await generaConControllo(chiedi, prompt, { scadenza: avvio + 45000, correzione: CORREZIONE_PRESENTAZIONE });
 
     // Testo troncato (visto l'11/9: "Prossimi Passi" finiva a metà frase) → meglio il testo di riserva.
     if (troncato) throw new Error('testo dell\'AI troncato: troppo lungo');
+    // I riassunti per la presentazione (28/9) stanno dopo il separatore: controllati con il
+    // report, salvati a parte. Se mancano la presentazione chiede di rigenerare il Report.
+    const { report: testo, presentazione } = separaPresentazione(testoAi);
     const report = conNota(conPassi(inserisciCosaComprende(testo, sezioneComprende)), true);
     const pdfUrl = await tryGeneratePdf(client, 'activation', report, id).catch(() => null);
-    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', ai_status: aiStatus, pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
+    const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', ai_status: aiStatus, pdf_url: pdfUrl, quote_compliance: quoteCompliance, presentazione }).catch(() => null);
     return res.json({ report, source: 'ai', ai_status: aiStatus, problemi, pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
     // Qui la chiamata è stata fatta: i dati SONO usciti, la risposta non è stata usata.

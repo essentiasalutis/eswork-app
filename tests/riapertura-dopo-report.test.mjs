@@ -79,7 +79,8 @@ test('elenco aziende: niente «N assessment · N attivo» (28/9)', () => {
 
 test('scheda: «in valutazione» e «programma attivato» si spiegano al passaggio del mouse (28/9)', () => {
   const s = src('pages/dashboard/[clientId].js');
-  assert.match(s, /title="Quale messaggio per i dipendenti prepara «Invia link al referente HR»/);
+  assert.match(s, /aria-label="Informazioni sul testo per i dipendenti"/);
+  assert.match(s, /title=\{'Quale messaggio per i dipendenti prepara «Invia link al referente HR»/);
   assert.match(s, /\['valutazione', 'in valutazione', 'Prima della firma\./);
   assert.match(s, /\['avvio', 'programma attivato', 'Dopo la firma\./);
   assert.match(s, /<button key=\{v\} title=\{spiega\}/);

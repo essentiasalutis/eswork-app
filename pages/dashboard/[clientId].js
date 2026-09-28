@@ -1050,8 +1050,11 @@ ${FIRMA}`,
                 {/* Momento e tono si scelgono QUI, al momento dell'invio. */}
                 <div className="flex items-center gap-1 text-[11px] text-gray-500">
                   {/* Spiegazioni al passaggio del mouse (Enrico, 28/9: «non ricordo cosa fanno»). */}
-                  <span className="font-semibold uppercase tracking-wide cursor-help"
-                    title="Quale messaggio per i dipendenti prepara «Invia link al referente HR». Si sceglie da solo in base al contratto (non firmato → in valutazione, firmato → programma attivato); puoi forzarlo qui.">Testo:</span>
+                  <span className="font-semibold uppercase tracking-wide">Testo:</span>
+                  {/* La «i» dice che c'è una spiegazione (Enrico, 28/9). */}
+                  <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-gray-400 text-gray-500 text-[10px] font-bold italic leading-none cursor-help select-none"
+                    aria-label="Informazioni sul testo per i dipendenti"
+                    title={'Quale messaggio per i dipendenti prepara «Invia link al referente HR».\n\n• in valutazione (prima della firma): l\'azienda sta valutando un programma, il check-up è conoscitivo.\n• programma attivato (dopo la firma): l\'azienda ha attivato il programma, costruito sui risultati del check-up; anticipa la richiesta di consenso.\n\nSi sceglie da solo in base al contratto; puoi forzarlo qui.'}>i</span>
                   {[
                     ['valutazione', 'in valutazione', 'Prima della firma. Il messaggio ai dipendenti dice che l\'azienda STA VALUTANDO un programma sui disturbi muscolo-scheletrici e che il check-up è conoscitivo; chi non compila non rientra nei percorsi individuali che l\'azienda deciderà eventualmente di attivare.'],
                     ['avvio', 'programma attivato', 'Dopo la firma. Il messaggio ai dipendenti dice che l\'azienda HA ATTIVATO il programma, che il programma si costruisce sui risultati del check-up, e anticipa che prima delle domande verrà chiesto il consenso al trattamento dei dati sulla salute.'],

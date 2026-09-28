@@ -169,7 +169,7 @@ export default function PricingV2Page() {
               <input type="number" min="1" max="20" step="1" defaultValue={texts.checkup_max_aperti ?? ''} placeholder="3" className={`${inputCls} mt-1`}
                 onBlur={e => { const v = e.target.value; if ((texts.checkup_max_aperti ?? '') !== v && /^\d+$/.test(v) && +v >= 1 && +v <= 20) put({ tipo: 'setting', key: 'checkup_max_aperti', value: v }, 'limite dei check-up salvato'); }} />
             </label>
-            <p className="text-[11px] text-gray-400 mt-2">Non convertiti = aziende reali in Check-up inviato, Report presentato o Offerta aperta. Oltre il limite, all&apos;avvio di un nuovo check-up compare un avviso (non un blocco).</p>
+            <p className="text-[11px] text-gray-400 mt-2">Non convertiti = aziende reali in Check-up inviato, Report presentato o Proposta aperta. Oltre il limite, all&apos;avvio di un nuovo check-up compare un avviso (non un blocco).</p>
             <p className="text-[11px] text-gray-400 mt-2">La data di chiusura parte da oggi + questi giorni e si può cambiare a ogni avvio. Il check-up chiude alle 23:59 di quel giorno; chi aveva già iniziato ha 30 minuti per inviare.</p>
           </div>
 
@@ -191,12 +191,12 @@ export default function PricingV2Page() {
 
           {/* Offerta: validità proposta per tutte le offerte, cancellabile */}
           <div className={box}>
-            <h2 className="font-semibold text-gray-800 mb-3">Offerta</h2>
-            <label className="block text-xs text-gray-500 max-w-xs">Validità dell'offerta (giorni, 1–90)
+            <h2 className="font-semibold text-gray-800 mb-3">Proposta di intervento</h2>
+            <label className="block text-xs text-gray-500 max-w-xs">Validità della proposta (giorni, 1–90)
               <input type="number" min="1" max="90" step="1" defaultValue={texts.offerta_giorni_a ?? ''} placeholder="10" className={`${inputCls} mt-1`}
                 onBlur={e => { const v = e.target.value; if ((texts.offerta_giorni_a ?? '') !== v && /^\d+$/.test(v) && +v >= 1 && +v <= 90) put({ tipo: 'setting', key: 'offerta_giorni_a', value: v }, 'validità dell\'offerta salvata'); }} />
             </label>
-            <p className="text-[11px] text-gray-400 mt-2">Quando sposti un&apos;azienda in &laquo;Offerta aperta&raquo; la scadenza viene proposta a oggi + questi giorni: puoi modificarla o cancellarla caso per caso. Per un&apos;azienda strutturata si alza (30 giorni).</p>
+            <p className="text-[11px] text-gray-400 mt-2">Quando sposti un&apos;azienda in &laquo;Proposta aperta&raquo; la scadenza viene proposta a oggi + questi giorni: puoi modificarla o cancellarla caso per caso. Per un&apos;azienda strutturata si alza (30 giorni).</p>
           </div>
 
           {/* Avvisi di revisione della forbice — il tetto porta il margine sotto la soglia */}
@@ -224,7 +224,7 @@ export default function PricingV2Page() {
                           <td className="text-right">€{Number(r.massimo).toLocaleString('it-IT', { useGrouping: 'always' })}</td>
                           <td className="text-right">€{Number(r.costo).toLocaleString('it-IT', { useGrouping: 'always' })}</td>
                           <td className="text-right font-semibold text-amber-700">{String(Number(r.margine_pct)).replace('.', ',')}% <span className="font-normal text-gray-400">(soglia {String(Number(r.soglia_pct)).replace('.', ',')}%)</span></td>
-                          <td>{r.fonte === 'report' ? 'Report di Attivazione' : 'Offerta'}</td>
+                          <td>{r.fonte === 'report' ? 'Report di Attivazione' : 'Proposta di intervento'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -237,7 +237,7 @@ export default function PricingV2Page() {
           <div className={box}>
             <h2 className="font-semibold text-gray-800 mb-2">Argomentario</h2>
             <ArgomentarioVoci />
-            <p className="text-[11px] text-gray-400 mt-2">Le 12 voci e i loro testi (per il cliente e per te) sono una lista unica, la stessa della Stima, del Report di Attivazione e dell&apos;Offerta. Per cambiarli chiedi a me.</p>
+            <p className="text-[11px] text-gray-400 mt-2">Le 12 voci e i loro testi (per il cliente e per te) sono una lista unica, la stessa della Stima, del Report di Attivazione e della proposta di intervento. Per cambiarli chiedi a me.</p>
           </div>
 
           {/* Servizi & deliverable */}

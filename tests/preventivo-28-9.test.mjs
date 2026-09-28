@@ -31,21 +31,23 @@ test('pagina del preventivo: niente Presenta/Sintesi, niente avviso di Chrome, �
   assert.match(offer, /🖥 Mostra al cliente/);
   // in modalità cliente spariscono i riquadri di lavoro e l'argomentario
   assert.match(offer, /\{!cliente && \(\n\s+<div className="no-print px-6 pt-4 pb-2">/);
-  assert.match(offer, /\{!cliente && \(\n\s+<aside className="no-print hidden lg:block/);
-  assert.match(offer, /<ArgomentarioVoci aperto \/>/);
+  // l'argomentario in un riquadro vicino a «Mostra al cliente», non a lato (28/9)
+  assert.ok(!/<aside/.test(offer));
+  assert.match(offer, /🖥 Mostra al cliente\n\s+<\/button>\n[\s\S]{0,800}📖 Argomentario/);
+  assert.match(offer, /\{conArgomentario && <div className="mb-2"><ArgomentarioVoci aperto \/><\/div>\}/);
   // in stampa il documento resta A4, a schermo si allarga
   assert.match(offer, /\.offer-doc \{ zoom: 1 !important; \}/);
-  assert.match(offer, /@media screen \{ \.offer-doc \{ zoom: var\(--zoom-doc, 1\); \} \}/);
+  assert.match(offer, /@media screen \{ \.offer-doc \{ zoom: var\(--zoom-doc, 1\); \}/);
 });
 
 test('documento: cruscotto, programma, investimento con le leve, accettazione — in quest\'ordine', () => {
   const doc = senzaCommenti(src('pages/dashboard/offer.js'));
   assert.ok(!/Piattaforma digitale ES Work/.test(doc), 'riquadro piattaforma tolto (resta la voce 11)');
-  const ordine = ['Cruscotto sintetico</div>', 'Il vostro programma nel primo anno</div>', 'Cosa comprende il programma</div>', '>Investimento</div>', 'Le leve economiche</div>', 'Accettazione offerta</div>'];
+  const ordine = ['Cruscotto sintetico</div>', 'Il vostro programma nel primo anno</div>', 'Cosa comprende il programma</div>', '>Investimento</div>', 'Le leve economiche</div>', 'Accettazione della proposta</div>'];
   const pos = ordine.map(t => doc.indexOf(t));
   assert.ok(pos.every(p => p > 0), JSON.stringify(pos));
   assert.deepEqual([...pos].sort((a, b) => a - b), pos);
-  assert.match(doc, /'Accettazione dell\\'offerta',/);
+  assert.match(doc, /'Accettazione della proposta',/);
   assert.match(src('pages/dashboard/offer.js'), /leveEconomichePreventivo\(t\.leve\.economiche, \{ conVoceOT23: t\.nuovoProgramma \}\)/);
 });
 
@@ -84,4 +86,35 @@ test('«Cosa comprende» allineato ai passi della presentazione; argomentario se
   assert.equal(RIGA_REPORT_ANNO, '4 report nell\'anno (di Attivazione, al mese 3, al mese 6 e annuale)');
   assert.equal(pianoPerLivello()[3].testo, `${RIGA_REPORT_ANNO}.`);
   assert.equal(quantitaPrimoAnno({ y1: {}, l1: 0, l2: 0 }).at(-1), RIGA_REPORT_ANNO);
+});
+
+test('«proposta di intervento» ovunque: niente «offerta» in ciò che legge il cliente (28/9)', async () => {
+  const { testoAccettazione, prossimiPassi } = await import('../lib/presentazione-testi.mjs');
+  const { fraseValidita, testoSollecitoOfferta } = await import('../lib/offerta.js');
+  const { STAGES } = await import('../lib/pipeline.js');
+  const testi = [
+    ...Object.values(testoAccettazione({ importo: '€5.576', iva: 'IVA', scadenza: '2026-10-08' })),
+    ...prossimiPassi({ scadenzaOfferta: '2026-10-08' }),
+    fraseValidita('2026-10-08'),
+    ...Object.values(testoSollecitoOfferta({ azienda: 'X', referente: 'Y', inviataIl: '2026-09-28', scadeIl: '2026-10-08' })),
+  ].join(' ');
+  assert.ok(!/offert/i.test(testi), testi);
+  assert.match(prossimiPassi()[0], /^Accettazione della proposta di intervento: la firma in fondo al documento\.$/);
+  assert.equal(STAGES.find(s => s.id === 'offer_open').label, 'Proposta aperta');
+  const offer = senzaCommenti(src('pages/dashboard/offer.js'));
+  for (const vecchio of [/Invia offerta via email/, /Accettazione offerta/, /Validità dell&apos;offerta/, /«Offerta aperta»/]) assert.ok(!vecchio.test(offer), String(vecchio));
+  assert.match(src('pages/dashboard/[clientId].js'), /📄 Proposta di intervento\{reportDopo\(a\) \? '' : ' \(bozza\)'\}/);
+});
+
+test('flusso: la proposta nasce dal Report (bozza prima, stesso prezzo dopo); la presentazione solo con il Report (28/9)', () => {
+  const offer = src('pages/dashboard/offer.js');
+  assert.match(offer, /const pronta = !!\(reportAttivazione && !prezzoDiverso\);/);
+  assert.match(offer, /reportAttivazione\.prezzo != null && Math\.round\(reportAttivazione\.prezzo\) !== Math\.round\(calc\.price_y1\)/);
+  for (const b of ['onClick={() => window.print()} disabled={!pronta}', 'onClick={openOfferEmail} disabled={!pronta}', 'onClick={mostraAlCliente} disabled={!pronta}']) assert.ok(offer.includes(b), b);
+  assert.match(offer, /BOZZA — NON VALIDA COME PROPOSTA DI INTERVENTO/);
+  // alla pagina solo data e prezzo del Report
+  assert.match(offer, /const reportAttivazione = rep \? \{ il: rep\.created_at, prezzo: /);
+  const pres = src('pages/dashboard/presentazione/[clientId].js');
+  assert.match(pres, /if \(d && !d\.errore && !d\.reportAttivazione\)/);
+  assert.match(src('pages/dashboard/[clientId].js'), /a\.id === sortedAssessments\[0\]\.id && reportDopo\(a\) && \(/);
 });

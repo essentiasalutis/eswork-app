@@ -1104,14 +1104,17 @@ ${FIRMA}`,
                               📊 Report
                             </button>
                           )}
+                          {/* Il flusso (Enrico, 28/9): chiudi il check-up → Report di Attivazione →
+                              da lì presentazione e proposta di intervento. Prima del Report la
+                              proposta si apre come bozza, solo per prezzo e prezzo applicato. */}
                           {rCount > 0 && a.type === 'initial' && (
                             <button onClick={() => openRealQuote(a)}
                               className="text-xs font-semibold text-green-700 bg-green-50 border border-green-300 px-3 py-1.5 rounded-xl hover:bg-green-100"
-                              title="Preventivo con i dati reali del check-up e le condizioni della scheda colloquio">
-                              📄 Preventivo (PDF)
+                              title={reportDopo(a) ? 'La proposta di intervento, con i numeri del Report di Attivazione' : 'Bozza: prezzo e prezzo applicato prima del Report di Attivazione'}>
+                              📄 Proposta di intervento{reportDopo(a) ? '' : ' (bozza)'}
                             </button>
                           )}
-                          {rCount > 0 && a.type === 'initial' && sortedAssessments[0] && a.id === sortedAssessments[0].id && (
+                          {rCount > 0 && a.type === 'initial' && sortedAssessments[0] && a.id === sortedAssessments[0].id && reportDopo(a) && (
                             <Link href={`/dashboard/presentazione/${client.id}`}
                               className="text-xs font-semibold text-white bg-gray-900 px-3 py-1.5 rounded-xl hover:bg-gray-700"
                               title="Presentazione a schermo del Report di Attivazione (secondo incontro)">

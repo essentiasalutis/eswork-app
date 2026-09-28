@@ -106,7 +106,7 @@ export default function FinancePage({ clients, economia = {} }) {
               { label: 'ARR Attuale', value: fmt(totalARR), sub: `${activeClients.length} ${activeClients.length === 1 ? 'cliente accettato' : 'clienti accettati'}`, color: '#16a34a' },
               { label: 'Margine Lordo', value: `${totalMargin}%`, sub: `Costi: ${fmt(totalCost)}`, color: totalMargin > 40 ? '#16a34a' : '#ca8a04' },
               { label: 'Pipeline Value', value: fmt(pipelineValue), sub: `${prospectClients.length} in trattativa${nonOraCount ? ` · ${nonOraCount} in Non ora` : ''}`, color: '#2563eb' },
-              { label: 'Forecast 6m', value: fmt(totalARR + forecast6m), sub: `+${fmt(forecast6m)} da ${offerteAperte.length} ${offerteAperte.length === 1 ? 'offerta aperta' : 'offerte aperte'}`, color: '#7c3aed' },
+              { label: 'Forecast 6m', value: fmt(totalARR + forecast6m), sub: `+${fmt(forecast6m)} da ${offerteAperte.length} ${offerteAperte.length === 1 ? 'proposta aperta' : 'proposte aperte'}`, color: '#7c3aed' },
             ].map(k => (
               <div key={k.label} className="bg-white rounded-2xl border border-gray-200 p-4">
                 <div className="text-xs text-gray-400 mb-1">{k.label}</div>

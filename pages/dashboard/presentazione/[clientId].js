@@ -124,7 +124,7 @@ function Piano({ d }) {
         <ul className="space-y-4">
           {d.quantita.map(q => <li key={q} className="text-2xl md:text-3xl text-gray-800 flex gap-4"><span className="text-green-600">●</span><span>{q}</span></li>)}
         </ul>
-      ) : <p className="text-2xl text-gray-600">Il piano è descritto nell&apos;Offerta.</p>}
+      ) : <p className="text-2xl text-gray-600">Il piano è descritto nella proposta di intervento.</p>}
     </>
   );
 }
@@ -253,7 +253,7 @@ export default function PresentazionePage({ d }) {
     else if (d.inRange === false) righe.push(['warn', `Fuori forbice: ${eur(d.prezzo.y1)} contro ${eur(d.forchetta.min)} – ${eur(d.forchetta.max)}. Prepara la motivazione: la schermata del preventivo lo mostra.`]);
     else righe.push(['info', 'Nessuna Stima registrata: prezzo pieno, senza forbice e senza tetto. La schermata del preventivo mostra solo il prezzo.']);
     righe.push(d.vista.pubblicabile ? ['ok', `${d.checkup.risposte} risposte al check-up.`] : ['warn', `Meno di ${K_ANON} risposte: fotografia e stratificazione non mostrano dati.`]);
-    if (d.scontoStato === 'sospeso') righe.push(['warn', 'Il prezzo applicato registrato è sospeso: i dati sono cambiati. Riconfermalo dall\'Offerta, altrimenti vale il prezzo pieno.']);
+    if (d.scontoStato === 'sospeso') righe.push(['warn', 'Il prezzo applicato registrato è sospeso: i dati sono cambiati. Riconfermalo dalla proposta di intervento, altrimenti vale il prezzo pieno.']);
     if (d.checkup.stato === 'aperto') righe.push(['warn', `Il check-up è ancora aperto${d.checkup.chiude_il ? ` (chiude il ${etichettaData(d.checkup.chiude_il)})` : ''}: i numeri possono ancora cambiare.`]);
 
     const icona = { ok: '✓', warn: '⚠', info: 'ℹ' };
@@ -315,5 +315,10 @@ export default function PresentazionePage({ d }) {
 export const getServerSideProps = requireAuthSsr(async (ctx) => {
   const { datiPresentazione } = await import('../../../lib/presentazione-server');
   const d = await datiPresentazione(ctx.params.clientId).catch(e => ({ errore: `Errore: ${e.message}` }));
+  // La presentazione nasce dal Report di Attivazione (Enrico, 28/9: chiudo il check-up →
+  // creo il Report → da lì presentazione e proposta di intervento).
+  if (d && !d.errore && !d.reportAttivazione) {
+    return { props: { d: { errore: 'La presentazione nasce dal Report di Attivazione: generalo dalla scheda dell\'azienda, poi torna qui.', azienda: d.azienda, clientId: d.clientId } } };
+  }
   return { props: { d: JSON.parse(JSON.stringify(d)) } };
 });

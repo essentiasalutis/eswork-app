@@ -74,8 +74,8 @@ test('accettazione (strada B): chi firma, importo con IVA forfettaria, 15 giorni
   assert.equal(GIORNI_FIRMA_CONTRATTO, 15);
   const a = testoAccettazione({ importo: '€5.576', iva: 'IVA non applicata — regime forfettario', scadenza: '2026-10-08' });
   assert.match(a.dichiarazione, /per un investimento nel primo anno di €5\.576 \(IVA non applicata — regime forfettario\)\.$/);
-  assert.equal(a.condizioni, `L'accettazione fissa le condizioni di questa offerta per ${GIORNI_FIRMA_CONTRATTO} giorni: il programma si attiva con la firma del contratto entro questo termine.`);
-  assert.equal(a.validita, 'La presente offerta è valida fino all\'8 ottobre 2026.');
+  assert.equal(a.condizioni, `L'accettazione fissa le condizioni di questa proposta per ${GIORNI_FIRMA_CONTRATTO} giorni: il programma si attiva con la firma del contratto entro questo termine.`);
+  assert.equal(a.validita, 'La presente proposta è valida fino all\'8 ottobre 2026.');
   assert.equal(testoAccettazione({}).validita, '');
   assert.ok(!/\+ IVA/.test(JSON.stringify(a)));
   const offer = src('pages/dashboard/offer.js');

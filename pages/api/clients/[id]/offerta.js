@@ -17,7 +17,7 @@ export default requireAuth(async function handler(req, res) {
     if (b.azione === 'inviata') {
       const scade = b.scade_il || null;
       if (scade !== null && (!isYmd(String(scade)) || scade < oggiRoma())) {
-        return res.status(422).json({ error: 'La scadenza dell\'offerta deve essere oggi o un giorno futuro.' });
+        return res.status(422).json({ error: 'La scadenza della proposta deve essere oggi o un giorno futuro.' });
       }
 
       // ── IL MASSIMO PROMESSO È IL MASSIMO ──────────────────────────────────
@@ -86,7 +86,7 @@ export default requireAuth(async function handler(req, res) {
 
     if (b.azione === 'sollecitata') {
       const { v55Mancante } = await aggiornaClienteTollerante(id, { offerta_sollecito_at: new Date().toISOString() });
-      if (v55Mancante) return res.status(409).json({ error: 'Serve la migration v55 (promemoria dell\'offerta): applicala in Supabase e riprova.' });
+      if (v55Mancante) return res.status(409).json({ error: 'Serve la migration v55 (promemoria della proposta): applicala in Supabase e riprova.' });
       return res.json({ ok: true });
     }
     return res.status(400).json({ error: 'azione non valida' });

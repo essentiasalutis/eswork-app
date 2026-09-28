@@ -119,7 +119,7 @@ function ModaleData({ richiesta, onConferma, onAnnulla }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-end md:items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-sm p-5 space-y-3">
-        <h3 className="font-semibold text-gray-800 text-base">{client.name} → {nonOra ? 'Non ora' : 'Offerta aperta'}</h3>
+        <h3 className="font-semibold text-gray-800 text-base">{client.name} → {nonOra ? 'Non ora' : 'Proposta aperta'}</h3>
         {nonOra ? (
           <>
             <p className="text-sm text-gray-600">Quando lo ricontatti? Comparirà in dashboard nella settimana della data.</p>
@@ -132,7 +132,7 @@ function ModaleData({ richiesta, onConferma, onAnnulla }) {
           </>
         ) : (
           <p className="text-sm text-gray-600">
-            L&apos;offerta scade in questa data, proposta dal Listino. Puoi cambiarla — o cancellarla, se questa offerta non deve scadere.
+            La proposta di intervento scade in questa data, suggerita dal Listino. Puoi cambiarla — o cancellarla, se questa proposta non deve scadere.
           </p>
         )}
         <input type="date" value={data} min={oggi} onChange={e => setData(e.target.value)}
@@ -303,7 +303,7 @@ export default function PipelinePage({ clients: initialClients, offertaGiorni = 
           <span className="text-gray-500">No: <strong>{stats.no}</strong></span>
           <span className="text-red-600">Declinati: <strong>{stats.lost}</strong></span>
           {(() => { const n = checkupNonConvertiti(clients).length; return (
-            <span className={n >= checkupMaxAperti ? 'text-red-600 font-semibold' : 'text-blue-700'} title="Aziende in Check-up inviato, Report presentato o Offerta aperta (demo escluse)">
+            <span className={n >= checkupMaxAperti ? 'text-red-600 font-semibold' : 'text-blue-700'} title="Aziende in Check-up inviato, Report presentato o Proposta aperta (demo escluse)">
               Check-up non convertiti: <strong>{n}/{checkupMaxAperti}</strong>
             </span>
           ); })()}

@@ -40,7 +40,7 @@ function EmailModal({ modal, onClose, onInvia, scadenza, stage }) {
     <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl w-full max-w-lg p-5 space-y-3 shadow-2xl">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-gray-800">Invia via email</h3>
+          <h3 className="font-semibold text-gray-800">Invia al referente</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
         </div>
         <div>
@@ -76,7 +76,7 @@ function EmailModal({ modal, onClose, onInvia, scadenza, stage }) {
           {normalizza(stage) === 'offer_open'
             ? ` Aprendo la mail la scadenza in Pipeline diventa ${scadenza ? dataIt(scadenza) : 'nessuna'}.`
             : avanzamento(normalizza(stage), 'offer_open')
-              ? ` Aprendo la mail l'azienda passa in «Offerta aperta»${scadenza ? `, con scadenza ${dataIt(scadenza)}` : ''}.`
+              ? ` Aprendo la mail l'azienda passa in «Proposta aperta»${scadenza ? `, con scadenza ${dataIt(scadenza)}` : ''}.`
               : ''}
         </p>
         <div className="flex gap-3">
@@ -169,7 +169,7 @@ function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine,
       </div>
 
       {revisioneForbice && (
-        <div className="mt-1.5">⚠ <strong>Il massimo della forbice porta il margine {conArticolo(revisioneForbice.marginePct, 'a')}</strong> ({fmt(revisioneForbice.margineEur)}), sotto la soglia {conArticolo(revisioneForbice.sogliaPct)}. Il tetto resta: è una promessa scritta. All&apos;invio dell&apos;offerta si registra come <strong>avviso di revisione dei parametri della forbice</strong> (lo trovi nel Listino).</div>
+        <div className="mt-1.5">⚠ <strong>Il massimo della forbice porta il margine {conArticolo(revisioneForbice.marginePct, 'a')}</strong> ({fmt(revisioneForbice.margineEur)}), sotto la soglia {conArticolo(revisioneForbice.sogliaPct)}. Il tetto resta: è una promessa scritta. All&apos;invio della proposta si registra come <strong>avviso di revisione dei parametri della forbice</strong> (lo trovi nel Listino).</div>
       )}
 
       {stato === 'attivo' && (
@@ -242,7 +242,7 @@ function PrezzoApplicato({ client, query, prezzoBase, costoAnno1, sogliaMargine,
 // niente «Perché riguarda l'azienda», «Come funziona» né «Prossimi passi», che sono già
 // nella presentazione; le leve economiche subito dopo l'investimento, a sostegno del prezzo.
 //   condivisi: { zone, piano, anno2, leve: { economiche }, nuovoProgramma, pacchetto }
-export default function OfferPage({ client, assessment, nmq, calc, forchetta, tetto = null, query = null, date, offertaGiorni = 10, prezzo = null, errore = null, condivisi = null }) {
+export default function OfferPage({ client, assessment, nmq, calc, forchetta, tetto = null, query = null, date, offertaGiorni = 10, prezzo = null, errore = null, condivisi = null, reportAttivazione = null }) {
   const [emailModal, setEmailModal] = useState(null);
   // Validità dell'offerta (Listino, 10 giorni): la stessa data dei prossimi passi della
   // presentazione. I 15 giorni sono un'altra cosa: dall'accettazione al contratto.
@@ -251,6 +251,7 @@ export default function OfferPage({ client, assessment, nmq, calc, forchetta, te
   // «Mostra al cliente» (Enrico, 28/9): a schermo intero resta solo il documento; forbice,
   // costo, margine e argomentario spariscono. Si esce con Esc (o uscendo dallo schermo intero).
   const [cliente, setCliente] = useState(false);
+  const [conArgomentario, setConArgomentario] = useState(false);
   // Sul PC di Enrico il documento occupa tutta la larghezza (28/9): si ingrandisce in
   // proporzione, come un PDF «adatta alla larghezza»; in stampa resta A4.
   const docRef = useRef(null);
@@ -294,7 +295,7 @@ export default function OfferPage({ client, assessment, nmq, calc, forchetta, te
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div role="alert" className="max-w-lg bg-red-50 border border-red-200 rounded-2xl p-5 text-sm text-red-800">
-          <strong>Offerta non generata.</strong> {errore}
+          <strong>Proposta di intervento non generata.</strong> {errore}
         </div>
       </div>
     );
@@ -340,6 +341,12 @@ export default function OfferPage({ client, assessment, nmq, calc, forchetta, te
   const dettaglioVoce = n => (calc && n === 6 && calc.training_sessions_y1 ? ` (${calc.training_sessions_y1} sessioni nel primo anno)` : '');
   const accettazione = testoAccettazione({ importo: calc ? fmt(calc.price_y1) : null, iva: DICITURA_IVA_BREVE, scadenza });
   const leveEconomiche = (condivisi && condivisi.leve && condivisi.leve.economiche) || [];
+  // La proposta nasce dal Report di Attivazione e ne porta il prezzo (Enrico, 28/9). Prima
+  // del Report è una bozza: qui si preparano prezzo e prezzo applicato, che il Report poi
+  // fissa. Se il prezzo di oggi non è più quello scritto nel Report, non esce.
+  const prezzoDiverso = !!(reportAttivazione && calc && reportAttivazione.prezzo != null && Math.round(reportAttivazione.prezzo) !== Math.round(calc.price_y1));
+  const pronta = !!(reportAttivazione && !prezzoDiverso);
+  const motivoSpento = !reportAttivazione ? 'Bozza: si accende dopo il Report di Attivazione' : prezzoDiverso ? 'Il prezzo non è quello del Report di Attivazione: rigeneralo' : undefined;
 
   // Emissione dell'offerta. Il prezzo è già capato al massimo promesso: emettere
   // non chiede nulla. Il server registra la traccia dello scostamento, e per
@@ -354,10 +361,10 @@ export default function OfferPage({ client, assessment, nmq, calc, forchetta, te
       }),
     }).catch(() => null);
     const j = r ? await r.json().catch(() => ({})) : {};
-    if (!r || !r.ok) setEsitoInvio({ ok: false, testo: j.error || 'Offerta non registrata in Pipeline: riprova.' });
+    if (!r || !r.ok) setEsitoInvio({ ok: false, testo: j.error || 'Proposta non registrata in Pipeline: riprova.' });
     else {
-      if (j.spostata) setEsitoInvio({ ok: true, testo: 'Azienda spostata in «Offerta aperta».' });
-      else if (j.stage === 'offer_open') setEsitoInvio({ ok: true, testo: 'Scadenza dell\'offerta aggiornata in Pipeline.' });
+      if (j.spostata) setEsitoInvio({ ok: true, testo: 'Azienda spostata in «Proposta aperta».' });
+      else if (j.stage === 'offer_open') setEsitoInvio({ ok: true, testo: 'Scadenza della proposta aggiornata in Pipeline.' });
     }
   }
 
@@ -460,7 +467,7 @@ ${FIRMA}`;
           .offer-layout { display: block !important; padding: 0 !important; }
           .offer-doc { zoom: 1 !important; }
         }
-        @media screen { .offer-doc { zoom: var(--zoom-doc, 1); } }
+        @media screen { .offer-doc { zoom: var(--zoom-doc, 1); } .solo-stampa { display: none; } }
         .section-label {
           font-size: 10px;
           font-weight: 700;
@@ -486,29 +493,49 @@ ${FIRMA}`;
             ← Indietro
           </button>
           <button
-            onClick={() => window.print()}
-            className="flex items-center gap-1 text-sm text-green-700 border border-green-300 bg-green-50 px-4 py-2 rounded-xl font-semibold"
+            onClick={() => window.print()} disabled={!pronta} title={motivoSpento}
+            className="flex items-center gap-1 text-sm text-green-700 border border-green-300 bg-green-50 px-4 py-2 rounded-xl font-semibold disabled:opacity-40"
           >
             🖨 Stampa / Salva PDF
           </button>
           <button
-            onClick={openOfferEmail}
-            className="flex items-center gap-1 text-sm text-blue-700 border border-blue-300 bg-blue-50 px-4 py-2 rounded-xl font-semibold"
+            onClick={openOfferEmail} disabled={!pronta} title={motivoSpento}
+            className="flex items-center gap-1 text-sm text-blue-700 border border-blue-300 bg-blue-50 px-4 py-2 rounded-xl font-semibold disabled:opacity-40"
           >
-            ✉ Invia offerta via email
+            ✉ Invia al referente
           </button>
           <button
-            onClick={mostraAlCliente}
-            className="flex items-center gap-1 text-sm text-white bg-gray-900 px-4 py-2 rounded-xl font-semibold"
-            title="Schermo intero con il solo documento: niente forbice, margine né argomentario. Esc per tornare."
+            onClick={mostraAlCliente} disabled={!pronta}
+            className="flex items-center gap-1 text-sm text-white bg-gray-900 px-4 py-2 rounded-xl font-semibold disabled:opacity-40"
+            title={motivoSpento || 'Schermo intero con il solo documento: niente forbice, margine né argomentario. Esc per tornare.'}
           >
             🖥 Mostra al cliente
           </button>
+          {/* L'argomentario in un riquadro vicino a «Mostra al cliente», non a lato del
+              documento (Enrico, 28/9). Solo per te, non si stampa. */}
+          <button
+            onClick={() => setConArgomentario(v => !v)} aria-expanded={conArgomentario}
+            className={`flex items-center gap-1 text-sm px-4 py-2 rounded-xl font-semibold border ${conArgomentario ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-amber-50 border-amber-200 text-amber-800'}`}
+          >
+            📖 Argomentario
+          </button>
         </div>
+        {conArgomentario && <div className="mb-2"><ArgomentarioVoci aperto /></div>}
+
+        {!reportAttivazione && (
+          <div className="mb-2 rounded-xl px-4 py-2.5 text-xs border bg-amber-50 border-amber-300 text-amber-900">
+            📝 <strong>Bozza.</strong> La proposta di intervento nasce dal Report di Attivazione: qui prepari il prezzo e, se serve, il prezzo applicato, che il Report poi fissa. Stampa, invio e «Mostra al cliente» si accendono dopo il Report, che si genera dalla scheda dell&apos;azienda.
+          </div>
+        )}
+        {prezzoDiverso && (
+          <div className="mb-2 rounded-xl px-4 py-2.5 text-xs border bg-red-50 border-red-200 text-red-800">
+            ⚠ <strong>Il prezzo di oggi, {fmt(calc.price_y1)}, non è quello scritto nel Report di Attivazione del {dataIt(reportAttivazione.il)}, {fmt(reportAttivazione.prezzo)}.</strong> La proposta deve avere i numeri del Report: rigenera il Report dalla scheda dell&apos;azienda.
+          </div>
+        )}
 
         {/* Validità dell'offerta — scelta qui, stampata nel documento se c'è una data */}
         <div className="mt-2 rounded-xl px-4 py-2.5 text-xs border bg-white border-gray-200 text-gray-700 flex items-center gap-2 flex-wrap">
-          <strong>⏳ Validità dell&apos;offerta</strong>
+          <strong>⏳ Validità della proposta</strong>
           <input type="date" value={scadenza} min={oggiRoma()} onChange={e => setScadenza(e.target.value)} className="border border-gray-300 rounded-lg px-2 py-1" />
           {scadenza
             ? <button onClick={() => setScadenza('')} className="text-gray-500 underline">togli la scadenza</button>
@@ -516,9 +543,6 @@ ${FIRMA}`;
           <span className="text-gray-500">{offertaGiorni} giorni dal Listino</span>
           {esitoInvio && <span className={`font-semibold ${esitoInvio.ok ? 'text-green-700' : 'text-red-600'}`}>{esitoInvio.testo}</span>}
         </div>
-
-        {/* Sotto lo schermo largo l'argomentario non ha spazio a lato: resta qui, chiuso. */}
-        <div className="mt-2 lg:hidden"><ArgomentarioVoci /></div>
 
         {/* Forbice della Stima — SOLO vista admin, mai nel PDF. Tre situazioni da
             distinguere: dentro il tetto, tetto applicato, nessuna forbice promessa.
@@ -539,7 +563,7 @@ ${FIRMA}`;
               ) : (
                 <>📐 <strong>Forbice della Stima</strong>: {fmt(tetto.min)} – {fmt(tetto.max)}{forchetta?.avg ? ` (medio ${fmt(forchetta.avg)})` : ''} ·{' '}
                 {st === 'dentro' && <><strong>preventivo dai dati reali {fmt(tetto.prezzo)}</strong> ✓ dentro la forbice, nessun tetto applicato.</>}
-                {st === 'capato' && <><strong>tetto applicato</strong>: il dimensionamento reale vale {fmt(tetto.calcolato)}, si propone il massimo promesso <strong>{fmt(tetto.max)}</strong> ({fmt(tetto.scostamento)} assorbiti). L&apos;offerta si invia così com&apos;è; lo scostamento resta registrato per la trattativa dell&apos;Anno 2.{' '}
+                {st === 'capato' && <><strong>tetto applicato</strong>: il dimensionamento reale vale {fmt(tetto.calcolato)}, si propone il massimo promesso <strong>{fmt(tetto.max)}</strong> ({fmt(tetto.scostamento)} assorbiti). La proposta si invia così com&apos;è; lo scostamento resta registrato per la trattativa dell&apos;Anno 2.{' '}
                   <button onClick={() => setSforamento({ calcolato: tetto.calcolato, massimo: tetto.max, scostamento: tetto.scostamento })}
                     className="underline font-semibold">Superare il massimo promesso…</button></>}
                 {st === 'sopra_autorizzato' && <><strong>⚠ sopra il massimo, autorizzato</strong>: proposto {fmt(tetto.calcolato)} contro un massimo promesso di {fmt(tetto.max)} ({fmt(tetto.scostamento)} oltre). Motivazione registrata il {client?.sforamento_forbice_at ? dataIt(client.sforamento_forbice_at) : '—'}.{' '}
@@ -561,10 +585,10 @@ ${FIRMA}`;
       {sforamento && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" style={{ WebkitPrintColorAdjust: 'exact' }}>
           <div className="bg-white rounded-2xl w-full max-w-lg p-5 space-y-3 shadow-2xl">
-            <h3 className="font-semibold text-gray-900">Questa offerta supera il massimo promesso</h3>
+            <h3 className="font-semibold text-gray-900">Questa proposta supera il massimo promesso</h3>
             <p className="text-sm text-gray-600 leading-relaxed">
               Nella Stima avete indicato un massimo di <strong>{fmt(sforamento.massimo)}</strong>. Il dimensionamento reale vale <strong>{fmt(sforamento.calcolato)}</strong>: <strong>{fmt(sforamento.scostamento)}</strong> oltre.
-              Puoi proporre lo stesso il prezzo pieno, ma la motivazione resta registrata sulla scheda — è interna, non compare in nessun documento del cliente. Finché non autorizzi, l&apos;offerta resta al massimo promesso.
+              Puoi proporre lo stesso il prezzo pieno, ma la motivazione resta registrata sulla scheda — è interna, non compare in nessun documento del cliente. Finché non autorizzi, la proposta resta al massimo promesso.
             </p>
             <label className="block text-xs font-semibold text-gray-500">Perché superi il massimo promesso (obbligatorio)
               <textarea value={motivoSforamento} onChange={e => setMotivoSforamento(e.target.value)} rows={3}
@@ -589,10 +613,9 @@ ${FIRMA}`;
         <button onClick={esciCliente} className="no-print fixed top-3 right-3 z-40 text-xs text-gray-400 hover:text-gray-700 bg-white/80 border border-gray-200 rounded-lg px-2 py-1" title="Torna alla vista di lavoro (Esc)">✕</button>
       )}
 
-      {/* Documento a tutta larghezza + argomentario a lato, che segue lo scorrimento
-          (Enrico, 28/9: «mettilo affianco a sintesi, con un box»). Mai stampato. */}
-      <div className="offer-layout px-6 pb-10 lg:flex lg:items-start lg:gap-6">
-        <div ref={docRef} className="flex-1 min-w-0">
+      {/* Documento a tutta larghezza (Enrico, 28/9); in stampa resta A4. */}
+      <div className="offer-layout px-6 pb-10">
+        <div ref={docRef}>
           <div className="offer-doc" style={{ '--zoom-doc': zoom }}>
 
       {/* ══════════════════════════════════════════════════════════════
@@ -616,6 +639,8 @@ ${FIRMA}`;
             <div style={{ fontSize: 22, color: '#1e293b', fontWeight: 700 }}>{client.name}</div>
           </div>
           <div style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>{date}</div>
+          {/* Una bozza stampata non deve sembrare una proposta valida. */}
+          {!pronta && <div className="solo-stampa" style={{ marginTop: 18, fontSize: 13, fontWeight: 800, color: '#b91c1c', letterSpacing: 1 }}>BOZZA — NON VALIDA COME PROPOSTA DI INTERVENTO</div>}
 
           <div style={{ marginTop: 48, width: '100%', maxWidth: 480, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 16, padding: '16px 24px', textAlign: 'left' }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Contenuto del documento</div>
@@ -624,7 +649,7 @@ ${FIRMA}`;
               'Disturbi muscolo-scheletrici — zone e stratificazione',
               ...(condivisi && condivisi.piano ? ['Il vostro programma nel primo anno e cosa comprende'] : []),
               leveEconomiche.length ? 'Investimento e leve economiche' : 'Investimento',
-              'Accettazione dell\'offerta',
+              'Accettazione della proposta',
             ].map((v, i, arr) => (
               <div key={i} style={{ fontSize: 12, color: '#374151', paddingTop: 5, paddingBottom: 5, borderBottom: i < arr.length - 1 ? '1px solid #f3f4f6' : 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ color: '#16a34a', fontWeight: 700 }}>{i + 1}.</span> {v}
@@ -946,7 +971,7 @@ ${FIRMA}`;
         <div>
         {/* — Accettazione e firma — */}
         <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 14, padding: '16px 20px' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Accettazione offerta</div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: '#4b5563', textTransform: 'uppercase', marginBottom: 8 }}>Accettazione della proposta</div>
           {/* Strada B (Enrico, 27/9): l'accettazione fissa le condizioni, il programma parte
               con il contratto entro 15 giorni. Nome e ruolo di chi firma; l'importo nella
               frase, così la pagina firmata porta il prezzo anche da sola. */}
@@ -1006,11 +1031,6 @@ ${FIRMA}`;
       </Page>
           </div>
         </div>
-        {!cliente && (
-          <aside className="no-print hidden lg:block w-[22rem] shrink-0 sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
-            <ArgomentarioVoci aperto />
-          </aside>
-        )}
       </div>
     </>
   );
@@ -1056,6 +1076,11 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
     const params = await getOrgParams().catch(() => ({ offertaGiorni }));
     const t = testiCondivisi({ client, d, fm, params });
     // Alla pagina solo ciò che mostra: niente leve d'impatto (28/9, restano nella presentazione).
+    // Il Report di Attivazione di questo check-up: la proposta ne porta il prezzo (28/9).
+    // Alla pagina solo data e prezzo, niente testo né dati interni del Report.
+    const { ultimoReportAttivazione } = await import('../../lib/checkup-server');
+    const rep = await ultimoReportAttivazione(client.id, assessment.created_at).catch(() => null);
+    const reportAttivazione = rep ? { il: rep.created_at, prezzo: rep.quote_compliance && rep.quote_compliance.real_price != null ? rep.quote_compliance.real_price : null } : null;
     const condivisi = { zone: t.zone, piano: t.piano, anno2: t.anno2, leve: { economiche: leveEconomichePreventivo(t.leve.economiche, { conVoceOT23: t.nuovoProgramma }) }, nuovoProgramma: t.nuovoProgramma, pacchetto: t.pacchetto };
 
     return {
@@ -1073,6 +1098,7 @@ export const getServerSideProps = requireAuthSsr(async (ctx) => {
         offertaGiorni,
         condivisi: JSON.parse(JSON.stringify(condivisi)),
         prezzo: JSON.parse(JSON.stringify(prezzo)),
+        reportAttivazione,
       },
     };
   } catch (e) {

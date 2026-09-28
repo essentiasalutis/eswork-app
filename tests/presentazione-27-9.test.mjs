@@ -46,15 +46,15 @@ test('piano per livello: il testo di Enrico, numeri dal protocollo', () => {
   assert.ok(!p.some(r => /giornat|sedut/.test(r.testo)));
 });
 
-test('prossimi passi: prima l\'accettazione dell\'offerta, poi il contratto entro 15 giorni (27/9)', () => {
+test('prossimi passi: prima l\'accettazione della proposta di intervento, poi il contratto entro 15 giorni (27/9, 28/9)', () => {
   const p = prossimiPassi();
   assert.equal(p.length, 6);
-  assert.equal(p[0], 'Accettazione dell\'offerta: la firma in fondo all\'Offerta.');
+  assert.equal(p[0], 'Accettazione della proposta di intervento: la firma in fondo al documento.');
   assert.equal(p[1], 'Firma del contratto, entro 15 giorni dall\'accettazione.');
   assert.match(p[5], /^Review al mese 3 per chi ha iniziato un percorso, di trattamento \(Livello 1\) o di prevenzione \(Livello 2\); al mese 6 nuovo check-up di tutta la popolazione/);
-  // la data è quella stampata in fondo all'Offerta, con l'articolo giusto
-  assert.equal(prossimiPassi({ scadenzaOfferta: '2026-10-07' })[0], 'Accettazione dell\'offerta: la firma in fondo all\'Offerta, entro il 7 ottobre 2026.');
-  assert.equal(prossimiPassi({ scadenzaOfferta: '2026-10-08' })[0], 'Accettazione dell\'offerta: la firma in fondo all\'Offerta, entro l\'8 ottobre 2026.');
+  // la data è quella stampata in fondo alla proposta, con l'articolo giusto
+  assert.equal(prossimiPassi({ scadenzaOfferta: '2026-10-07' })[0], 'Accettazione della proposta di intervento: la firma in fondo al documento, entro il 7 ottobre 2026.');
+  assert.equal(prossimiPassi({ scadenzaOfferta: '2026-10-08' })[0], 'Accettazione della proposta di intervento: la firma in fondo al documento, entro l\'8 ottobre 2026.');
   // chi ha firmato parte dal calendario
   assert.equal(prossimiPassi({ firmato: true, scadenzaOfferta: '2026-10-08' })[0], 'Calendario: date di sportello e formazione, spazio riservato, referente operativo.');
   assert.equal(prossimiPassi({ firmato: true }).length, 4);

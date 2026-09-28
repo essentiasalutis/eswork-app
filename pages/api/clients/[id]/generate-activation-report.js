@@ -281,7 +281,7 @@ ${isPacchetto
 
 ${isPacchetto
   ? '## Prossimi Passi\n(SOLO gli step del pacchetto: restituzione dei risultati alla direzione, formazione collettiva, sopralluogo ergonomico e conferma delle postazioni, consulenza ergonomico-posturale; NIENTE monitoraggio, follow-up clinici o trattamenti)'
-  : 'NON scrivere la sezione «Prossimi Passi»: la inserisce il sistema, uguale alla presentazione e all\'Offerta.'}
+  : 'NON scrivere la sezione «Prossimi Passi»: la inserisce il sistema, uguale alla presentazione e alla proposta di intervento.'}
 ${parametriOperativi}${vincoliV2}${istruzioniPacchetto}
 ${firmato ? '' : 'STATO (tassativo): il contratto NON è ancora firmato, questo report PROPONE il programma. VIETATO scrivere che il programma è stato attivato, avviato, erogato o che è operativo, e VIETATO citare trattamenti già svolti: scrivi «programma proposto», «si propone di attivare».\n'}${IDENTITA_PROFESSIONALE}
 ${NIENTE_PARAGONI}

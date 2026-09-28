@@ -14,7 +14,7 @@ import { dataIt, giornoIt } from '../../lib/date-it.mjs';
 const AGENDA = {
   incontro: { icona: '📊', testo: 'Presentazione del Report', scaduto: '' },
   ricontatto: { icona: '🔁', testo: 'Ricontattare', scaduto: 'Ricontatto in ritardo' },
-  offerta: { icona: '⏳', testo: 'Offerta in scadenza', scaduto: 'Offerta scaduta' },
+  offerta: { icona: '⏳', testo: 'Proposta in scadenza', scaduto: 'Proposta scaduta' },
   checkup: { icona: '📋', testo: 'Check-up in chiusura', scaduto: '' },
 };
 
@@ -127,7 +127,7 @@ export default function Dashboard({ clients: initialClients, assessmentCounts, f
         )}
         {sollecitiOfferta.length > 0 && (
           <div className="mb-5 bg-white rounded-2xl border border-orange-200 p-4">
-            <h2 className="font-semibold text-gray-700 text-sm mb-2">📣 Offerte da sollecitare oggi</h2>
+            <h2 className="font-semibold text-gray-700 text-sm mb-2">📣 Proposte da sollecitare oggi</h2>
             <div className="space-y-1.5">
               {sollecitiOfferta.map(s => {
                 const href = `mailto:${encodeURIComponent(s.email)}?subject=${encodeURIComponent(s.oggetto)}&body=${encodeURIComponent(s.corpo)}`;

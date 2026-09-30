@@ -2,6 +2,7 @@
 // (tutte le aziende) e la scheda azienda (la sua fetta). Stessi dati, stessi pezzi.
 import { useState } from 'react';
 import { postiDaOrario, SPORTELLO } from '../../lib/sportello.mjs';
+import { PROTOCOLLO } from '../../lib/protocollo.mjs';
 
 export const giornoBreve = (g) => String(g || '').split('-').reverse().join('/');
 const GIORNI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
@@ -152,16 +153,16 @@ export function ContrattoErogato({ azienda }) {
     const pct = totale > 0 ? Math.min(100, Math.round((fatte / totale) * 100)) : 0;
     return <div className="h-2 bg-gray-100 rounded-full overflow-hidden mt-1"><div className="h-full bg-green-600 rounded-full" style={{ width: `${pct}%` }} /></div>;
   };
-  if (!c) return <div className="text-sm text-gray-500">Nessun Report di Attivazione: il contratto delle sedute nasce lì.</div>;
-  if (c.mancante) return <div className="text-sm text-amber-800">Il Report di Attivazione del {giornoBreve(String(c.reportDel).slice(0, 10))} non ha le persone a contratto (è precedente al 28/9): rigeneralo per registrarle. Sedute erogate nell&apos;anno: Livello 1 {azienda.erogate.l1}, Livello 2 {azienda.erogate.l2}.</div>;
+  if (!c) return <div className="text-sm text-gray-500">Nessun Report di Attivazione: i trattamenti a contratto nascono lì.</div>;
+  if (c.mancante) return <div className="text-sm text-amber-800">Il Report di Attivazione del {giornoBreve(String(c.reportDel).slice(0, 10))} non ha le persone a contratto (è precedente al 28/9): rigeneralo per registrarle. Trattamenti erogati nell&apos;anno: L1 {azienda.erogate.l1}, L2 {azienda.erogate.l2}.</div>;
   return (
     <div className="grid sm:grid-cols-2 gap-4">
       <div>
-        <div className="text-sm text-gray-700"><strong>Livello 1</strong>: {azienda.erogate.l1} sedute su {c.l1} <span className="text-gray-400">({c.personeL1} persone × 4)</span></div>
+        <div className="text-sm text-gray-700"><strong>Trattamenti L1</strong>: {azienda.erogate.l1} su {c.l1} <span className="text-gray-400">({c.personeL1} persone × {PROTOCOLLO.sedute_per_ciclo})</span></div>
         {barra(azienda.erogate.l1, c.l1)}
       </div>
       <div>
-        <div className="text-sm text-gray-700"><strong>Livello 2</strong>: {azienda.erogate.l2} sedute su {c.l2} <span className="text-gray-400">({c.personeL2} persone × 4)</span></div>
+        <div className="text-sm text-gray-700"><strong>Trattamenti L2</strong>: {azienda.erogate.l2} su {c.l2} <span className="text-gray-400">({c.personeL2} persone × {PROTOCOLLO.sessioni_prevenzione_l2})</span></div>
         {barra(azienda.erogate.l2, c.l2)}
       </div>
     </div>

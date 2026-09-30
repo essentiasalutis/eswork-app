@@ -1499,7 +1499,9 @@ ${FIRMA}`,
         </div>
 
         {/* ── Sportello: la fetta di questa azienda (stessi dati della sezione «Sportello») ── */}
-        <SportelloAzienda clientId={client.id} oggi={giornoIt(new Date())} />
+        {/* Lo sportello compare dopo la firma (Enrico, 30/9): prima non ci sono trattamenti
+            a contratto né persone in carico. */}
+        {isFirmato(client.pipeline_stage) && <SportelloAzienda clientId={client.id} oggi={giornoIt(new Date())} />}
 
         {/* ── Sezione AI Reports ─────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5">

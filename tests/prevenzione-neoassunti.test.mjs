@@ -37,7 +37,7 @@ test('sportello: niente prevenzione per chi è in Livello 3, anche con i cicli d
   const l3 = statoPercorso({ cicli, livello: 'level3', dataAvvio: AVVIO, adesso });
   assert.ok(!l3.some(r => /revenzione/.test(r)), l3.join(' | '));
   const l2 = statoPercorso({ cicli, livello: 'level2', dataAvvio: AVVIO, adesso });
-  assert.ok(l2.some(r => /seduta da fare entro/.test(r)), l2.join(' | '));
+  assert.ok(l2.some(r => /trattamento da fare entro/.test(r)), l2.join(' | '));
   const neo = statoPercorso({ livello: 'level2', dataAvvio: AVVIO, adesso: new Date('2026-03-01T10:00:00Z'), prevenzioneDopo: { dal: '2026-09-22' } });
   assert.deepEqual(neo, ['Neoassunto: prevenzione dal prossimo anno di programma (22/09/2026)']);
   assert.match(src('lib/sportello-server.js'), /if \(liv === 'level2' && !prevenzioneDopo && !prevenzioneNonSpetta\) \{/, 'niente allarme del trimestre');
@@ -126,4 +126,13 @@ test('HR: dal link solo numeri, mai nomi', () => {
   assert.match(hr, /SOLA LETTURA aggregata \(solo numeri k-anon\)/);
   assert.match(src('pages/api/hr/aggregati.js'), /MAI nomi/);
   assert.match(src('pages/api/org/[clientId]/export.js'), /ADMIN-ONLY \(requireAuth/);
+});
+
+test('sportello: solo dopo la firma, e i contatori si chiamano «Trattamenti L1 / L2»', () => {
+  assert.match(src('pages/dashboard/[clientId].js'), /\{isFirmato\(client\.pipeline_stage\) && <SportelloAzienda /);
+  assert.match(src('lib/sportello-server.js'), /aziende\.filter\(c => programmaAttivo\(c\) && \(clientId \|\| !c\.is_demo\)\)/);
+  const s = src('components/sportello/Sportello.jsx');
+  assert.match(s, /<strong>Trattamenti L1<\/strong>/);
+  assert.match(s, /<strong>Trattamenti L2<\/strong>/);
+  assert.doesNotMatch(s, /sedute su \{c\./);
 });

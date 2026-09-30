@@ -114,7 +114,7 @@ export default function SportelloPage({ oggi }) {
 
           {d && (
             <section className="space-y-4">
-              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Programmi attivi — sedute e percorsi</div>
+              <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">Programmi attivi — trattamenti e percorsi</div>
               {d.aziende.length ? d.aziende.map(c => (
                 <div key={c.id} className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
                   <div className="flex items-baseline gap-3">

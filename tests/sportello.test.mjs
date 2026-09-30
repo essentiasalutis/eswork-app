@@ -62,7 +62,7 @@ test('stato del percorso: solo conteggi e date, mai dolore o note', () => {
     autosegnalazioni: [{ status: 'pending', created_at: '2026-10-20T09:00:00Z', note: 'segreto' }],
     livello: 'level1', adesso: alle('2026-10-31'),
   });
-  assert.deepEqual(righe, ['Ciclo 1: 2 sedute su 4, aperto da 30 giorni', 'Autosegnalazione in attesa da 11 giorni']);
+  assert.deepEqual(righe, ['Ciclo 1: 2 trattamenti su 4, aperto da 30 giorni', 'Autosegnalazione in attesa da 11 giorni']);
   assert.ok(!/segreto|NRS|dolore/.test(righe.join(' ')));
 });
 
@@ -101,9 +101,9 @@ test('prevenzione: si contano solo le sedute dell\'anno di programma in corso (p
   const seduteDate = { p1: ['2025-10-05', '2026-01-10', '2026-04-10', '2026-07-10'] };
   const righe = statoPercorso({ cicli, seduteDate, livello: 'level2', dataAvvio: '2025-09-22', adesso: alle('2026-10-15') });
   assert.equal(righe[0], 'Prevenzione di quest\'anno non ancora avviata');
-  assert.match(righe[1], /^Prevenzione: 0 sedute su 4 nell'anno; trimestre 1: seduta da fare entro il 21\/12\/2026$/);
+  assert.match(righe[1], /^Prevenzione: 0 trattamenti su 4 nell'anno; trimestre 1: trattamento da fare entro il 21\/12\/2026$/);
   const ok = statoPercorso({ cicli, seduteDate: { p1: [...seduteDate.p1, '2026-10-02'] }, livello: 'level2', dataAvvio: '2025-09-22', adesso: alle('2026-10-15') });
-  assert.equal(ok[0], 'Prevenzione: 1 seduta su 4 nell\'anno; trimestre 1: seduta fatta');
+  assert.equal(ok[0], 'Prevenzione: 1 trattamento su 4 nell\'anno; trimestre 1: trattamento fatto');
   assert.deepEqual(controllaGiornata({ client_id: 'c', data: '2026-10-06', ora_inizio: '09:00', ora_fine: '11:00', posti: 6 }), ['Una giornata dura almeno 3 ore.']);
 });
 

@@ -9,7 +9,8 @@ import {
   getPreValidationByPatient,
   getTreatmentCapacity,
 } from '../../../../../lib/store';
-import { finestraAnno, dirittoCicli } from '../../../../../lib/anno-programma.mjs';
+import { finestraAnno, dirittoCicli, prevenzioneDal, testoPrevenzioneDal } from '../../../../../lib/anno-programma.mjs';
+import { analisiCongelataIl } from '../../../../../lib/checkup-server';
 import { PROTOCOLLO } from '../../../../../lib/protocollo.mjs';
 
 
@@ -40,6 +41,14 @@ export default requireProAuth(async function handler(req, res) {
     // ogni Livello 2. Distinto dal ciclo di trattamento.
     if (patient.level !== 'level2') return res.status(400).json({ error: 'La prevenzione attiva è riservata ai pazienti Livello 2' });
     if (!patient.prevention_eligible) return res.status(400).json({ error: 'Prevenzione attiva non spettante quest\'anno (diritto fissato a inizio anno — regola opzione A)' });
+    // Entrato dopo il Report di Attivazione (neoassunto o check-up compilato in ritardo):
+    // la prevenzione parte con l'anno di programma successivo (Enrico, 30/9). Se la
+    // lettura fallisce non si avvia un ciclo fuori regola.
+    let congelataIl;
+    try { congelataIl = await analisiCongelataIl(patient.client_id); }
+    catch (_) { return res.status(503).json({ error: 'Servizio momentaneamente non disponibile, riprova tra qualche minuto.' }); }
+    const dopo = prevenzioneDal({ entrataIl: patient.created_at, congelataIl, dataAvvio: azienda?.data_avvio_programma || null });
+    if (dopo) return res.status(400).json({ error: testoPrevenzioneDal(dopo), prevenzione_dal: dopo.dal });
     const diritto = dirittoCicli({ cicli: cycles, tipo: 'prevention', finestra });
     if (diritto.esaurito) return res.status(400).json({ error: diritto.messaggio, rinnovo_il: diritto.rinnovoIl });
 

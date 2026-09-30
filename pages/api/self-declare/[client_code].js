@@ -15,7 +15,8 @@ import { hashIp } from '../../../lib/crypto-utils';
 import { getClientIp } from '../../../lib/rate-limit';
 import { limiteCheckup, MESSAGGIO_LIMITE } from '../../../lib/limite-checkup';
 import { sessioneConsensiValida, collegaSessioneAPaziente } from '../../../lib/testi-legali-server';
-import { statoCheckupCliente } from '../../../lib/checkup-server';
+import { statoCheckupCliente, analisiCongelataIl } from '../../../lib/checkup-server';
+import { prevenzioneDal } from '../../../lib/anno-programma.mjs';
 import { ilGiorno, etichettaOra, oggiRoma as giornoRoma } from '../../../lib/checkup';
 
 // Messaggio al dipendente quando il check-up è chiuso: onesto e senza dettagli tecnici.
@@ -166,10 +167,19 @@ export default async function handler(req, res) {
         }).catch(e => console.error('addToWaitlist error:', e.message));
       }
 
+      // Livello 2 entrato dopo il Report di Attivazione: la schermata finale dice che la
+      // prevenzione parte con l'anno di programma successivo (Enrico, 30/9).
+      let prevenzioneDopo = null;
+      if (!demo && computed_level === 'level2') {
+        const congelataIl = await analisiCongelataIl(client.id).catch(() => null);
+        prevenzioneDopo = prevenzioneDal({ entrataIl: now, congelataIl, dataAvvio: client.data_avvio_programma || null });
+      }
+
       return res.status(201).json({
         ok: true,
         // Demo: il livello non esce nemmeno nella risposta (la schermata finale non lo dice).
         level: demo ? null : computed_level,
+        prevenzione_dopo: prevenzioneDopo,
         patient_id: patient.id,
         // Link area personale (self-trigger, mini-check, re-assessment)
         care_token: contatto ? patient.care_token : null,

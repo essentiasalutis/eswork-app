@@ -10,6 +10,8 @@ import {
 import { vistaPazienteAreaPersonale, vistaCicli, andamentoNrs, vistaPercorso } from '../../../lib/vista';
 import { limiteAreaPersonale } from '../../../lib/employee-guard';
 import { programmaAttivo } from '../../../lib/attivazione';
+import { prevenzioneDal } from '../../../lib/anno-programma.mjs';
+import { analisiCongelataIl } from '../../../lib/checkup-server';
 
 // Area personale del dipendente. Al browser va SOLO ciò che la pagina disegna
 // (lib/vista.js): fino al 12/9 partivano anche anamnesi, red flag, note interne,
@@ -32,6 +34,13 @@ export default async function handler(req, res) {
     getClientById(patient.client_id).catch(() => null),
   ]);
   const selfTriggerBudget = await getSelfTriggerBudget(patient.id, client).catch(() => null);
+  // Livello 2 entrato dopo il Report di Attivazione: la prevenzione parte con l'anno di
+  // programma successivo (Enrico, 30/9). Solo il giorno esce di qui.
+  let prevenzioneDopo = null;
+  if (patient.level === 'level2') {
+    const congelataIl = await analisiCongelataIl(patient.client_id).catch(() => null);
+    prevenzioneDopo = prevenzioneDal({ entrataIl: patient.created_at, congelataIl, dataAvvio: client?.data_avvio_programma || null });
+  }
 
   return res.json({
     patient: vistaPazienteAreaPersonale(patient),
@@ -45,5 +54,6 @@ export default async function handler(req, res) {
     // Solo il sì/no: la pagina spegne i pulsanti del percorso finché il programma
     // non è attivo. Il gate vero resta sul server (lib/attivazione + self-trigger).
     programmaAttivo: programmaAttivo(client),
+    prevenzioneDopo,
   });
 }

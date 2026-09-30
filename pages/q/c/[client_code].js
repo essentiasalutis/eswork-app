@@ -289,7 +289,7 @@ function CompletionDemo() {
   );
 }
 
-function CompletionScreen({ level, wantsContact, careToken, firmato = false, emailAttiva = false, email = '' }) {
+function CompletionScreen({ level, wantsContact, careToken, firmato = false, emailAttiva = false, email = '', prevenzioneDopo = null }) {
   const isL1 = level === 'level1';
   const isL2 = level === 'level2';
   const [copiedLink, setCopiedLink] = useState(false);
@@ -353,7 +353,9 @@ function CompletionScreen({ level, wantsContact, careToken, firmato = false, ema
         {isL2 && (firmato ? (
           <>
             <p className="text-gray-600 mb-2">Hai riportato alcuni fastidi, senza un impatto sulle tue attività.</p>
-            <p className="text-gray-600">Sei incluso nella <strong>prevenzione attiva</strong>: {PROTOCOLLO.sessioni_prevenzione_l2} trattamenti di prevenzione con l&apos;osteopata nell&apos;anno di programma della tua azienda, più la formazione collettiva. Se la situazione peggiora, puoi <strong>segnalarlo</strong> dalla tua area personale (fino a {PROTOCOLLO.autosegnalazioni_per_anno} volte nell&apos;anno di programma della tua azienda) per essere ricontattato dall&apos;osteopata.</p>
+            {prevenzioneDopo
+              ? <p className="text-gray-600">Sei entrato nel programma durante l&apos;anno: la <strong>prevenzione attiva</strong> — {PROTOCOLLO.sessioni_prevenzione_l2} trattamenti di prevenzione con l&apos;osteopata — parte con il prossimo anno di programma della tua azienda{prevenzioneDopo.dal ? `, dal ${prevenzioneDopo.dal.split('-').reverse().join('/')}` : ''}. Intanto hai la formazione collettiva e, se la situazione peggiora, puoi <strong>segnalarlo</strong> dalla tua area personale (fino a {PROTOCOLLO.autosegnalazioni_per_anno} volte nell&apos;anno di programma della tua azienda) per essere ricontattato dall&apos;osteopata.</p>
+              : <p className="text-gray-600">Sei incluso nella <strong>prevenzione attiva</strong>: {PROTOCOLLO.sessioni_prevenzione_l2} trattamenti di prevenzione con l&apos;osteopata nell&apos;anno di programma della tua azienda, più la formazione collettiva. Se la situazione peggiora, puoi <strong>segnalarlo</strong> dalla tua area personale (fino a {PROTOCOLLO.autosegnalazioni_per_anno} volte nell&apos;anno di programma della tua azienda) per essere ricontattato dall&apos;osteopata.</p>}
           </>
         ) : (
           <>
@@ -447,6 +449,7 @@ export default function SelfDeclarePage({ client, error: serverError, checkup, s
   const [submitError, setSubmitError] = useState(null);
   const [chiusoMsg, setChiusoMsg] = useState(null); // check-up chiuso scoperto all'invio (oltre la grazia)
   const [level, setLevel] = useState(null);
+  const [prevenzioneDopo, setPrevenzioneDopo] = useState(null);
   const [careToken, setCareToken] = useState(null);
   // Identificativo della sessione dei consensi, restituito dal server alla conferma
   // delle caselle: la prova del consenso è già registrata, qui si consegna solo il legame.
@@ -494,6 +497,7 @@ export default function SelfDeclarePage({ client, error: serverError, checkup, s
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setLevel(data.level || 'level3');
+        setPrevenzioneDopo(data.prevenzione_dopo || null);
         setCareToken(data.care_token || null);
         if (STORAGE_KEY) { try { localStorage.removeItem(STORAGE_KEY); } catch {} }
         setPhase(PHASES.DONE);
@@ -599,7 +603,7 @@ export default function SelfDeclarePage({ client, error: serverError, checkup, s
 
       {phase === PHASES.DONE && demo && <CompletionDemo />}
       {phase === PHASES.DONE && !demo && (
-        <CompletionScreen level={level} wantsContact={wantsContact} careToken={careToken} firmato={!!checkup?.firmato} emailAttiva={!!emailAttiva} email={contactData?.email || ''} />
+        <CompletionScreen level={level} wantsContact={wantsContact} careToken={careToken} firmato={!!checkup?.firmato} emailAttiva={!!emailAttiva} email={contactData?.email || ''} prevenzioneDopo={prevenzioneDopo} />
       )}
     </>
   );

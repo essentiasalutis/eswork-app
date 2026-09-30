@@ -216,7 +216,7 @@ function DashboardL1({ patient, cycles, nrs, onSelfTrigger, remaining, rinnovo =
 }
 
 // ─── Dashboard L2 ─────────────────────────────────────────────────────────────
-function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining, rinnovo = null, attivo = true }) {
+function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining, rinnovo = null, attivo = true, prevenzioneDopo = null }) {
   // I mini-check non viaggiano più come lista a sé: vivono nel percorso (fonte unica).
   // La resa resta quella di prima — "T3 · Molto meglio" e la data — e la parola del
   // PGIC è quella scelta rispondendo (lib/pgic.js).
@@ -225,10 +225,12 @@ function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining, rinnovo
     <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #0369a1 100%)', borderRadius: 18, padding: '20px', color: '#fff' }}>
         <div style={{ fontSize: 12, opacity: .8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Il tuo programma ES Work</div>
-        <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>Sei nella prevenzione attiva.</div>
+        <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.4 }}>{attivo && prevenzioneDopo ? 'La tua prevenzione parte con il prossimo anno di programma.' : 'Sei nella prevenzione attiva.'}</div>
         <div style={{ fontSize: 13, opacity: .85, marginTop: 8, lineHeight: 1.6 }}>
           Il tuo check-up ha rilevato disturbi iniziali che non limitano ancora la tua attività.{' '}
-          {attivo ? (
+          {attivo && prevenzioneDopo ? (
+            <>Sei entrato nel programma durante l&apos;anno: i {PROTOCOLLO.sessioni_prevenzione_l2} trattamenti di prevenzione con l&apos;osteopata partono con il prossimo anno di programma della tua azienda{prevenzioneDopo.dal ? `, dal ${prevenzioneDopo.dal.split('-').reverse().join('/')}` : ''}. Intanto hai la formazione collettiva e, se il tuo stato cambia, puoi segnalarlo tramite il bottone qui sotto.</>
+          ) : attivo ? (
             <>Il programma prevede per te {PROTOCOLLO.sessioni_prevenzione_l2} trattamenti di prevenzione con l&apos;osteopata, in sede.<br />
             Se il tuo stato cambia, puoi segnalarlo tramite il bottone qui sotto.</>
           ) : (
@@ -572,7 +574,7 @@ export default function EmployeeDashboard() {
                 : level === 'level1'
                   ? <DashboardL1 patient={patient} cycles={cycles} nrs={nrs} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} rinnovo={rinnovo} attivo={attivo} />
                   : level === 'level2'
-                    ? <DashboardL2 patient={patient} percorso={percorso} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} rinnovo={rinnovo} attivo={attivo} />
+                    ? <DashboardL2 patient={patient} percorso={percorso} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} rinnovo={rinnovo} attivo={attivo} prevenzioneDopo={data.prevenzioneDopo || null} />
                     : <DashboardL3 patient={patient} onSelfTrigger={() => setShowSelfTrigger(true)} remaining={remaining} rinnovo={rinnovo} attivo={attivo} />
               }
 

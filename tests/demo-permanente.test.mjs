@@ -88,7 +88,6 @@ test('report della demo: niente «colloquio»; la riga per l\'AI non finisce mai
   assert.match(gen, /const TESTA_STAMPATA_DEMO = 'Investimento calcolato sulla popolazione indicata e sulla stratificazione della sala:';/);
   assert.match(gen, /const inLinea = inRange && !demo\s*\?/);
   assert.match(gen, /\$\{demo \? TESTA_BLOCCO_DEMO : TESTA_BLOCCO\}/);
-  // l'istruzione resta nel blocco che legge l'AI e si toglie dal testo stampato
-  assert.match(gen, /\.\$\{ISTRUZIONE_DIMENSIONAMENTO\}`/);
-  assert.match(gen, /\.replace\(ISTRUZIONE_DIMENSIONAMENTO, ''\)/);
+  // la riga del dimensionamento (risposte riportate su tutti) non c'è più dal 30/9
+  assert.doesNotMatch(gen, /ISTRUZIONE_DIMENSIONAMENTO/);
 });

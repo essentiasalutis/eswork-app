@@ -379,7 +379,7 @@ ${isPacchetto
   : `Il piano prevede la presa in carico dei pazienti L1 distribuiti in turni di avvio mensili, con sportello osteopatico in sede. La formazione collettiva copre l'intera popolazione aziendale con moduli su ergonomia e postura.`}
 ${!isPacchetto && quoteBlock ? `
 ## Proposta economica collegata
-${quoteBlock.replace(TESTA_BLOCCO, TESTA_STAMPATA).replace(TESTA_BLOCCO_DEMO, TESTA_STAMPATA_DEMO).replace(ISTRUZIONE_DIMENSIONAMENTO, '')}` : ''}${sezioneComprende ? `
+${quoteBlock.replace(TESTA_BLOCCO, TESTA_STAMPATA).replace(TESTA_BLOCCO_DEMO, TESTA_STAMPATA_DEMO)}` : ''}${sezioneComprende ? `
 
 ${sezioneComprende}` : ''}${isPacchetto && testoEvoluzione && !testoEvoluzione.startsWith('Segnaposto') ? `
 ## Evoluzione possibile
@@ -422,7 +422,6 @@ const TESTA_STAMPATA = 'Investimento calcolato sui numeri del vostro check-up:';
 const TESTA_STAMPATA_DEMO = 'Investimento calcolato sulla popolazione indicata e sulla stratificazione della sala:';
 // Istruzione per l'AI dentro la riga del dimensionamento: resta nel testo che va all'AI,
 // non nel documento (Enrico, 21/9: nella versione di sistema finiva stampata).
-export const ISTRUZIONE_DIMENSIONAMENTO = ' Sono gli UNICI numeri di persone sull\'intera popolazione: non proiettare altri livelli';
 
 export async function buildQuoteBlock(client_id, client, answers) {
   try {
@@ -480,9 +479,11 @@ export async function buildQuoteBlock(client_id, client, answers) {
       min = null; avg = null; max = null;
     }
 
-    // Prezzo reale (Enrico, 27/9: «SEMPRE»): Livello 1 e Livello 2 OSSERVATI nel check-up,
-    // riportati sulla forza lavoro (snapshottata se presente).
-    const real = realL1L2FromAssessment({ l1Responders: nmq.level1.count, l2Responders: nmq.level2.count, responders, employees: nEmp, l2Mult, pricingVersion, v2Params: conditions.v2Params });
+    // Prezzo reale (Enrico, 27/9: «SEMPRE»): Livello 1 e Livello 2 OSSERVATI nel check-up.
+    // Dal 30/9 le persone trovate, non riportate su tutti (lib/pricing/v2.js); la demo dei
+    // convegni riporta ancora la sala sulla popolazione indicata.
+    const demoConvegno = !!(client && client.demo_permanente);
+    const real = realL1L2FromAssessment({ l1Responders: nmq.level1.count, l2Responders: nmq.level2.count, responders, employees: nEmp, l2Mult, pricingVersion, v2Params: conditions.v2Params, proiezione: demoConvegno });
     const calc = calculatePricing({ n: nEmp, l1: real.l1, l2: real.l2, ...conditions });
     if (!calc) return { block: '', compliance: null };
 
@@ -532,29 +533,6 @@ export async function buildQuoteBlock(client_id, client, answers) {
       ? (tetto && tetto.capApplicato ? ', entro la Stima di investimento presentata al colloquio' : ', in linea con la Stima di investimento presentata al colloquio')
       : '';
 
-    // PONTE rispondenti -> popolazione. Il prezzo NON si dimensiona sui soli
-    // rispondenti: la prevalenza osservata viene riportata sull'intera forza
-    // lavoro (stessa regola della forbice, vedi realL1L2FromAssessment). Senza
-    // questa riga il documento dice "5 in Livello 1" e fattura per 8: numeri
-    // entrambi giusti, ma il passaggio non era spiegato da nessuna parte.
-    // Riservatezza (27/9): le quote e le persone attese si scrivono solo per i livelli
-    // mostrabili. Da quelle di un livello nascosto si risalirebbe al gruppo sotto soglia.
-    const partLiv = tooSmall(responders) ? null : Object.fromEntries(kAnonPartition([
-      { key: 'l1', count: nmq.level1.count }, { key: 'l2', count: nmq.level2.count }, { key: 'l3', count: nmq.level3.count },
-    ], responders).map(c => [c.key, c]));
-    const vis = k => !!(partLiv && !partLiv[k].suppressed);
-    const copreTutti = 'così il programma copre anche chi non ha compilato il questionario';
-    const quote = vis('l1') && vis('l2')
-      ? `le quote di Livello 1 (${partLiv.l1.pct}%) e di Livello 2 (${partLiv.l2.pct}%) osservate sui ${responders} questionari sono riportate sull'intera popolazione di ${nEmp} dipendenti (${real.l1} e ${real.l2} persone attese), ${copreTutti}`
-      : vis('l2')
-        ? `la quota di Livello 2 (${partLiv.l2.pct}%) osservata sui ${responders} questionari è riportata sull'intera popolazione di ${nEmp} dipendenti (${real.l2} persone attese), e così quella di Livello 1, che non si mostra a tutela della riservatezza: ${copreTutti}`
-        : vis('l1')
-          ? `la quota di Livello 1 (${partLiv.l1.pct}%) osservata sui ${responders} questionari è riportata sull'intera popolazione di ${nEmp} dipendenti (${real.l1} persone attese), e così quella di Livello 2, che non si mostra a tutela della riservatezza: ${copreTutti}`
-          : `le quote di Livello 1 e di Livello 2 osservate nel check-up sono riportate sull'intera popolazione di ${nEmp} dipendenti, ${copreTutti}; le quote non si mostrano a tutela della riservatezza`;
-    const rigaDimensionamento = (pricingVersion === 'v2' && responders > 0 && nEmp > responders)
-      ? `\n- Dimensionamento: ${quote}.${ISTRUZIONE_DIMENSIONAMENTO}`
-      : '';
-
     // ERGONOMIA: e' una voce PAGATA (fino a qui invisibile nel documento). Senza
     // questa riga il cliente paga la valutazione delle postazioni e nel report
     // non se ne parla — e l'AI e' arrivata a raccomandarla come cosa da valutare.
@@ -574,7 +552,7 @@ export async function buildQuoteBlock(client_id, client, answers) {
       ? `\n- Include la consulenza ergonomico-posturale — osservazione delle postazioni di lavoro e del gesto, con raccomandazioni di adeguamento e indicazioni personalizzate — ${pezzi.join('; ')}. È già compresa nell'investimento, non è un'attività da acquistare a parte. Non sostituisce la valutazione dei rischi ai sensi del D.Lgs. 81/2008, che resta di competenza del datore di lavoro e dell'RSPP.`
       : '';
 
-    const block = `\n${demo ? TESTA_BLOCCO_DEMO : TESTA_BLOCCO}\n- Programma Anno 1: €${eur(realPrice)}${inLinea}\n- Anno 2 e successivi (indicativo): €${eur(calc.price_y2)}${rigaDimensionamento}${rigaErgonomia}`;
+    const block = `\n${demo ? TESTA_BLOCCO_DEMO : TESTA_BLOCCO}\n- Programma Anno 1: €${eur(realPrice)}${inLinea}\n- Anno 2 e successivi (indicativo): €${eur(calc.price_y2)}${rigaErgonomia}`;
     // `calc` con il tetto già applicato: la sezione «Cosa comprende» stampa
     // l'investimento e deve dire il prezzo proposto, non il calcolato.
     return { block, compliance, calc: calcFinale };

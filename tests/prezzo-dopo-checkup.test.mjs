@@ -9,10 +9,17 @@ import { spiegazioneAnno2, fraseRiduzioneAnno2, FRASE_ANNO2_CON_TETTO } from '..
 const src = f => fs.readFileSync(f, 'utf8');
 const RATES = { training_cost: 100, training_sell: 250, sportello_cost: 60, sportello_sell: 120, prevalidation_cost: 15, prevalidation_sell: 30 };
 
-test('Livello 2 dalle risposte, non dal moltiplicatore (Weisoft: 6 su 9 → 8 su 12)', () => {
+test('nel prezzo le persone trovate dal check-up, non riportate su tutti (Enrico, 30/9: la B)', () => {
+  // Weisoft: 2 L1 e 6 L2 su 9 risposte, 12 dipendenti. Prima 3 e 8.
   const r = realL1L2FromAssessment({ l1Responders: 2, l2Responders: 6, responders: 9, employees: 12, l2Mult: 2 });
-  assert.equal(r.l1, 3);
-  assert.equal(r.l2, 8);
+  assert.equal(r.l1, 2);
+  assert.equal(r.l2, 6);
+  // la demo dei convegni riporta ancora la sala sulla popolazione indicata
+  const demo = realL1L2FromAssessment({ l1Responders: 2, l2Responders: 6, responders: 9, employees: 12, proiezione: true });
+  assert.deepEqual([demo.l1, demo.l2], [3, 8]);
+  const report = src('pages/api/clients/[id]/generate-activation-report.js');
+  assert.match(report, /proiezione: demoConvegno \}\);/);
+  assert.doesNotMatch(report, /riportate sull'intera popolazione|copre anche chi non ha compilato|ISTRUZIONE_DIMENSIONAMENTO/);
 });
 
 test('senza il conteggio del Livello 2 il calcolo si ferma e lo dice', () => {
@@ -64,7 +71,9 @@ test('Anno 2: il motivo del calo è quello vero, e con il tetto la frase approva
 test('riservatezza: nel prezzo niente quote né persone di un livello nascosto', () => {
   const report = src('pages/api/clients/[id]/generate-activation-report.js');
   assert.ok(!/const obsPct = /.test(report), 'la quota del Livello 1 non si scrive senza controllo');
-  assert.match(report, /const vis = k => !!\(partLiv && !partLiv\[k\]\.suppressed\);/);
+  // Dal 30/9 il blocco del prezzo non scrive più né quote né persone per livello: la riga
+  // del dimensionamento (risposte riportate su tutti) non esiste più.
+  assert.ok(!/\$\{real\.l[12]\}/.test(report), 'nessun numero di persone per livello nel testo del prezzo');
   // L'Offerta non scrive più le persone dell'Anno 2: la frase è quella della presentazione.
   assert.ok(!/pop_y2/.test(src('pages/dashboard/offer.js')));
 });

@@ -582,7 +582,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                       <div className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-1">Pacchetto prevenzione — 12 mesi, non rinnovabile</div>
                       <div className="text-4xl font-bold mb-1">{fmt(pacchetto.price)}</div>
                       {vatExemptPacchetto(vatExempt)}
-                      <div className="text-xs opacity-80 mt-1">Include check-up completo (consensi identici al programma), formazione {PROTOCOLLO.formazione_moduli_primo_anno} moduli, ergonomia. ESCLUDE cicli L1, prevenzione L2 e buffer clinico.</div>
+                      <div className="text-xs opacity-80 mt-1">Include check-up completo (consensi identici al programma), formazione {PROTOCOLLO.formazione_moduli_primo_anno} moduli, ergonomia. ESCLUDE cicli L1, prevenzione L2 e posti per i nuovi L1.</div>
                     </div>
                     <button type="button" onClick={() => setDettaglioInterno(v => !v)} className="text-xs font-semibold text-gray-500 underline">
                       {dettaglioInterno ? 'Nascondi il dettaglio interno' : 'Dettaglio interno'}
@@ -633,7 +633,7 @@ export default function FirstMeetingScheda({ client: initialClient, meeting, v2P
                   <table className="w-full text-sm"><tbody>
                     {/* Cosa sono L1/L2/L3 e la pre-validazione: fonte unica lib/livelli.js */}
                     {calc.y1.items.map((it, i) => (<tr key={i} className="border-b border-gray-50"><td className="py-2 text-gray-600">{it.label}<span className="block text-[11px] text-gray-400">{it.detail}</span></td><td className="py-2 text-right font-medium text-gray-700">{fmt(it.sell)}</td></tr>))}
-                    <tr className="border-b border-gray-50"><td className="py-2 text-gray-600">Buffer {Math.round(calc.y1.buffer_pct * 100)}%</td><td className="py-2 text-right font-medium text-gray-700">{fmt(calc.y1.buffer_sell)}</td></tr>
+                    <tr className="border-b border-gray-50"><td className="py-2 text-gray-600">{calc.y1.posti_nuovi_l1 != null ? <>Posti per i nuovi L1<span className="block text-[11px] text-gray-400">{calc.y1.posti_nuovi_l1} × percorso (pre-validazione + ciclo) · {Math.round(calc.y1.nuovi_l1_pct * 100)}% dei dipendenti, per eccesso</span></> : `Scorta ${Math.round(calc.y1.buffer_pct * 100)}% (Stima di prima del 30/9)`}</td><td className="py-2 text-right font-medium text-gray-700">{fmt(calc.y1.buffer_sell)}</td></tr>
                     <tr className="border-t-2 border-gray-200"><td className="py-2 font-semibold text-gray-800">Totale Anno 1</td><td className="py-2 text-right font-bold text-green-700">{fmt(calc.y1.total_sell)}</td></tr>
                   </tbody></table>
                   <div className="text-[11px] text-gray-400 mt-2">Costo {fmt(calc.y1.total_cost)} · margine {fmt(calc.y1.margin)} — uso interno</div>

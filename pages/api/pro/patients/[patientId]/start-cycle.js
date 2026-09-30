@@ -64,12 +64,12 @@ export default requireProAuth(async function handler(req, res) {
   // Ciclo di TRATTAMENTO — solo L1
   if (patient.level !== 'level1') return res.status(400).json({ error: 'Solo pazienti L1 possono avere cicli di trattamento' });
 
-  // CAPACITÀ CONTRATTUALE: i cicli di trattamento non possono superare i percorsi
-  // pagati (L1 contratto + buffer del protocollo). Tutela automatica contro l'over-delivery.
+  // CAPACITÀ CONTRATTUALE: i cicli di trattamento dell'anno non possono superare i
+  // percorsi pagati (L1 del Report + posti per i nuovi L1, 30/9). Tutela contro l'over-delivery.
   const capacity = await getTreatmentCapacity(patient.client_id).catch(() => null);
   if (capacity?.deliverySaturated) {
     return res.status(409).json({
-      error: `Capacità contrattuale esaurita: ${capacity.used}/${capacity.budget} percorsi di trattamento già avviati (L1 a contratto ${capacity.contracted} + buffer ${Math.round(capacity.buffer_pct * 100)}%). Per proseguire serve un'estensione del contratto — contatta l'amministrazione ES Work.`,
+      error: `Capacità contrattuale esaurita: ${capacity.used}/${capacity.percorsiPagati} percorsi di trattamento già avviati quest'anno (${capacity.l1Checkup} Livello 1 del check-up + ${capacity.posti} posti per i nuovi Livello 1). Per proseguire serve un'estensione del contratto — contatta l'amministrazione ES Work.`,
       capacity_reached: true,
     });
   }

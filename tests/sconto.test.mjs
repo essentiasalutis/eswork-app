@@ -1,7 +1,9 @@
 // Prezzo Anno 1 più basso del calcolato (Enrico, 21/9): margine sul costo TOTALE
 // (professionisti + 30% della quota), soglia del Listino con conferma, zero fisso nel
 // codice, un anno solo, il cliente vede solo il totale. Numeri reali del motore:
-// 100 dipendenti al 12% → €16.800, costo €7.600, rinnovo €14.800.
+// 100 dipendenti al 12% → €16.800, costo €7.600, rinnovo €14.800 — con la scorta del 20%
+// sulla parte clinica, quella delle Stime registrate prima del 30/9: lo sconto non dipende
+// da come si forma il prezzo (i posti per i nuovi L1 sono in tests/posti-nuovi-l1).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -13,7 +15,7 @@ import { CONFIG } from '../lib/config.js';
 // Tariffe standard passate in modo esplicito: il motore non ripiega più da sé (21/9).
 const TARIFFE_STANDARD = CONFIG.rates_new;
 
-const calc = calculatePricing({ rates: TARIFFE_STANDARD, n: 100, l1: 12, l2: 24 });
+const calc = calculatePricing({ rates: TARIFFE_STANDARD, n: 100, l1: 12, l2: 24, v2Params: { scorta_su_clinica: true } });
 const base = { prezzoBase: calc.price_y1, costo: calc.y1.total_cost, sogliaPct: DEFAULTS_V2.sconto_margine_avviso_pct, motivo: 'Prima azienda del distretto, concordato col titolare' };
 
 test('il caso di riferimento: 100 dipendenti al 12%', () => {

@@ -6,7 +6,7 @@ import { testoKit, testoKitCheckupDopoFirma, firmaKit, bloccoKit } from '../../l
 import { isFirmato } from '../../lib/pipeline';
 import MailAvvio from '../../components/MailAvvio';
 import { isValidato, rigaValidazione, testoConValidazione } from '../../lib/validazione';
-import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getDocumentsByClient, getProfessionals, getMonitoringByClient, getTreatmentCapacity } from '../../lib/store';
+import { getClientById, getResponsesForClient, getAssignmentsByClient, getPatientsByClient, getSessionsForClient, getReferralCodesByClient, getConsentsByAssessment, getWaitlistByClient, getGeneratedReportsByClient, getDocumentsByClient, getProfessionals, getMonitoringByClient, getTreatmentCapacity, getAllCyclesByClient } from '../../lib/store';
 import { TYPE_LABELS } from '../../lib/scoring';
 import ReportView from '../../components/ReportView';
 import ReportDoc, { reportPrintHtml } from '../../components/ReportDoc';
@@ -19,6 +19,7 @@ import { rigaRinnovo } from '../../lib/sconto.mjs';
 import QrCheckup from '../../components/QrCheckup';
 import SportelloAzienda from '../../components/sportello/SportelloAzienda';
 import { giornoIt } from '../../lib/date-it.mjs';
+import { percorsiDelPaziente, nomePercorso, statoPercorso } from '../../lib/percorsi-paziente.mjs';
 
 
 
@@ -261,11 +262,7 @@ export default function ClientPage({ dipInForza = 0, client: initialClient, asse
   const [copiedMonitor, setCopiedMonitor] = useState(null); // patient_id+fase copiato
   const [showNrsTable, setShowNrsTable] = useState(false);  // tabella NRS a scomparsa
   const [showWaitlistTable, setShowWaitlistTable] = useState(false); // lista d'attesa a scomparsa
-  const [capacity, setCapacity] = useState(initialCapacity);
-  const [contractedInput, setContractedInput] = useState(
-    initialCapacity?.source === 'contratto' ? String(initialCapacity.contracted) : ''
-  );
-  const [savingContracted, setSavingContracted] = useState(false);
+  const capacity = initialCapacity;
 
 
   // Il Report di Attivazione chiude il check-up (Enrico, 28/9): il server lo chiude, qui la
@@ -557,37 +554,6 @@ ${FIRMA}`,
   // della scheda colloquio (tier/tariffe/IVA caricati server-side da first_meetings).
   function openRealQuote(a) {
     router.push(`/dashboard/offer?assessmentId=${a.id}&clientId=${client.id}&n=${client.employees}`);
-  }
-
-  // Salva gli L1 a contratto e ricalcola la capacità in locale
-  async function saveContractedL1() {
-    const v = contractedInput === '' ? null : Math.max(0, parseInt(contractedInput) || 0);
-    setSavingContracted(true);
-    const res = await fetch(`/api/clients/${client.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contracted_l1: v }),
-    });
-    if (res.ok && capacity) {
-      // Campo vuoto: le persone L1 del Report di Attivazione (lib/store.js, 28/9).
-      const contracted = v != null && v > 0 ? v : capacity.auto;
-      const budget = Math.ceil(contracted * (1 + PROTOCOLLO.buffer_pct));
-      const committed = capacity.used + capacity.pending;
-      setCapacity({
-        ...capacity,
-        contracted,
-        source: v != null && v > 0 ? 'contratto' : capacity.sourceAuto,
-        budget,
-        committed,
-        remaining: Math.max(0, budget - committed),
-        intakeSaturated: budget > 0 && committed >= budget,
-        deliverySaturated: budget > 0 && capacity.used >= budget,
-      });
-    } else if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      alert(d.error || 'Errore salvataggio (hai eseguito la migration v30?)');
-    }
-    setSavingContracted(false);
   }
 
   // ── Monitoraggio T3/T6/T12 ───────────────────────────────────────────────────
@@ -1326,13 +1292,13 @@ ${FIRMA}`,
               </span>
             </button>
             {showNrsTable && (
-            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
                     <th className="text-left px-4 py-2">Paziente</th>
                     <th className="text-center px-3 py-2">Livello</th>
-                    <th className="text-center px-3 py-2">Sedute</th>
+                    <th className="text-left px-3 py-2" title="Le date si compilano da sole quando l'osteopata registra il trattamento. In verde i trattamenti chiusi; in giallo quelli registrati ma non ancora chiusi.">Percorsi e date</th>
                     <th className="text-center px-3 py-2">NRS inizio</th>
                     <th className="text-center px-3 py-2">NRS fine</th>
                     <th className="text-center px-3 py-2">Delta</th>
@@ -1355,7 +1321,25 @@ ${FIRMA}`,
                             </span>
                           ) : '—'}
                         </td>
-                        <td className="px-3 py-2.5 text-center text-gray-600">{p.session_count}</td>
+                        <td className="px-3 py-2.5 text-xs">
+                          {p.percorsi.length === 0 && p.fuori.length === 0 ? <span className="text-gray-300">—</span> : (
+                            <div className="space-y-1">
+                              {[...p.percorsi, ...(p.fuori.length ? [{ id: 'fuori', fuori: true, date: p.fuori }] : [])].map(c => (
+                                <div key={c.id} className="flex flex-wrap items-center gap-1">
+                                  <span className="font-semibold text-gray-600 whitespace-nowrap">{c.fuori ? 'Fuori percorso' : nomePercorso(c)}</span>
+                                  {!c.fuori && <span className="text-gray-400 tabular-nums">{c.fatte}/{c.previste}</span>}
+                                  {c.date.map((d, i) => (
+                                    <span key={i} className={`px-1.5 py-0.5 rounded tabular-nums whitespace-nowrap ${d.chiusa ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}
+                                      title={d.chiusa ? 'Trattamento chiuso' : 'Registrato, non ancora chiuso'}>
+                                      {d.il ? dataIt(d.il, { day: '2-digit', month: '2-digit', year: '2-digit' }) : 'senza data'}{d.chiusa ? '' : ' · da chiudere'}
+                                    </span>
+                                  ))}
+                                  {!c.fuori && statoPercorso(c) && <span className="text-gray-400">{statoPercorso(c)}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
                         <td className="px-3 py-2.5 text-center"><NrsBar value={p.nrs_first} /></td>
                         <td className="px-3 py-2.5 text-center"><NrsBar value={p.nrs_last} /></td>
                         <td className="px-3 py-2.5 text-center font-bold">
@@ -1399,41 +1383,26 @@ ${FIRMA}`,
           </div>
         )}
 
-        {/* ── Capacità trattamenti (anno di programma) — L1 contratto + buffer del protocollo ── */}
-        {capacity && capacity.budget > 0 && (() => {
-          const pct = Math.min(100, Math.round(capacity.committed / capacity.budget * 100));
+        {/* ── Posti per i nuovi L1 (Enrico, 30/9): il 15% dei dipendenti, per eccesso, per chi
+            entra in Livello 1 durante l'anno. La barra dice presi e disponibili. ── */}
+        {capacity && capacity.posti > 0 && (() => {
+          const pct = Math.min(100, Math.round(capacity.presi / capacity.posti * 100));
           const barColor = capacity.intakeSaturated ? '#dc2626' : pct >= 80 ? '#ca8a04' : '#16a34a';
           return (
             <div className="bg-white rounded-xl border border-gray-200 p-4">
               <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">🎯 Capacità trattamenti (anno)</div>
-                {capacity.intakeSaturated ? (
-                  <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">ESAURITA — self-trigger bloccati</span>
-                ) : pct >= 80 ? (
-                  <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{pct}% impegnata</span>
-                ) : (
-                  <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{capacity.remaining} {capacity.remaining === 1 ? 'percorso disponibile' : 'percorsi disponibili'}</span>
-                )}
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-help"
+                  title={`Il ${Math.round(PROTOCOLLO.nuovi_l1_pct * 100)}% dei ${capacity.dipendenti} dipendenti, per eccesso: posti nel prezzo per chi entra in Livello 1 durante l'anno di programma (autosegnalazioni prese in carico, promozioni a Livello 1). Finiti i posti, le autosegnalazioni si fermano.`}>
+                  🎯 Posti per i nuovi L1
+                </div>
+                {capacity.intakeSaturated
+                  ? <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">ESAURITI — autosegnalazioni bloccate</span>
+                  : <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{capacity.disponibili} {capacity.disponibili === 1 ? 'disponibile' : 'disponibili'}</span>}
               </div>
-              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-2">
+              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-1.5">
                 <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: barColor }} />
               </div>
-              <div className="text-xs text-gray-500">
-                <strong className="text-gray-700">{capacity.used}</strong> cicli avviati · <strong className="text-gray-700">{capacity.pending}</strong> in coda · budget <strong className="text-gray-700">{capacity.budget}</strong> percorsi
-                <span className="text-gray-400"> = {capacity.contracted} L1 {capacity.source === 'contratto' ? 'a contratto (scritti a mano)' : capacity.source === 'report' ? 'del Report di Attivazione' : 'da check-up'} + buffer {Math.round(capacity.buffer_pct * 100)}% per chi entra in Livello 1 durante l&apos;anno</span>
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <label className="text-xs text-gray-400">L1 a contratto:</label>
-                <input type="number" min="0" value={contractedInput}
-                  onChange={e => setContractedInput(e.target.value)}
-                  placeholder={`auto (${capacity.auto})`}
-                  className="w-24 px-2 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
-                <button onClick={saveContractedL1} disabled={savingContracted}
-                  className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-1 rounded-lg hover:bg-gray-50 disabled:opacity-50">
-                  {savingContracted ? '…' : 'Salva'}
-                </button>
-                <span className="text-xs text-gray-300">vuoto = {capacity.sourceAuto === 'report' ? 'le persone L1 del Report di Attivazione, quelle nel prezzo' : 'gli L1 del check-up (non c\'è ancora un Report di Attivazione)'}</span>
-              </div>
+              <div className="text-xs text-gray-500">{capacity.presi} presi su {capacity.posti}</div>
             </div>
           );
         })()}
@@ -1808,14 +1777,17 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
   const client = await getClientById(clientId);
   if (!client) return { notFound: true };
 
-  const [{ assessments, responses }, assignments, patientsRaw, sessionsRaw, referralCodes, allProfessionals] = await Promise.all([
+  const [{ assessments, responses }, assignments, patientsRaw, sessionsRaw, referralCodes, allProfessionals, cicliRaw] = await Promise.all([
     getResponsesForClient(clientId),
     getAssignmentsByClient(clientId),
     getPatientsByClient(clientId),
     getSessionsForClient(clientId),
     getReferralCodesByClient(clientId),
     getProfessionals().catch(() => []),
+    getAllCyclesByClient(clientId).catch(() => []),
   ]);
+  // Solo i campi che servono alle date dei percorsi (niente dati della persona dal join).
+  const cicli = (cicliRaw || []).map(c => ({ id: c.id, patient_id: c.patient_id, cycle_type: c.cycle_type || 'treatment', status: c.status || null, sessions_planned: c.sessions_planned || null, started_at: c.started_at || null, created_at: c.created_at || null }));
 
   // Carica consensi per ogni assessment chiuso
   const assessmentsWithConsents = await Promise.all(
@@ -1844,7 +1816,8 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
       assigned_professional_id: p.assigned_professional_id || null,
       assessment_completed_at: p.assessment_completed_at || null,
       assessment_invite_sent_at: p.assessment_invite_sent_at || null,
-      session_count: closed.length,
+      // Date dei trattamenti per percorso: si compilano quando l'osteopata registra (30/9).
+      ...percorsiDelPaziente(p.id, cicli, sessionsRaw),
       nrs_first: firstClosed?.nrs_pre ?? null,
       nrs_last: lastClosed?.nrs_pre ?? null,
     };

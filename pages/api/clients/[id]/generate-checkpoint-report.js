@@ -12,9 +12,8 @@ import {
   insertGeneratedReport,
   insertDocument,
   getAllCyclesByClient,
-  getSelfTriggersByClient,
 } from '../../../../lib/store';
-import { sezioneMovimento, inserisciMovimento } from '../../../../lib/movimento';
+import { sezioneMovimento, inserisciMovimento, finestraTreMesi, nellaFinestra } from '../../../../lib/movimento';
 import { sezioneRifotografia, inserisciRifotografia, distribuzioneLeggibile, l1Confrontabile, L1_NON_CONFRONTABILE } from '../../../../lib/rifotografia';
 import { getNoteReport, getAndamentoT12Texts } from '../../../../lib/pricing/settings';
 import { CONFIG_V1 } from '../../../../lib/pricing/v1';
@@ -104,45 +103,39 @@ export default requireAuth(async function handler(req, res) {
   const oreSedute = ore(completed);
   const divisioneTxt = div.divisibile ? ` (${div.trattamento} di trattamento, ${div.prevenzione} di prevenzione)` : '';
 
+  // Solo Livello 1 (report a 3 mesi, Enrico 30/9): i percorsi di trattamento avviati nei
+  // primi tre mesi dell'anno di programma, i loro trattamenti e il loro NRS. Niente
+  // prevenzione, e niente di quanto è successo dopo i tre mesi (un report rifatto più
+  // tardi contava tutto lo storico: «36 percorsi» di due anni sotto «i primi 3 mesi»).
+  const fT3 = finestraTreMesi(client.data_avvio_programma || null);
+  const cicliL1 = (tuttiCicli || []).filter(c => (c.cycle_type || 'treatment') === 'treatment'
+    && nellaFinestra(c.started_at || c.created_at, fT3));
+  const idL1 = new Set(cicliL1.map(c => c.id));
+  const conclusiL1 = cicliL1.filter(c => c.status === 'closed' && (!fT3 || !c.closed_at || Date.parse(c.closed_at) < Date.parse(fT3.al))).length;
+  const sedL1 = sessions.filter(s => idL1.has(s.cycle_id) && nellaFinestra(s.date || s.closed_at, fT3));
+  const sedL1Chiuse = sedL1.filter(s => s.closed_at).length;
+  const sedL1Nrs = sedL1.filter(s => s.closed_at && s.nrs_pre != null && s.nrs_post != null);
+  const deltaL1 = sedL1Nrs.length ? (sedL1Nrs.reduce((a, s) => a + (s.nrs_pre - s.nrs_post), 0) / sedL1Nrs.length).toFixed(1) : 'n.d.';
+  const datiT3 = `DATI DEL LIVELLO 1 (i valori "n.d." sono soppressi per riservatezza/k-anonymity, < ${K_ANON}: NON dedurli né stimarli).
+Questo report segue SOLO i percorsi di trattamento del Livello 1 avviati nei primi tre mesi ${fT3 && fT3.anno > 1 ? `del ${fT3.anno}° anno di programma` : 'del programma'}:
+- Persone con un percorso di trattamento avviato: ${conNd(new Set(cicliL1.map(c => c.patient_id)).size)}
+- Percorsi di trattamento avviati: ${conNd(cicliL1.length)} · conclusi: ${conNd(conclusiL1)}
+- Trattamenti del Livello 1 completati/pianificati: ${sedL1Chiuse}/${sedL1.length}
+- Riduzione media NRS per trattamento: ${deltaL1} punti`;
+
   const isAnnual = checkpoint === 't12';
   const checkLabel = checkpoint === 't3' ? '3 mesi' : checkpoint === 't6' ? '6 mesi' : '12 mesi (Annuale)';
 
-  // ── «Il movimento» (solo T3): cosa si è mosso, senza ri-somministrare il
-  // questionario a nessuno. Sezione deterministica, mai scritta dall'AI.
+  // ── «I percorsi di trattamento» (solo T3, Enrico 30/9): il report a tre mesi segue
+  // SOLO il Livello 1 partito dall'avvio del programma — percorsi avviati e conclusi.
+  // Sezione deterministica, mai scritta dall'AI.
   let movimentoSection = '';
   if (checkpoint === 't3') {
-    try {
-      const [assessments, cicli, segnalazioni] = await Promise.all([
-        getAssessmentsByClient(id).catch(() => []),
-        getAllCyclesByClient(id).catch(() => []),
-        getSelfTriggersByClient(id).catch(() => []),
-      ]);
-      // Fotografia di partenza: le risposte CONGELATE del check-up iniziale (il più vecchio).
-      const t0Ass = (assessments || [])[assessments.length - 1];
-      const t0Answers = t0Ass ? await getResponsesByAssessment(t0Ass.id).catch(() => []) : [];
-      const t0 = stratificazioneOsservata(t0Answers);
-      // Nuovi ingressi = chi ha compilato il check-up DOPO la chiusura della raccolta
-      // iniziale (i neoassunti), non l'intera popolazione che ha risposto all'inizio.
-      const chiusuraIniziale = (t0Ass && (t0Ass.chiude_il || t0Ass.created_at)) || null;
-      const dopoLaRaccolta = (d) => !!chiusuraIniziale && !!d && String(d) > String(chiusuraIniziale);
-      const trattamento = (cicli || []).filter(c => (c.cycle_type || 'treatment') === 'treatment');
-      const prevenzione = (cicli || []).filter(c => c.cycle_type === 'prevention');
-      movimentoSection = sezioneMovimento({
-        inizio: { n: t0.n, l1: t0.l1, l2: t0.l2, l3: t0.l3 },
-        attuale: { l1, l2, l3 },
-        movimenti: {
-          trattamentiAvviati: trattamento.length,
-          trattamentiChiusi: trattamento.filter(c => c.status === 'closed').length,
-          seduteErogate: completed,
-          prevenzioneAvviata: new Set(prevenzione.map(c => c.patient_id)).size,
-          segnalazioni: new Set((segnalazioni || []).map(x => x.patient_id)).size,
-          nuoviIngressi: (patients || []).filter(p => dopoLaRaccolta(p.assessment_completed_at)).length,
-        },
-        checkLabel: '3 mesi',
-      });
-    } catch (e) {
-      console.error('[checkpoint t3] sezione movimento non costruita:', e.message);
-    }
+    movimentoSection = sezioneMovimento({
+      movimenti: { trattamentiAvviati: cicliL1.length, trattamentiChiusi: conclusiL1 },
+      anno: fT3 ? fT3.anno : 1,
+      checkLabel: '3 mesi',
+    });
   }
 
   // ── «La fotografia a sei mesi» (solo T6): il questionario è tornato a tutta la
@@ -287,7 +280,7 @@ LESSICO (tassativo): la rilevazione fatta con il questionario si chiama «check-
 CHIUSURA: non aggiungere firme, sottotitoli, slogan o formule di congedo in fondo al report — la chiusura la aggiunge il sistema.
 Tono: clinico, orientato ai risultati e alla direzione. Italiano. Max 650 parole.` : `Sei un consulente clinico ES Work. Genera un Report Intermedio professionale a ${checkLabel} per un'azienda cliente.
 
-DATI CLINICI (i valori "n.d." sono soppressi per riservatezza/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
+${checkpoint === 't3' ? datiT3 : `DATI CLINICI (i valori "n.d." sono soppressi per riservatezza/k-anonymity, < ${K_ANON}: NON dedurli né stimarli):
 Distribuzione ATTUALE dei dipendenti per livello, su ${stratTotal} dipendenti (è una classificazione, NON il numero di persone seguite in un percorso):
 ${righeLivelli}
 Persone seguite dall'osteopata (queste sono le persone in percorso):
@@ -296,7 +289,7 @@ Persone seguite dall'osteopata (queste sono le persone in percorso):
 - Persone seguite in tutto (chi ha avuto entrambi i percorsi conta una volta): ${seguitiD}
 - Trattamenti completati/pianificati: ${completed}/${planned}${divisioneTxt}
 ${formazioneTxt}
-- Riduzione media NRS per trattamento: ${avgDelta} punti
+- Riduzione media NRS per trattamento: ${avgDelta} punti`}
 - Settore: ${client.sector === 1 ? 'Manifattura' : 'Servizi'}
 
 MINI-CHECK ${checkpoint.toUpperCase()} — breve questionario inviato SOLO a chi ha avviato un percorso con l'osteopata, a ${checkpoint === 't6' ? '180' : '90'} giorni dall'inizio del suo primo percorso. NON va a tutta la popolazione e NON è il check-up: il numero di compilati dipende da quanti percorsi sono partiti da almeno ${checkpoint === 't6' ? 'sei' : 'tre'} mesi, NON misura l'adesione dei dipendenti.
@@ -308,7 +301,7 @@ ${mc.count === 0 ? 'NOTA: nessun mini-check ancora compilato — segnala che i K
 ${checkup6 ? `CHECK-UP A SEI MESI (tutta la popolazione, stesse domande del check-up iniziale): ${checkup6.compilati} compilati, a fronte di ${checkup6.iniziali} al check-up iniziale. È QUESTO il dato di adesione a sei mesi; il confronto è già scritto dal sistema nella sezione «La fotografia a sei mesi».
 ` : ''}
 ${DEFINIZIONE_LIVELLI}
-${VERSO_DEI_LIVELLI}
+${checkpoint === 't3' ? '' : VERSO_DEI_LIVELLI}
 
 STRUTTURA REPORT (markdown, ## per titoli):
 
@@ -316,7 +309,7 @@ STRUTTURA REPORT (markdown, ## per titoli):
 (3-4 punti chiave di rilievo clinico e operativo)
 
 ## KPI Clinici
-(tabella o lista strutturata: trattamenti, NRS dei trattamenti, persone in percorso, mini-check ${checkpoint.toUpperCase()} con NRS dichiarato e limitazioni, distribuzione per livello)
+(tabella o lista strutturata: ${checkpoint === 't3' ? 'percorsi e trattamenti del Livello 1, NRS dei trattamenti, mini-check T3 con NRS dichiarato e limitazioni' : `trattamenti, NRS dei trattamenti, persone in percorso, mini-check ${checkpoint.toUpperCase()} con NRS dichiarato e limitazioni, distribuzione per livello`})
 
 ## Trend e Analisi
 (andamento NRS, compliance pazienti, situazioni da monitorare)
@@ -325,10 +318,10 @@ STRUTTURA REPORT (markdown, ## per titoli):
 (eventuali criticità operative o cliniche)
 
 ## Prossimi Passi
-(3-4 azioni per i prossimi ${checkpoint === 't3' ? '3' : '6'} mesi, scelte fra ciò che il programma prevede già)
+${checkpoint === 't3' ? "(2-3 azioni sui percorsi del Livello 1 fino al check-up di tutti a sei mesi, scelte SOLO fra percorsi di trattamento, mini-check e check-up a sei mesi)" : '(3-4 azioni per i prossimi 6 mesi, scelte fra ciò che il programma prevede già)'}
 
 ${checkpoint === 't6' ? `FOTOGRAFIA (tassativo): il confronto fra il check-up iniziale e quello dei sei mesi è già scritto dal sistema nella sezione «La fotografia a sei mesi», con le sue cautele sulla rappresentatività. NON duplicarlo, NON ricalcolare le percentuali e NON presentarlo come un risultato clinico dimostrato.
-` : ''}${checkpoint === 't3' ? `MOVIMENTO (tassativo): il racconto di cosa si è mosso in questi tre mesi — percorsi avviati e conclusi, trattamenti, prevenzione, segnalazioni, nuovi ingressi, distribuzione attuale — è già scritto dal sistema nella sezione «Il movimento dei primi 3 mesi». NON duplicarlo e NON riscriverne i numeri. In particolare NON affermare che la distribuzione attuale derivi da un nuovo questionario: a tre mesi nessuno ricompila nulla.
+` : ''}${checkpoint === 't3' ? `PERIMETRO (tassativo, Enrico 30/9): il report a tre mesi segue SOLO i percorsi di trattamento del Livello 1 partiti dall'avvio del programma. VIETATO parlare di Livello 2, Livello 3, prevenzione, formazione, ergonomia, nuovi ingressi o distribuzione per livello: il quadro di tutta la popolazione arriva a sei mesi. I numeri dei percorsi avviati e conclusi sono già scritti dal sistema nella sezione «I percorsi di trattamento nei primi 3 mesi»: NON duplicarli. A tre mesi nessuno ricompila il questionario.
 ` : ''}${programmaPrevisto()}
 ${IDENTITA_PROFESSIONALE}
 ${NIENTE_RIFERIMENTI_INVENTATI}
@@ -347,7 +340,7 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
 
   // Manca la chiave: NESSUNA chiamata, nessun dato uscito (ai_status, v57).
   if (!process.env.ANTHROPIC_API_KEY) {
-    const fallback = finalize(generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc));
+    const fallback = finalize(generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, ...(checkpoint === 't3' ? [sedL1Chiuse, sedL1.length, deltaL1] : [completed, planned, avgDelta]), t12, mc));
     // PDF prima dell'insert: così pdf_url resta sul record e il report è riapribile col PDF
     const pdfUrl = await tryGeneratePdf(client, reportType, fallback, id, checkpoint).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system', ai_status: 'fallback_no_key', pdf_url: pdfUrl }).catch(() => null);
@@ -368,7 +361,7 @@ Tono: clinico, analitico, orientato ai dati. Italiano. Max 600 parole.`;
     return res.json({ report, source: 'ai', ai_status: aiStatus, problemi, pdf_url: pdfUrl, report_id: rec?.id });
   } catch (e) {
     // Chiamata fatta: i dati sono usciti, la risposta non è stata usata. Solo la classe.
-    const fallback = finalize(generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, completed, planned, avgDelta, t12, mc));
+    const fallback = finalize(generateFallbackCheckpoint(client, checkpoint, checkLabel, l1, l2, l3, ...(checkpoint === 't3' ? [sedL1Chiuse, sedL1.length, deltaL1] : [completed, planned, avgDelta]), t12, mc));
     const pdfUrl = await tryGeneratePdf(client, reportType, fallback, id, checkpoint).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: reportType, content_text: fallback, checkpoint, created_by: 'system', ai_status: 'fallback_errore', pdf_url: pdfUrl }).catch(() => null);
     return res.json({ report: fallback, source: 'fallback', ai_status: 'fallback_errore', error: e.message, pdf_url: pdfUrl, report_id: rec?.id });
@@ -506,9 +499,35 @@ ${completed} interventi erogati su ${planned} pianificati. ${TESTO_OT23_IN_VERIF
 3. Modulo formativo avanzato
 4. Check-up annuale di controllo`;
   }
+  // A tre mesi solo il Livello 1 (Enrico 30/9): niente distribuzione per livello né L2.
+  if (checkpoint === 't3') {
+    return `## Highlights Principali a ${checkLabel}
+
+Il report a tre mesi segue i percorsi di trattamento del Livello 1 partiti dall'avvio del programma ES Work per **${client.name}**.
+
+- ${completed} trattamenti del Livello 1 completati su ${planned} pianificati
+- Riduzione media NRS: **${avgDelta} punti** per trattamento
+
+## KPI Clinici
+
+| Indicatore | Valore |
+|-----------|--------|
+| Trattamenti del Livello 1 completati | ${completed} / ${planned} |
+| Riduzione NRS media (trattamenti) | ${avgDelta} punti |
+| Mini-check T3 compilati | ${mc ? (mc.smallGroup ? 'n.d.' : mc.count) : 0} |
+| NRS medio dichiarato (mini-check) | ${mc ? mc.avgNrs : 'n.d.'} |
+| Con limitazioni funzionali | ${mc && mc.limitationsPct != null ? mc.limitationsPct + '%' : 'n.d.'} |
+| Richiedono contatto | ${mc ? mc.needsContact : 0} |
+
+## Prossimi Passi
+
+1. Continuazione dei percorsi di trattamento del Livello 1 in corso
+2. Mini-check a tre mesi per chi ha iniziato un percorso
+3. Check-up a sei mesi per tutti i dipendenti, con le stesse domande del check-up iniziale`;
+  }
   return `## Highlights Principali a ${checkLabel}
 
-Il programma ES Work per **${client.name}** ha raggiunto il checkpoint a ${checkLabel} con risultati in linea con le aspettative cliniche.
+Il programma ES Work per **${client.name}** ha raggiunto il checkpoint a ${checkLabel}.
 
 - ${completed} trattamenti completati su ${planned} pianificati (${planned > 0 ? Math.round(completed/planned*100) : 0}% completamento)
 - Riduzione media NRS: **${avgDelta} punti** per trattamento
@@ -528,7 +547,7 @@ ${righeTabella}
 
 ## Trend e Analisi
 
-Il trend di riduzione NRS è positivo. I pazienti L1 mostrano risposta al protocollo di trattamento individuale. I pazienti L2 proseguono nella prevenzione attiva.
+I valori di NRS e dei mini-check sono riportati nella tabella qui sopra; l'analisi clinica si aggiunge alla revisione del report.
 
 ## Problematiche Emerse
 

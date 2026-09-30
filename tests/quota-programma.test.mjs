@@ -15,15 +15,22 @@ const PRIMA = { quota_programma_fissa: 0, quota_programma_per_dipendente: 0 };
 const cento = (pct, v2Params) => { const l1 = Math.round(100 * pct); return calculatePricing({ rates: TARIFFE_STANDARD, n: 100, l1, l2: l1 * 2, v2Params }); };
 
 test('azienda da 100 al 3% e al 12%: prima e dopo la quota', () => {
-  assert.equal(cento(0.03, PRIMA).price_y1, 5700);
-  assert.equal(cento(0.03).price_y1, 8700);
-  assert.equal(cento(0.03).price_per_employee_y1, 87);
-  assert.equal(cento(0.12, PRIMA).price_y1, 13800);
-  assert.equal(cento(0.12).price_y1, 16800);
+  // Dal 30/9 i posti per i nuovi L1 (15 su 100) sono nel prezzo: +€4.050 al posto della
+  // scorta del 20% sulla parte clinica. La quota resta +€3.000.
+  assert.equal(cento(0.03, PRIMA).price_y1, 9300);
+  assert.equal(cento(0.03).price_y1, 12300);
+  assert.equal(cento(0.03).price_per_employee_y1, 123);
+  assert.equal(cento(0.12, PRIMA).price_y1, 16050);
+  assert.equal(cento(0.12).price_y1, 19050);
   // rinnovo: la quota si rifà ogni anno
-  assert.equal(cento(0.03, PRIMA).price_y2, 3700);
-  assert.equal(cento(0.03).price_y2, 6700);
-  assert.equal(cento(0.12).price_y2, 14800);
+  assert.equal(cento(0.03, PRIMA).price_y2, 7300);
+  assert.equal(cento(0.03).price_y2, 10300);
+  assert.equal(cento(0.12).price_y2, 17050);
+  // le Stime registrate prima del 30/9 tengono la scorta di allora
+  const vecchia = { scorta_su_clinica: true };
+  assert.equal(cento(0.03, vecchia).price_y1, 8700);
+  assert.equal(cento(0.12, vecchia).price_y1, 16800);
+  assert.equal(cento(0.12, vecchia).price_y2, 14800);
 });
 
 test('la quota è una voce propria, fuori dal buffer, con costo al 30%', () => {

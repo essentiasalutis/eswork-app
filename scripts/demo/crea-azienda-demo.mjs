@@ -256,9 +256,8 @@ async function fase1() {
 // ═══ FIRMA — dopo il Report di Attivazione (e la sua presentazione) ═══
 async function faseFirma() {
   log('FIRMA — proposta accettata, contratto, avvio del programma');
-  // Offerta, firma, avvio. Capacità: L1 del check-up.
-  // Niente contracted_l1 a mano (28/9): la capacità usa le persone L1 del Report di
-  // Attivazione, quelle nel prezzo (lib/store.js getTreatmentCapacity).
+  // Offerta, firma, avvio. I posti per i nuovi L1 (15% dei dipendenti, 30/9) li calcola
+  // lib/store.js getTreatmentCapacity: niente da scrivere a mano.
   await upd('clients', { pipeline_stage: 'signed', offerta_aperta_il: '2025-09-09', offerta_scade_il: '2025-09-19', secondo_incontro_il: '2025-09-09', contract_start_date: AVVIO, data_avvio_programma: AVVIO, last_contact_date: '2025-09-12' }, 'id', C);
   await ins('professional_assignments', { id: id('pa'), professional_id: PRO, client_id: C, active: true, created_at: g('2025-09-15') });
 }

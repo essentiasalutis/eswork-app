@@ -50,9 +50,8 @@ export default async function handler(req, res) {
     });
   }
 
-  // Capacità contrattuale azienda: cicli avviati + candidati in coda non possono
-  // superare i percorsi pagati (L1 contratto + buffer del protocollo). Tutela automatica:
-  // niente nuovi ingressi oltre quanto contrattualizzato.
+  // Posti per i nuovi Livello 1 (Enrico, 30/9): il 15% dei dipendenti, per eccesso, ogni
+  // anno di programma. Finiti i posti, nessun nuovo ingresso oltre quanto pagato.
   const capacity = await getTreatmentCapacity(patient.client_id).catch(() => null);
   if (capacity?.intakeSaturated) {
     return res.status(429).json({

@@ -14,7 +14,8 @@ const PARAM_LABELS = {
   session_duration_min: 'Durata seduta (minuti)',
   prevention_sessions_per_l2: 'Sessioni prevenzione per L2',
   tariffa_sessione_prevenzione: 'Tariffa sessione prevenzione (€)',
-  buffer_pct: 'Buffer clinico — solo su clinica',
+  nuovi_l1_pct: 'Posti per i nuovi L1 nell\'anno (% della popolazione, per eccesso; ognuno un percorso)',
+  buffer_pct: 'Scorta di prima (20% della clinica) — solo Stime registrate prima del 30/9',
   capienza_aula: 'Capienza aula (formazione)',
   training_modules_y1: 'Moduli formazione Anno 1',
   training_modules_y2: 'Moduli formazione Anno 2+',
@@ -129,7 +130,7 @@ export default function PricingV2Page() {
                 {Object.entries(PARAMETRI_PROTOCOLLO_LISTINO).map(([k, v]) => (
                   <div key={k} className="flex items-center justify-between text-xs text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-2">
                     <span>{PARAM_LABELS[k] || k}</span>
-                    <strong className="tabular-nums text-gray-900">{k === 'buffer_pct' ? percento(v) : v}</strong>
+                    <strong className="tabular-nums text-gray-900">{k === 'buffer_pct' || k === 'nuovi_l1_pct' ? percento(v) : v}</strong>
                   </div>
                 ))}
               </div>

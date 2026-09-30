@@ -2,13 +2,12 @@ import { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../lib/auth';
-import { getAllRestratAlerts, getAllPatients } from '../../lib/store';
+import { getAllRestratAlerts, getAllPatients, getTreatmentCapacity } from '../../lib/store';
 import { PROTOCOLLO, percento } from '../../lib/protocollo.mjs';
 import NavMenu from '../../components/NavMenu';
 import { dataIt } from '../../lib/date-it.mjs';
 
 // Sedute per un nuovo L1 (regola del protocollo)
-const SESSIONS_PER_NEW_L1 = PROTOCOLLO.sedute_per_ciclo;
 
 // Fonte: tutti grigi/neutri — è solo informazione su chi ha segnalato
 const SOURCE_BADGE = {
@@ -24,16 +23,13 @@ const STATUS_BADGE = {
   not_confirmed: { label: 'Non confermato',    cls: 'bg-gray-100 text-gray-500 border-gray-200' },
 };
 
-function BufferBar({ usedSessions, totalSessions }) {
-  const pct = totalSessions > 0 ? Math.min(100, Math.round((usedSessions / totalSessions) * 100)) : 0;
-  const color = pct >= 90 ? '#dc2626' : pct >= 60 ? '#ca8a04' : '#16a34a';
-  const residuoSess = Math.max(0, totalSessions - usedSessions);
+// Posti per i nuovi Livello 1 (Enrico, 30/9): la stessa barra del box nella scheda.
+function PostiBar({ presi, posti }) {
+  const pct = posti > 0 ? Math.min(100, Math.round((presi / posti) * 100)) : 0;
+  const color = pct >= 100 ? '#dc2626' : pct >= 80 ? '#ca8a04' : '#16a34a';
   return (
     <div className="mt-3">
-      <div className="flex justify-between text-xs mb-1">
-        <span className="text-gray-500">{usedSessions} sess. impegnate su {totalSessions} buffer</span>
-        <span style={{ color }} className="font-semibold">{residuoSess} sess. residue</span>
-      </div>
+      <div className="text-xs text-gray-500 mb-1">{presi} presi su {posti}</div>
       <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
       </div>
@@ -61,11 +57,6 @@ export default function RestratificationsPage({ alerts: initialAlerts, bufferByC
       console.error(e);
     }
     setUpdating(null);
-  }
-
-  // Conta confermati per client in tempo reale
-  function confirmedForClient(clientId) {
-    return alerts.filter(a => a.client_id === clientId && a.status === 'confirmed_l1').length;
   }
 
   const pendingCount = alerts.filter(a => a.status === 'pending').length;
@@ -116,68 +107,48 @@ export default function RestratificationsPage({ alerts: initialAlerts, bufferByC
                 <span className="mt-0.5 text-green-600 text-base">✅</span>
                 <div>
                   <div className="font-semibold text-gray-800">Promosso L1</div>
-                  <div className="text-xs text-gray-500">Hai confermato il passaggio a trattamento attivo. Questo dipendente consuma uno slot del buffer {percento(PROTOCOLLO.buffer_pct)} dell'azienda.</div>
+                  <div className="text-xs text-gray-500">Hai confermato il passaggio a trattamento attivo. Questo dipendente consuma uno dei posti per i nuovi Livello 1 dell'azienda.</div>
                 </div>
               </div>
               <div className="flex gap-3">
                 <span className="mt-0.5 text-gray-400 text-base">✖</span>
                 <div>
                   <div className="font-semibold text-gray-800">Non confermato</div>
-                  <div className="text-xs text-gray-500">Il segnale è stato valutato ma non richiede un cambio di livello. Non consuma buffer.</div>
+                  <div className="text-xs text-gray-500">Il segnale è stato valutato ma non richiede un cambio di livello. Non consuma posti.</div>
                 </div>
               </div>
               <div className="flex gap-3">
                 <span className="mt-0.5 text-gray-500 text-base">📊</span>
                 <div>
-                  <div className="font-semibold text-gray-800">Buffer {percento(PROTOCOLLO.buffer_pct)}</div>
-                  <div className="text-xs text-gray-500">Slot aggiuntivi inclusi nel preventivo per assorbire nuovi L1 senza rinegoziare il contratto. Esauriti gli slot, ogni nuovo L1 è fuori contratto.</div>
+                  <div className="font-semibold text-gray-800">Posti per i nuovi Livello 1</div>
+                  <div className="text-xs text-gray-500">Il {percento(PROTOCOLLO.nuovi_l1_pct)} dei dipendenti, per eccesso, ogni anno di programma: sono nel prezzo, ognuno un percorso di trattamento. Li consumano autosegnalazioni prese in carico e promozioni a Livello 1. Finiti i posti, ogni nuovo Livello 1 è fuori contratto.</div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* ── Buffer per azienda ─────────────────────────────────────── */}
+          {/* ── Posti per i nuovi L1, per azienda (stessa funzione della scheda) ── */}
           {bufferByClient && bufferByClient.length > 0 && (
             <div>
               <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
-                Capacità buffer {percento(PROTOCOLLO.buffer_pct)} per azienda
+                Posti per i nuovi Livello 1, per azienda
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                {bufferByClient.map(c => {
-                  const confirmed = confirmedForClient(c.client_id);
-                  // Sessioni impegnate = promozioni confermate × sessioni per nuovo L1
-                  const sessPerL1 = Math.round(SESSIONS_PER_NEW_L1);
-                  const usedSessions = confirmed * sessPerL1;
-                  const residuoSess = c.buffer_sessions - usedSessions;
-                  const isOver = residuoSess < 0;
-                  const pctUsed = c.buffer_sessions > 0 ? Math.min(100, Math.round((usedSessions / c.buffer_sessions) * 100)) : 0;
-                  const statusColor = isOver ? 'text-red-600' : pctUsed >= 60 ? 'text-amber-600' : 'text-green-700';
-                  return (
-                    <div key={c.client_id}
-                      className={`bg-white rounded-2xl border p-4 ${isOver ? 'border-red-300' : 'border-gray-200'}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="font-semibold text-gray-900 text-sm">{c.client_name}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            {c.l1_count} L1 attivi · {c.l2_count} L2 monitorati
-                          </div>
-                        </div>
-                        <div className={`text-right shrink-0 ${statusColor}`}>
-                          <div className="text-2xl font-bold leading-none">
-                            {isOver ? '−' + Math.abs(residuoSess) : '+' + residuoSess}
-                          </div>
-                          <div className="text-xs font-medium">sess. {isOver ? 'fuori budget' : 'residue'}</div>
-                        </div>
+                {bufferByClient.map(c => (
+                  <div key={c.client_id} className={`bg-white rounded-2xl border p-4 ${c.presi > c.posti ? 'border-red-300' : 'border-gray-200'}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="font-semibold text-gray-900 text-sm">{c.client_name}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{c.posti} posti · {percento(PROTOCOLLO.nuovi_l1_pct)} di {c.dipendenti} dipendenti</div>
                       </div>
-                      <BufferBar usedSessions={usedSessions} totalSessions={c.buffer_sessions} />
-                      <div className="text-xs text-gray-400 mt-2">
-                        Buffer totale: <strong>{c.buffer_sessions} sessioni</strong> ({percento(PROTOCOLLO.buffer_pct)} di {c.l1_count} L1 × {sessPerL1} sess.)
-                        {confirmed > 0 && <span className="ml-1">· {confirmed} promozioni × {sessPerL1} sess. = {usedSessions} impegnate</span>}
-                        {isOver && <span className="ml-1 text-red-600 font-semibold"> ⚠️ Fuori budget — rinegoziare il contratto</span>}
+                      <div className={`text-right shrink-0 ${c.presi > c.posti ? 'text-red-600' : c.disponibili === 0 ? 'text-amber-600' : 'text-green-700'}`}>
+                        <div className="text-2xl font-bold leading-none">{c.presi > c.posti ? `−${c.presi - c.posti}` : c.disponibili}</div>
+                        <div className="text-xs font-medium">{c.presi > c.posti ? 'fuori contratto' : c.disponibili === 1 ? 'disponibile' : 'disponibili'}</div>
                       </div>
                     </div>
-                  );
-                })}
+                    <PostiBar presi={c.presi} posti={c.posti} />
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -281,31 +252,14 @@ export const getServerSideProps = requireAuthSsr(async () => {
       getAllPatients(),
     ]);
 
-    // Calcola buffer per azienda basato sui pazienti L1 attuali
-    const clientMap = {};
-    patients.forEach(p => {
-      const cid = p.client_id;
-      if (!clientMap[cid]) {
-        clientMap[cid] = {
-          client_id: cid,
-          client_name: p.clients?.name || cid,
-          l1_count: 0,
-          l2_count: 0,
-        };
-      }
-      if (p.level === 'level1') clientMap[cid].l1_count++;
-      if (p.level === 'level2') clientMap[cid].l2_count++;
-    });
-
-    const bufferByClient = Object.values(clientMap)
-      .filter(c => c.l1_count > 0 || c.l2_count > 0)
-      .map(c => {
-        const base_sessions = c.l1_count * PROTOCOLLO.sedute_per_ciclo;
-        const buffer_sessions = Math.round(base_sessions * PROTOCOLLO.buffer_pct);
-        const sessions_per_new_l1 = PROTOCOLLO.sedute_per_ciclo;
-        const max_new_l1 = sessions_per_new_l1 > 0 ? Math.floor(buffer_sessions / sessions_per_new_l1) : 0;
-        return { ...c, buffer_sessions, max_new_l1 };
-      });
+    // Posti per i nuovi L1, per azienda: la stessa funzione del box nella scheda
+    // (lib/store.js getTreatmentCapacity), per le aziende con persone dal check-up.
+    const aziende = {};
+    patients.forEach(p => { if (!aziende[p.client_id]) aziende[p.client_id] = p.clients?.name || p.client_id; });
+    const bufferByClient = (await Promise.all(Object.entries(aziende).map(async ([client_id, client_name]) => {
+      const c = await getTreatmentCapacity(client_id).catch(() => null);
+      return c && c.posti > 0 ? { client_id, client_name, posti: c.posti, presi: c.presi, disponibili: c.disponibili, dipendenti: c.dipendenti } : null;
+    }))).filter(Boolean);
 
     return { props: { alerts, bufferByClient, dbError: null } };
   } catch {

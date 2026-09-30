@@ -11,7 +11,9 @@ test('i valori del protocollo sono quelli contrattuali', () => {
   assert.deepEqual({ ...PROTOCOLLO }, {
     sedute_per_ciclo: 4, durata_seduta_min: 30, sessioni_prevenzione_l2: 4,
     cicli_trattamento_per_anno: 2, cicli_prevenzione_per_anno: 1,
-    giorni_tra_cicli: 60, autosegnalazioni_per_anno: 2, buffer_pct: 0.20,
+    giorni_tra_cicli: 60, autosegnalazioni_per_anno: 2,
+    // Enrico, 30/9: posti per i nuovi L1 = 15% dei dipendenti; il 20% resta per le Stime di prima.
+    nuovi_l1_pct: 0.15, buffer_pct: 0.20,
     // Enrico, 27/9: ciclo completo entro 60 giorni, avviso all'osteopata dal 45°.
     durata_max_ciclo_giorni: 60, avviso_ciclo_giorni: 45,
     durata_prevalidazione_min: 15,
@@ -37,7 +39,9 @@ test('il prezzo usa il protocollo, qualunque cosa sia salvata nel listino', () =
   assert.equal(p.prevention_sessions_per_l2, 4);
   assert.equal(p.buffer_pct, 0.20);
   assert.equal(p.tariffa_sessione_prevenzione, 50, 'i parametri commerciali restano modificabili');
+  assert.equal(p.nuovi_l1_pct, 0.15);
   assert.equal(eRegolaDelProtocollo('buffer_pct'), true);
+  assert.equal(eRegolaDelProtocollo('nuovi_l1_pct'), true);
   assert.equal(eRegolaDelProtocollo('l2_multiplier'), false);
   assert.equal(eRegolaDelProtocollo('finestra_recupero_mesi'), true);
   assert.equal(eRegolaDelProtocollo('soglia_recupero_fasce'), true);
@@ -49,6 +53,7 @@ test('i default del listino v2 coincidono con il protocollo', () => {
   assert.equal(DEFAULTS_V2.session_duration_min, PROTOCOLLO.durata_seduta_min);
   assert.equal(DEFAULTS_V2.prevention_sessions_per_l2, PROTOCOLLO.sessioni_prevenzione_l2);
   assert.equal(DEFAULTS_V2.buffer_pct, PROTOCOLLO.buffer_pct);
+  assert.equal(DEFAULTS_V2.nuovi_l1_pct, PROTOCOLLO.nuovi_l1_pct);
 });
 
 test('numeri per le frasi', () => {

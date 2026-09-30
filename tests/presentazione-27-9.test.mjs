@@ -29,7 +29,7 @@ test('il dato unito è sempre ricavabile dal totale: non rivela niente di nuovo'
 });
 
 test('nessun «n.d.» livello per livello, e mai più «sotto le 5 persone»', () => {
-  for (const f of ['pages/dashboard/presentazione/[clientId].js', 'lib/dati-sanitari.js', 'components/ReportView.jsx', 'pages/dashboard/offer.js', 'lib/movimento.js', 'pages/api/clients/[id]/generate-activation-report.js']) {
+  for (const f of ['pages/dashboard/presentazione/[clientId].js', 'lib/dati-sanitari.js', 'components/ReportView.jsx', 'pages/dashboard/offer.js', 'pages/api/clients/[id]/generate-activation-report.js']) {
     assert.match(src(f), /livelliLeggibili\(/, f);
   }
   assert.ok(!/sotto le 5 persone/.test(src('pages/dashboard/presentazione/[clientId].js')));

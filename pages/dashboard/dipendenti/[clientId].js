@@ -190,8 +190,7 @@ export default function DipendentiPage({ clientId }) {
             <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
               <h2 className="font-bold text-gray-900">👥 Anagrafica ({dipendenti.length})</h2>
               <div className="flex gap-2">
-                <a href={`/api/org/${clientId}/export`} className="text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-xl hover:bg-gray-200">⬇ Esporta CSV</a>
-                <button onClick={() => call('POST', `/api/org/${clientId}/seed`, {}, 'seed')} disabled={busy === 'seed'} className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl disabled:opacity-50">Importa nomi dal check-up</button>
+                <a href={`/api/org/${clientId}/export`} title="Registro della formazione: solo chi ha partecipato ad almeno una sessione o a un intervento di ergonomia" className="text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-xl hover:bg-gray-200">⬇ Registro formazione (CSV)</a>
               </div>
             </div>
             <input value={cerca} onChange={e => setCerca(e.target.value)} placeholder="Cerca per nome o matricola…" className={`${inputCls} w-full mb-3`} />
@@ -278,7 +277,7 @@ export default function DipendentiPage({ clientId }) {
                       </>
                     );
                   })}
-                  {dipendentiMostrati.length === 0 && <tr><td colSpan={9} className="py-6 text-center text-gray-400">{dipendenti.length ? 'Nessun dipendente trovato con questa ricerca.' : 'Nessun dipendente. Usa "Importa nomi dal check-up" o aggiungi sopra.'}</td></tr>}
+                  {dipendentiMostrati.length === 0 && <tr><td colSpan={9} className="py-6 text-center text-gray-400">{dipendenti.length ? 'Nessun dipendente trovato con questa ricerca.' : 'Nessun dipendente. I nomi di chi compila il check-up entrano da soli quando il programma è attivo; puoi anche aggiungerli sopra.'}</td></tr>}
                 </tbody>
               </table>
             </div>

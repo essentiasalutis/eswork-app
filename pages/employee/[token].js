@@ -229,7 +229,7 @@ function DashboardL2({ patient, percorso = [], onSelfTrigger, remaining, rinnovo
         <div style={{ fontSize: 13, opacity: .85, marginTop: 8, lineHeight: 1.6 }}>
           Il tuo check-up ha rilevato disturbi iniziali che non limitano ancora la tua attività.{' '}
           {attivo && prevenzioneDopo ? (
-            <>Sei entrato nel programma durante l&apos;anno: i {PROTOCOLLO.sessioni_prevenzione_l2} trattamenti di prevenzione con l&apos;osteopata partono con il prossimo anno di programma della tua azienda{prevenzioneDopo.dal ? `, dal ${prevenzioneDopo.dal.split('-').reverse().join('/')}` : ''}. Intanto hai la formazione collettiva e, se il tuo stato cambia, puoi segnalarlo tramite il bottone qui sotto.</>
+            <>Sei entrato in azienda durante l&apos;anno di programma: i {PROTOCOLLO.sessioni_prevenzione_l2} trattamenti di prevenzione con l&apos;osteopata partono con il prossimo anno di programma della tua azienda{prevenzioneDopo.dal ? `, dal ${prevenzioneDopo.dal.split('-').reverse().join('/')}` : ''}. Intanto hai la formazione collettiva e, se il tuo stato cambia, puoi segnalarlo tramite il bottone qui sotto.</>
           ) : attivo ? (
             <>Il programma prevede per te {PROTOCOLLO.sessioni_prevenzione_l2} trattamenti di prevenzione con l&apos;osteopata, in sede.<br />
             Se il tuo stato cambia, puoi segnalarlo tramite il bottone qui sotto.</>

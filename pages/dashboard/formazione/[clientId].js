@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { requireAuthSsr } from '../../../lib/auth';
-import { TIPO_ERGONOMIA } from '../../../lib/org-regole.mjs';
+import { TIPO_ERGONOMIA, monitoraggioPersone } from '../../../lib/org-regole.mjs';
 import { dataIt, giornoIt } from '../../../lib/date-it.mjs';
 import { PROTOCOLLO, inLettere } from '../../../lib/protocollo.mjs';
 
@@ -20,6 +20,7 @@ export default function FormazionePage({ clientId }) {
   const [presenti, setPresenti] = useState({});
   const [conErgonomia, setConErgonomia] = useState(true); // proposta spuntata: vedi modale presenti
   const [ergoFor, setErgoFor] = useState(null);           // { data, note, scelti:{} } intervento di ergonomia
+  const [cerca, setCerca] = useState('');
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/org/${clientId}`);
@@ -122,12 +123,53 @@ export default function FormazionePage({ clientId }) {
             )}
           </div>
 
-          {/* L'anagrafica ora vive in «👥 Dipendenti»: qui resta il richiamo, così i
-              nomi si toccano in un posto solo (Enrico, 13/9). */}
-          <div className="bg-white rounded-2xl border border-gray-200 px-4 py-3 text-sm text-gray-700 flex items-center justify-between gap-3 flex-wrap">
-            <span>👥 <strong>{dipendenti.length}</strong> {dipendenti.length === 1 ? 'dipendente in anagrafica' : 'dipendenti in anagrafica'} · nomi, aree, inviti e accesso HR si gestiscono nella pagina Dipendenti.</span>
-            <Link href={`/dashboard/dipendenti/${clientId}`} className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl">Apri Dipendenti →</Link>
-          </div>
+          {/* Monitoraggio per persona (Enrico, 30/9): formazione ed ergonomia di ognuno.
+              I nomi entrano da soli dal check-up e si modificano in «👥 Dipendenti»:
+              qui solo lettura, così si toccano in un posto solo (13/9). */}
+          {(() => {
+            const M = monitoraggioPersone(dipendenti, partecipazioni, sessioni, params.anno_programma || 1);
+            const q = cerca.trim().toLowerCase();
+            const righe = q ? M.righe.filter(r => r.nome.toLowerCase().includes(q)) : M.righe;
+            const cella = (x, conData = true) => x.stato === 'svolta'
+              ? <span className="text-green-700">✓{conData && x.data ? ` ${fmt(x.data)}` : ''}</span>
+              : x.stato === 'pianificata' ? <span className="text-amber-700">◷ pianificata</span> : <span className="text-gray-400">—</span>;
+            return (
+              <div className={box}>
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                  <h2 className="font-bold text-gray-900">📋 Formazione ed ergonomia per persona</h2>
+                  <Link href={`/dashboard/dipendenti/${clientId}`} className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl">Modifica i nomi in Dipendenti →</Link>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs mb-3">
+                  <span className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1">Formazione base: <strong>{M.base}</strong> su {M.totale}</span>
+                  {M.aggiornamento != null && <span className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1">Aggiornamento anno {params.anno_programma}: <strong>{M.aggiornamento}</strong> su {M.totale}</span>}
+                  <span className="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1">Ergonomia: <strong>{M.ergonomia}</strong> su {M.totale}</span>
+                </div>
+                {M.totale === 0 ? <p className="text-sm text-gray-400">Nessun dipendente in anagrafica. I nomi di chi compila il check-up entrano da soli quando il programma è attivo.</p> : (
+                  <>
+                    <input value={cerca} onChange={e => setCerca(e.target.value)} placeholder="Cerca per nome…" className={`${inputCls} w-full mb-2`} />
+                    <div className="overflow-x-auto max-h-[28rem] overflow-y-auto">
+                      <table className="w-full text-sm min-w-[520px]">
+                        <thead><tr className="text-left text-xs uppercase tracking-wide text-gray-400 border-b border-gray-100">
+                          <th className="py-2">Nome</th><th>Formazione base</th>{M.aggiornamento != null && <th>Aggiornamento</th>}<th>Ergonomia</th>
+                        </tr></thead>
+                        <tbody>
+                          {righe.map(r => (
+                            <tr key={r.id} className="border-b border-gray-50">
+                              <td className="py-1.5 text-gray-800">{r.nome}{r.area && <span className="text-xs text-gray-400"> · {r.area}</span>}{r.straordinario && <span className="ml-1 text-[10px] bg-purple-100 text-purple-700 px-1.5 rounded">straordinario</span>}</td>
+                              <td>{cella(r.base)}</td>
+                              {M.aggiornamento != null && <td>{cella(r.aggiornamento)}</td>}
+                              <td>{cella(r.ergonomia)}</td>
+                            </tr>
+                          ))}
+                          {righe.length === 0 && <tr><td colSpan={4} className="py-4 text-center text-gray-400">Nessun nome trovato.</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Interventi di ergonomia */}
           <div className={box}>

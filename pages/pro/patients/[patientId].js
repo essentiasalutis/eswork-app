@@ -883,13 +883,10 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
   // regola del server (e la stessa finestra, calcolata una volta sola qui).
   const { finestraAnno, prevenzioneDal } = await import('../../../lib/anno-programma.mjs');
   const finestra = finestraAnno(client?.data_avvio_programma || null);
-  // Entrato dopo il Report di Attivazione: prevenzione dall'anno successivo (30/9).
-  let prevenzioneDopo = null;
-  if (patient.level === 'level2') {
-    const { analisiCongelataIl } = await import('../../../lib/checkup-server');
-    const congelataIl = await analisiCongelataIl(patient.client_id).catch(() => null);
-    prevenzioneDopo = prevenzioneDal({ entrataIl: patient.created_at, congelataIl, dataAvvio: client?.data_avvio_programma || null });
-  }
+  // Neoassunto in Livello 2: prevenzione dall'anno di programma successivo (30/9).
+  const prevenzioneDopo = patient.level === 'level2'
+    ? prevenzioneDal({ neoassunto: patient.neoassunto === true, entrataIl: patient.created_at, dataAvvio: client?.data_avvio_programma || null })
+    : null;
 
   return {
     props: {

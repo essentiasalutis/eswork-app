@@ -1392,7 +1392,7 @@ ${FIRMA}`,
             <div className="bg-white rounded-xl border border-gray-200 p-4">
               <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-help"
-                  title={`Il ${Math.round(PROTOCOLLO.nuovi_l1_pct * 100)}% dei ${capacity.dipendenti} dipendenti, per eccesso: posti nel prezzo per chi entra in Livello 1 durante l'anno di programma (autosegnalazioni prese in carico, promozioni a Livello 1). Finiti i posti, le autosegnalazioni si fermano.`}>
+                  title={`Il ${Math.round(PROTOCOLLO.nuovi_l1_pct * 100)}% dei ${capacity.dipendenti} dipendenti, per eccesso: posti nel prezzo per chi entra in Livello 1 durante l'anno di programma (autosegnalazioni prese in carico, promozioni a Livello 1, neoassunti in Livello 1). Finiti i posti, le autosegnalazioni si fermano.`}>
                   🎯 Posti per i nuovi L1
                 </div>
                 {capacity.intakeSaturated
@@ -1861,7 +1861,8 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
   // confrontarla con i dipendenti dichiarati (denominatore). Nessun nome esce di qui.
   let dipInForza = 0;
   try {
-    const { getOrgDipendenti } = await import('../../lib/org');
+    const { getOrgDipendenti, sincronizzaNomiDalCheckup } = await import('../../lib/org');
+    await sincronizzaNomiDalCheckup(clientId, client).catch(e => console.error('[scheda] import nomi:', e.message));
     dipInForza = (await getOrgDipendenti(clientId)).filter(d => d.attivo).length;
   } catch (_) { dipInForza = 0; }
 

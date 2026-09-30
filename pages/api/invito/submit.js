@@ -60,6 +60,14 @@ export default async function handler(req, res) {
       const { data: p } = await supabase.from('patients').select('id').eq('care_token', care_token).maybeSingle();
       if (p) await collegaSessioneAPaziente(b.consensi_sessione_id, p.id);
     } catch (e) { console.error('[invito] collega consensi:', e.message); }
+    // Neoassunto (v83, Enrico 30/9): in Livello 2 fa la prevenzione dall'anno di
+    // programma successivo; in Livello 1 prende un posto per i nuovi L1. È un'etichetta
+    // sulla persona, nessun id dell'anagrafica (vincolo #1). Senza la migration l'update
+    // fallisce e vale la regola di prima.
+    try {
+      const { error: eNeo } = await supabase.from('patients').update({ neoassunto: true }).eq('care_token', care_token);
+      if (eNeo) console.error('[invito] neoassunto:', eNeo.message);
+    } catch (e) { console.error('[invito] neoassunto:', e.message); }
     // B1: care_token nel BODY, mai in URL. La pagina lo usa per il link personale.
     return res.status(200).json({ ok: true, care_token });
   } catch (_e) {

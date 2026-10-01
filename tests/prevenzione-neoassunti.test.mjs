@@ -136,3 +136,12 @@ test('sportello: solo dopo la firma, e i contatori si chiamano «Trattamenti L1 
   assert.match(s, /<strong>Trattamenti L2<\/strong>/);
   assert.doesNotMatch(s, /sedute su \{c\./);
 });
+
+test('chi compila il check-up dopo la firma e risulta L1 prende un posto per i nuovi L1 (1/10)', () => {
+  const cap = src('lib/store.js');
+  assert.match(cap, /const congelataIl = await analisiCongelataIl\(client_id\)\.catch\(\(\) => null\);/);
+  assert.match(cap, /\.gt\('created_at', congelataIl\)/);
+  assert.match(cap, /\.\.\.\[\.\.\.\(neoassunti \|\| \[\]\), \.\.\.\(tardivi \|\| \[\]\)\]\.filter\(p => nellAnno\(p\.created_at, finestra\)/);
+  // il momento della chiusura: il primo Report di Attivazione dopo l'avvio o la riapertura
+  assert.match(src('lib/checkup-server.js'), /\.gte\('created_at', inizioAnalisi\(a\)\)\s*\n\s*\.order\('created_at', \{ ascending: true \}\)/);
+});

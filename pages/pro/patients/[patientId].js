@@ -23,7 +23,7 @@ import { parolaPgic } from '../../../lib/pgic';
 import { AVVISO_COPIA_NOTE } from '../../../lib/copia-dati.mjs';
 import { nomeLivello, etichettaLivello } from '../../../lib/livelli';
 import { documentiMancanti, prevedeSedute } from '../../../lib/documenti-seduta.mjs';
-import { dirittoCicli, testoPrevenzioneDal } from '../../../lib/anno-programma.mjs';
+import { dirittoCicli } from '../../../lib/anno-programma.mjs';
 import { PROTOCOLLO } from '../../../lib/protocollo.mjs';
 import { dataIt } from '../../../lib/date-it.mjs';
 import { avvisoDurataCiclo } from '../../../lib/scadenza-ciclo.mjs';
@@ -363,7 +363,7 @@ function ClosedSessionCard({ session: s, patientId, onUpdated }) {
 
 // ─── Pagina principale ────────────────────────────────────────────────────────
 
-export default function PatientPage({ proName, patient: initialPatient, sessions: initialSessions, client, documents: initialDocs, cycles: initialCycles , testiFirma = null, finestraAnno = null, prevenzioneDopo = null, preValidations = [], miniChecks = [], reassessment = null }) {
+export default function PatientPage({ proName, patient: initialPatient, sessions: initialSessions, client, documents: initialDocs, cycles: initialCycles , testiFirma = null, finestraAnno = null, preValidations = [], miniChecks = [], reassessment = null }) {
   const router = useRouter();
   const [patient, setPatient] = useState(initialPatient);
   const [sessions, setSessions] = useState(initialSessions);
@@ -670,7 +670,6 @@ export default function PatientPage({ proName, patient: initialPatient, sessions
 
               {/* L2 idoneo — ciclo di prevenzione: 1 per ANNO DI PROGRAMMA */}
               {!activeCycle && patient.level === 'level2' && patient.prevention_eligible && (() => {
-                if (prevenzioneDopo) return <div className="w-full py-2.5 px-3 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-700">{testoPrevenzioneDal(prevenzioneDopo)} Intanto ha la formazione e l&apos;autosegnalazione.</div>;
                 const d = dirittoCicli({ cicli: cycles, tipo: 'prevention', finestra: finestraAnno });
                 return d.esaurito
                   ? <div className="w-full py-2.5 px-3 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-700">{d.messaggio}</div>
@@ -881,12 +880,8 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
 
   // Anno di programma dell'azienda: la cartella mostra i diritti con la stessa
   // regola del server (e la stessa finestra, calcolata una volta sola qui).
-  const { finestraAnno, prevenzioneDal } = await import('../../../lib/anno-programma.mjs');
+  const { finestraAnno } = await import('../../../lib/anno-programma.mjs');
   const finestra = finestraAnno(client?.data_avvio_programma || null);
-  // Neoassunto in Livello 2: prevenzione dall'anno di programma successivo (30/9).
-  const prevenzioneDopo = patient.level === 'level2'
-    ? prevenzioneDal({ neoassunto: patient.neoassunto === true, entrataIl: patient.created_at, dataAvvio: client?.data_avvio_programma || null })
-    : null;
 
   return {
     props: {
@@ -904,7 +899,6 @@ export const getServerSideProps = requireProAuthSsr(async (ctx) => {
       cycles,
       testiFirma,
       finestraAnno: finestra,
-      prevenzioneDopo,
       preValidations: vistaPrevalidazioniCartella(preValidations),
       miniChecks: vistaMiniCheckCartella(miniChecks),
       reassessment: vistaRivalutazioneCartella(reassessment),

@@ -54,9 +54,12 @@ export default requireAuth(async function handler(req, res) {
     getSessionsForClient(id).catch(() => []),
   ]);
 
-  const l1 = patients.filter(p => p.level === 'level1').length;
-  const l2 = patients.filter(p => p.level === 'level2').length;
-  const l3 = patients.filter(p => p.level === 'level3').length;
+  // Distribuzione per livello: senza i neoassunti, che restano fuori dalle statistiche
+  // del check-up (Enrico, 3/10). I loro trattamenti contano come trattamenti erogati.
+  const popolazione = patients.filter(p => p.neoassunto !== true);
+  const l1 = popolazione.filter(p => p.level === 'level1').length;
+  const l2 = popolazione.filter(p => p.level === 'level2').length;
+  const l3 = popolazione.filter(p => p.level === 'level3').length;
 
   // k-anonymity sulla stratificazione L1/L2/L3 (con soppressione secondaria).
   // l1d/l2d/l3d = stringhe da PUBBLICARE; l1/l2/l3 restano per i calcoli interni.

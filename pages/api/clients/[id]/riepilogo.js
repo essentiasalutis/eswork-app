@@ -29,7 +29,7 @@ export default requireAuth(async function handler(req, res) {
     firmato: isFirmato(client.pipeline_stage),
     contesto: rigaContesto({ n: client.employees || (fm && fm.employees), sector: s1.sector, absenceDays: s1.absence_days != null && s1.absence_days !== '' ? s1.absence_days : fm && fm.absence_days }),
     shareCode: client.assessment_share_code,
-    // stato: aperto | chiuso | adesione | non_avviato (lib/checkup.js). Solo "aperto" va nella mail.
+    // stato: aperto | chiuso | non_avviato (lib/checkup.js). Solo "aperto" va nella mail.
     checkup: { stato: (stato && stato.stato) || 'non_avviato', chiude_il: (a && a.chiude_il) || null, attivo: !!(a && a.status === 'active') },
     secondo_incontro_il: client.secondo_incontro_il || null,
     checkupGiorni: params.checkupGiorni,

@@ -14,7 +14,7 @@ const PARAM_LABELS = {
   session_duration_min: 'Durata seduta (minuti)',
   prevention_sessions_per_l2: 'Sessioni prevenzione per L2',
   tariffa_sessione_prevenzione: 'Tariffa sessione prevenzione (€)',
-  nuovi_l1_pct: 'Posti per i nuovi L1 nell\'anno (% della popolazione, per eccesso; ognuno un percorso)',
+  nuovi_l1_pct: 'Posti per i nuovi ingressi nell\'anno (% della popolazione, per eccesso; nuovi L1 e neoassunti L1/L2)',
   buffer_pct: 'Scorta di prima (20% della clinica) — solo Stime registrate prima del 30/9',
   capienza_aula: 'Capienza aula (formazione)',
   training_modules_y1: 'Moduli formazione Anno 1',

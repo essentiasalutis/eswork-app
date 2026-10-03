@@ -9,27 +9,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { prevenzioneDal, testoPrevenzioneDal } from '../lib/anno-programma.mjs';
 import { statoPercorso } from '../lib/sportello.mjs';
 import { nomiDaImportare, monitoraggioPersone } from '../lib/org-regole.mjs';
 
 const src = f => fs.readFileSync(f, 'utf8');
 const AVVIO = '2025-09-22';
 
-test('prevenzione: solo il neoassunto aspetta l\'anno dopo', () => {
-  // chi compila il check-up in ritardo non è un neoassunto
-  assert.equal(prevenzioneDal({ neoassunto: false, entrataIl: '2026-02-10T10:00:00Z', dataAvvio: AVVIO, adesso: new Date('2026-03-01T10:00:00Z') }), null);
-  // neoassunto a febbraio 2026 (1° anno): aspetta il 22/9/2026
-  const a = prevenzioneDal({ neoassunto: true, entrataIl: '2026-02-10T10:00:00Z', dataAvvio: AVVIO, adesso: new Date('2026-03-01T10:00:00Z') });
-  assert.deepEqual(a, { dal: '2026-09-22' });
-  assert.equal(testoPrevenzioneDal(a), 'Neoassunto: la prevenzione parte con il prossimo anno di programma, dal 22/09/2026.');
-  assert.equal(prevenzioneDal({ neoassunto: true, entrataIl: '2026-02-10T10:00:00Z', dataAvvio: AVVIO, adesso: new Date('2026-09-22T08:00:00Z') }), null, 'dal rinnovo spetta');
-  // entrato fra la firma e l'avvio in sede: anno 1 → dal 2°
-  assert.deepEqual(prevenzioneDal({ neoassunto: true, entrataIl: '2025-09-18T10:00:00Z', dataAvvio: AVVIO, adesso: new Date('2025-10-01T10:00:00Z') }), { dal: '2026-09-22' });
-  // entrato nel 2° anno: dal 3°
-  assert.deepEqual(prevenzioneDal({ neoassunto: true, entrataIl: '2026-11-05T10:00:00Z', dataAvvio: AVVIO, adesso: new Date('2026-12-01T10:00:00Z') }), { dal: '2027-09-22' });
-  assert.deepEqual(prevenzioneDal({ neoassunto: true, entrataIl: '2026-02-10T10:00:00Z', dataAvvio: null }), { dal: null });
-});
 
 test('sportello: niente prevenzione per chi è in Livello 3, anche con i cicli dell\'anno prima', () => {
   const cicli = [{ id: 'c1', cycle_type: 'prevention', status: 'closed', started_at: '2025-10-01T10:00:00Z' }];
@@ -38,27 +23,53 @@ test('sportello: niente prevenzione per chi è in Livello 3, anche con i cicli d
   assert.ok(!l3.some(r => /revenzione/.test(r)), l3.join(' | '));
   const l2 = statoPercorso({ cicli, livello: 'level2', dataAvvio: AVVIO, adesso });
   assert.ok(l2.some(r => /trattamento da fare entro/.test(r)), l2.join(' | '));
-  const neo = statoPercorso({ livello: 'level2', dataAvvio: AVVIO, adesso: new Date('2026-03-01T10:00:00Z'), prevenzioneDopo: { dal: '2026-09-22' } });
-  assert.deepEqual(neo, ['Neoassunto: prevenzione dal prossimo anno di programma (22/09/2026)']);
-  assert.match(src('lib/sportello-server.js'), /if \(liv === 'level2' && !prevenzioneDopo && !prevenzioneNonSpetta\) \{/, 'niente allarme del trimestre');
+  assert.match(src('lib/sportello-server.js'), /if \(liv === 'level2' && !prevenzioneNonSpetta\) \{/, 'allarme del trimestre solo per il Livello 2');
 });
 
-test('neoassunto: marcato all\'invito, gate sul server, posto per i nuovi L1', () => {
-  const inv = src('pages/api/invito/submit.js');
-  assert.match(inv, /update\(\{ neoassunto: true \}\)\.eq\('care_token', care_token\)/);
-  const api = src('pages/api/pro/patients/[patientId]/start-cycle.js');
-  assert.match(api, /prevenzioneDal\(\{ neoassunto: patient\.neoassunto === true, entrataIl: patient\.created_at/);
-  assert.match(api, /if \(dopo\) return res\.status\(400\)/);
-  assert.match(src('pages/pro/patients/[patientId].js'), /if \(prevenzioneDopo\) return <div/);
-  assert.match(src('pages/employee/[token].js'), /partono con il prossimo anno di programma della tua azienda/);
-  // chi compila il check-up (anche in ritardo) non passa da qui
-  assert.doesNotMatch(src('pages/api/self-declare/[client_code].js'), /prevenzioneDal/);
+test('neoassunto (3/10): marcato all\'invito, prevenzione subito, L1 e L2 prendono un posto', () => {
+  assert.match(src('pages/api/invito/submit.js'), /update\(\{ neoassunto: true \}\)\.eq\('care_token', care_token\)/);
+  // nessuna attesa dell'anno dopo: tolta ovunque
+  for (const f of ['pages/api/pro/patients/[patientId]/start-cycle.js', 'pages/pro/patients/[patientId].js', 'pages/api/employee/[token].js', 'pages/employee/[token].js', 'lib/sportello-server.js', 'lib/sportello.mjs', 'lib/anno-programma.mjs']) {
+    assert.doesNotMatch(src(f), /prevenzioneDal|prevenzioneDopo/, f);
+  }
   const cap = src('lib/store.js');
   assert.match(cap, /\.eq\('neoassunto', true\)/);
-  assert.match(cap, /\(p\.level === 'level1' \|\| cicliAnno\.some\(c => c\.patient_id === p\.id\)\)/);
+  assert.match(cap, /neoAnno\.filter\(p => p\.level === 'level1' \|\| conCiclo\(trattamentoAnno, p\.id\)\)/);
+  assert.match(cap, /\.filter\(p => !nuoviL1\.has\(p\.id\) && \(p\.level === 'level2' \|\| conCiclo\(prevenzioneAnno, p\.id\)\)\)/);
+  assert.match(cap, /const percorsiPagati = l1Checkup \+ Math\.max\(0, posti - presiL2\);/, 'i posti presi da L2 non sono cicli di trattamento');
+  assert.match(cap, /oltre: Math\.max\(0, presi - posti\)/);
+  assert.match(cap, /quasiFiniti: posti > 0 && presi < posti && presi >= Math\.ceil\(posti \* 0\.8\)/);
+  assert.doesNotMatch(cap, /tardivi|analisiCongelataIl/, 'chi c\'era e compila tardi non entra più');
   const v83 = src('supabase-schema-v83-neoassunti-anagrafica.sql');
   assert.match(v83, /ADD COLUMN IF NOT EXISTS neoassunto boolean NOT NULL DEFAULT false/);
-  assert.match(v83, /CHECK \(inserito_da IN \('admin', 'hr', 'checkup'\)\)/);
+  const scheda = src('pages/dashboard/[clientId].js');
+  assert.match(scheda, /🎯 Posti per i nuovi ingressi/);
+  assert.match(scheda, /\{capacity\.presi\} presi su \{capacity\.posti\} · L1 \{capacity\.presiL1\} · L2 \{capacity\.presiL2\}/);
+  assert.match(scheda, /oltre i posti: da fatturare a listino/);
+});
+
+test('neoassunti fuori dalle statistiche del check-up (3/10)', () => {
+  assert.match(src('pages/api/clients/[id]/generate-checkpoint-report.js'), /const popolazione = patients\.filter\(p => p\.neoassunto !== true\);/);
+  const store = src('lib/store.js');
+  assert.match(store, /const neo = await idNeoassunti\(client_id\);/, 'confronti a 6 e 12 mesi');
+  assert.match(store, /!gia\.has\(p\.id\) && p\.neoassunto !== true\);/, 'nessun invito al check-up dei sei mesi');
+  const scheda = src('pages/dashboard/[clientId].js');
+  assert.match(scheda, /p\.assessment_completed_at && !p\.neoassunto && !reass12\.has\(p\.id\)/);
+});
+
+test('chi c\'era e non ha compilato: dopo la scadenza il check-up è chiuso anche a programma firmato (3/10)', async () => {
+  const { statoCheckup } = await import('../lib/checkup.js');
+  const a = { status: 'active', chiude_il: '2026-09-10', created_at: '2026-09-01T08:00:00Z' };
+  const dopo = statoCheckup({ assessment: a, now: new Date('2026-09-20T10:00:00Z') });
+  assert.equal(dopo.stato, 'chiuso');
+  assert.equal(dopo.accetta, false);
+  assert.equal(statoCheckup({ assessment: null }).stato, 'non_avviato');
+  assert.equal(statoCheckup({ assessment: null }).accetta, false);
+  assert.doesNotMatch(src('lib/checkup.js'), /stato: 'adesione'/);
+  const { testoKitCheckupDopoFirma } = await import('../lib/riepilogo.js');
+  const t = testoKitCheckupDopoFirma({ link: 'L', scadenza: '2026-10-15', firma: 'F' }).corpo;
+  assert.match(t, /chi non compila entro tale data non potrà partecipare al programma fino al check-up dell'anno successivo\. Vi chiediamo per questo di compilarlo tutti\./);
+  assert.doesNotMatch(t, /a disposizione di tutti|segnalare disturbi anche in seguito/);
 });
 
 test('anagrafica: i nomi del check-up entrano da soli, senza segnaposto né neoassunti', () => {
@@ -135,13 +146,4 @@ test('sportello: solo dopo la firma, e i contatori si chiamano «Trattamenti L1 
   assert.match(s, /<strong>Trattamenti L1<\/strong>/);
   assert.match(s, /<strong>Trattamenti L2<\/strong>/);
   assert.doesNotMatch(s, /sedute su \{c\./);
-});
-
-test('chi compila il check-up dopo la firma e risulta L1 prende un posto per i nuovi L1 (1/10)', () => {
-  const cap = src('lib/store.js');
-  assert.match(cap, /const congelataIl = await analisiCongelataIl\(client_id\)\.catch\(\(\) => null\);/);
-  assert.match(cap, /\.gt\('created_at', congelataIl\)/);
-  assert.match(cap, /\.\.\.\[\.\.\.\(neoassunti \|\| \[\]\), \.\.\.\(tardivi \|\| \[\]\)\]\.filter\(p => nellAnno\(p\.created_at, finestra\)/);
-  // il momento della chiusura: il primo Report di Attivazione dopo l'avvio o la riapertura
-  assert.match(src('lib/checkup-server.js'), /\.gte\('created_at', inizioAnalisi\(a\)\)\s*\n\s*\.order\('created_at', \{ ascending: true \}\)/);
 });

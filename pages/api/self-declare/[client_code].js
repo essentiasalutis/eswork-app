@@ -122,9 +122,8 @@ export default async function handler(req, res) {
         assessment_completed_at: now,
       }).catch(e => console.error('updatePatient error:', e.message));
 
-      // 4. Salva le risposte NMQ nell'analisi del check-up — SOLO se è aperta.
-      //    In adesione (azienda firmata, check-up chiuso) la persona entra nel
-      //    programma ma l'analisi, base del Report di Attivazione, resta intatta.
+      // 4. Salva le risposte NMQ nell'analisi del check-up — SOLO se è aperta (a check-up
+      //    chiuso la richiesta si ferma prima, con il 410).
       const assessment = st.salvaRisposta ? st.assessment : null;
       if (assessment && answers) {
         await insertResponse({

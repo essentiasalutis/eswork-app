@@ -65,9 +65,9 @@ test('capacità: posti del 15%, presi = autosegnalazioni prese in carico + promo
   assert.equal(fs.existsSync('pages/api/clients/[id]/buffer-status.js'), false);
 });
 
-test('scheda: box «Posti per i nuovi L1» con presi e disponibili, niente «L1 a contratto»', () => {
+test('scheda: box «Posti per i nuovi ingressi» con presi e disponibili, niente «L1 a contratto»', () => {
   const s = src('pages/dashboard/[clientId].js');
-  assert.match(s, /🎯 Posti per i nuovi L1/);
+  assert.match(s, /🎯 Posti per i nuovi ingressi/);
   assert.match(s, /\{capacity\.presi\} presi su \{capacity\.posti\}/);
   assert.match(s, /capacity\.disponibili === 1 \? 'disponibile' : 'disponibili'/);
   assert.doesNotMatch(s, /contracted|L1 a contratto|saveContractedL1/);

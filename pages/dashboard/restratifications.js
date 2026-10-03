@@ -107,7 +107,7 @@ export default function RestratificationsPage({ alerts: initialAlerts, bufferByC
                 <span className="mt-0.5 text-green-600 text-base">✅</span>
                 <div>
                   <div className="font-semibold text-gray-800">Promosso L1</div>
-                  <div className="text-xs text-gray-500">Hai confermato il passaggio a trattamento attivo. Questo dipendente consuma uno dei posti per i nuovi Livello 1 dell'azienda.</div>
+                  <div className="text-xs text-gray-500">Hai confermato il passaggio a trattamento attivo. Questo dipendente consuma uno dei posti per i nuovi ingressi dell'azienda.</div>
                 </div>
               </div>
               <div className="flex gap-3">
@@ -120,7 +120,7 @@ export default function RestratificationsPage({ alerts: initialAlerts, bufferByC
               <div className="flex gap-3">
                 <span className="mt-0.5 text-gray-500 text-base">📊</span>
                 <div>
-                  <div className="font-semibold text-gray-800">Posti per i nuovi Livello 1</div>
+                  <div className="font-semibold text-gray-800">Posti per i nuovi ingressi</div>
                   <div className="text-xs text-gray-500">Il {percento(PROTOCOLLO.nuovi_l1_pct)} dei dipendenti, per eccesso, ogni anno di programma: sono nel prezzo, ognuno un percorso di trattamento. Li consumano autosegnalazioni prese in carico e promozioni a Livello 1. Finiti i posti, ogni nuovo Livello 1 è fuori contratto.</div>
                 </div>
               </div>
@@ -131,7 +131,7 @@ export default function RestratificationsPage({ alerts: initialAlerts, bufferByC
           {bufferByClient && bufferByClient.length > 0 && (
             <div>
               <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
-                Posti per i nuovi Livello 1, per azienda
+                Posti per i nuovi ingressi, per azienda
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {bufferByClient.map(c => (
@@ -143,7 +143,7 @@ export default function RestratificationsPage({ alerts: initialAlerts, bufferByC
                       </div>
                       <div className={`text-right shrink-0 ${c.presi > c.posti ? 'text-red-600' : c.disponibili === 0 ? 'text-amber-600' : 'text-green-700'}`}>
                         <div className="text-2xl font-bold leading-none">{c.presi > c.posti ? `−${c.presi - c.posti}` : c.disponibili}</div>
-                        <div className="text-xs font-medium">{c.presi > c.posti ? 'fuori contratto' : c.disponibili === 1 ? 'disponibile' : 'disponibili'}</div>
+                        <div className="text-xs font-medium">{c.presi > c.posti ? 'oltre i posti' : c.disponibili === 1 ? 'disponibile' : 'disponibili'}</div>
                       </div>
                     </div>
                     <PostiBar presi={c.presi} posti={c.posti} />

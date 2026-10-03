@@ -9,7 +9,7 @@ import {
   getPreValidationByPatient,
   getTreatmentCapacity,
 } from '../../../../../lib/store';
-import { finestraAnno, dirittoCicli, prevenzioneDal, testoPrevenzioneDal } from '../../../../../lib/anno-programma.mjs';
+import { finestraAnno, dirittoCicli } from '../../../../../lib/anno-programma.mjs';
 import { PROTOCOLLO } from '../../../../../lib/protocollo.mjs';
 
 
@@ -40,9 +40,6 @@ export default requireProAuth(async function handler(req, res) {
     // ogni Livello 2. Distinto dal ciclo di trattamento.
     if (patient.level !== 'level2') return res.status(400).json({ error: 'La prevenzione attiva è riservata ai pazienti Livello 2' });
     if (!patient.prevention_eligible) return res.status(400).json({ error: 'Prevenzione attiva non spettante quest\'anno (diritto fissato a inizio anno — regola opzione A)' });
-    // Neoassunto: la prevenzione parte con l'anno di programma successivo (Enrico, 30/9).
-    const dopo = prevenzioneDal({ neoassunto: patient.neoassunto === true, entrataIl: patient.created_at, dataAvvio: azienda?.data_avvio_programma || null });
-    if (dopo) return res.status(400).json({ error: testoPrevenzioneDal(dopo), prevenzione_dal: dopo.dal });
     const diritto = dirittoCicli({ cicli: cycles, tipo: 'prevention', finestra });
     if (diritto.esaurito) return res.status(400).json({ error: diritto.messaggio, rinnovo_il: diritto.rinnovoIl });
 
@@ -72,7 +69,7 @@ export default requireProAuth(async function handler(req, res) {
   const capacity = await getTreatmentCapacity(patient.client_id).catch(() => null);
   if (capacity?.deliverySaturated) {
     return res.status(409).json({
-      error: `Capacità contrattuale esaurita: ${capacity.used}/${capacity.percorsiPagati} percorsi di trattamento già avviati quest'anno (${capacity.l1Checkup} Livello 1 del check-up + ${capacity.posti} posti per i nuovi Livello 1). Per proseguire serve un'estensione del contratto — contatta l'amministrazione ES Work.`,
+      error: `Capacità contrattuale esaurita: ${capacity.used}/${capacity.percorsiPagati} percorsi di trattamento già avviati quest'anno (${capacity.l1Checkup} Livello 1 del check-up + ${capacity.percorsiPagati - capacity.l1Checkup} posti per i nuovi ingressi). Per proseguire serve un'estensione del contratto — contatta l'amministrazione ES Work.`,
       capacity_reached: true,
     });
   }

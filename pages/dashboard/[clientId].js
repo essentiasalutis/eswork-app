@@ -583,9 +583,10 @@ ${FIRMA}`,
       if (days >= 90 && !done.has('t3')) dueT3.push({ ...p, days });
     });
     // A sei mesi tocca a tutti quelli che hanno compilato il check-up, non ai soli trattati.
-    const dueT6 = (patientsNrs || []).filter(p => p.care_token && p.assessment_completed_at
+    // I neoassunti no: restano fuori dai confronti del check-up (Enrico, 3/10).
+    const dueT6 = (patientsNrs || []).filter(p => p.care_token && p.assessment_completed_at && !p.neoassunto
       && Math.floor((now - new Date(p.assessment_completed_at)) / 86400000) >= 180 && !reass6.has(p.id));
-    const dueT12 = (patientsNrs || []).filter(p => p.care_token && p.assessment_completed_at && !reass12.has(p.id));
+    const dueT12 = (patientsNrs || []).filter(p => p.care_token && p.assessment_completed_at && !p.neoassunto && !reass12.has(p.id));
     return {
       dueT3, dueT6, dueT12,
       doneT3: (m.checks || []).filter(c => c.check_type === 't3').length,
@@ -1383,26 +1384,28 @@ ${FIRMA}`,
           </div>
         )}
 
-        {/* ── Posti per i nuovi L1 (Enrico, 30/9): il 15% dei dipendenti, per eccesso, per chi
-            entra in Livello 1 durante l'anno. La barra dice presi e disponibili. ── */}
+        {/* ── Posti per i nuovi ingressi (Enrico, 30/9 e 3/10): il 15% dei dipendenti, per
+            eccesso. Li prendono i nuovi L1 dell'anno e i neoassunti in L1 o L2. All'80% avvisa;
+            oltre i posti si fattura a listino. ── */}
         {capacity && capacity.posti > 0 && (() => {
           const pct = Math.min(100, Math.round(capacity.presi / capacity.posti * 100));
-          const barColor = capacity.intakeSaturated ? '#dc2626' : pct >= 80 ? '#ca8a04' : '#16a34a';
+          const barColor = capacity.intakeSaturated ? '#dc2626' : capacity.quasiFiniti ? '#ca8a04' : '#16a34a';
           return (
             <div className="bg-white rounded-xl border border-gray-200 p-4">
               <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-help"
-                  title={`Il ${Math.round(PROTOCOLLO.nuovi_l1_pct * 100)}% dei ${capacity.dipendenti} dipendenti, per eccesso: posti nel prezzo per chi entra in Livello 1 durante l'anno di programma (autosegnalazioni prese in carico, promozioni a Livello 1, neoassunti e chi compila il check-up dopo la firma, se in Livello 1). Finiti i posti, le autosegnalazioni si fermano.`}>
-                  🎯 Posti per i nuovi L1
+                  title={`Il ${Math.round(PROTOCOLLO.nuovi_l1_pct * 100)}% dei ${capacity.dipendenti} dipendenti, per eccesso: posti nel prezzo per chi entra nel servizio durante l'anno di programma. Livello 1: autosegnalazioni prese in carico, promozioni a Livello 1, neoassunti in Livello 1. Livello 2: neoassunti in Livello 2. Finiti i posti, le autosegnalazioni si fermano; oltre i posti ogni persona si fattura a listino.`}>
+                  🎯 Posti per i nuovi ingressi
                 </div>
                 {capacity.intakeSaturated
                   ? <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">ESAURITI — autosegnalazioni bloccate</span>
-                  : <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{capacity.disponibili} {capacity.disponibili === 1 ? 'disponibile' : 'disponibili'}</span>}
+                  : <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${capacity.quasiFiniti ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-700'}`}>{capacity.disponibili} {capacity.disponibili === 1 ? 'disponibile' : 'disponibili'}{capacity.quasiFiniti ? ' — quasi finiti' : ''}</span>}
               </div>
               <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-1.5">
                 <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: barColor }} />
               </div>
-              <div className="text-xs text-gray-500">{capacity.presi} presi su {capacity.posti}</div>
+              <div className="text-xs text-gray-500">{capacity.presi} presi su {capacity.posti} · L1 {capacity.presiL1} · L2 {capacity.presiL2}</div>
+              {capacity.oltre > 0 && <div className="text-xs font-semibold text-red-700 mt-1">{capacity.oltre} {capacity.oltre === 1 ? 'persona' : 'persone'} oltre i posti: da fatturare a listino.</div>}
             </div>
           );
         })()}
@@ -1818,6 +1821,7 @@ export const getServerSideProps = require('../../lib/auth').requireAuthSsr(async
       assigned_professional_id: p.assigned_professional_id || null,
       assessment_completed_at: p.assessment_completed_at || null,
       assessment_invite_sent_at: p.assessment_invite_sent_at || null,
+      neoassunto: p.neoassunto === true,
       // Date dei trattamenti per percorso: si compilano quando l'osteopata registra (30/9).
       ...percorsiDelPaziente(p.id, cicli, sessionsRaw),
       nrs_first: firstClosed?.nrs_pre ?? null,

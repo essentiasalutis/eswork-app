@@ -209,8 +209,9 @@ function DashboardL1({ patient, cycles, nrs, onSelfTrigger, remaining, rinnovo =
 
       <CheckPeriodici attivo={attivo} />
 
-      {/* Self-trigger — solo a fine ciclo per richiedere il 2° ciclo */}
-      {canSelfTrigger && <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} rinnovo={rinnovo} label="Richiedi un nuovo ciclo" attivo={attivo} />}
+      {/* Self-trigger a fine ciclo: un segnale, non la richiesta del 2° ciclo — il secondo
+          ciclo lo decide l'osteopata alla rivalutazione (Enrico, 4/10). */}
+      {canSelfTrigger && <SelfTriggerButton onPress={onSelfTrigger} remaining={remaining} rinnovo={rinnovo} label="Segnala che il disturbo continua" descrizione="L'osteopata ti ricontatta per valutare se serve un nuovo ciclo." attivo={attivo} />}
     </div>
   );
 }
@@ -353,7 +354,7 @@ function CheckPeriodici({ attivo = true }) {
 // Prima che il programma sia attivo il pulsante NON c'è: al suo posto una riga che
 // spiega perché. Premerlo avvierebbe una presa in carico fuori contratto — il
 // rifiuto vero sta comunque sul server (lib/attivazione).
-function SelfTriggerButton({ onPress, remaining = 2, rinnovo = null, label = 'Ho iniziato ad avere un disturbo', attivo = true }) {
+function SelfTriggerButton({ onPress, remaining = 2, rinnovo = null, label = 'Ho iniziato ad avere un disturbo', descrizione = 'Se avverti un nuovo disturbo, segnalalo: un osteopata ti ricontatterà per una breve videochiamata di valutazione.', attivo = true }) {
   if (!attivo) {
     return (
       <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 14, padding: '16px' }}>
@@ -367,7 +368,7 @@ function SelfTriggerButton({ onPress, remaining = 2, rinnovo = null, label = 'Ho
     <div style={{ background: exhausted ? '#f8fafc' : '#eff6ff', border: `1.5px solid ${exhausted ? '#e2e8f0' : '#bfdbfe'}`, borderRadius: 14, padding: '16px' }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: exhausted ? '#64748b' : '#1d4ed8', marginBottom: 4 }}>🩺 {label}</div>
       <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12, lineHeight: 1.5 }}>
-        Se avverti un nuovo disturbo, segnalalo: un osteopata ti ricontatterà per una breve videochiamata di valutazione.
+        {descrizione}
         <br /><strong>{remaining}</strong> {remaining === 1 ? 'segnalazione disponibile' : 'segnalazioni disponibili'} nell&apos;anno di programma della tua azienda.
         {exhausted && rinnovo && <><br />Tornano disponibili il {rinnovo}.</>}
       </div>

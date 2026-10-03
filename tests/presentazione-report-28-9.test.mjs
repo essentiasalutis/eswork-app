@@ -165,7 +165,8 @@ test('scheda: Report, Presenta, Proposta da sinistra; il Report di Attivazione c
   assert.match(srv, /if \(!corrente \|\| corrente\.status !== 'active' \|\| corrente\.type !== 'initial'\) return null;/);
   assert.match(srv, /scriviAssessmentTollerante\('update', \{ status: 'closed', chiuso_at \}, corrente\.id\)/);
   const gen = src('pages/api/clients/[id]/generate-activation-report.js');
-  assert.equal((gen.match(/const checkup_chiuso = rec \? await chiudiCheckupDopoReport\(id\)\.catch\(\(\) => null\) : null;/g) || []).length, 3, 'AI, riserva senza chiave, riserva per errore');
+  assert.equal((gen.match(/const checkup_chiuso = rec \? await dopoIlReport\(id, firmato\) : null;/g) || []).length, 3, 'AI, riserva senza chiave, riserva per errore');
+  assert.match(gen, /return chiudiCheckupDopoReport\(id\)\.catch\(\(\) => null\);/);
   // la scheda lo mostra subito, anche quando il Report si genera dalla sua pagina
   assert.match(scheda, /onReportGenerato=\{\(d\) => \{/);
   assert.match(src('components/ReportView.jsx'), /if \(onReportGenerato\) onReportGenerato\(d\);/);

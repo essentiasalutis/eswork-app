@@ -13,7 +13,7 @@ test('i valori del protocollo sono quelli contrattuali', () => {
     cicli_trattamento_per_anno: 2, cicli_prevenzione_per_anno: 1,
     giorni_tra_cicli: 60, autosegnalazioni_per_anno: 2,
     // Enrico, 30/9: posti per i nuovi L1 = 15% dei dipendenti; il 20% resta per le Stime di prima.
-    nuovi_l1_pct: 0.15, buffer_pct: 0.20,
+    nuovi_l1_pct: 0.15, posti_aggiuntivi_pct: 0.05, buffer_pct: 0.20,
     // Enrico, 27/9: ciclo completo entro 60 giorni, avviso all'osteopata dal 45°.
     durata_max_ciclo_giorni: 60, avviso_ciclo_giorni: 45,
     durata_prevalidazione_min: 15,

@@ -32,19 +32,13 @@ test('neoassunto (3/10): marcato all\'invito, prevenzione subito, L1 e L2 prendo
   for (const f of ['pages/api/pro/patients/[patientId]/start-cycle.js', 'pages/pro/patients/[patientId].js', 'pages/api/employee/[token].js', 'pages/employee/[token].js', 'lib/sportello-server.js', 'lib/sportello.mjs', 'lib/anno-programma.mjs']) {
     assert.doesNotMatch(src(f), /prevenzioneDal|prevenzioneDopo/, f);
   }
-  const cap = src('lib/store.js');
-  assert.match(cap, /\.eq\('neoassunto', true\)/);
-  assert.match(cap, /neoAnno\.filter\(p => p\.level === 'level1' \|\| conCiclo\(trattamentoAnno, p\.id\)\)/);
-  assert.match(cap, /\.filter\(p => !nuoviL1\.has\(p\.id\) && \(p\.level === 'level2' \|\| conCiclo\(prevenzioneAnno, p\.id\)\)\)/);
-  assert.match(cap, /const percorsiPagati = l1Checkup \+ Math\.max\(0, posti - presiL2\);/, 'i posti presi da L2 non sono cicli di trattamento');
-  assert.match(cap, /oltre: Math\.max\(0, presi - posti\)/);
-  assert.match(cap, /quasiFiniti: posti > 0 && presi < posti && presi >= Math\.ceil\(posti \* 0\.8\)/);
-  assert.doesNotMatch(cap, /tardivi|analisiCongelataIl/, 'chi c\'era e compila tardi non entra più');
+  // dal 4/10 i neoassunti consumano un posto quando parte il loro ciclo (lib/posti.mjs)
+  assert.match(src('lib/posti.mjs'), /const livello = neo \? null : nelPrezzo\[c\.patient_id\] \|\| null;/);
   const v83 = src('supabase-schema-v83-neoassunti-anagrafica.sql');
   assert.match(v83, /ADD COLUMN IF NOT EXISTS neoassunto boolean NOT NULL DEFAULT false/);
   const scheda = src('pages/dashboard/[clientId].js');
   assert.match(scheda, /🎯 Posti per i nuovi ingressi/);
-  assert.match(scheda, /\{capacity\.presi\} presi su \{capacity\.posti\} · L1 \{capacity\.presiL1\} · L2 \{capacity\.presiL2\}/);
+  assert.match(scheda, /\{capacity\.presi\} presi su \{capacity\.posti\} · nuovi L1 \{capacity\.nuoviL1\} · secondi cicli \{capacity\.secondiCicli\} · L2 neoassunti \{capacity\.prevenzioniNeoassunti\}/);
   assert.match(scheda, /oltre i posti: da fatturare a listino/);
 });
 

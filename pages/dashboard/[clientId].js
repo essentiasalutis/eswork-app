@@ -1394,7 +1394,7 @@ ${FIRMA}`,
             <div className="bg-white rounded-xl border border-gray-200 p-4">
               <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                 <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-help"
-                  title={`Il ${Math.round(PROTOCOLLO.nuovi_l1_pct * 100)}% dei ${capacity.dipendenti} dipendenti, per eccesso: posti nel prezzo per chi entra nel servizio durante l'anno di programma. Livello 1: autosegnalazioni prese in carico, promozioni a Livello 1, neoassunti in Livello 1. Livello 2: neoassunti in Livello 2. Finiti i posti, le autosegnalazioni si fermano; oltre i posti ogni persona si fattura a listino.`}>
+                  title={`Posti fissati nel Report di Attivazione (${Math.round(PROTOCOLLO.nuovi_l1_pct * 100)}% dei dipendenti, per eccesso). Il primo ciclo dell'anno di chi è nel prezzo è compreso; ogni altro ciclo prende un posto quando parte: il primo ciclo di chi entra in Livello 1 durante l'anno, ogni secondo ciclo, la prevenzione dei neoassunti in Livello 2. Chi è in coda non consuma. Finiti i posti, autosegnalazioni e nuovi cicli si fermano; oltre i posti si fattura a listino.`}>
                   🎯 Posti per i nuovi ingressi
                 </div>
                 {capacity.intakeSaturated
@@ -1404,8 +1404,10 @@ ${FIRMA}`,
               <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-1.5">
                 <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: barColor }} />
               </div>
-              <div className="text-xs text-gray-500">{capacity.presi} presi su {capacity.posti} · L1 {capacity.presiL1} · L2 {capacity.presiL2}</div>
-              {capacity.oltre > 0 && <div className="text-xs font-semibold text-red-700 mt-1">{capacity.oltre} {capacity.oltre === 1 ? 'persona' : 'persone'} oltre i posti: da fatturare a listino.</div>}
+              <div className="text-xs text-gray-500">{capacity.presi} presi su {capacity.posti} · nuovi L1 {capacity.nuoviL1} · secondi cicli {capacity.secondiCicli} · L2 neoassunti {capacity.prevenzioniNeoassunti}{capacity.inAttesa > 0 ? ` · in attesa ${capacity.inAttesa}` : ''}</div>
+              {capacity.oltre > 0 && <div className="text-xs font-semibold text-red-700 mt-1">{capacity.oltre} {capacity.oltre === 1 ? 'percorso' : 'percorsi'} oltre i posti: da fatturare a listino.</div>}
+              {capacity.incoerente && <div className="text-xs text-amber-800 mt-1">Più primi cicli «compresi» che persone nel Report ({capacity.inclusiL1} L1 su {capacity.personeL1}, {capacity.inclusiL2} L2 su {capacity.personeL2}): controllare i segni «nel prezzo».</div>}
+              {!capacity.segnoNelPrezzo && <div className="text-xs text-amber-800 mt-1">Manca la migration v84: chi è nel prezzo si legge dal livello di oggi, meno affidabile dopo il check-up annuale.</div>}
             </div>
           );
         })()}

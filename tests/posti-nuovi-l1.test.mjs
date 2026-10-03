@@ -53,16 +53,17 @@ test('Stime registrate prima del 30/9: la scorta di allora, 20% della parte clin
   assert.match(src('lib/pricing/settings.js'), /return \{ params: conProtocollo\(params\), texts \};/);
 });
 
-test('capacità: posti del 15%, presi = autosegnalazioni prese in carico + promozioni a L1', () => {
+test('capacità (4/10): posti fissati nel Report, consumati dai cicli che partono', () => {
   const store = src('lib/store.js');
-  const cap = store.slice(store.indexOf('export async function getTreatmentCapacity'), store.indexOf('// Mini-check di un\'azienda'));
-  assert.match(cap, /const posti = postiNuoviL1\(dipendenti\);/);
-  assert.match(cap, /\.eq\('source', 'self_trigger'\)/);
-  assert.match(cap, /\.eq\('status', 'confirmed_l1'\)/);
-  assert.match(cap, /intakeSaturated: dipendenti > 0 && presi >= posti/);
+  const cap = store.slice(store.indexOf('export async function getTreatmentCapacity'), store.indexOf('// Neoassunti di un\'azienda'));
+  assert.match(cap, /const posti = q\.posti != null \? Number\(q\.posti\) : postiNuoviL1\(dipendenti\);/);
+  assert.match(cap, /const k = classificaCicli\(\{ cicli: cicliAnno, nelPrezzo, neoassunti \}\);/);
+  assert.match(cap, /intakeSaturated: posti > 0 && presi >= posti/);
   assert.doesNotMatch(store, /contracted_l1/, 'il numero scritto a mano non esiste più');
-  assert.doesNotMatch(store, /getBufferStatusByClient|getSelfTriggersByClient/);
+  assert.doesNotMatch(store, /getBufferStatusByClient|getSelfTriggersByClient|deliverySaturated|percorsiPagati/);
   assert.equal(fs.existsSync('pages/api/clients/[id]/buffer-status.js'), false);
+  const rep = src('pages/api/clients/[id]/generate-activation-report.js');
+  assert.match(rep, /posti_aggiuntivi: postiAggiuntivi\(nEmp\),/);
 });
 
 test('scheda: box «Posti per i nuovi ingressi» con presi e disponibili, niente «L1 a contratto»', () => {

@@ -17,6 +17,7 @@ import {
   insertDocument,
   contaSchedeColloquio,
   messaggioSchedeDoppie,
+  segnaNelPrezzo,
 } from '../../../../lib/store';
 import { generateAndStorePdf, buildReportHtml } from '../../../../lib/pdf';
 import { calculatePricing, realL1L2FromAssessment } from '../../../../lib/calculator';
@@ -34,7 +35,7 @@ import { aggregateNMQ } from '../../../../lib/scoring';
 import { CONFIG } from '../../../../lib/config';
 import { kAnonPartition, tooSmall, K_ANON, livelliLeggibili, nomeCella } from '../../../../lib/kanon';
 import { dataIt } from '../../../../lib/date-it.mjs';
-import { conProtocollo, PROTOCOLLO } from '../../../../lib/protocollo.mjs';
+import { conProtocollo, PROTOCOLLO, postiNuoviL1, postiAggiuntivi } from '../../../../lib/protocollo.mjs';
 import { tariffeMancanti, messaggioTariffeDove } from '../../../../lib/tariffe.mjs';
 
 export const config = { maxDuration: 60 };
@@ -252,7 +253,7 @@ PRINCIPIO GUIDA: la stratificazione è la fotografia dello stato della popolazio
     const fallback = conNota(conPassi(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { sezioneComprende, isPacchetto, nomeProdotto, testoEvoluzione, firmato })));
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', ai_status: 'fallback_no_key', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
-    const checkup_chiuso = rec ? await chiudiCheckupDopoReport(id).catch(() => null) : null;
+    const checkup_chiuso = rec ? await dopoIlReport(id, firmato) : null;
     return res.json({ report: fallback, source: 'fallback', ai_status: 'fallback_no_key', pdf_url: pdfUrl, report_id: rec?.id, checkup_chiuso });
   }
 
@@ -307,7 +308,7 @@ ${istruzioniPresentazione()}`;
     const pdfUrl = await tryGeneratePdf(client, 'activation', report, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: report, created_by: 'admin', ai_status: aiStatus, pdf_url: pdfUrl, quote_compliance: quoteCompliance, presentazione }).catch(() => null);
     // Il Report chiude il check-up (Enrico, 28/9), solo se è stato davvero salvato.
-    const checkup_chiuso = rec ? await chiudiCheckupDopoReport(id).catch(() => null) : null;
+    const checkup_chiuso = rec ? await dopoIlReport(id, firmato) : null;
     return res.json({ report, source: 'ai', ai_status: aiStatus, problemi, pdf_url: pdfUrl, report_id: rec?.id, checkup_chiuso });
   } catch (e) {
     // Qui la chiamata è stata fatta: i dati SONO usciti, la risposta non è stata usata.
@@ -315,10 +316,18 @@ ${istruzioniPresentazione()}`;
     const fallback = conNota(conPassi(generateFallbackReport(client, l1Count, l2Count, l3Count, stratTotal, sessions.length, sectorLabel, quoteBlock, { sezioneComprende, isPacchetto, nomeProdotto, testoEvoluzione, firmato })));
     const pdfUrl = await tryGeneratePdf(client, 'activation', fallback, id).catch(() => null);
     const rec = await insertGeneratedReport({ client_id: id, report_type: 'activation', content_text: fallback, created_by: 'system', ai_status: 'fallback_errore', pdf_url: pdfUrl, quote_compliance: quoteCompliance }).catch(() => null);
-    const checkup_chiuso = rec ? await chiudiCheckupDopoReport(id).catch(() => null) : null;
+    const checkup_chiuso = rec ? await dopoIlReport(id, firmato) : null;
     return res.json({ report: fallback, source: 'fallback', ai_status: 'fallback_errore', error: e.message, pdf_url: pdfUrl, report_id: rec?.id, checkup_chiuso });
   }
 });
+
+// Dopo il salvataggio del Report: finché l'azienda non ha firmato mette nel prezzo le
+// persone del check-up (v84, lib/posti.mjs), poi chiude il check-up. Dopo la firma il
+// segno non si riscrive (Enrico, 4/10).
+async function dopoIlReport(id, firmato) {
+  if (!firmato) await segnaNelPrezzo(id).catch(e => console.error('[report] nel prezzo:', e.message));
+  return chiudiCheckupDopoReport(id).catch(() => null);
+}
 
 function generateFallbackReport(client, l1, l2, l3, total, sessioni, settore, quoteBlock, v2 = {}) {
   const { sezioneComprende = '', isPacchetto = false, nomeProdotto = '', testoEvoluzione = '', firmato = false } = v2;
@@ -514,6 +523,11 @@ export async function buildQuoteBlock(client_id, client, answers) {
       // Persone di Livello 1 e 2 dimensionate nel prezzo, congelate al Report: sono il
       // contratto delle sedute dello sportello (× 4, lib/sportello.mjs; Enrico, 28/9).
       persone_l1: real.l1, persone_l2: real.l2,
+      // Posti per i nuovi ingressi e posti aggiuntivi a consumo, FISSATI qui (Allegato A,
+      // Art. 5-ter): il contatore legge questi, non i dipendenti della scheda (4/10). Le
+      // Stime registrate prima del 30/9 non hanno posti nel prezzo: vale il 15% dei dipendenti.
+      posti: calc.y1 && calc.y1.posti_nuovi_l1 != null ? calc.y1.posti_nuovi_l1 : postiNuoviL1(nEmp),
+      posti_aggiuntivi: postiAggiuntivi(nEmp),
       tetto: { stato: tetto.stato, calcolato: tetto.calcolato, massimo: tetto.max, scostamento: tetto.scostamento },
       // Interni (mai al cliente): posizione nella forbice, margine, sconto copiato e
       // fermato qui con la sua motivazione, avviso di revisione della forbice.

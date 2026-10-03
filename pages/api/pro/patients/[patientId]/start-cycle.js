@@ -9,7 +9,8 @@ import {
   getPreValidationByPatient,
   getTreatmentCapacity,
 } from '../../../../../lib/store';
-import { finestraAnno, dirittoCicli } from '../../../../../lib/anno-programma.mjs';
+import { finestraAnno, nellAnno, dirittoCicli } from '../../../../../lib/anno-programma.mjs';
+import { nuovoCicloConsuma } from '../../../../../lib/posti.mjs';
 import { PROTOCOLLO } from '../../../../../lib/protocollo.mjs';
 
 
@@ -64,14 +65,26 @@ export default requireProAuth(async function handler(req, res) {
   // Ciclo di TRATTAMENTO — solo L1
   if (patient.level !== 'level1') return res.status(400).json({ error: 'Solo pazienti L1 possono avere cicli di trattamento' });
 
-  // CAPACITÀ CONTRATTUALE: i cicli di trattamento dell'anno non possono superare i
-  // percorsi pagati (L1 del Report + posti per i nuovi L1, 30/9). Tutela contro l'over-delivery.
-  const capacity = await getTreatmentCapacity(patient.client_id).catch(() => null);
-  if (capacity?.deliverySaturated) {
-    return res.status(409).json({
-      error: `Capacità contrattuale esaurita: ${capacity.used}/${capacity.percorsiPagati} percorsi di trattamento già avviati quest'anno (${capacity.l1Checkup} Livello 1 del check-up + ${capacity.percorsiPagati - capacity.l1Checkup} posti per i nuovi ingressi). Per proseguire serve un'estensione del contratto — contatta l'amministrazione ES Work.`,
-      capacity_reached: true,
-    });
+  // POSTI PER I NUOVI INGRESSI (Art. 5-ter, lib/posti.mjs): il primo ciclo dell'anno di chi
+  // è nel prezzo come L1 parte sempre; ogni altro ciclo (nuovo L1, secondo ciclo da
+  // qualunque strada) consuma un posto, e a posti finiti non parte.
+  const nelPrezzo = 'nel_prezzo' in patient
+    ? patient.nel_prezzo
+    : (['level1', 'level2'].includes(patient.computed_level) ? patient.computed_level : null);   // senza v84
+  const consuma = nuovoCicloConsuma({
+    tipo: 'treatment',
+    cicliPersona: cycles.filter(c => nellAnno(c.started_at || c.created_at, finestra)),
+    nelPrezzo,
+    neoassunto: patient.neoassunto === true,
+  });
+  if (consuma) {
+    const capacity = await getTreatmentCapacity(patient.client_id).catch(() => null);
+    if (capacity?.postiFiniti) {
+      return res.status(409).json({
+        error: `Posti per i nuovi ingressi esauriti: ${capacity.presi} su ${capacity.posti} già presi quest'anno (nuovi Livello 1, secondi cicli, prevenzioni dei neoassunti). Questo ciclo ne consumerebbe uno: contatta l'amministrazione ES Work.`,
+        capacity_reached: true,
+      });
+    }
   }
 
   const closedTreatment = cycles.filter(c => c.status === 'closed' && (c.cycle_type || 'treatment') === 'treatment');

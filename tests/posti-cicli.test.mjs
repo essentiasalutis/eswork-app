@@ -74,3 +74,12 @@ test('area del lavoratore: a fine ciclo si segnala, il secondo ciclo lo valuta l
   assert.match(s, /label="Segnala che il disturbo continua" descrizione="L'osteopata ti ricontatta per valutare se serve un nuovo ciclo\."/);
   assert.doesNotMatch(s, /Richiedi un nuovo ciclo/);
 });
+
+test('origine del segno (v85): «report» dal Report, ricostruito dallo script, sempre riconoscibile', () => {
+  const store = src('lib/store.js');
+  assert.match(store, /nel_prezzo: livello, nel_prezzo_origine: 'report', nel_prezzo_il: il/);
+  const script = src('scripts/una-tantum/segna-nel-prezzo.mjs');
+  assert.match(script, /const origine = modo === 'tracce' \? 'ricostruito_tracce' : 'ricostruito_livello';/);
+  assert.match(script, /if \(scrivi && v85\.error\)/, 'senza v85 lo script non scrive');
+  assert.match(src('supabase-schema-v85-origine-nel-prezzo.sql'), /CHECK \(nel_prezzo_origine IN \('report', 'ricostruito_livello', 'ricostruito_tracce'\)\)/);
+});
